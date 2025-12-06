@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaceLink Docs</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="description" content="FaceLink Documentation">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    window.$docsify = {
+      name: 'FaceLink',
+      repo: '',
+      loadSidebar: true,
+      subMaxLevel: 3,
+      basePath: '/',
+      search: {
+        placeholder: 'Search...',
+        noData: 'No results',
+        depth: 3
+      },
+      auto2top: true,
+      // Enhanced markdown configuration for front matter support
+      markdown: {
+        smartypants: true,
+        // Remove custom link renderer that was interfering with routing
+      },
+      // Extract and use front matter titles
+      plugins: [
+        function(hook) {
+          hook.beforeEach(function(content) {
+            // Extract front matter for page metadata
+            const frontMatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
+            if (frontMatterMatch) {
+              const frontMatter = frontMatterMatch[1];
+
+              // Extract title from front matter
+              const titleMatch = frontMatter.match(/title:\s*(.+)/i);
+              if (titleMatch) {
+                const title = titleMatch[1].trim().replace(/^["']|["']$/g, '');
+                // Set page title (if docsify supports it)
+                if (typeof document !== 'undefined') {
+                  document.title = `${title} - FaceLink Docs`;
+                }
+              }
+
+              // Extract description for meta
+              const descMatch = frontMatter.match(/description:\s*(.+)/i);
+              if (descMatch && typeof document !== 'undefined') {
+                const description = descMatch[1].trim().replace(/^["']|["']$/g, '');
+                let metaDesc = document.querySelector('meta[name="description"]');
+                if (!metaDesc) {
+                  metaDesc = document.createElement('meta');
+                  metaDesc.name = 'description';
+                  document.head.appendChild(metaDesc);
+                }
+                metaDesc.content = description;
+              }
+            }
+            return content;
+          });
+        }
+      ]
+    }
+  </script>
+  <!-- Docsify -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4"></script>
+  <!-- Search plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+</body>
+</html>

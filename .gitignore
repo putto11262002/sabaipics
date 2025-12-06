@@ -11,6 +11,7 @@ node_modules
 .env.development.local
 .env.test.local
 .env.production.local
+.dev.vars
 
 # Testing
 coverage
@@ -26,6 +27,7 @@ coverage
 out/
 build
 dist
+*.tsbuildinfo
 
 
 # Debug
@@ -36,3 +38,6 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Session logs
+.session/
