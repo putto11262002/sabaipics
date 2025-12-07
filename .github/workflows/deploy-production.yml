@@ -20,6 +20,12 @@ jobs:
 
       - run: pnpm install
 
+      # Create dashboard env file for production
+      - name: Create Dashboard Env
+        run: |
+          echo "VITE_API_URL=https://api.sabaipics.com" >> apps/dashboard/.env.production
+          echo "VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }}" >> apps/dashboard/.env.production
+
       - run: pnpm build
 
       # Deploy API to Cloudflare Workers

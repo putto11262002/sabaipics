@@ -21,6 +21,12 @@ jobs:
 
       - run: pnpm install
 
+      # Create dashboard env file for staging
+      - name: Create Dashboard Env
+        run: |
+          echo "VITE_API_URL=https://api-staging.sabaipics.com" >> apps/dashboard/.env.staging
+          echo "VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }}" >> apps/dashboard/.env.staging
+
       - run: pnpm build
 
       # Deploy API to Cloudflare Workers
