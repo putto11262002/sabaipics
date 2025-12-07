@@ -1,68 +1,44 @@
-import { useQuery } from "@tanstack/react-query";
-import { Button } from "@sabaipics/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@sabaipics/ui/components/card";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@sabaipics/ui/components/alert";
-import { api } from "./lib/api";
+import { Routes, Route, Navigate } from "react-router";
+import { SignedIn, SignedOut } from "@sabaipics/auth/react";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { SignInPage } from "./routes/sign-in";
+import { SignUpPage } from "./routes/sign-up";
+import { DashboardPage } from "./routes/dashboard";
+import { Layout } from "./components/Layout";
 
-function App() {
-  const {
-    data: health,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["health"],
-    queryFn: async () => {
-      const res = await api.health.$get();
-      return res.json();
-    },
-  });
-
+export default function App() {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <h1 className="text-xl font-semibold">SabaiPics Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
-              API: {isLoading ? "..." : error ? "offline" : health?.status}
-            </span>
-            <Button variant="outline">Sign In</Button>
-          </div>
-        </div>
-      </header>
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-4">
-          <h2 className="text-2xl font-bold">Welcome to SabaiPics</h2>
-          <p className="text-muted-foreground">Manage your events and photos</p>
-        </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Events</CardTitle>
-            <CardDescription>List of events</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p>Hello</p>
-          </CardContent>
-        </Card>
-        <Alert>
-          <AlertTitle>Warning</AlertTitle>
-          <AlertDescription>
-            This is a warning alert — check it out!
-          </AlertDescription>
-        </Alert>
-      </main>
-    </div>
+    <Routes>
+      {/* Public routes */}
+      <Route path="/sign-in/*" element={<SignInPage />} />
+      <Route path="/sign-up/*" element={<SignUpPage />} />
+
+      {/* Protected routes */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/dashboard" element={<DashboardPage />} />
+        {/* Future: /events, /settings, etc. */}
+      </Route>
+
+      {/* Root redirect */}
+      <Route
+        path="/"
+        element={
+          <>
+            <SignedIn>
+              <Navigate to="/dashboard" replace />
+            </SignedIn>
+            <SignedOut>
+              <Navigate to="/sign-in" replace />
+            </SignedOut>
+          </>
+        }
+      />
+    </Routes>
   );
 }
-
-export default App;

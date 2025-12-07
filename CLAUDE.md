@@ -5,7 +5,7 @@ Event photo distribution platform with face recognition for the Thai market.
 ## Quick Context
 
 - `docs/README.md` - Technical docs index (use cases, flows, API design, data schema)
-- `.session/log/<date>.md` - Daily changelog (e.g. `2025-12-06.md`), append-only, include doc URLs
+- `.session/log/<date>.md` - Daily changelog (e.g. `2025-12-06.md`), you must append to change log every time you make change to the codebase. you MUST append only and include doc URLs or any reference files used during the implementation.
 
 ## Monorepo Structure
 

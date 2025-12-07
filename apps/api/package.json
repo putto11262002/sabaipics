@@ -8,13 +8,16 @@
     }
   },
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "node scripts/dev-tunnel.js",
+    "dev:local": "wrangler dev",
     "build": "tsc",
-    "deploy:prod": "wrangler deploy --minify",
+    "deploy:prod": "wrangler deploy --env production --minify",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },
   "dependencies": {
-    "hono": "^4.10.7"
+    "@sabaipics/auth": "workspace:*",
+    "hono": "^4.10.7",
+    "svix": "^1.82.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.29",
