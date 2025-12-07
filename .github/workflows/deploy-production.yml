@@ -20,6 +20,13 @@ jobs:
 
       - run: pnpm install
 
+      # TODO: Future improvement - run migrations on a test branch first, verify, then merge to main DB
+      # Currently runs migrations directly which is risky for production
+      - name: Run Database Migrations
+        run: pnpm --filter=@sabaipics/db db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       # Create dashboard env file for production
       - name: Create Dashboard Env
         run: |
