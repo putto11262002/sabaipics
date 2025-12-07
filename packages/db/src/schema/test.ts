@@ -5,3 +5,6 @@ export const dbTest = pgTable("_db_test", {
   name: varchar("name", { length: 255 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export type DbTest = typeof dbTest.$inferSelect;
+export type NewDbTest = typeof dbTest.$inferInsert;
