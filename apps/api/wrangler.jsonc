@@ -9,14 +9,16 @@
 	// Development environment (default)
 	"vars": {
 		"CORS_ORIGIN": "http://localhost:5173",
-		"AUTHORIZED_PARTIES": "http://localhost:5173"
+		"AUTHORIZED_PARTIES": "http://localhost:5173",
+		"DATABASE_URL": ""
 	},
 	// Production environment
 	"env": {
 		"production": {
 			"vars": {
 				"CORS_ORIGIN": "https://sabaipics-dashboard.pages.dev",
-				"AUTHORIZED_PARTIES": "https://sabaipics-dashboard.pages.dev"
+				"AUTHORIZED_PARTIES": "https://sabaipics-dashboard.pages.dev",
+				"DATABASE_URL": ""
 			},
 			"preview_urls": false,
 			"observability": {

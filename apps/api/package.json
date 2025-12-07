@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@sabaipics/auth": "workspace:*",
+    "@sabaipics/db": "workspace:*",
     "hono": "^4.10.7",
     "svix": "^1.82.0"
   },

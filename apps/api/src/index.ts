@@ -4,10 +4,12 @@ import { createClerkAuth } from "@sabaipics/auth/middleware";
 import type { AuthBindings, AuthVariables } from "@sabaipics/auth/types";
 import { authRouter } from "./routes/auth";
 import { webhookRouter } from "./routes/webhooks";
+import { dbTestRouter } from "./routes/db-test";
 
 type Bindings = AuthBindings & {
   CORS_ORIGIN: string;
   CLERK_WEBHOOK_SIGNING_SECRET: string;
+  DATABASE_URL: string;
 };
 type Variables = AuthVariables;
 
@@ -25,6 +27,7 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
   .use("/*", createClerkAuth())
   .get("/", (c) => c.text("SabaiPics API"))
   .get("/health", (c) => c.json({ status: "ok", timestamp: Date.now() }))
+  .route("/db-test", dbTestRouter)
   .route("/auth", authRouter);
 // Future protected routes:
 // .use('/events/*', requireAuth())
