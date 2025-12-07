@@ -1,0 +1,49 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - run: pnpm install
+
+      - run: pnpm build
+
+      # Deploy API to Cloudflare Workers
+      - name: Deploy API
+        run: pnpm --filter=@sabaipics/api wrangler deploy --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Set API secrets
+      - name: Set API Secrets
+        run: |
+          echo "${{ secrets.DATABASE_URL }}" | pnpm --filter=@sabaipics/api wrangler secret put DATABASE_URL --env production
+          echo "${{ secrets.CLERK_SECRET_KEY }}" | pnpm --filter=@sabaipics/api wrangler secret put CLERK_SECRET_KEY --env production
+          echo "${{ secrets.CLERK_PUBLISHABLE_KEY }}" | pnpm --filter=@sabaipics/api wrangler secret put CLERK_PUBLISHABLE_KEY --env production
+          echo "${{ secrets.CLERK_JWT_KEY }}" | pnpm --filter=@sabaipics/api wrangler secret put CLERK_JWT_KEY --env production
+          echo "${{ secrets.CLERK_WEBHOOK_SIGNING_SECRET }}" | pnpm --filter=@sabaipics/api wrangler secret put CLERK_WEBHOOK_SIGNING_SECRET --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Deploy Dashboard to Cloudflare Pages
+      - name: Deploy Dashboard
+        run: pnpm --filter=@sabaipics/dashboard deploy:prod
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

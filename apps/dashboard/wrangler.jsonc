@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "sabaipics-dashboard",
+  "name": "dashboard",
   "pages_build_output_dir": "dist",
   "compatibility_date": "2025-12-06"
 }

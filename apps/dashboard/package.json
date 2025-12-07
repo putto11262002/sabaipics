@@ -9,7 +9,8 @@
     "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "check-types": "tsc --noEmit",
-    "deploy:prod": "wrangler pages deploy dist --project-name=sabaipics-dashboard"
+    "deploy:staging": "wrangler pages deploy dist --project-name=dashboard --branch=staging",
+    "deploy:prod": "wrangler pages deploy dist --project-name=dashboard --branch=main"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",

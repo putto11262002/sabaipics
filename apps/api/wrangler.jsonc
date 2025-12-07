@@ -6,20 +6,43 @@
 	"dev": {
 		"port": 8081
 	},
-	// Development environment (default)
+	// Development environment (default) - localhost
 	"vars": {
 		"CORS_ORIGIN": "http://localhost:5173",
-		"AUTHORIZED_PARTIES": "http://localhost:5173",
-		"DATABASE_URL": ""
+		"AUTHORIZED_PARTIES": "http://localhost:5173"
 	},
-	// Production environment
 	"env": {
+		// Staging environment - auto-deploy from master
+		"staging": {
+			"vars": {
+				"CORS_ORIGIN": "https://app-staging.sabaipics.com",
+				"AUTHORIZED_PARTIES": "https://app-staging.sabaipics.com"
+			},
+			"routes": [
+				{
+					"pattern": "api-staging.sabaipics.com",
+					"zone_name": "sabaipics.com",
+					"custom_domain": true
+				}
+			],
+			"observability": {
+				"enabled": true,
+				"head_sampling_rate": 1
+			}
+		},
+		// Production environment - manual approval
 		"production": {
 			"vars": {
-				"CORS_ORIGIN": "https://sabaipics-dashboard.pages.dev",
-				"AUTHORIZED_PARTIES": "https://sabaipics-dashboard.pages.dev",
-				"DATABASE_URL": ""
+				"CORS_ORIGIN": "https://app.sabaipics.com",
+				"AUTHORIZED_PARTIES": "https://app.sabaipics.com"
 			},
+			"routes": [
+				{
+					"pattern": "api.sabaipics.com",
+					"zone_name": "sabaipics.com",
+					"custom_domain": true
+				}
+			],
 			"preview_urls": false,
 			"observability": {
 				"enabled": true,

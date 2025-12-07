@@ -1,6 +1,3 @@
-# Drizzle meta (keep migration SQL files)
-drizzle/meta/
-
 # Build
 dist/
 *.tsbuildinfo
