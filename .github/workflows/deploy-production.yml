@@ -24,19 +24,20 @@ jobs:
 
       # Deploy API to Cloudflare Workers
       - name: Deploy API
-        run: pnpm --filter=@sabaipics/api wrangler deploy --env production
+        run: pnpm --filter=@sabaipics/api deploy:prod
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       # Set API secrets
       - name: Set API Secrets
+        working-directory: apps/api
         run: |
-          echo "${{ secrets.DATABASE_URL }}" | pnpm --filter=@sabaipics/api wrangler secret put DATABASE_URL --env production
-          echo "${{ secrets.CLERK_SECRET_KEY }}" | pnpm --filter=@sabaipics/api wrangler secret put CLERK_SECRET_KEY --env production
-          echo "${{ secrets.CLERK_PUBLISHABLE_KEY }}" | pnpm --filter=@sabaipics/api wrangler secret put CLERK_PUBLISHABLE_KEY --env production
-          echo "${{ secrets.CLERK_JWT_KEY }}" | pnpm --filter=@sabaipics/api wrangler secret put CLERK_JWT_KEY --env production
-          echo "${{ secrets.CLERK_WEBHOOK_SIGNING_SECRET }}" | pnpm --filter=@sabaipics/api wrangler secret put CLERK_WEBHOOK_SIGNING_SECRET --env production
+          echo "${{ secrets.DATABASE_URL }}" | pnpm wrangler secret put DATABASE_URL --env production
+          echo "${{ secrets.CLERK_SECRET_KEY }}" | pnpm wrangler secret put CLERK_SECRET_KEY --env production
+          echo "${{ secrets.CLERK_PUBLISHABLE_KEY }}" | pnpm wrangler secret put CLERK_PUBLISHABLE_KEY --env production
+          echo "${{ secrets.CLERK_JWT_KEY }}" | pnpm wrangler secret put CLERK_JWT_KEY --env production
+          echo "${{ secrets.CLERK_WEBHOOK_SIGNING_SECRET }}" | pnpm wrangler secret put CLERK_WEBHOOK_SIGNING_SECRET --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
