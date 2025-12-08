@@ -5,7 +5,7 @@ Event photo distribution platform with face recognition for the Thai market.
 ## Quick Context
 
 - `docs/README.md` - Technical docs index (use cases, flows, API design, data schema)
-- `.session/log/<date>.md` - Daily changelog (e.g. `2025-12-06.md`), you must append to change log every time you make change to the codebase. you MUST append only and include doc URLs or any reference files used during the implementation.
+- `./log/NNN-topic-name.md` - Topic-based changelogs (e.g. `001-monorepo-setup.md`), append-only format grouped by feature/topic
 
 ## Monorepo Structure
 
@@ -26,5 +26,5 @@ pnpm --filter=@sabaipics/dashboard pages:deploy  # Deploy dashboard
 ## Rules
 
 - Use official docs only - spawn subagents to research
-- Append changes to `.session/log/<date>.md` (create new file per day, append within day)
+- Append changes to `./log/NNN-topic-name.md` (append-only, create new numbered file for new topics)
 - Use shadcn CLI for components: `pnpm --filter=@sabaipics/ui ui:add <component>`
