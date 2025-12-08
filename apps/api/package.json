@@ -23,7 +23,6 @@
     "svix": "^1.82.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20251205.0",
     "@types/node": "^22.15.29",
     "typescript": "^5.8.0"
   }
