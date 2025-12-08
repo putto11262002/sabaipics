@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"time"
 
 	"github.com/fclairamb/ftpserverlib"
 	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/client"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/config"
 )
@@ -15,8 +17,9 @@ import (
 // MainDriver implements the ftpserverlib.MainDriver interface
 // Logs application flow events at FTP protocol boundaries
 type MainDriver struct {
-	db     *pgxpool.Pool
-	config *config.Config
+	db        *pgxpool.Pool
+	config    *config.Config
+	apiClient *apiclient.Client
 	// tlsMode specifies the TLS requirement mode for this FTP server
 	tlsMode ftpserver.TLSRequirement
 }
@@ -24,18 +27,20 @@ type MainDriver struct {
 // NewMainDriver creates a new MainDriver instance for explicit FTPS (AUTH TLS)
 func NewMainDriver(db *pgxpool.Pool, cfg *config.Config) *MainDriver {
 	return &MainDriver{
-		db:      db,
-		config:  cfg,
-		tlsMode: ftpserver.ClearOrEncrypted, // Explicit FTPS (optional TLS via AUTH TLS)
+		db:        db,
+		config:    cfg,
+		apiClient: apiclient.NewClient(cfg.APIURL),
+		tlsMode:   ftpserver.ClearOrEncrypted, // Explicit FTPS (optional TLS via AUTH TLS)
 	}
 }
 
 // NewMainDriverImplicit creates a new MainDriver instance for implicit FTPS
 func NewMainDriverImplicit(db *pgxpool.Pool, cfg *config.Config) *MainDriver {
 	return &MainDriver{
-		db:      db,
-		config:  cfg,
-		tlsMode: ftpserver.ImplicitEncryption, // Implicit FTPS (immediate TLS)
+		db:        db,
+		config:    cfg,
+		apiClient: apiclient.NewClient(cfg.APIURL),
+		tlsMode:   ftpserver.ImplicitEncryption, // Implicit FTPS (immediate TLS)
 	}
 }
 
@@ -90,29 +95,38 @@ func (d *MainDriver) ClientDisconnected(cc ftpserver.ClientContext) {
 	d.log().Info().Emitf("Client disconnected: %s (ID: %d)", clientIP, clientID)
 }
 
-// AuthUser validates FTP credentials (application boundary)
-// STUB: Returns mock ClientDriver instead of querying the database
+// AuthUser validates FTP credentials via API and returns ClientDriver with JWT token
 func (d *MainDriver) AuthUser(cc ftpserver.ClientContext, user, pass string) (ftpserver.ClientDriver, error) {
 	clientIP := cc.RemoteAddr().String()
 
 	// Log auth attempt at application boundary
 	d.log().Info().Emitf("Auth attempt: user=%s, client=%s", user, clientIP)
 
-	// STUB: In real implementation, we would:
-	// 1. Query: SELECT * FROM events WHERE ftp_username = $1
-	// 2. Verify: bcrypt.CompareHashAndPassword(event.ftp_password_hash, []byte(pass))
-	// 3. Check: Event published, upload window open, not deleted
-	// 4. Return ClientDriver with actual eventID and photographerID
+	// Create context with timeout for auth request
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// For now, accept any credentials for testing
-	eventID := "stub-event-id"
-	photographerID := "stub-photographer-id"
+	// Call API for authentication
+	authResp, err := d.apiClient.Authenticate(ctx, apiclient.AuthRequest{
+		Username: user,
+		Password: pass,
+	})
+	if err != nil {
+		d.log().Error().Emitf("FTP auth failed for user=%s: %v", user, err)
+		return nil, fmt.Errorf("authentication failed") // FTP 530 response
+	}
 
-	// Log stub acceptance
-	d.log().Debug().Emitf("STUB: Accepting credentials for user=%s (no DB validation)", user)
+	d.log().Info().Emitf("FTP auth successful: user=%s, event=%s, credits=%d",
+		user, authResp.EventID, authResp.CreditsRemaining)
 
-	// Create ClientDriver with client IP for upload transaction context
-	clientDriver := client.NewClientDriver(eventID, photographerID, clientIP, d.config)
+	// Create ClientDriver with JWT token, event context, and API client
+	clientDriver := client.NewClientDriver(
+		authResp.EventID,
+		authResp.Token,
+		clientIP,
+		d.apiClient,
+		d.config,
+	)
 
 	return clientDriver, nil
 }

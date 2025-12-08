@@ -4,21 +4,28 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http"
 	"os"
 	"sync/atomic"
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 )
 
+// ErrAuthExpired indicates that the JWT token has expired (401 from API)
+// MainDriver should disconnect the client when this error is encountered
+var ErrAuthExpired = errors.New("authentication expired")
+
 // UploadTransfer implements the afero.File interface for streaming uploads
-// Uses io.Pipe to stream data directly to R2 without buffering to disk
+// Uses io.Pipe to stream data to API via FormData without buffering to disk
 // LIFETIME CONTRACT: 1:1 with uploadTransaction. Must not be reused after Close().
 type UploadTransfer struct {
 	eventID           string
-	photographerID    string
+	jwtToken          string
 	clientIP          string
 	filename          string
+	apiClient         *apiclient.Client
 	pipeReader        *io.PipeReader
 	pipeWriter        *io.PipeWriter
 	uploadDone        chan error
@@ -35,9 +42,9 @@ func (t *UploadTransfer) log() sentry.Logger {
 	return sentry.NewLogger(context.Background())
 }
 
-// NewUploadTransfer creates a new upload transfer for streaming to R2
+// NewUploadTransfer creates a new upload transfer for streaming to API via FormData
 // Creates a ROOT Sentry transaction for this upload (not a child span)
-func NewUploadTransfer(eventID, photographerID, clientIP, filename string) *UploadTransfer {
+func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, apiClient *apiclient.Client) *UploadTransfer {
 	pr, pw := io.Pipe()
 
 	// Create ROOT Sentry transaction for this upload
@@ -50,14 +57,14 @@ func NewUploadTransfer(eventID, photographerID, clientIP, filename string) *Uplo
 	// Add comprehensive tags for filtering and analysis
 	uploadTransaction.SetTag("file.name", filename)
 	uploadTransaction.SetTag("event.id", eventID)
-	uploadTransaction.SetTag("photographer.id", photographerID)
 	uploadTransaction.SetTag("client.ip", clientIP)
 
 	transfer := &UploadTransfer{
 		eventID:           eventID,
-		photographerID:    photographerID,
+		jwtToken:          jwtToken,
 		clientIP:          clientIP,
 		filename:          filename,
+		apiClient:         apiClient,
 		pipeReader:        pr,
 		pipeWriter:        pw,
 		uploadDone:        make(chan error, 1),
@@ -65,12 +72,12 @@ func NewUploadTransfer(eventID, photographerID, clientIP, filename string) *Uplo
 		uploadTransaction: uploadTransaction,
 	}
 
-	// Start background goroutine to stream to R2
-	go transfer.streamToR2()
+	// Start background goroutine to stream to API
+	go transfer.streamToAPI()
 
 	// Log upload creation at I/O boundary
-	transfer.log().Info().Emitf("Upload started: file=%s, event=%s, photographer=%s, client=%s",
-		filename, eventID, photographerID, clientIP)
+	transfer.log().Info().Emitf("Upload started: file=%s, event=%s, client=%s",
+		filename, eventID, clientIP)
 
 	return transfer
 }
@@ -132,45 +139,38 @@ func (t *UploadTransfer) Close() error {
 	return err
 }
 
-// streamToR2 runs in a background goroutine to stream data to R2 (I/O boundary)
-// STUB: Just reads and discards data, logs would-be upload progress
-func (t *UploadTransfer) streamToR2() {
+// streamToAPI runs in a background goroutine to stream data to API via FormData (I/O boundary)
+func (t *UploadTransfer) streamToAPI() {
 	defer close(t.uploadDone)
 
-	// Log background goroutine start
-	t.log().Debug().Emitf("STUB: Background upload started for file=%s", t.filename)
+	ctx := t.uploadTransaction.Context()
 
-	// STUB: In real implementation, we would:
-	// 1. Create S3/R2 client with credentials
-	// 2. Start multipart upload or single PUT
-	// 3. Stream from pipeReader directly to R2
-	// 4. Handle errors and retry logic
-	// 5. Store metadata (event_id, photographer_id, upload_time)
-	// 6. Propagate Sentry traceparent to R2 metadata
+	// Upload via FormData to API
+	uploadResp, httpResp, err := t.apiClient.UploadFormData(
+		ctx,
+		t.jwtToken,
+		t.eventID,
+		t.filename,
+		t.pipeReader, // Stream directly from FTP client pipe
+	)
 
-	// For now, just read and discard data to simulate upload
-	buffer := make([]byte, 32*1024) // 32KB buffer
-	totalRead := int64(0)
-
-	for {
-		n, err := t.pipeReader.Read(buffer)
-		if n > 0 {
-			totalRead += int64(n)
-			// No logging per chunk - too verbose
-		}
-
-		if err == io.EOF {
-			t.log().Info().Emitf("STUB: R2 upload stream complete for file=%s (total: %d bytes)", t.filename, totalRead)
-			t.uploadDone <- nil
+	if err != nil {
+		// Check for 401 (token expired)
+		if httpResp != nil && httpResp.StatusCode == http.StatusUnauthorized {
+			t.log().Error().Emitf("Auth expired for file=%s: %v", t.filename, err)
+			t.uploadDone <- ErrAuthExpired // Triggers client disconnection
 			return
 		}
 
-		if err != nil {
-			t.log().Error().Emitf("STUB: R2 upload stream error for file=%s: %v", t.filename, err)
-			t.uploadDone <- err
-			return
-		}
+		t.log().Error().Emitf("API upload failed for file=%s: %v", t.filename, err)
+		t.uploadDone <- err
+		return
 	}
+
+	t.log().Info().Emitf("Upload successful: file=%s, photo_id=%s, size=%d bytes",
+		t.filename, uploadResp.Data.ID, uploadResp.Data.SizeBytes)
+
+	t.uploadDone <- nil
 }
 
 // Read is not supported (upload-only)

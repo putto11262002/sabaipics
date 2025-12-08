@@ -4,6 +4,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/config"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/transfer"
 	"github.com/spf13/afero"
@@ -13,19 +14,21 @@ import (
 // This driver enforces upload-only operations without logging (returns error sentinels)
 // Logging is the responsibility of MainDriver at application boundaries
 type ClientDriver struct {
-	eventID        string
-	photographerID string
-	clientIP       string // Client IP address for upload transaction context
-	config         *config.Config
+	eventID    string
+	jwtToken   string
+	clientIP   string // Client IP address for upload transaction context
+	apiClient  *apiclient.Client
+	config     *config.Config
 }
 
-// NewClientDriver creates a new ClientDriver instance
-func NewClientDriver(eventID, photographerID, clientIP string, cfg *config.Config) *ClientDriver {
+// NewClientDriver creates a new ClientDriver instance with JWT token and API client
+func NewClientDriver(eventID, jwtToken, clientIP string, apiClient *apiclient.Client, cfg *config.Config) *ClientDriver {
 	return &ClientDriver{
-		eventID:        eventID,
-		photographerID: photographerID,
-		clientIP:       clientIP,
-		config:         cfg,
+		eventID:   eventID,
+		jwtToken:  jwtToken,
+		clientIP:  clientIP,
+		apiClient: apiClient,
+		config:    cfg,
 	}
 }
 
@@ -41,8 +44,8 @@ func (d *ClientDriver) OpenFile(name string, flag int, perm os.FileMode) (afero.
 		return nil, ErrDownloadNotAllowed
 	}
 
-	// Create UploadTransfer with context for root transaction
-	uploadTransfer := transfer.NewUploadTransfer(d.eventID, d.photographerID, d.clientIP, name)
+	// Create UploadTransfer with JWT token and API client for FormData upload
+	uploadTransfer := transfer.NewUploadTransfer(d.eventID, d.jwtToken, d.clientIP, name, d.apiClient)
 	return uploadTransfer, nil
 }
 

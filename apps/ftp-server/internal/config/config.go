@@ -37,6 +37,9 @@ type Config struct {
 	// Implicit FTPS settings (optional)
 	ImplicitFTPSEnabled bool   // Enable implicit FTPS server on port 990
 	ImplicitFTPSPort    string // Port for implicit FTPS (default: 0.0.0.0:990)
+
+	// API settings (for API-based integration)
+	APIURL string // Base URL for SabaiPics API (e.g., https://api.sabaipics.com)
 }
 
 // Load reads configuration from environment variables
@@ -72,11 +75,17 @@ func Load() (*Config, error) {
 		// Implicit FTPS (optional)
 		ImplicitFTPSEnabled: getEnvBool("IMPLICIT_FTPS_ENABLED", false),
 		ImplicitFTPSPort:    getEnv("IMPLICIT_FTPS_PORT", "0.0.0.0:990"),
+
+		// API settings
+		APIURL: getEnv("API_URL", ""),
 	}
 
 	// Validate required fields
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
+	}
+	if cfg.APIURL == "" {
+		return nil, fmt.Errorf("API_URL is required")
 	}
 
 	return cfg, nil
