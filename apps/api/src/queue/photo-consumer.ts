@@ -1,0 +1,305 @@
+/**
+ * Photo Processing Queue Consumer
+ *
+ * Handles photo-processing queue messages with:
+ * - Rate limiting via Durable Object
+ * - Per-message ack/retry
+ * - Error classification and backoff
+ *
+ * Infrastructure layer:
+ * - Fetches image from R2
+ * - Calls Rekognition IndexFaces
+ * - Returns SDK types (FaceRecord[], UnindexedFace[])
+ *
+ * Application layer (NOT here) handles:
+ * - Saving faces to DB
+ * - Updating photo status
+ * - WebSocket notifications
+ */
+
+import type { PhotoJob, RateLimiterResponse } from "../types/photo-job";
+import {
+  createRekognitionClient,
+  indexFaces,
+  type IndexFacesResult,
+  isRetryableError,
+  isNonRetryableError,
+  isThrottlingError,
+  getBackoffDelay,
+  getThrottleBackoffDelay,
+  formatErrorMessage,
+} from "../lib/rekognition";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/**
+ * Environment bindings required by queue consumer
+ */
+export interface QueueConsumerEnv {
+  /** Durable Object namespace for rate limiting */
+  RATE_LIMITER: DurableObjectNamespace;
+
+  /** R2 bucket for photo storage */
+  PHOTOS_BUCKET: R2Bucket;
+
+  /** Database connection string */
+  DATABASE_URL: string;
+
+  /** AWS credentials */
+  AWS_ACCESS_KEY_ID: string;
+  AWS_SECRET_ACCESS_KEY: string;
+  AWS_REGION: string;
+}
+
+/**
+ * Result of processing a single photo.
+ * Contains Rekognition results for application layer to handle.
+ */
+export interface PhotoProcessingResult {
+  success: boolean;
+  data?: IndexFacesResult;
+  error?: string;
+}
+
+/**
+ * Function signature for photo processing logic.
+ */
+export type ProcessPhotoFn = (
+  job: PhotoJob,
+  env: QueueConsumerEnv
+) => Promise<PhotoProcessingResult>;
+
+// =============================================================================
+// Rate Limiter Client
+// =============================================================================
+
+/**
+ * Call rate limiter DO via fetch (type-safe wrapper).
+ */
+async function reserveBatch(
+  stub: DurableObjectStub,
+  batchSize: number
+): Promise<RateLimiterResponse> {
+  const response = await stub.fetch(
+    `https://rate-limiter/reserveBatch?batchSize=${batchSize}`
+  );
+  return response.json() as Promise<RateLimiterResponse>;
+}
+
+/**
+ * Report throttle error to rate limiter DO.
+ */
+async function reportThrottle(
+  stub: DurableObjectStub,
+  delayMs: number
+): Promise<void> {
+  await stub.fetch(`https://rate-limiter/reportThrottle?delay=${delayMs}`);
+}
+
+// =============================================================================
+// Queue Handler
+// =============================================================================
+
+/**
+ * Create a queue consumer handler with the given processing function.
+ *
+ * @param processPhoto - Function that processes a single photo
+ * @returns Queue handler for Cloudflare Workers
+ */
+export function createQueueHandler(processPhoto: ProcessPhotoFn) {
+  return async function queue(
+    batch: MessageBatch<PhotoJob>,
+    env: QueueConsumerEnv,
+    ctx: ExecutionContext
+  ): Promise<void> {
+    // Skip empty batches
+    if (batch.messages.length === 0) {
+      return;
+    }
+
+    console.log(`[Queue] Processing batch of ${batch.messages.length} photos`);
+
+    // Get rate limiter DO (singleton)
+    const rateLimiterId = env.RATE_LIMITER.idFromName("rekognition");
+    const rateLimiterStub = env.RATE_LIMITER.get(rateLimiterId);
+
+    // Reserve time slot for this batch
+    const { delay, intervalMs } = await reserveBatch(
+      rateLimiterStub,
+      batch.messages.length
+    );
+
+    if (delay > 0) {
+      console.log(`[Queue] Waiting ${delay}ms for rate limit slot`);
+      await sleep(delay);
+    }
+
+    // Process each message with pacing
+    for (const message of batch.messages) {
+      await processMessage(message, env, rateLimiterStub, processPhoto);
+
+      // Pace requests to stay within TPS limit
+      await sleep(intervalMs);
+    }
+  };
+}
+
+// =============================================================================
+// Message Processing
+// =============================================================================
+
+/**
+ * Process a single queue message with error handling and retry logic.
+ */
+async function processMessage(
+  message: Message<PhotoJob>,
+  env: QueueConsumerEnv,
+  rateLimiterStub: DurableObjectStub,
+  processPhoto: ProcessPhotoFn
+): Promise<void> {
+  const job = message.body;
+  const attempts = message.attempts;
+
+  console.log(
+    `[Queue] Processing photo ${job.photo_id} (attempt ${attempts})`
+  );
+
+  try {
+    const result = await processPhoto(job, env);
+
+    if (result.success && result.data) {
+      const { faceRecords, unindexedFaces } = result.data;
+      console.log(
+        `[Queue] Success: photo ${job.photo_id}, ${faceRecords.length} indexed, ${unindexedFaces.length} unindexed`
+      );
+      message.ack();
+    } else {
+      // Processing returned error but didn't throw
+      console.error(
+        `[Queue] Failed (non-retryable): photo ${job.photo_id} - ${result.error}`
+      );
+      message.ack(); // Don't retry, mark as handled
+    }
+  } catch (error) {
+    await handleProcessingError(message, error, rateLimiterStub);
+  }
+}
+
+/**
+ * Handle errors from photo processing.
+ * Determines retry strategy based on error type.
+ */
+async function handleProcessingError(
+  message: Message<PhotoJob>,
+  error: unknown,
+  rateLimiterStub: DurableObjectStub
+): Promise<void> {
+  const job = message.body;
+  const errorMessage = formatErrorMessage(error);
+
+  // Throttling error - report to rate limiter and retry with longer backoff
+  if (isThrottlingError(error)) {
+    console.warn(
+      `[Queue] Throttled: photo ${job.photo_id} - ${errorMessage}`
+    );
+
+    // Tell rate limiter to slow down
+    await reportThrottle(rateLimiterStub, 2000);
+
+    // Retry with longer backoff
+    const delaySeconds = getThrottleBackoffDelay(message.attempts);
+    console.log(`[Queue] Retrying in ${delaySeconds}s`);
+    message.retry({ delaySeconds });
+    return;
+  }
+
+  // Non-retryable error - ack to prevent infinite retries
+  if (isNonRetryableError(error)) {
+    console.error(
+      `[Queue] Non-retryable error: photo ${job.photo_id} - ${errorMessage}`
+    );
+    message.ack(); // Don't retry
+    return;
+  }
+
+  // Retryable error - retry with backoff
+  if (isRetryableError(error)) {
+    console.warn(
+      `[Queue] Retryable error: photo ${job.photo_id} - ${errorMessage}`
+    );
+
+    const delaySeconds = getBackoffDelay(message.attempts);
+    console.log(`[Queue] Retrying in ${delaySeconds}s`);
+    message.retry({ delaySeconds });
+    return;
+  }
+
+  // Unknown error - log and retry with backoff
+  console.error(
+    `[Queue] Unknown error: photo ${job.photo_id} - ${errorMessage}`
+  );
+
+  const delaySeconds = getBackoffDelay(message.attempts);
+  message.retry({ delaySeconds });
+}
+
+// =============================================================================
+// Utilities
+// =============================================================================
+
+/**
+ * Sleep for specified milliseconds.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// =============================================================================
+// Photo Processing Implementation
+// =============================================================================
+
+/**
+ * Process a photo: fetch from R2, call Rekognition, return results.
+ *
+ * This is infrastructure - returns SDK types.
+ * Application layer handles DB writes and notifications.
+ */
+export async function processPhoto(
+  job: PhotoJob,
+  env: QueueConsumerEnv
+): Promise<PhotoProcessingResult> {
+  // 1. Fetch image from R2
+  const object = await env.PHOTOS_BUCKET.get(job.r2_key);
+
+  if (!object) {
+    return {
+      success: false,
+      error: `Image not found in R2: ${job.r2_key}`,
+    };
+  }
+
+  const imageBytes = await object.arrayBuffer();
+
+  // 2. Create Rekognition client
+  const client = createRekognitionClient({
+    AWS_ACCESS_KEY_ID: env.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: env.AWS_SECRET_ACCESS_KEY,
+    AWS_REGION: env.AWS_REGION,
+  });
+
+  // 3. Call Rekognition IndexFaces
+  const result = await indexFaces(
+    client,
+    job.event_id,
+    imageBytes,
+    job.photo_id
+  );
+
+  // 4. Return SDK types for application layer
+  return {
+    success: true,
+    data: result,
+  };
+}
