@@ -7,7 +7,7 @@ import { webhookRouter } from "./routes/webhooks";
 import { dbTestRouter } from "./routes/db-test";
 
 // Queue consumer
-import { createQueueHandler, processPhoto } from "./queue/photo-consumer";
+import { queue } from "./queue/photo-consumer";
 
 // Durable Objects - must be exported for wrangler
 export { RekognitionRateLimiter } from "./durable-objects/rate-limiter";
@@ -51,11 +51,8 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 // Export type for Hono RPC client
 export type AppType = typeof app;
 
-// Queue handler - processes photos via Rekognition
-const queueHandler = createQueueHandler(processPhoto);
-
 // Export worker with both fetch and queue handlers
 export default {
   fetch: app.fetch,
-  queue: queueHandler,
+  queue,
 };

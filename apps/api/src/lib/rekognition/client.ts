@@ -53,7 +53,7 @@ export function createRekognitionClient(env: RekognitionEnv): RekognitionClient 
 
 /**
  * Create a Rekognition collection for an event.
- * Collection naming: sabaipics-{event_id}
+ * Collection ID = event_id (UUID)
  *
  * @param client - Rekognition client
  * @param eventId - Event UUID
@@ -144,10 +144,10 @@ export async function indexFaces(
 
 /**
  * Get collection ID from event ID.
- * Format: sabaipics-{event_id}
+ * Uses event UUID directly as collection ID.
  */
 export function getCollectionId(eventId: string): string {
-  return `sabaipics-${eventId}`;
+  return eventId;
 }
 
 // Re-export SDK types for convenience

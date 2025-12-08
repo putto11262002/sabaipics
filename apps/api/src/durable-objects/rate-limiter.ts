@@ -17,6 +17,7 @@
  * since no recent API activity.
  */
 
+import { DurableObject } from "cloudflare:workers";
 import type { RateLimiterResponse } from "../types/photo-job";
 
 // =============================================================================
@@ -36,88 +37,19 @@ const SAFETY_FACTOR = 0.9;
 const SAFE_INTERVAL_MS = Math.ceil(INTERVAL_MS / SAFETY_FACTOR); // ~22ms
 
 // =============================================================================
-// Durable Object Interface (for type-safe RPC)
-// =============================================================================
-
-/**
- * Public methods exposed by RekognitionRateLimiter.
- * Used for type-safe stub calls.
- */
-export interface IRateLimiter {
-  reserveBatch(batchSize: number): Promise<RateLimiterResponse>;
-  getStatus(): Promise<{
-    lastBatchEndTime: number;
-    currentBacklog: number;
-    tps: number;
-    intervalMs: number;
-  }>;
-  reset(): Promise<void>;
-  reportThrottle(additionalDelayMs?: number): Promise<void>;
-}
-
-// =============================================================================
-// Durable Object Class
+// Durable Object Class (RPC-enabled)
 // =============================================================================
 
 /**
  * RekognitionRateLimiter Durable Object implementation.
- *
- * Note: Uses DurableObject pattern compatible with Cloudflare Workers runtime.
- * TypeScript types are handled via the IRateLimiter interface.
+ * Uses RPC method invocation (requires compatibility_date >= 2024-04-03).
  */
-export class RekognitionRateLimiter implements DurableObject {
+export class RekognitionRateLimiter extends DurableObject {
   /**
    * Timestamp when the last reserved batch will finish.
    * Used to calculate delay for next batch.
    */
   private lastBatchEndTime: number = 0;
-
-  constructor(
-    private state: DurableObjectState,
-    private env: unknown
-  ) {}
-
-  /**
-   * HTTP fetch handler (required by DurableObject interface).
-   * We use RPC methods instead, but this is required.
-   */
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    // RPC-style routing via fetch (fallback if RPC not available)
-    if (path === "/reserveBatch") {
-      const batchSize = parseInt(url.searchParams.get("batchSize") || "1", 10);
-      const result = await this.reserveBatch(batchSize);
-      return new Response(JSON.stringify(result), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    if (path === "/getStatus") {
-      const result = await this.getStatus();
-      return new Response(JSON.stringify(result), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    if (path === "/reset") {
-      await this.reset();
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    if (path === "/reportThrottle") {
-      const delay = parseInt(url.searchParams.get("delay") || "1000", 10);
-      await this.reportThrottle(delay);
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    return new Response("Not Found", { status: 404 });
-  }
 
   /**
    * Reserve a time slot for processing a batch of photos.
@@ -148,35 +80,6 @@ export class RekognitionRateLimiter implements DurableObject {
   }
 
   /**
-   * Get current rate limiter status.
-   * Useful for monitoring and debugging.
-   */
-  async getStatus(): Promise<{
-    lastBatchEndTime: number;
-    currentBacklog: number;
-    tps: number;
-    intervalMs: number;
-  }> {
-    const now = Date.now();
-    const backlog = Math.max(0, this.lastBatchEndTime - now);
-
-    return {
-      lastBatchEndTime: this.lastBatchEndTime,
-      currentBacklog: backlog,
-      tps: REKOGNITION_TPS,
-      intervalMs: SAFE_INTERVAL_MS,
-    };
-  }
-
-  /**
-   * Reset the rate limiter state.
-   * Use with caution - only for testing or after service disruption.
-   */
-  async reset(): Promise<void> {
-    this.lastBatchEndTime = 0;
-  }
-
-  /**
    * Report that a throttling error occurred.
    * Adds extra delay to the slot to allow rate limits to reset.
    *
@@ -187,9 +90,3 @@ export class RekognitionRateLimiter implements DurableObject {
     this.lastBatchEndTime = Math.max(this.lastBatchEndTime, now) + additionalDelayMs;
   }
 }
-
-// =============================================================================
-// Export for wrangler binding
-// =============================================================================
-
-export { RekognitionRateLimiter as default };

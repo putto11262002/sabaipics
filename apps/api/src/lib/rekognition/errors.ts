@@ -6,6 +6,8 @@
  * - Non-retryable: Bad input (invalid image, wrong format)
  */
 
+import { isError } from "../../utils/error";
+
 // =============================================================================
 // Error Classification
 // =============================================================================
@@ -182,10 +184,3 @@ export function formatErrorMessage(error: unknown): string {
   return parts.join(" ");
 }
 
-// =============================================================================
-// Utility
-// =============================================================================
-
-function isError(value: unknown): value is Error {
-  return value instanceof Error || (typeof value === "object" && value !== null && "name" in value && "message" in value);
-}

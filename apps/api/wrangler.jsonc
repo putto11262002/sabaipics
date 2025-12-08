@@ -47,7 +47,7 @@
 	"durable_objects": {
 		"bindings": [
 			{
-				"name": "RATE_LIMITER",
+				"name": "AWS_REKOGNITION_RATE_LIMITER",
 				"class_name": "RekognitionRateLimiter"
 			}
 		]
