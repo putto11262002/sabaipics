@@ -14,7 +14,8 @@ type Config struct {
 	FTPListenAddress    string
 	FTPPassivePortStart int
 	FTPPassivePortEnd   int
-	FTPIdleTimeout      int // seconds
+	FTPIdleTimeout      int  // seconds
+	FTPDebug            bool // Enable FTP protocol command/response logging
 
 	// Database settings
 	DatabaseURL string
@@ -32,6 +33,10 @@ type Config struct {
 	// TLS settings (optional)
 	TLSCertPath string
 	TLSKeyPath  string
+
+	// Implicit FTPS settings (optional)
+	ImplicitFTPSEnabled bool   // Enable implicit FTPS server on port 990
+	ImplicitFTPSPort    string // Port for implicit FTPS (default: 0.0.0.0:990)
 }
 
 // Load reads configuration from environment variables
@@ -45,6 +50,7 @@ func Load() (*Config, error) {
 		FTPPassivePortStart: getEnvInt("FTP_PASSIVE_PORT_START", 5000),
 		FTPPassivePortEnd:   getEnvInt("FTP_PASSIVE_PORT_END", 5099),
 		FTPIdleTimeout:      getEnvInt("FTP_IDLE_TIMEOUT", 300),
+		FTPDebug:            getEnvBool("FTP_DEBUG", false),
 
 		// Database
 		DatabaseURL: getEnv("DATABASE_URL", ""),
@@ -62,6 +68,10 @@ func Load() (*Config, error) {
 		// TLS (optional)
 		TLSCertPath: getEnv("TLS_CERT_PATH", ""),
 		TLSKeyPath:  getEnv("TLS_KEY_PATH", ""),
+
+		// Implicit FTPS (optional)
+		ImplicitFTPSEnabled: getEnvBool("IMPLICIT_FTPS_ENABLED", false),
+		ImplicitFTPSPort:    getEnv("IMPLICIT_FTPS_PORT", "0.0.0.0:990"),
 	}
 
 	// Validate required fields
@@ -85,6 +95,16 @@ func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intVal, err := strconv.Atoi(value); err == nil {
 			return intVal
+		}
+	}
+	return defaultValue
+}
+
+// getEnvBool retrieves a boolean environment variable or returns a default value
+func getEnvBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolVal, err := strconv.ParseBool(value); err == nil {
+			return boolVal
 		}
 	}
 	return defaultValue

@@ -52,35 +52,80 @@ func (d *ClientDriver) Open(name string) (afero.File, error) {
 	return nil, ErrDownloadNotAllowed
 }
 
-// Remove blocks file deletion (DELE command)
+// Remove accepts file deletion but does nothing (no-op for client compatibility)
+// Returns success so clients can clean up temp files in their upload workflows
 func (d *ClientDriver) Remove(name string) error {
-	return ErrDeleteNotAllowed
+	return nil // Success (250 OK in FTP)
 }
 
-// Rename blocks file renaming (RNFR/RNTO commands)
+// Rename accepts file renaming but does nothing (no-op for client compatibility)
+// Many clients use atomic upload pattern: upload as temp name, then rename to final name
 func (d *ClientDriver) Rename(oldname, newname string) error {
-	return ErrRenameNotAllowed
+	return nil // Success (250 OK in FTP)
 }
 
-// Mkdir blocks directory creation
+// Mkdir accepts directory creation but does nothing (no-op for client compatibility)
+// Clients often organize uploads into directories (e.g., by date, device, etc.)
 func (d *ClientDriver) Mkdir(name string, perm os.FileMode) error {
-	return ErrMkdirNotAllowed
+	return nil // Success (257 Created in FTP)
 }
 
-// MkdirAll blocks directory creation
+// MkdirAll accepts recursive directory creation but does nothing (no-op)
 func (d *ClientDriver) MkdirAll(path string, perm os.FileMode) error {
-	return ErrMkdirNotAllowed
+	return nil // Success
 }
 
-// Stat returns fake file info for camera compatibility
-// Some cameras check file existence before uploading
+// Stat returns fake file info for client compatibility
+// Clients check file existence, sizes, timestamps, and directory status
+// Treats "/" and any path ending with "/" as directories for CWD compatibility
+// Treats paths with common directory names as directories
 func (d *ClientDriver) Stat(name string) (os.FileInfo, error) {
-	return &fakeFileInfo{name: name}, nil
+	// Detect directories: root, empty, trailing slash, or common dir names
+	isDir := name == "/" || name == "" ||
+		(len(name) > 0 && name[len(name)-1] == '/') ||
+		isCommonDirectoryName(name)
+
+	return &fakeFileInfo{name: name, isDir: isDir}, nil
 }
 
-// RemoveAll blocks recursive deletion
+// isCommonDirectoryName checks if path looks like a directory
+// Common patterns: no extension, or known directory names
+func isCommonDirectoryName(path string) bool {
+	// Remove leading slash
+	if len(path) > 0 && path[0] == '/' {
+		path = path[1:]
+	}
+
+	// Common directory names (case-insensitive)
+	commonDirs := []string{"iPhone", "Android", "Camera", "DCIM", "Photos",
+		"Pictures", "uploads", "tmp", "temp", "data"}
+
+	pathLower := path
+	for _, dir := range commonDirs {
+		if pathLower == dir || pathLower == dir+"/" {
+			return true
+		}
+	}
+
+	// No file extension = probably a directory
+	// Files usually have extensions like .jpg, .png, etc.
+	hasExtension := false
+	for i := len(path) - 1; i >= 0 && i > len(path)-6; i-- {
+		if path[i] == '.' {
+			hasExtension = true
+			break
+		}
+		if path[i] == '/' {
+			break
+		}
+	}
+
+	return !hasExtension
+}
+
+// RemoveAll accepts recursive deletion but does nothing (no-op)
 func (d *ClientDriver) RemoveAll(path string) error {
-	return ErrDeleteNotAllowed
+	return nil // Success
 }
 
 // Create is a shortcut for OpenFile with write flags
@@ -88,19 +133,21 @@ func (d *ClientDriver) Create(name string) (afero.File, error) {
 	return d.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 }
 
-// Chmod blocks permission changes
+// Chmod accepts permission changes but does nothing (no-op)
+// Some clients set permissions after upload (e.g., 644 for files)
 func (d *ClientDriver) Chmod(name string, mode os.FileMode) error {
-	return ErrChmodNotAllowed
+	return nil // Success (200 OK in FTP)
 }
 
-// Chown blocks ownership changes
+// Chown accepts ownership changes but does nothing (no-op)
 func (d *ClientDriver) Chown(name string, uid, gid int) error {
-	return ErrChownNotAllowed
+	return nil // Success
 }
 
-// Chtimes blocks timestamp changes
+// Chtimes accepts timestamp changes but does nothing (no-op)
+// Clients often preserve original file timestamps (MFMT command)
 func (d *ClientDriver) Chtimes(name string, atime time.Time, mtime time.Time) error {
-	return ErrChtimesNotAllowed
+	return nil // Success (213 Modified in FTP)
 }
 
 // ReadDir returns empty list for camera compatibility
@@ -112,14 +159,20 @@ func (d *ClientDriver) ReadDir(dirname string) ([]os.FileInfo, error) {
 
 // fakeFileInfo is a minimal os.FileInfo implementation for camera compatibility
 type fakeFileInfo struct {
-	name string
+	name  string
+	isDir bool
 }
 
 func (fi *fakeFileInfo) Name() string       { return fi.name }
 func (fi *fakeFileInfo) Size() int64        { return 0 }
-func (fi *fakeFileInfo) Mode() os.FileMode  { return 0644 }
+func (fi *fakeFileInfo) Mode() os.FileMode  {
+	if fi.isDir {
+		return os.ModeDir | 0755
+	}
+	return 0644
+}
 func (fi *fakeFileInfo) ModTime() time.Time { return time.Now() }
-func (fi *fakeFileInfo) IsDir() bool        { return false }
+func (fi *fakeFileInfo) IsDir() bool        { return fi.isDir }
 func (fi *fakeFileInfo) Sys() interface{}   { return nil }
 
 // Additional methods to satisfy afero.Fs interface
@@ -129,12 +182,12 @@ func (d *ClientDriver) Lstat(name string) (os.FileInfo, error) {
 	return d.Stat(name)
 }
 
-// Symlink blocks symlink creation
+// Symlink accepts symlink creation but does nothing (no-op)
 func (d *ClientDriver) Symlink(oldname, newname string) error {
-	return ErrSymlinkNotAllowed
+	return nil // Success
 }
 
-// Readlink blocks symlink reading
+// Readlink returns empty string for symlinks (no actual symlinks exist)
 func (d *ClientDriver) Readlink(name string) (string, error) {
-	return "", ErrReadlinkNotAllowed
+	return "", nil // Success, but no symlink target
 }

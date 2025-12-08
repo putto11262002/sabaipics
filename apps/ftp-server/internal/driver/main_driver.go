@@ -19,14 +19,27 @@ type MainDriver struct {
 	config *config.Config
 	// transactions tracks Sentry transactions by client ID for distributed tracing
 	transactions map[uint32]*sentry.Span
+	// tlsMode specifies the TLS requirement mode for this FTP server
+	tlsMode ftpserver.TLSRequirement
 }
 
-// NewMainDriver creates a new MainDriver instance
+// NewMainDriver creates a new MainDriver instance for explicit FTPS (AUTH TLS)
 func NewMainDriver(db *pgxpool.Pool, cfg *config.Config) *MainDriver {
 	return &MainDriver{
 		db:           db,
 		config:       cfg,
 		transactions: make(map[uint32]*sentry.Span),
+		tlsMode:      ftpserver.ClearOrEncrypted, // Explicit FTPS (optional TLS via AUTH TLS)
+	}
+}
+
+// NewMainDriverImplicit creates a new MainDriver instance for implicit FTPS
+func NewMainDriverImplicit(db *pgxpool.Pool, cfg *config.Config) *MainDriver {
+	return &MainDriver{
+		db:           db,
+		config:       cfg,
+		transactions: make(map[uint32]*sentry.Span),
+		tlsMode:      ftpserver.ImplicitEncryption, // Implicit FTPS (immediate TLS)
 	}
 }
 
@@ -40,13 +53,21 @@ func (d *MainDriver) log(clientID uint32) sentry.Logger {
 
 // GetSettings returns FTP server settings
 func (d *MainDriver) GetSettings() (*ftpserver.Settings, error) {
+	listenAddr := d.config.FTPListenAddress
+
+	// If this is an implicit FTPS server, use the implicit FTPS port
+	if d.tlsMode == ftpserver.ImplicitEncryption {
+		listenAddr = d.config.ImplicitFTPSPort
+	}
+
 	return &ftpserver.Settings{
-		ListenAddr: d.config.FTPListenAddress,
+		ListenAddr: listenAddr,
 		PassiveTransferPortRange: &ftpserver.PortRange{
 			Start: d.config.FTPPassivePortStart,
 			End:   d.config.FTPPassivePortEnd,
 		},
 		IdleTimeout: d.config.FTPIdleTimeout,
+		TLSRequired: d.tlsMode, // Set TLS requirement mode
 	}, nil
 }
 
@@ -54,6 +75,11 @@ func (d *MainDriver) GetSettings() (*ftpserver.Settings, error) {
 func (d *MainDriver) ClientConnected(cc ftpserver.ClientContext) (string, error) {
 	clientIP := cc.RemoteAddr().String()
 	clientID := cc.ID()
+
+	// Enable FTP protocol debug mode if configured
+	if d.config.FTPDebug {
+		cc.SetDebug(true)
+	}
 
 	// Create root Sentry transaction for this connection
 	ctx := context.Background()
@@ -141,16 +167,27 @@ func (d *MainDriver) AuthUser(cc ftpserver.ClientContext, user, pass string) (ft
 }
 
 // GetTLSConfig returns TLS configuration for FTPS
-// STUB: Returns nil (no TLS) for initial testing
 func (d *MainDriver) GetTLSConfig() (*tls.Config, error) {
-	// STUB: In production, we would load TLS certificates:
-	// if d.config.TLSCertPath != "" && d.config.TLSKeyPath != "" {
-	//     cert, err := tls.LoadX509KeyPair(d.config.TLSCertPath, d.config.TLSKeyPath)
-	//     if err != nil {
-	//         return nil, err
-	//     }
-	//     return &tls.Config{Certificates: []tls.Certificate{cert}}, nil
-	// }
+	// If TLS cert/key paths are not configured, return nil (plain FTP)
+	if d.config.TLSCertPath == "" || d.config.TLSKeyPath == "" {
+		return nil, nil
+	}
 
-	return nil, nil
+	// Load TLS certificate and private key
+	cert, err := tls.LoadX509KeyPair(d.config.TLSCertPath, d.config.TLSKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load TLS certificate: %w", err)
+	}
+
+	// Return TLS configuration for FTPS (explicit mode - AUTH TLS)
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12, // Require TLS 1.2 or higher
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+		},
+	}, nil
 }

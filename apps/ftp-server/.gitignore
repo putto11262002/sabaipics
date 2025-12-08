@@ -1,0 +1,41 @@
+# Binaries
+bin/
+ftp-server
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Coverage
+*.out
+coverage.txt
+
+# Environment files
+.env
+
+# TLS Certificates (never commit private keys!)
+certs/
+*.pem
+*.key
+*.crt
+*.cer
+
+# Vendor
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
