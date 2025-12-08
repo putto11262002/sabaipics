@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"os"
 	"time"
 
@@ -16,17 +15,17 @@ import (
 type ClientDriver struct {
 	eventID        string
 	photographerID string
+	clientIP       string // Client IP address for upload transaction context
 	config         *config.Config
-	parentCtx      context.Context // Parent context for span propagation to UploadTransfer
 }
 
 // NewClientDriver creates a new ClientDriver instance
-func NewClientDriver(eventID, photographerID string, cfg *config.Config, parentCtx context.Context) *ClientDriver {
+func NewClientDriver(eventID, photographerID, clientIP string, cfg *config.Config) *ClientDriver {
 	return &ClientDriver{
 		eventID:        eventID,
 		photographerID: photographerID,
+		clientIP:       clientIP,
 		config:         cfg,
-		parentCtx:      parentCtx,
 	}
 }
 
@@ -42,8 +41,8 @@ func (d *ClientDriver) OpenFile(name string, flag int, perm os.FileMode) (afero.
 		return nil, ErrDownloadNotAllowed
 	}
 
-	// Create UploadTransfer for streaming upload to R2, passing parent context
-	uploadTransfer := transfer.NewUploadTransfer(d.eventID, name, d.parentCtx)
+	// Create UploadTransfer with context for root transaction
+	uploadTransfer := transfer.NewUploadTransfer(d.eventID, d.photographerID, d.clientIP, name)
 	return uploadTransfer, nil
 }
 

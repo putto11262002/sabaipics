@@ -1034,3 +1034,471 @@ Target: Transaction per upload (correct!)
 **Test Status**: ✅ Mobile client uploads successful
 **Commit**: Ready for commit
 
+---
+
+## Phase 13: Sentry Tracing Refactor - Upload-Based Transactions (2025-12-08)
+
+### Objective
+Refactor Sentry distributed tracing from connection-level transactions to upload-level transactions for accurate observability and future pipeline tracing.
+
+### Problem
+Sentry transactions were created per FTP connection, not per upload:
+- ❌ Transaction started at `ClientConnected()` (lasted hours)
+- ❌ Multiple uploads shared same transaction
+- ❌ Impossible to trace individual uploads
+- ❌ Poor performance metrics (P95 latency meaningless)
+- ❌ Can't track upload pipeline (FTP → R2 → DB → Thumbnail)
+
+### Solution
+Create root transactions per upload with comprehensive context:
+- ✅ Transaction lifecycle matches upload lifecycle
+- ✅ Each upload independently traceable
+- ✅ Accurate metrics per file (duration, throughput, errors)
+- ✅ Ready for pipeline propagation (future: R2, DB, thumbnails)
+- ✅ Clear error attribution (which upload failed?)
+
+### Architecture Change
+
+**Before** (Connection-Level):
+```
+┌───────────────────────────────────────────────┐
+│ MainDriver: ClientConnected()                 │
+│   → Start Transaction (ID: connection-123)    │
+│   → Store in transactions[clientID]           │
+│                                               │
+│   ClientDriver: OpenFile()                    │
+│     → UploadTransfer: Create child span      │
+│       → Upload file 1 (span in transaction)  │
+│                                               │
+│   ClientDriver: OpenFile()                    │
+│     → UploadTransfer: Create child span      │
+│       → Upload file 2 (span in transaction)  │
+│                                               │
+│   MainDriver: ClientDisconnected()            │
+│   → Finish Transaction (after hours!)        │
+│   → Delete from transactions[clientID]       │
+└───────────────────────────────────────────────┘
+```
+
+**After** (Upload-Level):
+```
+┌───────────────────────────────────────────────┐
+│ MainDriver: ClientConnected()                 │
+│   → Log: "Client connected"                  │
+│   → NO transaction created                   │
+│                                               │
+│   ClientDriver: OpenFile()                    │
+│     → UploadTransfer: Create ROOT transaction│
+│       → Transaction ID: upload-abc123        │
+│       → Tags: file.name, event.id, etc.      │
+│       → Upload file 1                        │
+│       → Finish transaction (seconds)         │
+│                                               │
+│   ClientDriver: OpenFile()                    │
+│     → UploadTransfer: Create ROOT transaction│
+│       → Transaction ID: upload-def456        │
+│       → Tags: file.name, event.id, etc.      │
+│       → Upload file 2                        │
+│       → Finish transaction (seconds)         │
+│                                               │
+│   MainDriver: ClientDisconnected()            │
+│   → Log: "Client disconnected"               │
+│   → NO transaction cleanup                   │
+└───────────────────────────────────────────────┘
+```
+
+### Implementation
+
+#### 1. MainDriver: Remove Connection Transactions
+
+**File**: `internal/driver/main_driver.go`
+
+**Removed**:
+- `transactions map[uint32]*sentry.Span` field
+- Map initialization in constructors
+- Transaction creation in `ClientConnected()`
+- Transaction cleanup in `ClientDisconnected()`
+- `clientID` parameter from `log()` method
+
+**Changes**:
+```go
+// Before
+type MainDriver struct {
+    db           *pgxpool.Pool
+    config       *config.Config
+    transactions map[uint32]*sentry.Span // Per-connection transactions
+    tlsMode      ftpserver.TLSRequirement
+}
+
+func (d *MainDriver) log(clientID uint32) sentry.Logger {
+    if txn, exists := d.transactions[clientID]; exists && txn != nil {
+        return sentry.NewLogger(txn.Context())
+    }
+    return sentry.NewLogger(context.Background())
+}
+
+func (d *MainDriver) ClientConnected(cc ftpserver.ClientContext) (string, error) {
+    // ...
+    transaction := sentry.StartTransaction(ctx, fmt.Sprintf("ftp.connection.%d", clientID))
+    d.transactions[clientID] = transaction
+    // ...
+}
+
+func (d *MainDriver) ClientDisconnected(cc ftpserver.ClientContext) {
+    if transaction, exists := d.transactions[clientID]; exists {
+        transaction.Finish()
+        delete(d.transactions, clientID)
+    }
+}
+
+// After
+type MainDriver struct {
+    db      *pgxpool.Pool
+    config  *config.Config
+    tlsMode ftpserver.TLSRequirement
+}
+
+func (d *MainDriver) log() sentry.Logger {
+    return sentry.NewLogger(context.Background())
+}
+
+func (d *MainDriver) ClientConnected(cc ftpserver.ClientContext) (string, error) {
+    // Just log, no transaction
+    d.log().Info().Emitf("Client connected: %s (ID: %d)", clientIP, clientID)
+    return fmt.Sprintf("Welcome to SabaiPics FTP Server (Client: %s)", clientIP), nil
+}
+
+func (d *MainDriver) ClientDisconnected(cc ftpserver.ClientContext) {
+    // Just log, no transaction cleanup
+    d.log().Info().Emitf("Client disconnected: %s (ID: %d)", clientIP, clientID)
+}
+```
+
+**AuthUser Update**:
+```go
+// Before: Pass transaction context to ClientDriver
+var parentCtx context.Context
+if transaction, exists := d.transactions[clientID]; exists {
+    parentCtx = transaction.Context()
+}
+clientDriver := client.NewClientDriver(eventID, photographerID, d.config, parentCtx)
+
+// After: Pass client IP for upload transaction tags
+clientDriver := client.NewClientDriver(eventID, photographerID, clientIP, d.config)
+```
+
+#### 2. ClientDriver: Accept clientIP Instead of Context
+
+**File**: `internal/client/client_driver.go`
+
+**Changes**:
+```go
+// Before
+type ClientDriver struct {
+    eventID        string
+    photographerID string
+    config         *config.Config
+    parentCtx      context.Context // Connection-level context
+}
+
+func NewClientDriver(eventID, photographerID string, cfg *config.Config,
+                     parentCtx context.Context) *ClientDriver {
+    return &ClientDriver{
+        eventID:        eventID,
+        photographerID: photographerID,
+        config:         cfg,
+        parentCtx:      parentCtx,
+    }
+}
+
+func (d *ClientDriver) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
+    // ...
+    uploadTransfer := transfer.NewUploadTransfer(d.eventID, name, d.parentCtx)
+    return uploadTransfer, nil
+}
+
+// After
+type ClientDriver struct {
+    eventID        string
+    photographerID string
+    clientIP       string // Client IP address for upload transaction context
+    config         *config.Config
+}
+
+func NewClientDriver(eventID, photographerID, clientIP string,
+                     cfg *config.Config) *ClientDriver {
+    return &ClientDriver{
+        eventID:        eventID,
+        photographerID: photographerID,
+        clientIP:       clientIP,
+        config:         cfg,
+    }
+}
+
+func (d *ClientDriver) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
+    // ...
+    uploadTransfer := transfer.NewUploadTransfer(d.eventID, d.photographerID, d.clientIP, name)
+    return uploadTransfer, nil
+}
+```
+
+**Removed**: Unused `context` import (compilation fix)
+
+#### 3. UploadTransfer: Create Root Transactions
+
+**File**: `internal/transfer/upload_transfer.go`
+
+**Changes**:
+```go
+// Before: Child span
+type UploadTransfer struct {
+    eventID      string
+    filename     string
+    // ...
+    uploadSpan   *sentry.Span // CHILD span in connection transaction
+}
+
+func (t *UploadTransfer) log() sentry.Logger {
+    if t.uploadSpan != nil {
+        return sentry.NewLogger(t.uploadSpan.Context())
+    }
+    return sentry.NewLogger(context.Background())
+}
+
+func NewUploadTransfer(eventID, filename string, parentCtx context.Context) *UploadTransfer {
+    pr, pw := io.Pipe()
+
+    // Create CHILD span in parent transaction
+    uploadSpan := sentry.StartSpan(parentCtx, "ftp.upload")
+    uploadSpan.SetTag("file.name", filename)
+    uploadSpan.SetTag("event.id", eventID)
+
+    transfer := &UploadTransfer{
+        eventID:    eventID,
+        filename:   filename,
+        // ...
+        uploadSpan: uploadSpan,
+    }
+    // ...
+}
+
+func (t *UploadTransfer) Close() error {
+    // ...
+    if t.uploadSpan != nil {
+        t.uploadSpan.Finish()
+    }
+    // ...
+}
+
+// After: Root transaction
+type UploadTransfer struct {
+    eventID           string
+    photographerID    string
+    clientIP          string
+    filename          string
+    // ...
+    uploadTransaction *sentry.Span // ROOT transaction for this upload
+}
+
+func (t *UploadTransfer) log() sentry.Logger {
+    if t.uploadTransaction != nil {
+        return sentry.NewLogger(t.uploadTransaction.Context())
+    }
+    return sentry.NewLogger(context.Background())
+}
+
+func NewUploadTransfer(eventID, photographerID, clientIP, filename string) *UploadTransfer {
+    pr, pw := io.Pipe()
+
+    // Create ROOT transaction for this upload
+    ctx := context.Background()
+    uploadTransaction := sentry.StartTransaction(ctx,
+        "ftp.upload",
+        sentry.WithTransactionSource(sentry.SourceCustom),
+    )
+
+    // Add comprehensive tags for filtering and analysis
+    uploadTransaction.SetTag("file.name", filename)
+    uploadTransaction.SetTag("event.id", eventID)
+    uploadTransaction.SetTag("photographer.id", photographerID)
+    uploadTransaction.SetTag("client.ip", clientIP)
+
+    transfer := &UploadTransfer{
+        eventID:           eventID,
+        photographerID:    photographerID,
+        clientIP:          clientIP,
+        filename:          filename,
+        // ...
+        uploadTransaction: uploadTransaction,
+    }
+    // ...
+}
+
+func (t *UploadTransfer) Close() error {
+    // ...
+
+    // Add metrics to transaction
+    if t.uploadTransaction != nil {
+        t.uploadTransaction.SetData("upload.bytes", bytesTotal)
+        t.uploadTransaction.SetData("upload.duration_ms", duration.Milliseconds())
+        t.uploadTransaction.SetData("upload.throughput_mbps", throughputMBps)
+
+        if err != nil {
+            t.uploadTransaction.Status = sentry.SpanStatusInternalError
+            t.uploadTransaction.SetTag("error", "true")
+            t.uploadTransaction.SetData("error.message", err.Error())
+        } else {
+            t.uploadTransaction.Status = sentry.SpanStatusOK
+        }
+
+        t.uploadTransaction.Finish()
+    }
+    // ...
+}
+```
+
+### Transaction Lifecycle
+
+**1:1 Relationship** - Each UploadTransfer has exactly one transaction:
+```
+ClientDriver.OpenFile()
+    → Creates UploadTransfer
+    → UploadTransfer.New() creates ROOT transaction
+    → FTP client writes data to UploadTransfer
+    → UploadTransfer.Close() finishes transaction
+    → UploadTransfer destroyed (never reused)
+```
+
+**Transaction Duration**: Seconds (upload time), not hours (connection time)
+
+### Transaction Tags & Metrics
+
+**Tags** (for filtering in Sentry):
+- `file.name`: Filename being uploaded
+- `event.id`: Event this upload belongs to
+- `photographer.id`: Photographer performing upload
+- `client.ip`: Client IP address
+
+**Metrics** (for performance analysis):
+- `upload.bytes`: Total bytes transferred
+- `upload.duration_ms`: Upload duration in milliseconds
+- `upload.throughput_mbps`: Transfer speed in MB/s
+
+**Status**:
+- `SpanStatusOK`: Upload completed successfully
+- `SpanStatusInternalError`: Upload failed with error
+
+### Testing Results
+
+**Test Command**:
+```bash
+echo "Tracing refactor test" > /tmp/trace-test.txt
+curl -s ftp://testuser:testpass@localhost:2121/ -T /tmp/trace-test.txt
+```
+
+**Server Logs**:
+```
+[Sentry] Client connected: [::1]:61673 (ID: 1)
+[Sentry] Auth attempt: user=testuser, client=[::1]:61673
+[Sentry] STUB: Accepting credentials for user=testuser (no DB validation)
+[Sentry] Upload started: file=/trace-test.txt, event=stub-event-id, photographer=stub-photographer-id, client=[::1]:61673
+[Sentry] STUB: Background upload started for file=/trace-test.txt
+[Sentry] STUB: R2 upload stream complete for file=/trace-test.txt (total: 22 bytes)
+[Sentry] Sending transaction [29751e46f0d94b7783e2fb83b4569acb] to Sentry
+[Sentry] Upload completed: file=/trace-test.txt, bytes=22, duration=158.25µs, throughput=0.13 MB/s
+[Sentry] Client disconnected: [::1]:61673 (ID: 1)
+```
+
+**Key Observations**:
+- ✅ Transaction sent immediately after upload (not hours later)
+- ✅ Transaction ID unique per upload: `29751e46f0d94b7783e2fb83b4569acb`
+- ✅ Complete context: file, event, photographer, client IP
+- ✅ Accurate metrics: 22 bytes, 158.25µs, 0.13 MB/s
+- ✅ Clean separation: connection logs vs upload transaction
+
+### Benefits Achieved
+
+**Observability**:
+- ✅ Each upload has unique transaction ID
+- ✅ Can filter by file, event, photographer, or client IP
+- ✅ Accurate P50/P95/P99 latency per upload
+- ✅ Easy to identify slow uploads
+
+**Error Tracking**:
+- ✅ Know exactly which upload failed
+- ✅ See error message in transaction data
+- ✅ Transaction marked with `error: true` tag
+- ✅ Failed uploads filterable in Sentry
+
+**Future Pipeline**:
+- ✅ Ready for distributed tracing
+- ✅ Can propagate traceparent to R2 metadata
+- ✅ Can create child spans for DB insert, thumbnail generation
+- ✅ End-to-end visibility: FTP → R2 → DB → Thumbnails
+
+**Performance**:
+- ✅ No connection-level transaction overhead
+- ✅ Transactions only exist during active uploads
+- ✅ Memory efficient (no long-lived transaction map)
+
+### Files Modified
+
+1. `internal/driver/main_driver.go` - Removed connection-level transaction tracking
+2. `internal/client/client_driver.go` - Accept clientIP instead of parentCtx, removed unused import
+3. `internal/transfer/upload_transfer.go` - Create root transactions per upload
+
+### Compilation Fix
+
+**Error**:
+```
+internal/client/client_driver.go:4:2: "context" imported and not used
+```
+
+**Fix**: Removed unused `context` import after refactoring away `parentCtx` parameter
+
+### Future Work
+
+**Pipeline Tracing** (Out of scope for this phase):
+```
+ROOT Transaction: ftp.upload
+    ├─ Span: r2.upload (propagate traceparent)
+    ├─ Span: db.insert_photo
+    └─ Span: thumbnail.generate
+        ├─ Span: thumbnail.small
+        ├─ Span: thumbnail.medium
+        └─ Span: thumbnail.large
+```
+
+This architecture is now ready for pipeline tracing when R2 and DB implementations are added.
+
+### Known Behavior
+
+**Connection Events** (No transactions):
+- Client connected → INFO log only
+- Client disconnected → INFO log only
+- Auth attempt → INFO log only
+
+**Upload Events** (Root transactions):
+- Upload started → Create transaction + INFO log
+- Upload completed → Finish transaction + metrics + INFO log
+- Upload failed → Finish transaction + error status + ERROR log
+
+### Comparison: Before vs After
+
+| Aspect | Before (Connection) | After (Upload) |
+|--------|-------------------|----------------|
+| Transaction scope | Entire connection | Single upload |
+| Transaction duration | Hours | Seconds |
+| Transactions per connection | 1 | N (one per file) |
+| Traceability | Poor (many uploads in one) | Excellent (one per upload) |
+| Performance metrics | Meaningless (mixed uploads) | Accurate (per file) |
+| Error attribution | Ambiguous | Precise |
+| Pipeline ready | No | Yes |
+| Memory usage | Map grows with clients | Ephemeral (seconds) |
+
+---
+
+**Phase 13 Duration**: ~30 minutes
+**Build Status**: ✅ Compiles without errors
+**Test Status**: ✅ Upload with new transaction architecture verified
+**Commit**: Ready for commit

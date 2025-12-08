@@ -13,50 +13,64 @@ import (
 
 // UploadTransfer implements the afero.File interface for streaming uploads
 // Uses io.Pipe to stream data directly to R2 without buffering to disk
-// LIFETIME CONTRACT: 1:1 with uploadSpan. Must not be reused after Close().
+// LIFETIME CONTRACT: 1:1 with uploadTransaction. Must not be reused after Close().
 type UploadTransfer struct {
-	eventID      string
-	filename     string
-	pipeReader   *io.PipeReader
-	pipeWriter   *io.PipeWriter
-	uploadDone   chan error
-	bytesWritten atomic.Int64
-	startTime    time.Time
-	uploadSpan   *sentry.Span // Sentry span for upload tracking (1:1 lifetime)
+	eventID           string
+	photographerID    string
+	clientIP          string
+	filename          string
+	pipeReader        *io.PipeReader
+	pipeWriter        *io.PipeWriter
+	uploadDone        chan error
+	bytesWritten      atomic.Int64
+	startTime         time.Time
+	uploadTransaction *sentry.Span // Sentry ROOT transaction for this upload (1:1 lifetime)
 }
 
-// log returns a Sentry logger bound to the upload span context
+// log returns a Sentry logger bound to the upload transaction context
 func (t *UploadTransfer) log() sentry.Logger {
-	if t.uploadSpan != nil {
-		return sentry.NewLogger(t.uploadSpan.Context())
+	if t.uploadTransaction != nil {
+		return sentry.NewLogger(t.uploadTransaction.Context())
 	}
 	return sentry.NewLogger(context.Background())
 }
 
 // NewUploadTransfer creates a new upload transfer for streaming to R2
-func NewUploadTransfer(eventID, filename string, parentCtx context.Context) *UploadTransfer {
+// Creates a ROOT Sentry transaction for this upload (not a child span)
+func NewUploadTransfer(eventID, photographerID, clientIP, filename string) *UploadTransfer {
 	pr, pw := io.Pipe()
 
-	// Create child Sentry span from parent context
-	uploadSpan := sentry.StartSpan(parentCtx, "ftp.upload")
-	uploadSpan.SetTag("file.name", filename)
-	uploadSpan.SetTag("event.id", eventID)
+	// Create ROOT Sentry transaction for this upload
+	ctx := context.Background()
+	uploadTransaction := sentry.StartTransaction(ctx,
+		"ftp.upload",
+		sentry.WithTransactionSource(sentry.SourceCustom),
+	)
+
+	// Add comprehensive tags for filtering and analysis
+	uploadTransaction.SetTag("file.name", filename)
+	uploadTransaction.SetTag("event.id", eventID)
+	uploadTransaction.SetTag("photographer.id", photographerID)
+	uploadTransaction.SetTag("client.ip", clientIP)
 
 	transfer := &UploadTransfer{
-		eventID:    eventID,
-		filename:   filename,
-		pipeReader: pr,
-		pipeWriter: pw,
-		uploadDone: make(chan error, 1),
-		startTime:  time.Now(),
-		uploadSpan: uploadSpan,
+		eventID:           eventID,
+		photographerID:    photographerID,
+		clientIP:          clientIP,
+		filename:          filename,
+		pipeReader:        pr,
+		pipeWriter:        pw,
+		uploadDone:        make(chan error, 1),
+		startTime:         time.Now(),
+		uploadTransaction: uploadTransaction,
 	}
 
 	// Start background goroutine to stream to R2
 	go transfer.streamToR2()
 
 	// Log upload creation at I/O boundary
-	transfer.log().Info().Emitf("Upload started: file=%s, event=%s", filename, eventID)
+	transfer.log().Info().Emitf("Upload started: file=%s, event=%s, photographer=%s, client=%s",
+		filename, eventID, photographerID, clientIP)
 
 	return transfer
 }
@@ -73,10 +87,11 @@ func (t *UploadTransfer) Write(p []byte) (int, error) {
 func (t *UploadTransfer) Close() error {
 	// Signal EOF to the pipe reader
 	if err := t.pipeWriter.Close(); err != nil {
-		if t.uploadSpan != nil {
-			t.uploadSpan.SetTag("error", "true")
-			t.uploadSpan.SetData("error.message", err.Error())
-			t.uploadSpan.Finish()
+		if t.uploadTransaction != nil {
+			t.uploadTransaction.Status = sentry.SpanStatusInternalError
+			t.uploadTransaction.SetTag("error", "true")
+			t.uploadTransaction.SetData("error.message", err.Error())
+			t.uploadTransaction.Finish()
 		}
 		t.log().Error().Emitf("Pipe close error: file=%s, error=%v", t.filename, err)
 		return err
@@ -89,18 +104,21 @@ func (t *UploadTransfer) Close() error {
 	bytesTotal := t.bytesWritten.Load()
 	throughputMBps := float64(bytesTotal) / duration.Seconds() / 1024 / 1024
 
-	// Add metrics to Sentry span
-	if t.uploadSpan != nil {
-		t.uploadSpan.SetData("upload.bytes", bytesTotal)
-		t.uploadSpan.SetData("upload.duration_ms", duration.Milliseconds())
-		t.uploadSpan.SetData("upload.throughput_mbps", throughputMBps)
+	// Add metrics to Sentry transaction
+	if t.uploadTransaction != nil {
+		t.uploadTransaction.SetData("upload.bytes", bytesTotal)
+		t.uploadTransaction.SetData("upload.duration_ms", duration.Milliseconds())
+		t.uploadTransaction.SetData("upload.throughput_mbps", throughputMBps)
 
 		if err != nil {
-			t.uploadSpan.SetTag("error", "true")
-			t.uploadSpan.SetData("error.message", err.Error())
+			t.uploadTransaction.Status = sentry.SpanStatusInternalError
+			t.uploadTransaction.SetTag("error", "true")
+			t.uploadTransaction.SetData("error.message", err.Error())
+		} else {
+			t.uploadTransaction.Status = sentry.SpanStatusOK
 		}
 
-		t.uploadSpan.Finish()
+		t.uploadTransaction.Finish()
 	}
 
 	// Log at I/O boundary

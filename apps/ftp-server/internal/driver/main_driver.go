@@ -17,8 +17,6 @@ import (
 type MainDriver struct {
 	db     *pgxpool.Pool
 	config *config.Config
-	// transactions tracks Sentry transactions by client ID for distributed tracing
-	transactions map[uint32]*sentry.Span
 	// tlsMode specifies the TLS requirement mode for this FTP server
 	tlsMode ftpserver.TLSRequirement
 }
@@ -26,28 +24,24 @@ type MainDriver struct {
 // NewMainDriver creates a new MainDriver instance for explicit FTPS (AUTH TLS)
 func NewMainDriver(db *pgxpool.Pool, cfg *config.Config) *MainDriver {
 	return &MainDriver{
-		db:           db,
-		config:       cfg,
-		transactions: make(map[uint32]*sentry.Span),
-		tlsMode:      ftpserver.ClearOrEncrypted, // Explicit FTPS (optional TLS via AUTH TLS)
+		db:      db,
+		config:  cfg,
+		tlsMode: ftpserver.ClearOrEncrypted, // Explicit FTPS (optional TLS via AUTH TLS)
 	}
 }
 
 // NewMainDriverImplicit creates a new MainDriver instance for implicit FTPS
 func NewMainDriverImplicit(db *pgxpool.Pool, cfg *config.Config) *MainDriver {
 	return &MainDriver{
-		db:           db,
-		config:       cfg,
-		transactions: make(map[uint32]*sentry.Span),
-		tlsMode:      ftpserver.ImplicitEncryption, // Implicit FTPS (immediate TLS)
+		db:      db,
+		config:  cfg,
+		tlsMode: ftpserver.ImplicitEncryption, // Implicit FTPS (immediate TLS)
 	}
 }
 
-// log returns a Sentry logger bound to the client's transaction context
-func (d *MainDriver) log(clientID uint32) sentry.Logger {
-	if txn, exists := d.transactions[clientID]; exists && txn != nil {
-		return sentry.NewLogger(txn.Context())
-	}
+// log returns a Sentry logger for application-level events
+// Upload-level tracing is now handled in UploadTransfer, not at connection level
+func (d *MainDriver) log() sentry.Logger {
 	return sentry.NewLogger(context.Background())
 }
 
@@ -81,21 +75,8 @@ func (d *MainDriver) ClientConnected(cc ftpserver.ClientContext) (string, error)
 		cc.SetDebug(true)
 	}
 
-	// Create root Sentry transaction for this connection
-	ctx := context.Background()
-	transaction := sentry.StartTransaction(ctx,
-		fmt.Sprintf("ftp.connection.%d", clientID),
-		sentry.WithTransactionSource(sentry.SourceCustom),
-	)
-	transaction.SetTag("client.ip", clientIP)
-	transaction.SetTag("client.id", fmt.Sprintf("%d", clientID))
-	transaction.SetData("server.port", d.config.FTPListenAddress)
-
-	// Store transaction for later retrieval in child operations
-	d.transactions[clientID] = transaction
-
-	// Log at application boundary
-	d.log(clientID).Info().Emitf("Client connected: %s (ID: %d)", clientIP, clientID)
+	// Log at application boundary (no transaction - uploads create their own)
+	d.log().Info().Emitf("Client connected: %s (ID: %d)", clientIP, clientID)
 
 	return fmt.Sprintf("Welcome to SabaiPics FTP Server (Client: %s)", clientIP), nil
 }
@@ -105,41 +86,17 @@ func (d *MainDriver) ClientDisconnected(cc ftpserver.ClientContext) {
 	clientID := cc.ID()
 	clientIP := cc.RemoteAddr().String()
 
-	// Log at application boundary before finishing transaction
-	d.log(clientID).Info().Emitf("Client disconnected: %s (ID: %d)", clientIP, clientID)
-
-	// Finish the Sentry transaction if it exists
-	if transaction, exists := d.transactions[clientID]; exists {
-		transaction.Finish()
-		delete(d.transactions, clientID)
-	}
+	// Log at application boundary (no transaction cleanup needed)
+	d.log().Info().Emitf("Client disconnected: %s (ID: %d)", clientIP, clientID)
 }
 
 // AuthUser validates FTP credentials (application boundary)
 // STUB: Returns mock ClientDriver instead of querying the database
 func (d *MainDriver) AuthUser(cc ftpserver.ClientContext, user, pass string) (ftpserver.ClientDriver, error) {
-	clientID := cc.ID()
 	clientIP := cc.RemoteAddr().String()
 
-	// Get the parent transaction context
-	var parentCtx context.Context
-	var authSpan *sentry.Span
-
-	if transaction, exists := d.transactions[clientID]; exists {
-		// Create child span using parent transaction's context
-		parentCtx = transaction.Context()
-		authSpan = sentry.StartSpan(parentCtx, "ftp.auth")
-		defer authSpan.Finish()
-
-		authSpan.SetTag("ftp.username", user)
-		authSpan.SetTag("client.ip", clientIP)
-	} else {
-		// No transaction found - use background context
-		parentCtx = context.Background()
-	}
-
 	// Log auth attempt at application boundary
-	d.log(clientID).Info().Emitf("Auth attempt: user=%s, client=%s", user, clientIP)
+	d.log().Info().Emitf("Auth attempt: user=%s, client=%s", user, clientIP)
 
 	// STUB: In real implementation, we would:
 	// 1. Query: SELECT * FROM events WHERE ftp_username = $1
@@ -152,16 +109,10 @@ func (d *MainDriver) AuthUser(cc ftpserver.ClientContext, user, pass string) (ft
 	photographerID := "stub-photographer-id"
 
 	// Log stub acceptance
-	d.log(clientID).Debug().Emitf("STUB: Accepting credentials for user=%s (no DB validation)", user)
+	d.log().Debug().Emitf("STUB: Accepting credentials for user=%s (no DB validation)", user)
 
-	// Create mock ClientDriver with parent context for upload span propagation
-	clientDriver := client.NewClientDriver(eventID, photographerID, d.config, parentCtx)
-
-	// Add event context to Sentry span
-	if authSpan != nil {
-		authSpan.SetTag("event.id", eventID)
-		authSpan.SetTag("photographer.id", photographerID)
-	}
+	// Create ClientDriver with client IP for upload transaction context
+	clientDriver := client.NewClientDriver(eventID, photographerID, clientIP, d.config)
 
 	return clientDriver, nil
 }
