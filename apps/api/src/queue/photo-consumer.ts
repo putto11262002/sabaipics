@@ -3,8 +3,8 @@
  *
  * Handles photo-processing queue messages with:
  * - Rate limiting via Durable Object (RPC)
- * - Per-message ack/retry
- * - Error classification and backoff
+ * - Parallel request execution with paced initiation (20ms intervals)
+ * - Per-message ack/retry based on individual results
  *
  * Infrastructure layer:
  * - Fetches image from R2
@@ -37,12 +37,12 @@ import { sleep } from "../utils/async";
 
 /**
  * Result of processing a single photo.
- * Contains Rekognition results for application layer to handle.
+ * Uses [data, error] pattern so promises always resolve.
  */
-export interface PhotoProcessingResult {
-  success: boolean;
-  data?: IndexFacesResult;
-  error?: string;
+interface ProcessingResult {
+  message: Message<PhotoJob>;
+  data: IndexFacesResult | null;
+  error: unknown;
 }
 
 // =============================================================================
@@ -51,7 +51,11 @@ export interface PhotoProcessingResult {
 
 /**
  * Queue consumer handler for photo processing.
- * Uses RPC to communicate with rate limiter DO.
+ *
+ * Strategy:
+ * - Fire Rekognition requests at 20ms intervals (50 TPS pacing)
+ * - Don't await each response - let them complete in parallel
+ * - Collect all results, then handle ack/retry at the end
  */
 export async function queue(
   batch: MessageBatch<PhotoJob>,
@@ -75,47 +79,64 @@ export async function queue(
     await sleep(delay);
   }
 
-  // Process each message with pacing
-  for (const message of batch.messages) {
-    const job = message.body;
+  // Create Rekognition client once for entire batch
+  const client = createRekognitionClient({
+    AWS_ACCESS_KEY_ID: env.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: env.AWS_SECRET_ACCESS_KEY,
+    AWS_REGION: env.AWS_REGION,
+  });
 
-    try {
-      // 1. Fetch image from R2
-      const object = await env.PHOTOS_BUCKET.get(job.r2_key);
-
-      if (!object) {
-        console.error(`[Queue] Image not found: ${job.r2_key}`);
-        message.ack(); // Don't retry - image doesn't exist
-        continue;
+  // Fire all requests with paced initiation (20ms intervals)
+  // Don't await individual responses - let them complete in parallel
+  const results = await Promise.all(
+    batch.messages.map(async (message, index): Promise<ProcessingResult> => {
+      // Pace request initiation to stay within TPS limit
+      if (index > 0) {
+        await sleep(index * intervalMs);
       }
 
-      const imageBytes = await object.arrayBuffer();
+      const job = message.body;
 
-      // 2. Create Rekognition client
-      const client = createRekognitionClient({
-        AWS_ACCESS_KEY_ID: env.AWS_ACCESS_KEY_ID,
-        AWS_SECRET_ACCESS_KEY: env.AWS_SECRET_ACCESS_KEY,
-        AWS_REGION: env.AWS_REGION,
-      });
+      try {
+        // Fetch image from R2
+        const object = await env.PHOTOS_BUCKET.get(job.r2_key);
 
-      // 3. Call Rekognition IndexFaces
-      const result = await indexFaces(
-        client,
-        job.event_id,
-        imageBytes,
-        job.photo_id
-      );
+        if (!object) {
+          return {
+            message,
+            data: null,
+            error: new Error(`Image not found: ${job.r2_key}`),
+          };
+        }
 
-      // TODO: Application layer will handle DB writes here
-      // For now, just ack the message
-      message.ack();
-    } catch (error) {
-      // Handle errors with appropriate retry strategy
+        const imageBytes = await object.arrayBuffer();
+
+        // Call Rekognition IndexFaces
+        const result = await indexFaces(
+          client,
+          job.event_id,
+          imageBytes,
+          job.photo_id
+        );
+
+        return { message, data: result, error: null };
+      } catch (error) {
+        return { message, data: null, error };
+      }
+    })
+  );
+
+  // Handle ack/retry based on individual results
+  let hasThrottleError = false;
+
+  for (const { message, data, error } of results) {
+    if (error) {
       const errorMessage = formatErrorMessage(error);
+      const job = message.body;
 
       if (isThrottlingError(error)) {
         console.error(`[Queue] Throttled: ${job.photo_id} - ${errorMessage}`);
-        await rateLimiter.reportThrottle(2000);
+        hasThrottleError = true;
         message.retry({ delaySeconds: getThrottleBackoffDelay(message.attempts) });
       } else if (isNonRetryableError(error)) {
         console.error(`[Queue] Non-retryable: ${job.photo_id} - ${errorMessage}`);
@@ -127,9 +148,14 @@ export async function queue(
         console.error(`[Queue] Unknown error: ${job.photo_id} - ${errorMessage}`);
         message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
       }
+    } else {
+      // TODO: Application layer will handle DB writes here
+      message.ack();
     }
+  }
 
-    // Pace requests to stay within TPS limit
-    await sleep(intervalMs);
+  // Report throttle to rate limiter if any request was throttled
+  if (hasThrottleError) {
+    await rateLimiter.reportThrottle(2000);
   }
 }
