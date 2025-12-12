@@ -15,7 +15,7 @@ import {
   indexFaces,
 } from "../src/lib/rekognition";
 import type { RekognitionClient } from "@aws-sdk/client-rekognition";
-import { generateTestImage } from "./fixtures/generate-image";
+import { getTestImage } from "./fixtures/test-images";
 
 // Only run when INTEGRATION=true
 describe.runIf(process.env.INTEGRATION === "true")(
@@ -57,10 +57,10 @@ describe.runIf(process.env.INTEGRATION === "true")(
     ); // 30s timeout
 
     it(
-      "indexes faces from test image",
+      "indexes faces from real image",
       async () => {
-        // Generate a simple test image (no real face - will return empty)
-        const testImage = generateTestImage();
+        // Download real test image from R2 (cached locally)
+        const testImage = await getTestImage("1");
 
         const result = await indexFaces(
           client,
@@ -75,15 +75,15 @@ describe.runIf(process.env.INTEGRATION === "true")(
         expect(Array.isArray(result.faceRecords)).toBe(true);
         expect(Array.isArray(result.unindexedFaces)).toBe(true);
 
-        // Generated image has no faces, so expect empty results
-        // This validates the API call works, not face detection accuracy
+        // Image 1 has 4 dancers - expect faces detected
+        expect(result.faceRecords.length).toBeGreaterThan(0);
         console.log(
           `[IndexFaces] Faces found: ${result.faceRecords.length}, ` +
             `Unindexed: ${result.unindexedFaces.length}`
         );
       },
-      30000
-    );
+      60000
+    ); // 60s timeout for download + API call
 
     it(
       "deletes collection successfully",
