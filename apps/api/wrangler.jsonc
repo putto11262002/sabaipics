@@ -3,20 +3,71 @@
 	"name": "api",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-12-06",
+	"compatibility_flags": ["nodejs_compat"],
 	"dev": {
 		"port": 8081
 	},
+
 	// Development environment (default) - localhost
 	"vars": {
 		"CORS_ORIGIN": "http://localhost:5173",
-		"AUTHORIZED_PARTIES": "http://localhost:5173"
+		"AUTHORIZED_PARTIES": "http://localhost:5173",
+		"AWS_REGION": "us-west-2"
 	},
+
+	// R2 bucket for photo storage
+	"r2_buckets": [
+		{
+			"binding": "PHOTOS_BUCKET",
+			"bucket_name": "sabaipics-photos"
+		}
+	],
+
+	// Queue bindings
+	"queues": {
+		"producers": [
+			{
+				"queue": "photo-processing",
+				"binding": "PHOTO_QUEUE"
+			}
+		],
+		"consumers": [
+			{
+				"queue": "photo-processing",
+				"max_batch_size": 50,
+				"max_batch_timeout": 5,
+				"max_retries": 3,
+				"max_concurrency": 1,
+				"dead_letter_queue": "photo-processing-dlq"
+			}
+		]
+	},
+
+	// Durable Objects
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "AWS_REKOGNITION_RATE_LIMITER",
+				"class_name": "RekognitionRateLimiter"
+			}
+		]
+	},
+
+	// DO migrations
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_classes": ["RekognitionRateLimiter"]
+		}
+	],
+
 	"env": {
 		// Staging environment - auto-deploy from master
 		"staging": {
 			"vars": {
 				"CORS_ORIGIN": "https://app-staging.sabaipics.com",
-				"AUTHORIZED_PARTIES": "https://app-staging.sabaipics.com"
+				"AUTHORIZED_PARTIES": "https://app-staging.sabaipics.com",
+				"AWS_REGION": "us-west-2"
 			},
 			"routes": [
 				{
@@ -34,7 +85,8 @@
 		"production": {
 			"vars": {
 				"CORS_ORIGIN": "https://app.sabaipics.com",
-				"AUTHORIZED_PARTIES": "https://app.sabaipics.com"
+				"AUTHORIZED_PARTIES": "https://app.sabaipics.com",
+				"AWS_REGION": "us-west-2"
 			},
 			"routes": [
 				{
@@ -50,36 +102,4 @@
 			}
 		}
 	}
-	// "compatibility_flags": [
-	//   "nodejs_compat"
-	// ],
-	// "vars": {
-	//   "MY_VAR": "my-variable"
-	// },
-	// "kv_namespaces": [
-	//   {
-	//     "binding": "MY_KV_NAMESPACE",
-	//     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-	//   }
-	// ],
-	// "r2_buckets": [
-	//   {
-	//     "binding": "MY_BUCKET",
-	//     "bucket_name": "my-bucket"
-	//   }
-	// ],
-	// "d1_databases": [
-	//   {
-	//     "binding": "MY_DB",
-	//     "database_name": "my-database",
-	//     "database_id": ""
-	//   }
-	// ],
-	// "ai": {
-	//   "binding": "AI"
-	// },
-	// "observability": {
-	//   "enabled": true,
-	//   "head_sampling_rate": 1
-	// }
 }

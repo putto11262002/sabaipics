@@ -21,3 +21,7 @@ jobs:
       - run: pnpm install
 
       - run: pnpm build
+
+      # Run functional + workers tests (no real AWS calls)
+      - name: Run Tests
+        run: pnpm --filter=@sabaipics/api test:run
