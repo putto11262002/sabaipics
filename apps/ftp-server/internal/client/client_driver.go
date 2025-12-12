@@ -4,6 +4,7 @@ import (
 	"os"
 	"time"
 
+	ftpserver "github.com/fclairamb/ftpserverlib"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/config"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/transfer"
@@ -14,21 +15,23 @@ import (
 // This driver enforces upload-only operations without logging (returns error sentinels)
 // Logging is the responsibility of MainDriver at application boundaries
 type ClientDriver struct {
-	eventID    string
-	jwtToken   string
-	clientIP   string // Client IP address for upload transaction context
-	apiClient  *apiclient.Client
-	config     *config.Config
+	eventID       string
+	jwtToken      string
+	clientIP      string // Client IP address for upload transaction context
+	clientContext ftpserver.ClientContext // For disconnecting on auth expiry
+	apiClient     *apiclient.Client
+	config        *config.Config
 }
 
-// NewClientDriver creates a new ClientDriver instance with JWT token and API client
-func NewClientDriver(eventID, jwtToken, clientIP string, apiClient *apiclient.Client, cfg *config.Config) *ClientDriver {
+// NewClientDriver creates a new ClientDriver instance with JWT token, API client, and ClientContext
+func NewClientDriver(eventID, jwtToken, clientIP string, cc ftpserver.ClientContext, apiClient *apiclient.Client, cfg *config.Config) *ClientDriver {
 	return &ClientDriver{
-		eventID:   eventID,
-		jwtToken:  jwtToken,
-		clientIP:  clientIP,
-		apiClient: apiClient,
-		config:    cfg,
+		eventID:       eventID,
+		jwtToken:      jwtToken,
+		clientIP:      clientIP,
+		clientContext: cc,
+		apiClient:     apiClient,
+		config:        cfg,
 	}
 }
 
@@ -44,8 +47,8 @@ func (d *ClientDriver) OpenFile(name string, flag int, perm os.FileMode) (afero.
 		return nil, ErrDownloadNotAllowed
 	}
 
-	// Create UploadTransfer with JWT token and API client for FormData upload
-	uploadTransfer := transfer.NewUploadTransfer(d.eventID, d.jwtToken, d.clientIP, name, d.apiClient)
+	// Create UploadTransfer with JWT token, API client, and ClientContext for FormData upload
+	uploadTransfer := transfer.NewUploadTransfer(d.eventID, d.jwtToken, d.clientIP, name, d.clientContext, d.apiClient)
 	return uploadTransfer, nil
 }
 

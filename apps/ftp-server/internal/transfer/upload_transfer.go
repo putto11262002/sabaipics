@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	ftpserver "github.com/fclairamb/ftpserverlib"
 	"github.com/getsentry/sentry-go"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 )
@@ -25,6 +26,7 @@ type UploadTransfer struct {
 	jwtToken          string
 	clientIP          string
 	filename          string
+	clientContext     ftpserver.ClientContext // For disconnecting on auth expiry
 	apiClient         *apiclient.Client
 	pipeReader        *io.PipeReader
 	pipeWriter        *io.PipeWriter
@@ -44,7 +46,7 @@ func (t *UploadTransfer) log() sentry.Logger {
 
 // NewUploadTransfer creates a new upload transfer for streaming to API via FormData
 // Creates a ROOT Sentry transaction for this upload (not a child span)
-func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, apiClient *apiclient.Client) *UploadTransfer {
+func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, cc ftpserver.ClientContext, apiClient *apiclient.Client) *UploadTransfer {
 	pr, pw := io.Pipe()
 
 	// Create ROOT Sentry transaction for this upload
@@ -64,6 +66,7 @@ func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, apiClient *
 		jwtToken:          jwtToken,
 		clientIP:          clientIP,
 		filename:          filename,
+		clientContext:     cc,
 		apiClient:         apiClient,
 		pipeReader:        pr,
 		pipeWriter:        pw,
@@ -157,8 +160,16 @@ func (t *UploadTransfer) streamToAPI() {
 	if err != nil {
 		// Check for 401 (token expired)
 		if httpResp != nil && httpResp.StatusCode == http.StatusUnauthorized {
-			t.log().Error().Emitf("Auth expired for file=%s: %v", t.filename, err)
-			t.uploadDone <- ErrAuthExpired // Triggers client disconnection
+			t.log().Error().Emitf("Auth expired for file=%s, disconnecting client", t.filename)
+
+			// Disconnect the client using ClientContext.Close()
+			if t.clientContext != nil {
+				if closeErr := t.clientContext.Close(); closeErr != nil {
+					t.log().Error().Emitf("Failed to disconnect client: %v", closeErr)
+				}
+			}
+
+			t.uploadDone <- ErrAuthExpired
 			return
 		}
 

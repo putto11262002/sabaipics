@@ -2,7 +2,7 @@
 
 **Topic**: FTP upload server implementation for event photo distribution
 **Started**: 2025-12-08
-**Status**: Phases 1-9 completed (core implementation with stubs)
+**Status**: Phases 1-15 completed (API integration with disconnect on auth expiry)
 
 ---
 
@@ -1502,3 +1502,148 @@ This architecture is now ready for pipeline tracing when R2 and DB implementatio
 **Build Status**: ✅ Compiles without errors
 **Test Status**: ✅ Upload with new transaction architecture verified
 **Commit**: Ready for commit
+
+---
+
+## Phase 14: API-Based Authentication and FormData Upload ✅
+
+**Date**: 2025-12-12
+**Objective**: Refactor FTP server from direct DB/R2 access to API-based architecture
+
+### Architecture Change
+
+**Before**: FTP Server → Direct DB query + Direct R2 upload
+**After**: FTP Server → API (auth + upload) → R2
+
+```
+┌─────────────┐         ┌──────────────┐         ┌─────────────┐
+│ FTP Server  │────────>│ Hono Worker  │────────>│ R2 Storage  │
+│   (VPS)     │         │   (API)      │         │             │
+│ Thin Proxy  │<────────│  Validates   │         │             │
+└─────────────┘         └──────────────┘         └─────────────┘
+```
+
+### Files Created
+
+**`internal/apiclient/client.go`** - API client with FormData streaming
+- `Authenticate()` - POST /api/ftp/auth, returns JWT token
+- `UploadFormData()` - POST /api/ftp/upload with multipart/form-data
+- Uses `io.Pipe` + `multipart.Writer` for streaming (no buffering)
+- Returns `*http.Response` for status code checking (401 detection)
+
+### Files Modified
+
+**`internal/config/config.go`**
+- Added `APIURL string` field
+- Made `API_URL` required environment variable
+
+**`.env.example`**
+- Added `API_URL=https://api.sabaipics.com`
+
+**`internal/driver/main_driver.go`**
+- Added `apiClient *apiclient.Client` field
+- Updated constructors to create API client
+- Replaced auth stub with `apiClient.Authenticate()` call
+- Returns JWT token to ClientDriver
+
+**`internal/client/client_driver.go`**
+- Replaced `photographerID` with `jwtToken` field
+- Added `apiClient *apiclient.Client` field
+- Updated constructor signature
+- Passes JWT token and API client to UploadTransfer
+
+**`internal/transfer/upload_transfer.go`**
+- Added `jwtToken` and `apiClient` fields
+- Updated constructor signature
+- Replaced `streamToR2()` with `streamToAPI()`
+- Detects 401 → returns `ErrAuthExpired`
+
+### Key Decisions
+
+**FormData over Presigned URLs**:
+- Image validation must happen in API
+- VPS acts as thin proxy only (no direct R2 access)
+- Single upload path through API
+
+**JWT Lifecycle - Reactive (401 Detection)**:
+- No timer management, simpler implementation
+- Handles all auth failure scenarios (expired, revoked, clock skew)
+- Works across server restarts
+
+### API Contracts
+
+**POST /api/ftp/auth**
+- Request: `{ username, password }`
+- Response: `{ token, event_id, event_name, upload_window_end, credits_remaining }`
+
+**POST /api/ftp/upload**
+- FormData fields: `file` (binary), `eventId` (string)
+- Response: `{ data: { id, status, filename, size_bytes, r2_key } }`
+
+---
+
+## Phase 15: Disconnect Client on Auth Expiry ✅
+
+**Date**: 2025-12-12
+**Objective**: Properly disconnect FTP client when JWT token expires (401 from API)
+
+### Problem
+
+When `UploadTransfer.streamToAPI()` received 401 from API:
+1. Returned `ErrAuthExpired` through upload channel
+2. FTP library just sent error response to client
+3. **Connection stayed open** - client could retry
+
+### Solution
+
+Pass `ClientContext` through call chain to enable `Close()` on 401:
+
+```
+MainDriver.AuthUser(cc ClientContext)
+    ↓ passes cc
+ClientDriver (stores cc)
+    ↓ passes cc
+UploadTransfer (has access to cc)
+    ↓ on 401 detected
+ClientContext.Close() → disconnect
+```
+
+### Files Modified
+
+**`internal/client/client_driver.go`**
+- Added `clientContext ftpserver.ClientContext` field
+- Updated `NewClientDriver()` to accept `cc ftpserver.ClientContext`
+- Passes `clientContext` to `NewUploadTransfer()`
+
+**`internal/driver/main_driver.go`**
+- Updated `AuthUser()` to pass `cc` to `NewClientDriver()`
+
+**`internal/transfer/upload_transfer.go`**
+- Added `clientContext ftpserver.ClientContext` field
+- Updated `NewUploadTransfer()` to accept `cc ftpserver.ClientContext`
+- On 401: calls `t.clientContext.Close()` to disconnect client
+
+### Key Code
+
+```go
+// upload_transfer.go:streamToAPI()
+if httpResp != nil && httpResp.StatusCode == http.StatusUnauthorized {
+    t.log().Error().Emitf("Auth expired for file=%s, disconnecting client", t.filename)
+
+    // Disconnect the client using ClientContext.Close()
+    if t.clientContext != nil {
+        if closeErr := t.clientContext.Close(); closeErr != nil {
+            t.log().Error().Emitf("Failed to disconnect client: %v", closeErr)
+        }
+    }
+
+    t.uploadDone <- ErrAuthExpired
+    return
+}
+```
+
+### Build Status
+
+✅ Compiles successfully
+
+---

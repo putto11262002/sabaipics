@@ -119,11 +119,12 @@ func (d *MainDriver) AuthUser(cc ftpserver.ClientContext, user, pass string) (ft
 	d.log().Info().Emitf("FTP auth successful: user=%s, event=%s, credits=%d",
 		user, authResp.EventID, authResp.CreditsRemaining)
 
-	// Create ClientDriver with JWT token, event context, and API client
+	// Create ClientDriver with JWT token, ClientContext (for disconnect), and API client
 	clientDriver := client.NewClientDriver(
 		authResp.EventID,
 		authResp.Token,
 		clientIP,
+		cc, // Pass ClientContext for disconnect on auth expiry
 		d.apiClient,
 		d.config,
 	)
