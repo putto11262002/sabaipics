@@ -76,6 +76,38 @@
 					"custom_domain": true
 				}
 			],
+			"r2_buckets": [
+				{
+					"binding": "PHOTOS_BUCKET",
+					"bucket_name": "sabaipics-photos-staging"
+				}
+			],
+			"queues": {
+				"producers": [
+					{
+						"queue": "photo-processing-staging",
+						"binding": "PHOTO_QUEUE"
+					}
+				],
+				"consumers": [
+					{
+						"queue": "photo-processing-staging",
+						"max_batch_size": 50,
+						"max_batch_timeout": 5,
+						"max_retries": 3,
+						"max_concurrency": 1,
+						"dead_letter_queue": "photo-processing-dlq-staging"
+					}
+				]
+			},
+			"durable_objects": {
+				"bindings": [
+					{
+						"name": "AWS_REKOGNITION_RATE_LIMITER",
+						"class_name": "RekognitionRateLimiter"
+					}
+				]
+			},
 			"observability": {
 				"enabled": true,
 				"head_sampling_rate": 1
@@ -95,6 +127,38 @@
 					"custom_domain": true
 				}
 			],
+			"r2_buckets": [
+				{
+					"binding": "PHOTOS_BUCKET",
+					"bucket_name": "sabaipics-photos"
+				}
+			],
+			"queues": {
+				"producers": [
+					{
+						"queue": "photo-processing",
+						"binding": "PHOTO_QUEUE"
+					}
+				],
+				"consumers": [
+					{
+						"queue": "photo-processing",
+						"max_batch_size": 50,
+						"max_batch_timeout": 5,
+						"max_retries": 3,
+						"max_concurrency": 1,
+						"dead_letter_queue": "photo-processing-dlq"
+					}
+				]
+			},
+			"durable_objects": {
+				"bindings": [
+					{
+						"name": "AWS_REKOGNITION_RATE_LIMITER",
+						"class_name": "RekognitionRateLimiter"
+					}
+				]
+			},
 			"preview_urls": false,
 			"observability": {
 				"enabled": true,
