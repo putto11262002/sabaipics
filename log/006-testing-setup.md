@@ -57,8 +57,9 @@ pnpm test:integration  # Requires INTEGRATION=true
 | `tests/setup.ts` | Global test setup (credential validation) |
 | `tests/rate-limiter.workers.test.ts` | DO behavior tests (4 tests) |
 | `tests/rekognition.test.ts` | AWS SDK mock tests (11 tests) |
-| `tests/rekognition.integration.ts` | Real AWS integration test (opt-in) |
-| `tests/fixtures/generate-image.ts` | Test image generator |
+| `tests/rekognition.integration.ts` | Real AWS integration test |
+| `tests/setup.integration.ts` | Integration test setup (Zod env validation) |
+| `tests/fixtures/index.ts` | Generic fixture downloader with R2 caching |
 
 ---
 
@@ -70,7 +71,8 @@ pnpm test:integration  # Requires INTEGRATION=true
     "@cloudflare/vitest-pool-workers": "^0.10.14",
     "aws-sdk-client-mock": "^4.1.0",
     "vitest": "^3.2.0",
-    "vite": "6"
+    "vite": "6",
+    "zod": "^4.1.13"
   }
 }
 ```
@@ -101,7 +103,7 @@ pnpm test:run
 pnpm test:workers
 
 # Run integration tests (requires AWS credentials)
-INTEGRATION=true pnpm test:integration
+pnpm test:integration
 ```
 
 ---
@@ -141,11 +143,31 @@ it("tests DO behavior", async () => {
 });
 ```
 
-### 3. Integration Tests (opt-in)
+### 3. Integration Tests (separate config)
 
 ```typescript
-describe.runIf(process.env.INTEGRATION === "true")("AWS Integration", () => {
-  // Real AWS calls - only run when INTEGRATION=true
+// tests/setup.integration.ts - validates env with Zod
+import { z } from "zod";
+
+const envSchema = z.object({
+  AWS_ACCESS_KEY_ID: z.string().min(1),
+  AWS_SECRET_ACCESS_KEY: z.string().min(1),
+  AWS_REGION: z.string().min(1),
+});
+
+beforeAll(() => {
+  envSchema.parse(process.env);
+});
+```
+
+```typescript
+// Integration tests only verify API integration, NOT accuracy
+it("indexes faces from image", async () => {
+  const result = await indexFaces(client, eventId, testImage, "photo-001");
+
+  // Only test integration point - API returns expected structure
+  expect(result).toHaveProperty("faceRecords");
+  expect(result).toHaveProperty("unindexedFaces");
 });
 ```
 
@@ -209,3 +231,12 @@ Add these secrets at **repository level** (Settings → Secrets and variables �
 | `AWS_REGION` | AWS region (e.g., `us-west-2`) |
 
 **Note:** AWS credentials are shared across all environments. Use values from `.dev.vars`.
+
+### 2025-12-12 (continued)
+
+- Refactored `tests/fixtures/test-images.ts` → `tests/fixtures/index.ts` with generic `getFixture(folder, filename)` function
+- Deleted `tests/fixtures/generate-image.ts` (no longer needed)
+- Removed `describe.runIf(INTEGRATION)` pattern - integration tests use dedicated `vitest.integration.config.ts`
+- Created `tests/setup.integration.ts` with Zod validation for AWS credentials
+- Updated integration tests to only verify API integration point, not face detection accuracy (out of scope)
+- Added `zod@4.1.13` as dev dependency for env validation
