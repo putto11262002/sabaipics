@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/clientmgr"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/config"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/server"
 )
@@ -86,22 +86,13 @@ func main() {
 		log.Println("Sentry DSN not configured - telemetry disabled")
 	}
 
-	// Connect to PostgreSQL
-	ctx := context.Background()
-	dbPool, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer dbPool.Close()
-
-	// Test database connection
-	if err := dbPool.Ping(ctx); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
-	}
-	log.Printf("Database connection established")
+	// Create and start client manager for centralized client management
+	mgr := clientmgr.NewManager()
+	mgr.Start()
+	log.Printf("Client manager started")
 
 	// Create FTP server
-	ftpServer, err := server.New(cfg, dbPool)
+	ftpServer, err := server.New(cfg, mgr)
 	if err != nil {
 		log.Fatalf("Failed to create FTP server: %v", err)
 	}

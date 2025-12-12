@@ -6,16 +6,18 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
-	ftpserver "github.com/fclairamb/ftpserverlib"
 	"github.com/getsentry/sentry-go"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/clientmgr"
 )
 
 // ErrAuthExpired indicates that the JWT token has expired (401 from API)
-// MainDriver should disconnect the client when this error is encountered
+// ClientManager hub will handle disconnection when this error is reported
 var ErrAuthExpired = errors.New("authentication expired")
 
 // UploadTransfer implements the afero.File interface for streaming uploads
@@ -26,7 +28,8 @@ type UploadTransfer struct {
 	jwtToken          string
 	clientIP          string
 	filename          string
-	clientContext     ftpserver.ClientContext // For disconnecting on auth expiry
+	clientID          uint32 // Client ID for event reporting
+	clientMgr         *clientmgr.Manager
 	apiClient         *apiclient.Client
 	pipeReader        *io.PipeReader
 	pipeWriter        *io.PipeWriter
@@ -46,7 +49,7 @@ func (t *UploadTransfer) log() sentry.Logger {
 
 // NewUploadTransfer creates a new upload transfer for streaming to API via FormData
 // Creates a ROOT Sentry transaction for this upload (not a child span)
-func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, cc ftpserver.ClientContext, apiClient *apiclient.Client) *UploadTransfer {
+func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, clientID uint32, clientMgr *clientmgr.Manager, apiClient *apiclient.Client) *UploadTransfer {
 	pr, pw := io.Pipe()
 
 	// Create ROOT Sentry transaction for this upload
@@ -61,12 +64,19 @@ func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, cc ftpserve
 	uploadTransaction.SetTag("event.id", eventID)
 	uploadTransaction.SetTag("client.ip", clientIP)
 
+	// Extract and tag file extension (e.g., "jpg", "png", "cr2")
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
+	if ext != "" {
+		uploadTransaction.SetTag("file.extension", ext)
+	}
+
 	transfer := &UploadTransfer{
 		eventID:           eventID,
 		jwtToken:          jwtToken,
 		clientIP:          clientIP,
 		filename:          filename,
-		clientContext:     cc,
+		clientID:          clientID,
+		clientMgr:         clientMgr,
 		apiClient:         apiClient,
 		pipeReader:        pr,
 		pipeWriter:        pw,
@@ -158,22 +168,44 @@ func (t *UploadTransfer) streamToAPI() {
 	)
 
 	if err != nil {
-		// Check for 401 (token expired)
+		// Check for 401 (token expired) - report to hub, hub decides action
 		if httpResp != nil && httpResp.StatusCode == http.StatusUnauthorized {
-			t.log().Error().Emitf("Auth expired for file=%s, disconnecting client", t.filename)
+			t.log().Error().Emitf("Auth expired for file=%s, reporting to hub", t.filename)
 
-			// Disconnect the client using ClientContext.Close()
-			if t.clientContext != nil {
-				if closeErr := t.clientContext.Close(); closeErr != nil {
-					t.log().Error().Emitf("Failed to disconnect client: %v", closeErr)
-				}
-			}
+			// Report event to hub - hub decides whether to disconnect
+			t.clientMgr.SendEvent(clientmgr.ClientEvent{
+				Type:     clientmgr.EventAuthExpired,
+				ClientID: t.clientID,
+				Reason:   "401 Unauthorized from API",
+			})
 
 			t.uploadDone <- ErrAuthExpired
 			return
 		}
 
+		// Check for 429 (rate limited) - report to hub
+		if httpResp != nil && httpResp.StatusCode == http.StatusTooManyRequests {
+			t.log().Warn().Emitf("Rate limited for file=%s, reporting to hub", t.filename)
+
+			t.clientMgr.SendEvent(clientmgr.ClientEvent{
+				Type:     clientmgr.EventRateLimited,
+				ClientID: t.clientID,
+				Reason:   "429 Too Many Requests from API",
+			})
+
+			t.uploadDone <- err
+			return
+		}
+
+		// Other upload failures - report to hub (hub may log but keep connection)
 		t.log().Error().Emitf("API upload failed for file=%s: %v", t.filename, err)
+
+		t.clientMgr.SendEvent(clientmgr.ClientEvent{
+			Type:     clientmgr.EventUploadFailed,
+			ClientID: t.clientID,
+			Reason:   err.Error(),
+		})
+
 		t.uploadDone <- err
 		return
 	}

@@ -8,7 +8,7 @@ import (
 
 	"github.com/fclairamb/ftpserverlib"
 	ftpslog "github.com/fclairamb/go-log/slog"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/clientmgr"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/config"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/driver"
 )
@@ -18,13 +18,13 @@ type Server struct {
 	explicitServer *ftpserver.FtpServer // Explicit FTPS server (port 2121, AUTH TLS)
 	implicitServer *ftpserver.FtpServer // Implicit FTPS server (port 990, immediate TLS)
 	config         *config.Config
-	db             *pgxpool.Pool
+	clientMgr      *clientmgr.Manager
 }
 
 // New creates FTP server instance(s) - explicit FTPS and optionally implicit FTPS
-func New(cfg *config.Config, db *pgxpool.Pool) (*Server, error) {
+func New(cfg *config.Config, clientMgr *clientmgr.Manager) (*Server, error) {
 	// Create explicit FTPS server (port 2121, AUTH TLS command)
-	explicitDriver := driver.NewMainDriver(db, cfg)
+	explicitDriver := driver.NewMainDriver(cfg, clientMgr)
 	explicitServer := ftpserver.NewFtpServer(explicitDriver)
 
 	// Configure FTP protocol debug logging if enabled
@@ -44,12 +44,12 @@ func New(cfg *config.Config, db *pgxpool.Pool) (*Server, error) {
 	server := &Server{
 		explicitServer: explicitServer,
 		config:         cfg,
-		db:             db,
+		clientMgr:      clientMgr,
 	}
 
 	// Create implicit FTPS server if enabled (port 990, immediate TLS)
 	if cfg.ImplicitFTPSEnabled {
-		implicitDriver := driver.NewMainDriverImplicit(db, cfg)
+		implicitDriver := driver.NewMainDriverImplicit(cfg, clientMgr)
 		server.implicitServer = ftpserver.NewFtpServer(implicitDriver)
 
 		// Share the same logger if debug is enabled
@@ -110,21 +110,28 @@ func (s *Server) Start() error {
 }
 
 // Shutdown performs graceful shutdown of the FTP server(s)
-// STUB: For now, just returns nil. Full implementation in later phase.
 func (s *Server) Shutdown(ctx context.Context) error {
-	log.Printf("[Server] STUB: Graceful shutdown requested for all FTP servers")
+	log.Printf("[Server] Graceful shutdown requested for all FTP servers")
 
-	// STUB: In production, we would:
-	// 1. Stop accepting new connections on both servers
-	// 2. Wait for active transfers to complete (with timeout)
-	// 3. Close database connections
-	// 4. Flush Sentry events
-
-	// For now, just log
-	if s.implicitServer != nil {
-		log.Printf("[Server] STUB: Shutting down implicit FTPS server")
+	// Stop the client manager event processing
+	if s.clientMgr != nil {
+		log.Printf("[Server] Stopping client manager")
+		s.clientMgr.Stop()
 	}
-	log.Printf("[Server] STUB: Shutting down explicit FTPS server")
-	log.Printf("[Server] STUB: Shutdown complete")
+
+	// Stop FTP servers
+	if s.implicitServer != nil {
+		log.Printf("[Server] Stopping implicit FTPS server")
+		if err := s.implicitServer.Stop(); err != nil {
+			log.Printf("[Server] Error stopping implicit server: %v", err)
+		}
+	}
+
+	log.Printf("[Server] Stopping explicit FTPS server")
+	if err := s.explicitServer.Stop(); err != nil {
+		log.Printf("[Server] Error stopping explicit server: %v", err)
+	}
+
+	log.Printf("[Server] Shutdown complete")
 	return nil
 }

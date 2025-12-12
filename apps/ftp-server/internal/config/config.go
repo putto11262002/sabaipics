@@ -17,15 +17,6 @@ type Config struct {
 	FTPIdleTimeout      int  // seconds
 	FTPDebug            bool // Enable FTP protocol command/response logging
 
-	// Database settings
-	DatabaseURL string
-
-	// R2/S3 settings (for future use)
-	R2AccessKey  string
-	R2SecretKey  string
-	R2Endpoint   string
-	R2BucketName string
-
 	// Sentry settings
 	SentryDSN         string
 	SentryEnvironment string
@@ -38,7 +29,7 @@ type Config struct {
 	ImplicitFTPSEnabled bool   // Enable implicit FTPS server on port 990
 	ImplicitFTPSPort    string // Port for implicit FTPS (default: 0.0.0.0:990)
 
-	// API settings (for API-based integration)
+	// API settings - FTP server proxies uploads to this API
 	APIURL string // Base URL for SabaiPics API (e.g., https://api.sabaipics.com)
 }
 
@@ -54,15 +45,6 @@ func Load() (*Config, error) {
 		FTPPassivePortEnd:   getEnvInt("FTP_PASSIVE_PORT_END", 5099),
 		FTPIdleTimeout:      getEnvInt("FTP_IDLE_TIMEOUT", 300),
 		FTPDebug:            getEnvBool("FTP_DEBUG", false),
-
-		// Database
-		DatabaseURL: getEnv("DATABASE_URL", ""),
-
-		// R2/S3
-		R2AccessKey:  getEnv("R2_ACCESS_KEY", ""),
-		R2SecretKey:  getEnv("R2_SECRET_KEY", ""),
-		R2Endpoint:   getEnv("R2_ENDPOINT", ""),
-		R2BucketName: getEnv("R2_BUCKET_NAME", ""),
 
 		// Sentry
 		SentryDSN:         getEnv("SENTRY_DSN", ""),
@@ -81,9 +63,6 @@ func Load() (*Config, error) {
 	}
 
 	// Validate required fields
-	if cfg.DatabaseURL == "" {
-		return nil, fmt.Errorf("DATABASE_URL is required")
-	}
 	if cfg.APIURL == "" {
 		return nil, fmt.Errorf("API_URL is required")
 	}

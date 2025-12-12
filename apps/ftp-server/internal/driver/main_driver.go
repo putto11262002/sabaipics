@@ -6,40 +6,40 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/fclairamb/ftpserverlib"
+	ftpserver "github.com/fclairamb/ftpserverlib"
 	"github.com/getsentry/sentry-go"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/client"
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/clientmgr"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/config"
 )
 
 // MainDriver implements the ftpserverlib.MainDriver interface
 // Logs application flow events at FTP protocol boundaries
 type MainDriver struct {
-	db        *pgxpool.Pool
 	config    *config.Config
 	apiClient *apiclient.Client
+	clientMgr *clientmgr.Manager
 	// tlsMode specifies the TLS requirement mode for this FTP server
 	tlsMode ftpserver.TLSRequirement
 }
 
 // NewMainDriver creates a new MainDriver instance for explicit FTPS (AUTH TLS)
-func NewMainDriver(db *pgxpool.Pool, cfg *config.Config) *MainDriver {
+func NewMainDriver(cfg *config.Config, clientMgr *clientmgr.Manager) *MainDriver {
 	return &MainDriver{
-		db:        db,
 		config:    cfg,
 		apiClient: apiclient.NewClient(cfg.APIURL),
+		clientMgr: clientMgr,
 		tlsMode:   ftpserver.ClearOrEncrypted, // Explicit FTPS (optional TLS via AUTH TLS)
 	}
 }
 
 // NewMainDriverImplicit creates a new MainDriver instance for implicit FTPS
-func NewMainDriverImplicit(db *pgxpool.Pool, cfg *config.Config) *MainDriver {
+func NewMainDriverImplicit(cfg *config.Config, clientMgr *clientmgr.Manager) *MainDriver {
 	return &MainDriver{
-		db:        db,
 		config:    cfg,
 		apiClient: apiclient.NewClient(cfg.APIURL),
+		clientMgr: clientMgr,
 		tlsMode:   ftpserver.ImplicitEncryption, // Implicit FTPS (immediate TLS)
 	}
 }
@@ -80,6 +80,9 @@ func (d *MainDriver) ClientConnected(cc ftpserver.ClientContext) (string, error)
 		cc.SetDebug(true)
 	}
 
+	// Register client with manager for centralized management
+	d.clientMgr.RegisterClient(cc)
+
 	// Log at application boundary (no transaction - uploads create their own)
 	d.log().Info().Emitf("Client connected: %s (ID: %d)", clientIP, clientID)
 
@@ -90,6 +93,9 @@ func (d *MainDriver) ClientConnected(cc ftpserver.ClientContext) (string, error)
 func (d *MainDriver) ClientDisconnected(cc ftpserver.ClientContext) {
 	clientID := cc.ID()
 	clientIP := cc.RemoteAddr().String()
+
+	// Unregister client from manager
+	d.clientMgr.UnregisterClient(clientID)
 
 	// Log at application boundary (no transaction cleanup needed)
 	d.log().Info().Emitf("Client disconnected: %s (ID: %d)", clientIP, clientID)
@@ -119,12 +125,13 @@ func (d *MainDriver) AuthUser(cc ftpserver.ClientContext, user, pass string) (ft
 	d.log().Info().Emitf("FTP auth successful: user=%s, event=%s, credits=%d",
 		user, authResp.EventID, authResp.CreditsRemaining)
 
-	// Create ClientDriver with JWT token, ClientContext (for disconnect), and API client
+	// Create ClientDriver with JWT token, client manager (for event reporting), and API client
 	clientDriver := client.NewClientDriver(
 		authResp.EventID,
 		authResp.Token,
 		clientIP,
-		cc, // Pass ClientContext for disconnect on auth expiry
+		cc.ID(), // Pass client ID for event reporting
+		d.clientMgr,
 		d.apiClient,
 		d.config,
 	)

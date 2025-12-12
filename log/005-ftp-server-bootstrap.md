@@ -1647,3 +1647,154 @@ if httpResp != nil && httpResp.StatusCode == http.StatusUnauthorized {
 ✅ Compiles successfully
 
 ---
+
+## Phase 16: Centralized Client Management Hub ✅
+
+**Date**: 2025-12-12
+**Objective**: Implement centralized client management with event-driven architecture
+
+### Problem
+
+Previous implementation had UploadTransfer directly calling `ClientContext.Close()`:
+- ❌ Business logic (disconnect decision) mixed with I/O operations
+- ❌ UploadTransfer had too much responsibility
+- ❌ No centralized place to manage client state
+- ❌ Hard to extend with new client actions (rate limiting, etc.)
+
+### Solution: ClientManager Hub Pattern
+
+```
+UploadTransfer ──[events]──► ClientManager Hub ──[decisions]──► ClientContext.Close()
+     ↑                              ↓
+     │                        Decision Logic:
+     │                        - EventAuthExpired → Disconnect
+     │                        - EventRateLimited → Disconnect
+     │                        - EventUploadFailed → Log only
+     └───────────────────────────────────────────────────────────
+```
+
+**Key Principles**:
+1. UploadTransfer **reports events** but doesn't make decisions
+2. ClientManager Hub **receives events and decides actions**
+3. All client management logic centralized in one place
+
+### Files Created
+
+**`internal/clientmgr/manager.go`** - Centralized client management
+- `EventType` enum: `EventAuthExpired`, `EventUploadFailed`, `EventRateLimited`
+- `ClientEvent` struct: Type, ClientID, Reason
+- `ManagedClient` struct: ID, ClientContext, ClientIP
+- `Manager` struct with event channel and goroutine
+- `RegisterClient()` / `UnregisterClient()` for lifecycle
+- `SendEvent()` - non-blocking event send
+- `handleEvent()` - decision logic (what action to take)
+- `disconnectClient()` - actual disconnect execution
+
+### Files Modified
+
+**`internal/driver/main_driver.go`**
+- Removed `db *pgxpool.Pool` field (PostgreSQL removed)
+- Added `clientMgr *clientmgr.Manager` field
+- Updated constructors to accept clientMgr instead of db
+- `ClientConnected()` → `d.clientMgr.RegisterClient(cc)`
+- `ClientDisconnected()` → `d.clientMgr.UnregisterClient(clientID)`
+- `AuthUser()` → passes clientID and clientMgr to ClientDriver
+
+**`internal/client/client_driver.go`**
+- Replaced `clientContext ftpserver.ClientContext` with `clientID uint32`
+- Added `clientMgr *clientmgr.Manager` field
+- Updated constructor signature
+- Passes clientID and clientMgr to UploadTransfer
+
+**`internal/transfer/upload_transfer.go`**
+- Replaced `clientContext ftpserver.ClientContext` with `clientID uint32`
+- Added `clientMgr *clientmgr.Manager` field
+- Updated constructor signature
+- On 401: `clientMgr.SendEvent(EventAuthExpired)` instead of direct Close()
+- On 429: `clientMgr.SendEvent(EventRateLimited)`
+- On error: `clientMgr.SendEvent(EventUploadFailed)`
+- Added `file.extension` Sentry tag
+
+**`internal/server/server.go`**
+- Replaced `db *pgxpool.Pool` with `clientMgr *clientmgr.Manager`
+- Updated `New()` to accept clientMgr
+- `Shutdown()` now calls `clientMgr.Stop()`
+
+**`cmd/ftp-server/main.go`**
+- Removed PostgreSQL connection code
+- Creates and starts ClientManager
+- Passes clientMgr to server.New()
+
+**`internal/config/config.go`**
+- Removed `DatabaseURL`, `R2AccessKey`, `R2SecretKey`, `R2Endpoint`, `R2BucketName`
+- Removed `DATABASE_URL` validation
+
+**`go.mod`**
+- Removed `github.com/jackc/pgx/v5` dependency
+
+**`.env.example`**
+- Removed `DATABASE_URL` and `R2_*` variables
+
+**`README.md`**
+- Updated architecture diagram (API-based)
+- Updated directory structure (added apiclient, clientmgr)
+- Updated prerequisites (removed PostgreSQL)
+- Updated environment variables (removed DATABASE_URL)
+- Updated implementation status
+- Updated troubleshooting section
+
+### Event Flow Example
+
+```
+1. User uploads file
+2. API returns 401 (token expired)
+3. UploadTransfer.streamToAPI() detects 401
+4. UploadTransfer sends ClientEvent{Type: EventAuthExpired, ClientID: 1}
+5. ClientManager receives event in run() loop
+6. handleEvent() decides: EventAuthExpired → disconnect
+7. disconnectClient() calls cc.Close()
+8. Client FTP connection closed
+```
+
+### Decision Logic
+
+```go
+func (m *Manager) handleEvent(event ClientEvent) {
+    switch event.Type {
+    case EventAuthExpired:
+        // Decision: Disconnect client when auth expires
+        m.disconnectClient(event.ClientID, "authentication expired")
+
+    case EventUploadFailed:
+        // Decision: Log the failure but keep connection open
+        // Client can retry or upload other files
+        log.Warn()...
+
+    case EventRateLimited:
+        // Decision: Disconnect client when rate limited
+        // They can reconnect after cooldown
+        m.disconnectClient(event.ClientID, "rate limited")
+    }
+}
+```
+
+### Benefits
+
+✅ **Separation of Concerns**: UploadTransfer only reports, doesn't decide
+✅ **Centralized Logic**: All client actions in one place
+✅ **Extensible**: Easy to add new event types and actions
+✅ **Testable**: Decision logic isolated from I/O
+✅ **Non-blocking**: Event channel with buffering
+✅ **Clean Shutdown**: Manager.Stop() waits for goroutine
+
+### Removed Dependencies
+
+- PostgreSQL (`pgx/v5`)
+- Direct R2 access (now via API)
+
+### Build Status
+
+✅ Compiles successfully
+✅ Binary removed from git tracking
+
+---

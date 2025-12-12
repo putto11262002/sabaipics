@@ -6,24 +6,32 @@ Upload-only FTP server for event photo distribution, built with Go and ftpserver
 
 ```
 ┌─────────────┐     ┌──────────────────┐     ┌──────────────┐
-│   Camera    │────▶│   FTP Server     │────▶│      R2      │
-│  (FTP/FTPS) │     │ (Upload-Only)    │     │  (Storage)   │
+│   Camera    │────▶│   FTP Server     │────▶│  SabaiPics   │
+│  (FTP/FTPS) │     │ (VPS Proxy)      │     │    API       │
 └─────────────┘     └──────────────────┘     └──────────────┘
-                             │
-                             ▼
-                    ┌──────────────┐     ┌──────────────┐
-                    │  PostgreSQL  │     │    Sentry    │
-                    │  (Auth/Meta) │     │ (Tracing)    │
-                    └──────────────┘     └──────────────┘
+                             │                      │
+                             ▼                      ▼
+                    ┌──────────────┐        ┌──────────────┐
+                    │    Sentry    │        │   R2 + D1    │
+                    │  (Tracing)   │        │  (Storage)   │
+                    └──────────────┘        └──────────────┘
 ```
+
+The FTP server is a **thin proxy** that:
+1. Receives FTP uploads from cameras
+2. Authenticates via `POST /api/ftp/auth`
+3. Streams uploads via `POST /api/ftp/upload` (FormData)
+
+All business logic (validation, storage, metadata) lives in the Cloudflare Workers API.
 
 ### Key Features
 
 - **Upload-Only**: Blocks download, delete, and rename operations (FTP RETR, DELE, RNFR/RNTO)
-- **Streaming Uploads**: Uses `io.Pipe` to stream directly to R2 without disk buffering
-- **Event-Based Auth**: One shared FTP credential per event (see `docs/tech/00_business_rules.md`)
-- **Distributed Tracing**: Sentry spans for connection, auth, and upload operations
+- **Streaming Uploads**: Uses `io.Pipe` to stream via FormData to API without disk buffering
+- **API-Based Auth**: FTP credentials validated by API, returns JWT token
+- **Distributed Tracing**: Sentry spans for upload operations
 - **Camera Compatible**: Returns fake file info for cameras that check existence before upload
+- **Centralized Client Management**: Hub-based event handling for auth expiry and rate limits
 
 ## Directory Structure
 
@@ -32,11 +40,13 @@ apps/ftp-server/
 ├── cmd/ftp-server/           # Main entry point
 │   └── main.go
 ├── internal/
+│   ├── apiclient/            # HTTP client for SabaiPics API
+│   ├── clientmgr/            # Centralized client management hub
 │   ├── config/               # Environment configuration
 │   ├── server/               # FTP server lifecycle
 │   ├── driver/               # MainDriver (ftpserverlib interface)
 │   ├── client/               # ClientDriver (afero.Fs, upload-only enforcement)
-│   └── transfer/             # UploadTransfer (io.Pipe streaming to R2)
+│   └── transfer/             # UploadTransfer (io.Pipe streaming to API)
 ├── .env.example              # Environment variable template
 ├── Dockerfile                # Production container image
 ├── docker-compose.yml        # Local development setup
@@ -45,11 +55,10 @@ apps/ftp-server/
 
 ## Prerequisites
 
-- Go 1.21+ (developed with 1.23)
-- PostgreSQL 16+ (for authentication)
+- Go 1.24+
 - Docker & Docker Compose (for local development)
 - Sentry account (optional, for telemetry)
-- Cloudflare R2 bucket (for production uploads)
+- SabaiPics API (for authentication and uploads)
 
 ## Environment Variables
 
@@ -57,9 +66,9 @@ See `.env.example` for all available configuration options.
 
 ### Required
 
-- `DATABASE_URL`: PostgreSQL connection string
+- `API_URL`: SabaiPics API base URL
   ```
-  postgresql://user:password@localhost:5432/sabaipics?sslmode=disable
+  API_URL=https://api.sabaipics.com
   ```
 
 ### Optional
@@ -68,9 +77,11 @@ See `.env.example` for all available configuration options.
 - `FTP_PASSIVE_PORT_START`: Passive port range start (default: `5000`)
 - `FTP_PASSIVE_PORT_END`: Passive port range end (default: `5099`)
 - `FTP_IDLE_TIMEOUT`: Client idle timeout in seconds (default: `300`)
+- `FTP_DEBUG`: Enable FTP protocol logging (default: `false`)
 - `SENTRY_DSN`: Sentry project DSN (for distributed tracing)
 - `SENTRY_ENVIRONMENT`: Sentry environment (default: `development`)
-- `R2_ACCESS_KEY`, `R2_SECRET_KEY`, `R2_ENDPOINT`, `R2_BUCKET_NAME`: R2/S3 credentials
+- `TLS_CERT_PATH`, `TLS_KEY_PATH`: TLS certificate paths for FTPS
+- `IMPLICIT_FTPS_ENABLED`: Enable implicit FTPS on port 990 (default: `false`)
 
 ## Quick Start (Development)
 
@@ -79,49 +90,41 @@ See `.env.example` for all available configuration options.
 ```bash
 cd apps/ftp-server
 cp .env.example .env
-# Edit .env with your database credentials
+# Edit .env with your API_URL
 ```
 
-### 2. Start with Docker Compose
+### 2. Start FTP Server
 
 ```bash
-docker-compose up -d postgres  # Start PostgreSQL first
-docker-compose up ftp-server   # Start FTP server
+# Run directly
+go run ./cmd/ftp-server
+
+# Or build and run
+go build -o ftp-server ./cmd/ftp-server
+./ftp-server
 ```
 
 The FTP server will be available at `localhost:2121` (passive ports: `5000-5099`).
 
 ### 3. Test Connection
 
-Using the `ftp` command:
-
-```bash
-ftp localhost 2121
-# Username: any-username (stub accepts all)
-# Password: any-password (stub accepts all)
-```
-
 Using FileZilla:
 - Host: `localhost`
 - Port: `2121`
-- Protocol: FTP (plain, not FTPS yet)
-- Username: any (stub mode)
-- Password: any (stub mode)
+- Protocol: FTP (or FTPS if TLS configured)
+- Username: Your event FTP username (from API)
+- Password: Your event FTP password (from API)
 
 ### 4. Test Upload
 
 ```bash
 # From FTP prompt:
 ftp> put test.jpg
-# Should succeed with stub logging
+# Should succeed and stream to API
 
 # Download should fail:
 ftp> get test.jpg
 # Error: "download not allowed - upload only"
-
-# Delete should fail:
-ftp> delete test.jpg
-# Error: "delete not allowed - upload only"
 ```
 
 ## Build from Source
@@ -142,30 +145,24 @@ docker run -p 2121:21 -p 5000-5099:5000-5099 --env-file .env sabaipics-ftp-serve
 
 ## Current Implementation Status
 
-### ✅ Implemented (Phases 1-9)
+### ✅ Implemented
 
 - [x] Go module setup with monorepo naming
 - [x] Configuration loading from environment
-- [x] FTP server with ftpserverlib
-- [x] Upload-only enforcement (blocks RETR, DELE, RNFR/RNTO)
-- [x] Streaming upload with io.Pipe (stubbed R2 upload)
-- [x] Sentry distributed tracing (connection, auth, upload spans)
-- [x] Docker Compose for local testing
+- [x] FTP server with ftpserverlib (explicit and implicit FTPS)
+- [x] Upload-only enforcement (blocks RETR, allows uploads)
+- [x] API-based authentication (`POST /api/ftp/auth`)
+- [x] Streaming upload to API via FormData (`POST /api/ftp/upload`)
+- [x] Sentry distributed tracing (upload-level transactions)
+- [x] Centralized client management (hub-based event handling)
+- [x] TLS/FTPS support (explicit and implicit modes)
+- [x] JWT token lifecycle (reactive 401 detection → disconnect)
+- [x] Rate limit handling (429 response → disconnect)
 
-### 🚧 Stubbed (To Be Implemented Later)
+### 🚧 Pending
 
-- [ ] **Authentication**: Currently accepts any credentials (no DB query)
-  - Real implementation: Query `events` table by `ftp_username`
-  - Verify password with `bcrypt.CompareHashAndPassword`
-  - Check upload window (`upload_start_datetime` to `upload_end_datetime`)
-- [ ] **R2 Upload**: Currently just reads and discards bytes
-  - Real implementation: Stream to Cloudflare R2 using S3 SDK
-  - Multipart upload for large files
-  - Store metadata (event_id, photographer_id, upload_time)
-- [ ] **TLS/FTPS**: Returns nil (plain FTP only)
-  - Real implementation: Load certificates from `TLS_CERT_PATH` and `TLS_KEY_PATH`
-- [ ] **Graceful Shutdown**: Basic signal handling
-  - Real implementation: Wait for active transfers, timeout after 30s
+- [ ] Automated testing
+- [ ] Production deployment documentation
 
 ## Logs and Debugging
 
@@ -323,11 +320,15 @@ Planned deployment target: DigitalOcean/Hetzner VPS with Docker.
 
 ## Troubleshooting
 
-### "Failed to connect to database"
+### "API_URL is required"
 
-- Ensure PostgreSQL is running: `docker-compose ps postgres`
-- Check `DATABASE_URL` in `.env`
-- Test connection: `psql $DATABASE_URL`
+- Set `API_URL` in your `.env` file to the SabaiPics API base URL
+
+### "auth failed"
+
+- Verify your FTP credentials are valid for the event
+- Check that the event upload window is still active
+- Check API connectivity from the FTP server
 
 ### "bind: address already in use"
 
@@ -342,26 +343,25 @@ Planned deployment target: DigitalOcean/Hetzner VPS with Docker.
 
 ### Upload hangs or times out
 
-- Check server logs: `docker-compose logs -f ftp-server`
-- Verify stub is logging "Would upload to R2" messages
-- Increase `FTP_IDLE_TIMEOUT` if needed
+- Check server logs for API connectivity issues
+- Verify API_URL is reachable from the FTP server
+- Increase `FTP_IDLE_TIMEOUT` if needed for large uploads
 
 ## Testing
 
 ### Manual Testing Checklist
 
 - [ ] Connect via FTP client (FileZilla, `ftp` command)
-- [ ] Auth works (accepts any credentials in stub mode)
-- [ ] Upload file succeeds (check logs for "STUB: Would upload to R2")
+- [ ] Auth works with valid event credentials
+- [ ] Upload file succeeds (streams to API)
 - [ ] Download blocked (returns "download not allowed" error)
-- [ ] Delete blocked (returns "delete not allowed" error)
-- [ ] Rename blocked (returns "rename not allowed" error)
-- [ ] Sentry spans created (check logs for "Created Sentry span")
+- [ ] Auth expiry triggers disconnect (401 from API)
+- [ ] Rate limit triggers disconnect (429 from API)
 - [ ] Graceful shutdown works (Ctrl+C)
 
 ### Automated Tests
 
-**TODO**: Add unit tests and integration tests in later phases.
+**TODO**: Add unit tests and integration tests.
 
 ## References
 

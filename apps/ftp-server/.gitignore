@@ -1,6 +1,6 @@
 # Binaries
 bin/
-ftp-server
+/ftp-server
 *.exe
 *.dll
 *.so
