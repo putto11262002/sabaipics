@@ -20,6 +20,18 @@ jobs:
 
       - run: pnpm install
 
+      # Run functional + workers tests (no real AWS calls)
+      - name: Run Tests
+        run: pnpm --filter=@sabaipics/api test:run
+
+      # Run integration tests with real AWS (validates Rekognition connectivity)
+      - name: Run Integration Tests
+        run: pnpm --filter=@sabaipics/api test:integration
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
       # TODO: Future improvement - run migrations on a test branch first, verify, then merge to main DB
       # Currently runs migrations directly which is risky for production
       - name: Run Database Migrations
@@ -51,6 +63,9 @@ jobs:
           echo "${{ secrets.CLERK_PUBLISHABLE_KEY }}" | pnpm wrangler secret put CLERK_PUBLISHABLE_KEY --env production
           echo "${{ secrets.CLERK_JWT_KEY }}" | pnpm wrangler secret put CLERK_JWT_KEY --env production
           echo "${{ secrets.CLERK_WEBHOOK_SIGNING_SECRET }}" | pnpm wrangler secret put CLERK_WEBHOOK_SIGNING_SECRET --env production
+          echo "${{ secrets.AWS_ACCESS_KEY_ID }}" | pnpm wrangler secret put AWS_ACCESS_KEY_ID --env production
+          echo "${{ secrets.AWS_SECRET_ACCESS_KEY }}" | pnpm wrangler secret put AWS_SECRET_ACCESS_KEY --env production
+          echo "${{ secrets.AWS_REGION }}" | pnpm wrangler secret put AWS_REGION --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

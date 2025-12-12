@@ -1,37 +1,37 @@
 {
-  "name": "@sabaipics/api",
-  "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./src/index.ts"
-    }
-  },
-  "scripts": {
-    "dev": "node scripts/dev-tunnel.js",
-    "dev:local": "wrangler dev",
-    "build": "tsc",
-    "deploy:staging": "wrangler deploy --env staging --minify",
-    "deploy:prod": "wrangler deploy --env production --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
-    "test": "vitest --config vitest.node.config.ts",
-    "test:run": "vitest run --config vitest.node.config.ts && vitest run --config vitest.config.ts",
-    "test:workers": "vitest run --config vitest.config.ts",
-    "test:integration": "INTEGRATION=true vitest run --config vitest.node.config.ts tests/*.integration.ts"
-  },
-  "dependencies": {
-    "@aws-sdk/client-rekognition": "^3.946.0",
-    "@sabaipics/auth": "workspace:*",
-    "@sabaipics/db": "workspace:*",
-    "hono": "^4.10.7",
-    "svix": "^1.82.0"
-  },
-  "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.10.14",
-    "@types/node": "^22.15.29",
-    "aws-sdk-client-mock": "^4.1.0",
-    "typescript": "^5.8.0",
-    "vite": "6",
-    "vitest": "^3.2.0"
-  }
+	"name": "@sabaipics/api",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./src/index.ts"
+		}
+	},
+	"scripts": {
+		"dev": "node scripts/dev-tunnel.js",
+		"dev:local": "wrangler dev",
+		"build": "tsc",
+		"deploy:staging": "wrangler deploy --env staging --minify",
+		"deploy:prod": "wrangler deploy --env production --minify",
+		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
+		"test": "vitest --config vitest.node.config.ts",
+		"test:run": "vitest run --config vitest.node.config.ts && vitest run --config vitest.config.ts",
+		"test:workers": "vitest run --config vitest.config.ts",
+		"test:integration": "INTEGRATION=true vitest run --config vitest.integration.config.ts"
+	},
+	"dependencies": {
+		"@aws-sdk/client-rekognition": "^3.946.0",
+		"@sabaipics/auth": "workspace:*",
+		"@sabaipics/db": "workspace:*",
+		"hono": "^4.10.7",
+		"svix": "^1.82.0"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.10.14",
+		"@types/node": "^22.15.29",
+		"aws-sdk-client-mock": "^4.1.0",
+		"typescript": "^5.8.0",
+		"vite": "6",
+		"vitest": "^3.2.0"
+	}
 }

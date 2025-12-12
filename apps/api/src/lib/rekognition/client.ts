@@ -67,10 +67,6 @@ export async function createCollection(
 
   const command = new CreateCollectionCommand({
     CollectionId: collectionId,
-    Tags: {
-      event_id: eventId,
-      created_by: "sabaipics",
-    },
   });
 
   const response = await client.send(command);
