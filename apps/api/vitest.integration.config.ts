@@ -23,9 +23,9 @@ loadDevVars();
 export default defineConfig({
   test: {
     globals: true,
-    setupFiles: ["./tests/setup.ts"],
+    setupFiles: ["./tests/setup.integration.ts"],
     include: ["tests/**/*.integration.ts"],
-    exclude: [],
+    exclude: ["tests/setup.integration.ts"],
     environment: "node",
   },
 });
