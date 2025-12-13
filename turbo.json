@@ -11,7 +11,17 @@
 				".env*"
 			],
 			"outputs": [
-				"dist/**"
+				"dist/**",
+				"bin/**"
+			]
+		},
+		"test": {
+			"dependsOn": [
+				"^build"
+			],
+			"outputs": [
+				"coverage.out",
+				"coverage.html"
 			]
 		},
 		"lint": {
