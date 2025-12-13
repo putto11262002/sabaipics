@@ -5,8 +5,9 @@
   "scripts": {
     "dev": "go run ./cmd/ftp-server",
     "build": "go build -o bin/ftp-server ./cmd/ftp-server",
-    "test": "go test ./...",
-    "test:coverage": "go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out -o coverage.html",
+    "test": "echo 'No unit tests - use test:e2e for end-to-end tests'",
+    "test:e2e": "E2E_TEST=1 go test -v ./e2e/...",
+    "mockapi": "go run ./e2e/cmd/mockapi",
     "lint": "go vet ./...",
     "fmt": "go fmt ./...",
     "tidy": "go mod tidy",
