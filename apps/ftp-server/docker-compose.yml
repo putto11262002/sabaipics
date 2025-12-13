@@ -1,33 +1,13 @@
 version: '3.8'
 
 services:
-  # PostgreSQL database for FTP server
-  postgres:
-    image: postgres:16-alpine
-    container_name: sabaipics-ftp-db
-    environment:
-      POSTGRES_USER: sabaipics
-      POSTGRES_PASSWORD: dev_password
-      POSTGRES_DB: sabaipics
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sabaipics"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   # FTP Server (for local development)
+  # All authentication and uploads are proxied to the SabaiPics API
   ftp-server:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: sabaipics-ftp-server
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       # FTP Server settings
       FTP_LISTEN_ADDRESS: 0.0.0.0:21
@@ -35,26 +15,17 @@ services:
       FTP_PASSIVE_PORT_END: 5099
       FTP_IDLE_TIMEOUT: 300
 
-      # Database connection
-      DATABASE_URL: postgresql://sabaipics:dev_password@postgres:5432/sabaipics?sslmode=disable
+      # API URL (required) - FTP server proxies all uploads to this API
+      API_URL: ${API_URL:-https://api.sabaipics.com}
 
       # Sentry (optional - comment out if not using)
       # SENTRY_DSN: your-sentry-dsn-here
       SENTRY_ENVIRONMENT: development
-
-      # R2/S3 (for future use)
-      # R2_ACCESS_KEY:
-      # R2_SECRET_KEY:
-      # R2_ENDPOINT:
-      # R2_BUCKET_NAME:
     ports:
       - "2121:21"           # FTP command port
       - "5000-5099:5000-5099"  # FTP passive ports
     networks:
       - ftp-network
-
-volumes:
-  postgres_data:
 
 networks:
   ftp-network:

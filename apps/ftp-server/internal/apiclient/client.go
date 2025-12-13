@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -69,7 +70,12 @@ func (c *Client) Authenticate(ctx context.Context, req AuthRequest) (*AuthRespon
 		return nil, fmt.Errorf("failed to marshal auth request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/ftp/auth", bytes.NewReader(body))
+	authURL, err := url.JoinPath(c.baseURL, "/api/ftp/auth")
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct auth URL: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", authURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create auth request: %w", err)
 	}
@@ -132,7 +138,13 @@ func (c *Client) UploadFormData(ctx context.Context, token, eventID, filename st
 	}()
 
 	// Create HTTP request with streaming body
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/ftp/upload", pipeReader)
+	uploadURL, err := url.JoinPath(c.baseURL, "/api/ftp/upload")
+	if err != nil {
+		pipeReader.Close()
+		return nil, nil, fmt.Errorf("failed to construct upload URL: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, pipeReader)
 	if err != nil {
 		pipeReader.Close()
 		return nil, nil, fmt.Errorf("failed to create upload request: %w", err)

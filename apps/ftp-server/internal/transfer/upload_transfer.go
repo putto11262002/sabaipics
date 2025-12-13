@@ -39,14 +39,6 @@ type UploadTransfer struct {
 	uploadTransaction *sentry.Span // Sentry ROOT transaction for this upload (1:1 lifetime)
 }
 
-// log returns a Sentry logger bound to the upload transaction context
-func (t *UploadTransfer) log() sentry.Logger {
-	if t.uploadTransaction != nil {
-		return sentry.NewLogger(t.uploadTransaction.Context())
-	}
-	return sentry.NewLogger(context.Background())
-}
-
 // NewUploadTransfer creates a new upload transfer for streaming to API via FormData
 // Creates a ROOT Sentry transaction for this upload (not a child span)
 func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, clientID uint32, clientMgr *clientmgr.Manager, apiClient *apiclient.Client) *UploadTransfer {
@@ -68,6 +60,11 @@ func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, clientID ui
 	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
 	if ext != "" {
 		uploadTransaction.SetTag("file.extension", ext)
+		// Categorize file type based on extension
+		fileType := categorizeFileType(ext)
+		if fileType != "" {
+			uploadTransaction.SetTag("file.type", fileType)
+		}
 	}
 
 	transfer := &UploadTransfer{
@@ -89,7 +86,7 @@ func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, clientID ui
 	go transfer.streamToAPI()
 
 	// Log upload creation at I/O boundary
-	transfer.log().Info().Emitf("Upload started: file=%s, event=%s, client=%s",
+	sentry.NewLogger(uploadTransaction.Context()).Info().Emitf("Upload started: file=%s, event=%s, client=%s",
 		filename, eventID, clientIP)
 
 	return transfer
@@ -113,7 +110,7 @@ func (t *UploadTransfer) Close() error {
 			t.uploadTransaction.SetData("error.message", err.Error())
 			t.uploadTransaction.Finish()
 		}
-		t.log().Error().Emitf("Pipe close error: file=%s, error=%v", t.filename, err)
+		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("Pipe close error: file=%s, error=%v", t.filename, err)
 		return err
 	}
 
@@ -143,9 +140,9 @@ func (t *UploadTransfer) Close() error {
 
 	// Log at I/O boundary
 	if err != nil {
-		t.log().Error().Emitf("Upload failed: file=%s, bytes=%d, error=%v", t.filename, bytesTotal, err)
+		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("Upload failed: file=%s, bytes=%d, error=%v", t.filename, bytesTotal, err)
 	} else {
-		t.log().Info().Emitf("Upload completed: file=%s, bytes=%d, duration=%s, throughput=%.2f MB/s",
+		sentry.NewLogger(t.uploadTransaction.Context()).Info().Emitf("Upload completed: file=%s, bytes=%d, duration=%s, throughput=%.2f MB/s",
 			t.filename, bytesTotal, duration, throughputMBps)
 	}
 
@@ -170,7 +167,7 @@ func (t *UploadTransfer) streamToAPI() {
 	if err != nil {
 		// Check for 401 (token expired) - report to hub, hub decides action
 		if httpResp != nil && httpResp.StatusCode == http.StatusUnauthorized {
-			t.log().Error().Emitf("Auth expired for file=%s, reporting to hub", t.filename)
+			sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("Auth expired for file=%s, reporting to hub", t.filename)
 
 			// Report event to hub - hub decides whether to disconnect
 			t.clientMgr.SendEvent(clientmgr.ClientEvent{
@@ -185,7 +182,7 @@ func (t *UploadTransfer) streamToAPI() {
 
 		// Check for 429 (rate limited) - report to hub
 		if httpResp != nil && httpResp.StatusCode == http.StatusTooManyRequests {
-			t.log().Warn().Emitf("Rate limited for file=%s, reporting to hub", t.filename)
+			sentry.NewLogger(t.uploadTransaction.Context()).Warn().Emitf("Rate limited for file=%s, reporting to hub", t.filename)
 
 			t.clientMgr.SendEvent(clientmgr.ClientEvent{
 				Type:     clientmgr.EventRateLimited,
@@ -198,7 +195,7 @@ func (t *UploadTransfer) streamToAPI() {
 		}
 
 		// Other upload failures - report to hub (hub may log but keep connection)
-		t.log().Error().Emitf("API upload failed for file=%s: %v", t.filename, err)
+		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("API upload failed for file=%s: %v", t.filename, err)
 
 		t.clientMgr.SendEvent(clientmgr.ClientEvent{
 			Type:     clientmgr.EventUploadFailed,
@@ -210,7 +207,7 @@ func (t *UploadTransfer) streamToAPI() {
 		return
 	}
 
-	t.log().Info().Emitf("Upload successful: file=%s, photo_id=%s, size=%d bytes",
+	sentry.NewLogger(t.uploadTransaction.Context()).Info().Emitf("Upload successful: file=%s, photo_id=%s, size=%d bytes",
 		t.filename, uploadResp.Data.ID, uploadResp.Data.SizeBytes)
 
 	t.uploadDone <- nil
@@ -272,6 +269,23 @@ func (t *UploadTransfer) Truncate(size int64) error {
 // WriteString is a helper that writes a string
 func (t *UploadTransfer) WriteString(s string) (int, error) {
 	return t.Write([]byte(s))
+}
+
+// categorizeFileType returns the file type category based on extension
+func categorizeFileType(ext string) string {
+	switch ext {
+	// Standard image formats
+	case "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif":
+		return "image"
+	// RAW camera formats
+	case "cr2", "cr3", "nef", "arw", "orf", "rw2", "dng", "raf", "raw":
+		return "raw"
+	// Video formats (unlikely but possible)
+	case "mp4", "mov", "avi", "mkv":
+		return "video"
+	default:
+		return "unknown"
+	}
 }
 
 // fakeFileInfo implements os.FileInfo for Stat()

@@ -1,0 +1,17 @@
+{
+  "name": "@sabaipics/ftp-server",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "go run ./cmd/ftp-server",
+    "build": "go build -o bin/ftp-server ./cmd/ftp-server",
+    "test": "go test ./...",
+    "test:coverage": "go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out -o coverage.html",
+    "lint": "go vet ./...",
+    "fmt": "go fmt ./...",
+    "tidy": "go mod tidy",
+    "docker:build": "docker build -t sabaipics-ftp-server .",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  }
+}
