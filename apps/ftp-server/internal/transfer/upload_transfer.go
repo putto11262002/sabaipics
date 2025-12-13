@@ -30,7 +30,7 @@ type UploadTransfer struct {
 	filename          string
 	clientID          uint32 // Client ID for event reporting
 	clientMgr         *clientmgr.Manager
-	apiClient         *apiclient.Client
+	apiClient         apiclient.APIClient
 	pipeReader        *io.PipeReader
 	pipeWriter        *io.PipeWriter
 	uploadDone        chan error
@@ -41,7 +41,7 @@ type UploadTransfer struct {
 
 // NewUploadTransfer creates a new upload transfer for streaming to API via FormData
 // Creates a ROOT Sentry transaction for this upload (not a child span)
-func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, clientID uint32, clientMgr *clientmgr.Manager, apiClient *apiclient.Client) *UploadTransfer {
+func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, clientID uint32, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient) *UploadTransfer {
 	pr, pw := io.Pipe()
 
 	// Create ROOT Sentry transaction for this upload

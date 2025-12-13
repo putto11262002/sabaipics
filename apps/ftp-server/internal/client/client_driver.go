@@ -20,12 +20,12 @@ type ClientDriver struct {
 	clientIP  string // Client IP address for upload transaction context
 	clientID  uint32 // Client ID for event reporting to hub
 	clientMgr *clientmgr.Manager
-	apiClient *apiclient.Client
+	apiClient apiclient.APIClient
 	config    *config.Config
 }
 
 // NewClientDriver creates a new ClientDriver instance with JWT token, API client, and client manager
-func NewClientDriver(eventID, jwtToken, clientIP string, clientID uint32, clientMgr *clientmgr.Manager, apiClient *apiclient.Client, cfg *config.Config) *ClientDriver {
+func NewClientDriver(eventID, jwtToken, clientIP string, clientID uint32, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient, cfg *config.Config) *ClientDriver {
 	return &ClientDriver{
 		eventID:   eventID,
 		jwtToken:  jwtToken,

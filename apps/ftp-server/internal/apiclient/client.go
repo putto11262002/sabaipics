@@ -12,11 +12,20 @@ import (
 	"time"
 )
 
+// APIClient defines the interface for API operations (for testing)
+type APIClient interface {
+	Authenticate(ctx context.Context, req AuthRequest) (*AuthResponse, error)
+	UploadFormData(ctx context.Context, token, eventID, filename string, reader io.Reader) (*UploadResponse, *http.Response, error)
+}
+
 // Client is the HTTP client for communicating with the SabaiPics API
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
 }
+
+// Ensure Client implements APIClient
+var _ APIClient = (*Client)(nil)
 
 // AuthRequest represents the FTP authentication request
 type AuthRequest struct {

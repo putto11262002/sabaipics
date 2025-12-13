@@ -8,6 +8,7 @@ import (
 
 	"github.com/fclairamb/ftpserverlib"
 	ftpslog "github.com/fclairamb/go-log/slog"
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/clientmgr"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/config"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/driver"
@@ -23,8 +24,18 @@ type Server struct {
 
 // New creates FTP server instance(s) - explicit FTPS and optionally implicit FTPS
 func New(cfg *config.Config, clientMgr *clientmgr.Manager) (*Server, error) {
+	return NewWithClient(cfg, clientMgr, nil)
+}
+
+// NewWithClient creates FTP server with a custom API client (for testing)
+func NewWithClient(cfg *config.Config, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient) (*Server, error) {
 	// Create explicit FTPS server (port 2121, AUTH TLS command)
-	explicitDriver := driver.NewMainDriver(cfg, clientMgr)
+	var explicitDriver *driver.MainDriver
+	if apiClient != nil {
+		explicitDriver = driver.NewMainDriverWithClient(cfg, clientMgr, apiClient)
+	} else {
+		explicitDriver = driver.NewMainDriver(cfg, clientMgr)
+	}
 	explicitServer := ftpserver.NewFtpServer(explicitDriver)
 
 	// Configure FTP protocol debug logging if enabled

@@ -18,7 +18,7 @@ import (
 // Logs application flow events at FTP protocol boundaries
 type MainDriver struct {
 	config    *config.Config
-	apiClient *apiclient.Client
+	apiClient apiclient.APIClient
 	clientMgr *clientmgr.Manager
 	// tlsMode specifies the TLS requirement mode for this FTP server
 	tlsMode ftpserver.TLSRequirement
@@ -31,6 +31,16 @@ func NewMainDriver(cfg *config.Config, clientMgr *clientmgr.Manager) *MainDriver
 		apiClient: apiclient.NewClient(cfg.APIURL),
 		clientMgr: clientMgr,
 		tlsMode:   ftpserver.ClearOrEncrypted, // Explicit FTPS (optional TLS via AUTH TLS)
+	}
+}
+
+// NewMainDriverWithClient creates a MainDriver with a custom API client (for testing)
+func NewMainDriverWithClient(cfg *config.Config, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient) *MainDriver {
+	return &MainDriver{
+		config:    cfg,
+		apiClient: apiClient,
+		clientMgr: clientMgr,
+		tlsMode:   ftpserver.ClearOrEncrypted,
 	}
 }
 
