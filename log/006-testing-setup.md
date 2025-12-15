@@ -240,3 +240,27 @@ Add these secrets at **repository level** (Settings → Secrets and variables �
 - Created `tests/setup.integration.ts` with Zod validation for AWS credentials
 - Updated integration tests to only verify API integration point, not face detection accuracy (out of scope)
 - Added `zod@4.1.13` as dev dependency for env validation
+
+### 2025-12-15
+
+**Convention Change: Co-located Unit Tests**
+
+Unit tests are now co-located with source files instead of centralized in `tests/` directory.
+
+| Test Type | Location | Pattern |
+|-----------|----------|---------|
+| **Unit tests** | `src/**/*.test.ts` | Co-located with module |
+| **Workers tests** | `tests/*.workers.test.ts` | Centralized (needs workerd) |
+| **Integration tests** | `tests/*.integration.ts` | Centralized (needs real services) |
+
+**Rationale:**
+- Unit tests belong with the code they test for better discoverability
+- `tests/` folder is reserved for e2e, integration, and workers tests that need special runtime environments
+- Follows common TypeScript/JavaScript convention
+
+**Files Migrated:**
+- `tests/rekognition.test.ts` → `src/lib/rekognition/rekognition.test.ts`
+- `tests/line-webhook.test.ts` → `src/lib/line/webhook.test.ts`
+
+**Config Updated:**
+- `vitest.node.config.ts`: Changed include pattern from `tests/**/*.test.ts` to `src/**/*.test.ts`

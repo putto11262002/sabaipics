@@ -1,6 +1,11 @@
 import { Hono } from "hono";
-import type { WebhookEvent, WebhookRequestBody } from "@line/bot-sdk";
-import { verifyLineSignature } from "../../lib/line";
+import { z } from "zod";
+import { verifyLineSignature } from "../../lib/line/webhook";
+import {
+	WebhookRequestBodySchema,
+	type WebhookEvent,
+	type WebhookRequestBody,
+} from "../../lib/line/schemas";
 
 /**
  * LINE Webhook Bindings
@@ -45,11 +50,16 @@ export const lineWebhookRouter = new Hono<{
 		return c.json({ error: "Invalid signature" }, 401);
 	}
 
-	// Parse webhook body
+	// Parse and validate webhook body with Zod
 	let webhookBody: WebhookRequestBody;
 	try {
-		webhookBody = JSON.parse(body) as WebhookRequestBody;
-	} catch {
+		const parsed = JSON.parse(body);
+		webhookBody = WebhookRequestBodySchema.parse(parsed);
+	} catch (err) {
+		if (err instanceof z.ZodError) {
+			console.error("[LINE Webhook] Validation error:", err.errors);
+			return c.json({ error: "Invalid webhook payload" }, 400);
+		}
 		console.error("[LINE Webhook] Failed to parse request body");
 		return c.json({ error: "Invalid JSON" }, 400);
 	}
@@ -147,11 +157,6 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
 		case "unsend":
 			console.log("Unsent Message ID:", event.unsend.messageId);
 			break;
-
-		default:
-			// Log unknown event types for future reference
-			console.log("Unknown event type:", (event as { type: string }).type);
-			console.log("Full event:", JSON.stringify(event, null, 2));
 	}
 
 	console.log("=========================================");

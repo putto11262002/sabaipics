@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { verifyLineSignature } from "../src/lib/line";
+import { verifyLineSignature } from "./webhook";
 
 // Test channel secret (not a real secret)
 const TEST_CHANNEL_SECRET = "test_channel_secret_12345";
@@ -14,7 +14,7 @@ const TEST_CHANNEL_SECRET = "test_channel_secret_12345";
 /**
  * Generate a valid LINE signature for testing
  *
- * Uses Node.js crypto to generate the expected signature.
+ * Uses Web Crypto API to generate the expected signature.
  */
 async function generateValidSignature(
 	body: string,

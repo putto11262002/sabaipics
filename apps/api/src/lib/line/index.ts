@@ -4,4 +4,4 @@
  * Infrastructure for LINE webhook handling and message sending.
  */
 
-export { verifyLineSignature } from "./webhook";
+export { createLineClient, type LineEnv } from "./client";
