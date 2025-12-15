@@ -24,6 +24,7 @@
 		"@sabaipics/auth": "workspace:*",
 		"@sabaipics/db": "workspace:*",
 		"hono": "^4.10.7",
+		"stripe": "^20.0.0",
 		"svix": "^1.82.0"
 	},
 	"devDependencies": {

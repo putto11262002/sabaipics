@@ -9,6 +9,7 @@ const envSchema = z.object({
   AWS_ACCESS_KEY_ID: z.string().min(1, "AWS_ACCESS_KEY_ID is required"),
   AWS_SECRET_ACCESS_KEY: z.string().min(1, "AWS_SECRET_ACCESS_KEY is required"),
   AWS_REGION: z.string().min(1, "AWS_REGION is required"),
+  STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
 });
 
 beforeAll(() => {
@@ -19,7 +20,7 @@ beforeAll(() => {
       .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
       .join("\n");
     throw new Error(
-      `Integration tests require AWS credentials.\n${errors}\n\nSet in .dev.vars or environment.`
+      `Integration tests require credentials.\n${errors}\n\nSet in .dev.vars or environment.`
     );
   }
 });
