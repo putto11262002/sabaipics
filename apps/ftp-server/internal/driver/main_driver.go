@@ -22,6 +22,8 @@ type MainDriver struct {
 	clientMgr *clientmgr.Manager
 	// tlsMode specifies the TLS requirement mode for this FTP server
 	tlsMode ftpserver.TLSRequirement
+	// tlsConfig is an optional TLS config (for testing with self-signed certs)
+	tlsConfig *tls.Config
 }
 
 // NewMainDriver creates a new MainDriver instance for explicit FTPS (AUTH TLS)
@@ -41,6 +43,17 @@ func NewMainDriverWithClient(cfg *config.Config, clientMgr *clientmgr.Manager, a
 		apiClient: apiClient,
 		clientMgr: clientMgr,
 		tlsMode:   ftpserver.ClearOrEncrypted,
+	}
+}
+
+// NewMainDriverWithTLS creates a MainDriver with custom API client, TLS mode, and TLS config (for testing)
+func NewMainDriverWithTLS(cfg *config.Config, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient, tlsMode ftpserver.TLSRequirement, tlsConfig *tls.Config) *MainDriver {
+	return &MainDriver{
+		config:    cfg,
+		apiClient: apiClient,
+		clientMgr: clientMgr,
+		tlsMode:   tlsMode,
+		tlsConfig: tlsConfig,
 	}
 }
 
@@ -151,6 +164,11 @@ func (d *MainDriver) AuthUser(cc ftpserver.ClientContext, user, pass string) (ft
 
 // GetTLSConfig returns TLS configuration for FTPS
 func (d *MainDriver) GetTLSConfig() (*tls.Config, error) {
+	// If custom TLS config is provided (for testing), use it
+	if d.tlsConfig != nil {
+		return d.tlsConfig, nil
+	}
+
 	// If TLS cert/key paths are not configured, return nil (plain FTP)
 	if d.config.TLSCertPath == "" || d.config.TLSKeyPath == "" {
 		return nil, nil

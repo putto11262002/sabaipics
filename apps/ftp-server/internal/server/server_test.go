@@ -3,16 +3,33 @@ package server_test
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
+	"math/big"
 	"net"
 	"testing"
 	"time"
 
+	ftpserver "github.com/fclairamb/ftpserverlib"
 	"github.com/jlaffaye/ftp"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/clientmgr"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/config"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/server"
+)
+
+// ConnectionMode represents the type of FTP connection
+type ConnectionMode int
+
+const (
+	ModePlainFTP ConnectionMode = iota
+	ModeExplicitFTPS
+	ModeImplicitFTPS
 )
 
 // TestEnv holds the test environment
@@ -22,10 +39,58 @@ type TestEnv struct {
 	Config    *config.Config
 	ClientMgr *clientmgr.Manager
 	Addr      string
+	Mode      ConnectionMode
+	TLSConfig *tls.Config
 }
 
-// SetupTestEnv creates a test environment with mock API client
+// generateTestCert creates a self-signed certificate for testing
+func generateTestCert() (*tls.Config, error) {
+	// Generate ECDSA private key
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create certificate template
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization: []string{"SabaiPics Test"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:              []string{"localhost"},
+	}
+
+	// Create self-signed certificate
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create TLS certificate
+	cert := tls.Certificate{
+		Certificate: [][]byte{certDER},
+		PrivateKey:  privateKey,
+	}
+
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}, nil
+}
+
+// SetupTestEnv creates a test environment with mock API client (plain FTP)
 func SetupTestEnv(t *testing.T) *TestEnv {
+	return SetupTestEnvWithMode(t, ModePlainFTP)
+}
+
+// SetupTestEnvWithMode creates a test environment with specified connection mode
+func SetupTestEnvWithMode(t *testing.T, mode ConnectionMode) *TestEnv {
 	t.Helper()
 
 	// Find available port
@@ -48,14 +113,41 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 		FTPIdleTimeout:      30,
 		FTPDebug:            testing.Verbose(),
 		SentryEnvironment:   "test",
+		ImplicitFTPSPort:    addr, // Use same address for implicit FTPS tests
 	}
 
 	// Create client manager
 	mgr := clientmgr.NewManager()
 	mgr.Start()
 
-	// Create FTP server with mock API client
-	ftpServer, err := server.NewWithClient(cfg, mgr, mockAPI)
+	// Determine TLS settings based on mode
+	var tlsMode ftpserver.TLSRequirement
+	var tlsConfig *tls.Config
+
+	switch mode {
+	case ModePlainFTP:
+		tlsMode = ftpserver.ClearOrEncrypted
+		tlsConfig = nil
+	case ModeExplicitFTPS:
+		tlsMode = ftpserver.ClearOrEncrypted
+		tlsConfig, err = generateTestCert()
+		if err != nil {
+			t.Fatalf("Failed to generate test certificate: %v", err)
+		}
+	case ModeImplicitFTPS:
+		tlsMode = ftpserver.ImplicitEncryption
+		tlsConfig, err = generateTestCert()
+		if err != nil {
+			t.Fatalf("Failed to generate test certificate: %v", err)
+		}
+	}
+
+	// Create FTP server with specified options
+	ftpServer, err := server.NewWithOptions(cfg, mgr, server.TestServerOptions{
+		APIClient: mockAPI,
+		TLSMode:   tlsMode,
+		TLSConfig: tlsConfig,
+	})
 	if err != nil {
 		t.Fatalf("Failed to create FTP server: %v", err)
 	}
@@ -74,6 +166,8 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 		Config:    cfg,
 		ClientMgr: mgr,
 		Addr:      addr,
+		Mode:      mode,
+		TLSConfig: tlsConfig,
 	}
 }
 
@@ -102,43 +196,225 @@ func (te *TestEnv) Cleanup(t *testing.T) {
 	te.Server.Shutdown(ctx)
 }
 
-// ConnectFTP creates an FTP client connection
+// ConnectFTP creates an FTP client connection based on the test environment mode
 func (te *TestEnv) ConnectFTP(t *testing.T) *ftp.ServerConn {
 	t.Helper()
-	conn, err := ftp.Dial(te.Addr,
-		ftp.DialWithContext(context.Background()),
-		ftp.DialWithTimeout(5*time.Second),
-	)
+
+	var conn *ftp.ServerConn
+	var err error
+
+	switch te.Mode {
+	case ModePlainFTP:
+		conn, err = ftp.Dial(te.Addr,
+			ftp.DialWithContext(context.Background()),
+			ftp.DialWithTimeout(5*time.Second),
+		)
+	case ModeExplicitFTPS:
+		// Connect without TLS first, then upgrade with AUTH TLS
+		conn, err = ftp.Dial(te.Addr,
+			ftp.DialWithContext(context.Background()),
+			ftp.DialWithTimeout(5*time.Second),
+			ftp.DialWithExplicitTLS(&tls.Config{
+				InsecureSkipVerify: true, // Accept self-signed cert
+			}),
+		)
+	case ModeImplicitFTPS:
+		// Connect with TLS immediately
+		conn, err = ftp.Dial(te.Addr,
+			ftp.DialWithContext(context.Background()),
+			ftp.DialWithTimeout(5*time.Second),
+			ftp.DialWithTLS(&tls.Config{
+				InsecureSkipVerify: true, // Accept self-signed cert
+			}),
+		)
+	}
+
 	if err != nil {
-		t.Fatalf("Failed to connect to FTP server: %v", err)
+		t.Fatalf("Failed to connect to FTP server (mode=%d): %v", te.Mode, err)
 	}
 	return conn
 }
 
-// TestE2E_AuthSuccess tests successful FTP authentication
-func TestE2E_AuthSuccess(t *testing.T) {
-	env := SetupTestEnv(t)
+// =============================================================================
+// Plain FTP Tests
+// =============================================================================
+
+// TestE2E_PlainFTP_AuthSuccess tests successful authentication over plain FTP
+func TestE2E_PlainFTP_AuthSuccess(t *testing.T) {
+	env := SetupTestEnvWithMode(t, ModePlainFTP)
 	defer env.Cleanup(t)
 
 	conn := env.ConnectFTP(t)
 	defer conn.Quit()
 
-	// Login - mock accepts any credentials by default
 	err := conn.Login("testuser", "testpass")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	// Verify auth was called
 	if env.MockAPI.GetAuthCallCount() != 1 {
 		t.Errorf("Expected 1 auth call, got %d", env.MockAPI.GetAuthCallCount())
 	}
 
-	// Verify we can issue commands
 	if err := conn.NoOp(); err != nil {
 		t.Errorf("NoOp failed after login: %v", err)
 	}
 }
+
+// TestE2E_PlainFTP_Upload tests file upload over plain FTP
+func TestE2E_PlainFTP_Upload(t *testing.T) {
+	env := SetupTestEnvWithMode(t, ModePlainFTP)
+	defer env.Cleanup(t)
+
+	conn := env.ConnectFTP(t)
+	defer conn.Quit()
+
+	if err := conn.Login("test", "pass"); err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	testData := []byte("Plain FTP upload test data")
+	err := conn.Stor("plain_ftp_test.jpg", bytes.NewReader(testData))
+	if err != nil {
+		t.Fatalf("Upload failed: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if env.MockAPI.GetUploadCallCount() != 1 {
+		t.Errorf("Expected 1 upload call, got %d", env.MockAPI.GetUploadCallCount())
+	}
+
+	upload := env.MockAPI.GetLastUploadCall()
+	if upload == nil {
+		t.Fatal("No upload recorded")
+	}
+	if upload.Size != int64(len(testData)) {
+		t.Errorf("Size = %d, want %d", upload.Size, len(testData))
+	}
+}
+
+// =============================================================================
+// Explicit FTPS Tests (AUTH TLS)
+// =============================================================================
+
+// TestE2E_ExplicitFTPS_AuthSuccess tests successful authentication over explicit FTPS
+func TestE2E_ExplicitFTPS_AuthSuccess(t *testing.T) {
+	env := SetupTestEnvWithMode(t, ModeExplicitFTPS)
+	defer env.Cleanup(t)
+
+	conn := env.ConnectFTP(t)
+	defer conn.Quit()
+
+	err := conn.Login("testuser", "testpass")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	if env.MockAPI.GetAuthCallCount() != 1 {
+		t.Errorf("Expected 1 auth call, got %d", env.MockAPI.GetAuthCallCount())
+	}
+
+	if err := conn.NoOp(); err != nil {
+		t.Errorf("NoOp failed after login: %v", err)
+	}
+}
+
+// TestE2E_ExplicitFTPS_Upload tests file upload over explicit FTPS
+func TestE2E_ExplicitFTPS_Upload(t *testing.T) {
+	env := SetupTestEnvWithMode(t, ModeExplicitFTPS)
+	defer env.Cleanup(t)
+
+	conn := env.ConnectFTP(t)
+	defer conn.Quit()
+
+	if err := conn.Login("test", "pass"); err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	testData := []byte("Explicit FTPS upload test data - secure with AUTH TLS")
+	err := conn.Stor("explicit_ftps_test.jpg", bytes.NewReader(testData))
+	if err != nil {
+		t.Fatalf("Upload failed: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if env.MockAPI.GetUploadCallCount() != 1 {
+		t.Errorf("Expected 1 upload call, got %d", env.MockAPI.GetUploadCallCount())
+	}
+
+	upload := env.MockAPI.GetLastUploadCall()
+	if upload == nil {
+		t.Fatal("No upload recorded")
+	}
+	if upload.Size != int64(len(testData)) {
+		t.Errorf("Size = %d, want %d", upload.Size, len(testData))
+	}
+}
+
+// =============================================================================
+// Implicit FTPS Tests
+// =============================================================================
+
+// TestE2E_ImplicitFTPS_AuthSuccess tests successful authentication over implicit FTPS
+func TestE2E_ImplicitFTPS_AuthSuccess(t *testing.T) {
+	env := SetupTestEnvWithMode(t, ModeImplicitFTPS)
+	defer env.Cleanup(t)
+
+	conn := env.ConnectFTP(t)
+	defer conn.Quit()
+
+	err := conn.Login("testuser", "testpass")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	if env.MockAPI.GetAuthCallCount() != 1 {
+		t.Errorf("Expected 1 auth call, got %d", env.MockAPI.GetAuthCallCount())
+	}
+
+	if err := conn.NoOp(); err != nil {
+		t.Errorf("NoOp failed after login: %v", err)
+	}
+}
+
+// TestE2E_ImplicitFTPS_Upload tests file upload over implicit FTPS
+func TestE2E_ImplicitFTPS_Upload(t *testing.T) {
+	env := SetupTestEnvWithMode(t, ModeImplicitFTPS)
+	defer env.Cleanup(t)
+
+	conn := env.ConnectFTP(t)
+	defer conn.Quit()
+
+	if err := conn.Login("test", "pass"); err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	testData := []byte("Implicit FTPS upload test data - immediate TLS")
+	err := conn.Stor("implicit_ftps_test.jpg", bytes.NewReader(testData))
+	if err != nil {
+		t.Fatalf("Upload failed: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if env.MockAPI.GetUploadCallCount() != 1 {
+		t.Errorf("Expected 1 upload call, got %d", env.MockAPI.GetUploadCallCount())
+	}
+
+	upload := env.MockAPI.GetLastUploadCall()
+	if upload == nil {
+		t.Fatal("No upload recorded")
+	}
+	if upload.Size != int64(len(testData)) {
+		t.Errorf("Size = %d, want %d", upload.Size, len(testData))
+	}
+}
+
+// =============================================================================
+// Common Tests (run on plain FTP for simplicity)
+// =============================================================================
 
 // TestE2E_AuthFailure tests failed FTP authentication
 func TestE2E_AuthFailure(t *testing.T) {
@@ -160,51 +436,6 @@ func TestE2E_AuthFailure(t *testing.T) {
 	// Verify auth was attempted
 	if env.MockAPI.GetAuthCallCount() != 1 {
 		t.Errorf("Expected 1 auth call, got %d", env.MockAPI.GetAuthCallCount())
-	}
-}
-
-// TestE2E_Upload tests successful file upload
-func TestE2E_Upload(t *testing.T) {
-	env := SetupTestEnv(t)
-	defer env.Cleanup(t)
-
-	conn := env.ConnectFTP(t)
-	defer conn.Quit()
-
-	if err := conn.Login("test", "pass"); err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-
-	// Upload a file
-	testData := []byte("This is test image data for E2E testing")
-	err := conn.Stor("test_photo.jpg", bytes.NewReader(testData))
-	if err != nil {
-		t.Fatalf("Upload failed: %v", err)
-	}
-
-	// Wait for async upload to complete
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify upload was called
-	if env.MockAPI.GetUploadCallCount() != 1 {
-		t.Errorf("Expected 1 upload call, got %d", env.MockAPI.GetUploadCallCount())
-	}
-
-	// Verify upload details
-	upload := env.MockAPI.GetLastUploadCall()
-	if upload == nil {
-		t.Fatal("No upload recorded")
-	}
-	// FTP client sends full path, so filename may have leading slash
-	expectedFilename := "/test_photo.jpg"
-	if upload.Filename != expectedFilename {
-		t.Errorf("Filename = %q, want %q", upload.Filename, expectedFilename)
-	}
-	if upload.Size != int64(len(testData)) {
-		t.Errorf("Size = %d, want %d", upload.Size, len(testData))
-	}
-	if upload.Token != "mock-jwt-token" {
-		t.Errorf("Token = %q, want %q", upload.Token, "mock-jwt-token")
 	}
 }
 

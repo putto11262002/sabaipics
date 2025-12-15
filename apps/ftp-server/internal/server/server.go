@@ -2,11 +2,12 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"log"
 	"log/slog"
 	"os"
 
-	"github.com/fclairamb/ftpserverlib"
+	ftpserver "github.com/fclairamb/ftpserverlib"
 	ftpslog "github.com/fclairamb/go-log/slog"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/clientmgr"
@@ -27,16 +28,32 @@ func New(cfg *config.Config, clientMgr *clientmgr.Manager) (*Server, error) {
 	return NewWithClient(cfg, clientMgr, nil)
 }
 
+// TestServerOptions holds options for creating test servers
+type TestServerOptions struct {
+	APIClient apiclient.APIClient
+	TLSMode   ftpserver.TLSRequirement
+	TLSConfig *tls.Config
+}
+
 // NewWithClient creates FTP server with a custom API client (for testing)
 func NewWithClient(cfg *config.Config, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient) (*Server, error) {
-	// Create explicit FTPS server (port 2121, AUTH TLS command)
-	var explicitDriver *driver.MainDriver
-	if apiClient != nil {
-		explicitDriver = driver.NewMainDriverWithClient(cfg, clientMgr, apiClient)
+	return NewWithOptions(cfg, clientMgr, TestServerOptions{
+		APIClient: apiClient,
+		TLSMode:   ftpserver.ClearOrEncrypted,
+		TLSConfig: nil,
+	})
+}
+
+// NewWithOptions creates FTP server with custom options (for testing different connection types)
+func NewWithOptions(cfg *config.Config, clientMgr *clientmgr.Manager, opts TestServerOptions) (*Server, error) {
+	// Create driver with specified options
+	var mainDriver *driver.MainDriver
+	if opts.APIClient != nil {
+		mainDriver = driver.NewMainDriverWithTLS(cfg, clientMgr, opts.APIClient, opts.TLSMode, opts.TLSConfig)
 	} else {
-		explicitDriver = driver.NewMainDriver(cfg, clientMgr)
+		mainDriver = driver.NewMainDriver(cfg, clientMgr)
 	}
-	explicitServer := ftpserver.NewFtpServer(explicitDriver)
+	explicitServer := ftpserver.NewFtpServer(mainDriver)
 
 	// Configure FTP protocol debug logging if enabled
 	if cfg.FTPDebug {
