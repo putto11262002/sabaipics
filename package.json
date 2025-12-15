@@ -17,6 +17,11 @@
 		"wrangler": "^4.20.0"
 	},
 	"packageManager": "pnpm@9.0.0",
+	"pnpm": {
+		"overrides": {
+			"vitest>vite": "^6.0.0"
+		}
+	},
 	"engines": {
 		"node": ">=20.0.0"
 	}
