@@ -43,3 +43,10 @@ STRIPE_SECRET_KEY=sk_test_xxxxx
 # For local testing with Stripe CLI: stripe listen --forward-to localhost:8787/webhooks/stripe
 # Format: whsec_xxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxx
+
+# LINE Messaging API Credentials
+# Get from: LINE Developers Console → Your Channel → Basic settings / Messaging API tab
+# Channel Secret: Basic settings → Channel secret
+# Access Token: Messaging API → Channel access token (long-lived) → Issue
+LINE_CHANNEL_SECRET=xxxxx
+LINE_CHANNEL_ACCESS_TOKEN=xxxxx
