@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # FTP Server (for local development)
+  # All authentication and uploads are proxied to the SabaiPics API
+  ftp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sabaipics-ftp-server
+    environment:
+      # FTP Server settings
+      FTP_LISTEN_ADDRESS: 0.0.0.0:21
+      FTP_PASSIVE_PORT_START: 5000
+      FTP_PASSIVE_PORT_END: 5099
+      FTP_IDLE_TIMEOUT: 300
+
+      # API URL (required) - FTP server proxies all uploads to this API
+      API_URL: ${API_URL:-https://api.sabaipics.com}
+
+      # Sentry (optional - comment out if not using)
+      # SENTRY_DSN: your-sentry-dsn-here
+      SENTRY_ENVIRONMENT: development
+    ports:
+      - "2121:21"           # FTP command port
+      - "5000-5099:5000-5099"  # FTP passive ports
+    networks:
+      - ftp-network
+
+networks:
+  ftp-network:
+    driver: bridge
