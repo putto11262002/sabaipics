@@ -31,7 +31,6 @@ func New(cfg *config.Config, clientMgr *clientmgr.Manager) (*Server, error) {
 // TestServerOptions holds options for creating test servers
 type TestServerOptions struct {
 	APIClient apiclient.APIClient
-	TLSMode   ftpserver.TLSRequirement
 	TLSConfig *tls.Config
 }
 
@@ -39,25 +38,24 @@ type TestServerOptions struct {
 func NewWithClient(cfg *config.Config, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient) (*Server, error) {
 	return NewWithOptions(cfg, clientMgr, TestServerOptions{
 		APIClient: apiClient,
-		TLSMode:   ftpserver.ClearOrEncrypted,
 		TLSConfig: nil,
 	})
 }
 
-// NewWithOptions creates FTP server with custom options (for testing different connection types)
+// NewWithOptions creates FTP server with custom options (for testing)
+// Supports both explicit FTPS (main port) and implicit FTPS (if enabled in config)
 func NewWithOptions(cfg *config.Config, clientMgr *clientmgr.Manager, opts TestServerOptions) (*Server, error) {
-	// Create driver with specified options
-	var mainDriver *driver.MainDriver
+	// Create explicit FTPS driver (supports plain FTP and AUTH TLS upgrade)
+	var explicitDriver *driver.MainDriver
 	if opts.APIClient != nil {
-		mainDriver = driver.NewMainDriverWithTLS(cfg, clientMgr, opts.APIClient, opts.TLSMode, opts.TLSConfig)
+		explicitDriver = driver.NewMainDriverWithTLS(cfg, clientMgr, opts.APIClient, ftpserver.ClearOrEncrypted, opts.TLSConfig)
 	} else {
-		mainDriver = driver.NewMainDriver(cfg, clientMgr)
+		explicitDriver = driver.NewMainDriver(cfg, clientMgr)
 	}
-	explicitServer := ftpserver.NewFtpServer(mainDriver)
+	explicitServer := ftpserver.NewFtpServer(explicitDriver)
 
 	// Configure FTP protocol debug logging if enabled
 	if cfg.FTPDebug {
-		// Create slog logger with debug level
 		slogLogger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		}))
@@ -75,9 +73,14 @@ func NewWithOptions(cfg *config.Config, clientMgr *clientmgr.Manager, opts TestS
 		clientMgr:      clientMgr,
 	}
 
-	// Create implicit FTPS server if enabled (port 990, immediate TLS)
+	// Create implicit FTPS server if enabled (immediate TLS on separate port)
 	if cfg.ImplicitFTPSEnabled {
-		implicitDriver := driver.NewMainDriverImplicit(cfg, clientMgr)
+		var implicitDriver *driver.MainDriver
+		if opts.APIClient != nil {
+			implicitDriver = driver.NewMainDriverWithTLS(cfg, clientMgr, opts.APIClient, ftpserver.ImplicitEncryption, opts.TLSConfig)
+		} else {
+			implicitDriver = driver.NewMainDriverImplicit(cfg, clientMgr)
+		}
 		server.implicitServer = ftpserver.NewFtpServer(implicitDriver)
 
 		// Share the same logger if debug is enabled
