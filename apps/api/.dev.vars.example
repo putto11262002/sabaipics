@@ -1,0 +1,45 @@
+# Local development overrides
+# Copy this file to .dev.vars and fill in your values
+# Note: CORS_ORIGIN and AUTHORIZED_PARTIES are in wrangler.jsonc
+
+# Clerk Secrets (get from Clerk Dashboard → API Keys)
+CLERK_SECRET_KEY=sk_test_xxxxx
+CLERK_PUBLISHABLE_KEY=pk_test_xxxxx
+
+# Clerk JWT Public Key for networkless verification
+# Get from: Clerk Dashboard → API Keys → Show JWT public key
+# Format: Single line with \n escape characters
+CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\nYOUR_PUBLIC_KEY_HERE\n-----END PUBLIC KEY-----"
+
+# Clerk Webhook Signing Secret
+# Get from: Clerk Dashboard → Webhooks → Add Endpoint → Copy Signing Secret
+# Format: whsec_xxxxx
+CLERK_WEBHOOK_SIGNING_SECRET=whsec_xxxxx
+
+# ngrok static domain (each developer gets their own free static domain)
+# Get from: https://dashboard.ngrok.com/domains → New Domain
+# Format: xxx.ngrok-free.app or xxx.ngrok-free.dev
+NGROK_DOMAIN=your-domain.ngrok-free.app
+
+# Neon Database Connection String
+# Get from: Neon Console → Dashboard → Connection Details → Connection String
+# Format: postgres://user:password@host/database?sslmode=require
+DATABASE_URL=postgresql://user:password@host/database?sslmode=require
+
+# AWS Credentials for Rekognition
+# Get from: AWS IAM Console → Users → Security Credentials
+AWS_ACCESS_KEY_ID=AKIAXXXXXXXXXX
+AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
+AWS_REGION=us-west-2
+
+# Stripe Secret Key (get from Stripe Dashboard → Developers → API Keys)
+# Use TEST mode keys for development (sk_test_xxx)
+# IMPORTANT: NEVER use live keys (sk_live_xxx) in development!
+# Note: Publishable key (pk_test_xxx) is for frontend only, not needed here
+STRIPE_SECRET_KEY=sk_test_xxxxx
+
+# Stripe Webhook Signing Secret
+# Get from: Stripe Dashboard → Developers → Webhooks → Add Endpoint → Copy Signing Secret
+# For local testing with Stripe CLI: stripe listen --forward-to localhost:8787/webhooks/stripe
+# Format: whsec_xxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxx
