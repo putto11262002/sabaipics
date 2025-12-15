@@ -9,8 +9,18 @@ import { dbTestRouter } from "./routes/db-test";
 // Queue consumer
 import { queue } from "./queue/photo-consumer";
 
+// Event handlers - registered at module load time
+import { registerStripeHandlers } from "./handlers/stripe";
+
 // Durable Objects - must be exported for wrangler
 export { RekognitionRateLimiter } from "./durable-objects/rate-limiter";
+
+// =============================================================================
+// Event Bus Initialization
+// =============================================================================
+
+// Register all event handlers at startup
+registerStripeHandlers();
 
 // =============================================================================
 // Types

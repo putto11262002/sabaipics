@@ -62,5 +62,8 @@ export {
   type FormattedStripeError,
 } from "./errors";
 
+// Events
+export type { StripeEvents, StripeEventPayload } from "./events";
+
 // Re-export Stripe types for convenience
 export type { default as Stripe } from "stripe";

@@ -93,3 +93,72 @@ stripe trigger checkout.session.completed
 pnpm test              # Unit tests (52 tests)
 pnpm test:integration  # Integration tests - local only (12 tests)
 ```
+
+---
+
+## 2025-12-15: Event Bus Pattern Implementation
+
+### Added
+- `apps/api/src/events/` - Generic, type-safe event bus system
+  - `event-bus.ts` - Core EventBus class with producer/consumer pattern
+  - `index.ts` - Singleton instance and re-exports
+
+- `apps/api/src/lib/stripe/events.ts` - Stripe event type definitions
+  - Discriminated union type for all Stripe webhook events
+  - Events: `stripe:checkout.completed`, `stripe:checkout.expired`, `stripe:payment.succeeded`, `stripe:payment.failed`, `stripe:customer.created/updated/deleted`
+
+- `apps/api/src/handlers/stripe.ts` - Stripe event handlers
+  - Registered via `registerStripeHandlers()` at startup
+  - Shell handlers (logging only) - business logic deferred
+
+### Modified
+- `apps/api/src/routes/webhooks/stripe.ts` - Now emits events to bus instead of inline handling
+  - Uses `eventBus.producer<StripeEvents>()` for type-safe emission
+- `apps/api/src/index.ts` - Registers event handlers at startup
+- `apps/api/src/lib/stripe/index.ts` - Exports `StripeEvents` type
+
+### Technical Design
+
+#### Event Bus Pattern
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Global EventBus                             │
+│         (Generic - knows nothing about event shapes)            │
+└─────────────────────────────────────────────────────────────────┘
+                   ▲                         │
+                   │ publish                 │ deliver
+                   │                         ▼
+┌──────────────────┴───────┐    ┌───────────────────────────────┐
+│       Producers          │    │         Consumers             │
+│  (Define & emit events)  │    │  (Subscribe & handle events)  │
+└──────────────────────────┘    └───────────────────────────────┘
+```
+
+#### Event Definition (Discriminated Union)
+```typescript
+export type StripeEvents =
+  | { type: "stripe:checkout.completed"; session: Session; ... }
+  | { type: "stripe:payment.failed"; paymentIntent: PaymentIntent; ... };
+```
+
+#### Producer Usage
+```typescript
+const producer = eventBus.producer<StripeEvents>();
+producer.emit("stripe:checkout.completed", { session, metadata, customerId });
+```
+
+#### Consumer Registration
+```typescript
+eventBus.handle<StripeEvents>({
+  "stripe:checkout.completed": async (event) => {
+    // Handle event with full type inference
+  },
+});
+```
+
+### Key Features
+- **Type-safe**: Full TypeScript inference from event definition to handler
+- **Decoupled**: Webhook route only emits events; business logic in handlers
+- **Extensible**: Add new event types by defining new discriminated unions
+- **Multiple consumers**: Same event can trigger logging, analytics, and business logic
+- **Fire-and-forget async**: Handlers run concurrently; errors logged but don't block others
