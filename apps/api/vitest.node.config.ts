@@ -4,10 +4,10 @@ export default defineConfig({
   test: {
     globals: true,
     setupFiles: ["./tests/setup.ts"],
-    // Include tests that run in Node.js (AWS mocks, unit tests)
-    include: ["tests/**/*.test.ts"],
-    // Exclude workers tests (they use separate config)
-    exclude: ["tests/**/*.workers.test.ts", "tests/**/*.integration.ts"],
+    // Include unit tests co-located with source code
+    include: ["src/**/*.test.ts"],
+    // Exclude workers tests and integration tests (they use separate configs)
+    exclude: ["src/**/*.workers.test.ts", "src/**/*.integration.ts"],
     environment: "node",
   },
 });
