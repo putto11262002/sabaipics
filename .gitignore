@@ -46,4 +46,7 @@ yarn-error.log*
 # Session logs
 .session/
 
+# Claude drafts
+.claude/drafts/
+
 .vscode/*
