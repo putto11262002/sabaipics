@@ -55,3 +55,25 @@ LINE_CHANNEL_ACCESS_TOKEN=xxxxx
 # Local development: Use your local frontend URL
 # This is used to generate QR codes that encode event search URLs
 APP_BASE_URL=http://localhost:5173
+
+# Image URLs for CF Images transformations and R2 storage
+# CF_DOMAIN: Your Cloudflare zone domain (must have Images transformations enabled)
+# R2_BASE_URL: Your R2 bucket custom domain OR dev URL
+#
+# For local development, use R2 dev URL format:
+#   https://pub-<account-id>.r2.dev/<bucket-name>
+# Get your account ID from: https://dash.cloudflare.com/to/account-id
+#
+# For staging/production, use custom domains:
+#   R2_BASE_URL=https://photos-staging.sabaipics.com
+#   R2_BASE_URL=https://photos.sabaipics.com
+CF_DOMAIN=https://sabaipics.com
+R2_BASE_URL=https://pub-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.r2.dev/sabaipics-photos
+
+# R2 API Credentials for presigned URLs (optional, for download URL protection)
+# Get from: Cloudflare Dashboard → R2 → Manage R2 API Tokens
+# Create API Token with permissions: Object Read & Write for your bucket
+# Note: Only needed if using presigned URLs for downloads
+# R2_ACCESS_KEY_ID=xxxxxxxxxxxxxxxxxxxx
+# R2_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# CLOUDFLARE_ACCOUNT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

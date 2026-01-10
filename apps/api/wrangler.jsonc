@@ -13,7 +13,10 @@
 		"CORS_ORIGIN": "http://localhost:5173",
 		"AUTHORIZED_PARTIES": "http://localhost:5173",
 		"AWS_REGION": "us-west-2",
-		"APP_BASE_URL": "http://localhost:5173"
+		"APP_BASE_URL": "http://localhost:5173",
+		// Image URLs for CF Images transformations and R2 storage
+		"CF_DOMAIN": "https://sabaipics.com",
+		"R2_BASE_URL": "https://pub-<account-id>.r2.dev/sabaipics-photos"
 	},
 
 	// R2 bucket for photo storage
@@ -69,7 +72,13 @@
 				"CORS_ORIGIN": "https://app-staging.sabaipics.com",
 				"AUTHORIZED_PARTIES": "https://app-staging.sabaipics.com",
 				"AWS_REGION": "us-west-2",
-				"APP_BASE_URL": "https://app-staging.sabaipics.com"
+				"APP_BASE_URL": "https://app-staging.sabaipics.com",
+				// Image URLs for CF Images transformations and R2 storage
+				"CF_DOMAIN": "https://sabaipics.com",
+				"R2_BASE_URL": "https://photos-staging.sabaipics.com",
+				// For presigned URLs (set via: wrangler secret put CLOUDFLARE_ACCOUNT_ID)
+				"R2_ACCESS_KEY_ID": "",
+				"R2_SECRET_ACCESS_KEY": ""
 			},
 			"routes": [
 				{
@@ -121,7 +130,13 @@
 				"CORS_ORIGIN": "https://app.sabaipics.com",
 				"AUTHORIZED_PARTIES": "https://app.sabaipics.com",
 				"AWS_REGION": "us-west-2",
-				"APP_BASE_URL": "https://sabaipics.com"
+				"APP_BASE_URL": "https://sabaipics.com",
+				// Image URLs for CF Images transformations and R2 storage
+				"CF_DOMAIN": "https://sabaipics.com",
+				"R2_BASE_URL": "https://photos.sabaipics.com",
+				// For presigned URLs (set via: wrangler secret put CLOUDFLARE_ACCOUNT_ID)
+				"R2_ACCESS_KEY_ID": "",
+				"R2_SECRET_ACCESS_KEY": ""
 			},
 			"routes": [
 				{
