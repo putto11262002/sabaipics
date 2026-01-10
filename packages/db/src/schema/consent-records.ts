@@ -1,5 +1,6 @@
-import { pgTable, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, index, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { timestamptz } from "./common";
 import { photographers } from "./photographers";
 
 // Enum for consent types (DBSCHEMA-001)
@@ -9,16 +10,14 @@ export type ConsentType = (typeof consentTypes)[number];
 export const consentRecords = pgTable(
   "consent_records",
   {
-    id: text("id")
+    id: uuid("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    photographerId: text("photographer_id")
+    photographerId: uuid("photographer_id")
       .notNull()
       .references(() => photographers.id, { onDelete: "restrict" }),
     consentType: text("consent_type", { enum: consentTypes }).notNull(),
-    grantedAt: timestamp("granted_at", { mode: "string", withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    grantedAt: timestamptz("granted_at").defaultNow().notNull(),
     ipAddress: text("ip_address"), // For audit trail
   },
   (table) => [index("consent_records_photographer_id_idx").on(table.photographerId)]

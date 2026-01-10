@@ -1,11 +1,6 @@
-import {
-  pgTable,
-  text,
-  timestamp,
-  integer,
-  index,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, integer, index, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { timestamptz, createdAtCol } from "./common";
 import { photographers } from "./photographers";
 
 // Enum for credit ledger entry types (DBSCHEMA-001)
@@ -15,19 +10,17 @@ export type CreditLedgerType = (typeof creditLedgerTypes)[number];
 export const creditLedger = pgTable(
   "credit_ledger",
   {
-    id: text("id")
+    id: uuid("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    photographerId: text("photographer_id")
+    photographerId: uuid("photographer_id")
       .notNull()
       .references(() => photographers.id, { onDelete: "restrict" }),
     amount: integer("amount").notNull(), // Positive for purchase, negative for deduction
     type: text("type", { enum: creditLedgerTypes }).notNull(),
     stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
-    expiresAt: timestamp("expires_at", { mode: "string", withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { mode: "string", withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    expiresAt: timestamptz("expires_at").notNull(),
+    createdAt: createdAtCol(),
   },
   (table) => [
     index("credit_ledger_photographer_expires_idx").on(

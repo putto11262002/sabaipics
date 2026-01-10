@@ -1,5 +1,5 @@
-// Types
-export * from "./types";
+// Common utilities
+export * from "./common";
 
 // Tables
 export * from "./test";

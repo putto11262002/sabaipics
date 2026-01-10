@@ -1,26 +1,25 @@
-import { pgTable, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, index, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { timestamptz, createdAtCol } from "./common";
 import { photographers } from "./photographers";
 
 export const events = pgTable(
   "events",
   {
-    id: text("id")
+    id: uuid("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    photographerId: text("photographer_id")
+    photographerId: uuid("photographer_id")
       .notNull()
       .references(() => photographers.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
-    startDate: timestamp("start_date", { mode: "string", withTimezone: true }),
-    endDate: timestamp("end_date", { mode: "string", withTimezone: true }),
+    startDate: timestamptz("start_date"),
+    endDate: timestamptz("end_date"),
     accessCode: text("access_code").notNull().unique(), // 6-char code for QR
     qrCodeR2Key: text("qr_code_r2_key"), // R2 key for generated QR PNG
     rekognitionCollectionId: text("rekognition_collection_id"), // Nullable, created on first upload
-    expiresAt: timestamp("expires_at", { mode: "string", withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { mode: "string", withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    expiresAt: timestamptz("expires_at").notNull(),
+    createdAt: createdAtCol(),
   },
   (table) => [
     index("events_photographer_id_idx").on(table.photographerId),

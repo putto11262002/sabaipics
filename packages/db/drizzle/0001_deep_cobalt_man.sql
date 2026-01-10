@@ -1,5 +1,5 @@
 CREATE TABLE "photographers" (
-	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"clerk_id" text NOT NULL,
 	"email" text NOT NULL,
 	"name" text,
@@ -9,7 +9,7 @@ CREATE TABLE "photographers" (
 );
 --> statement-breakpoint
 CREATE TABLE "credit_packages" (
-	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
 	"credits" integer NOT NULL,
 	"price_thb" integer NOT NULL,
@@ -19,8 +19,8 @@ CREATE TABLE "credit_packages" (
 );
 --> statement-breakpoint
 CREATE TABLE "credit_ledger" (
-	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"photographer_id" text NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"photographer_id" uuid NOT NULL,
 	"amount" integer NOT NULL,
 	"type" text NOT NULL,
 	"stripe_session_id" text,
@@ -29,8 +29,8 @@ CREATE TABLE "credit_ledger" (
 );
 --> statement-breakpoint
 CREATE TABLE "events" (
-	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"photographer_id" text NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"photographer_id" uuid NOT NULL,
 	"name" text NOT NULL,
 	"start_date" timestamp with time zone,
 	"end_date" timestamp with time zone,
@@ -43,8 +43,8 @@ CREATE TABLE "events" (
 );
 --> statement-breakpoint
 CREATE TABLE "photos" (
-	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"event_id" text NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"event_id" uuid NOT NULL,
 	"r2_key" text NOT NULL,
 	"status" text DEFAULT 'processing' NOT NULL,
 	"face_count" integer DEFAULT 0,
@@ -52,8 +52,8 @@ CREATE TABLE "photos" (
 );
 --> statement-breakpoint
 CREATE TABLE "faces" (
-	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"photo_id" text NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"photo_id" uuid NOT NULL,
 	"rekognition_face_id" text,
 	"bounding_box" jsonb,
 	"rekognition_response" jsonb,
@@ -61,8 +61,8 @@ CREATE TABLE "faces" (
 );
 --> statement-breakpoint
 CREATE TABLE "consent_records" (
-	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"photographer_id" text NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"photographer_id" uuid NOT NULL,
 	"consent_type" text NOT NULL,
 	"granted_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"ip_address" text
