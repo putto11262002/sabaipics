@@ -32,6 +32,9 @@ importers:
       '@hono/zod-validator':
         specifier: ^0.7.6
         version: 0.7.6(hono@4.11.3)(zod@3.25.76)
+      '@juit/qrcode':
+        specifier: ^1.0.78
+        version: 1.0.78
       '@line/bot-sdk':
         specifier: ^10.5.0
         version: 10.5.0
@@ -1425,6 +1428,9 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@juit/qrcode@1.0.78':
+    resolution: {integrity: sha512-zLKQDDXnhI9BG2A22hyqMpSGLP9qj3i8+EprbhglHIGlKKDncoP3VJ+QXcVonin4j8GMB7Qf02+T0lL7Rv0ibQ==}
 
   '@line/bot-sdk@10.5.0':
     resolution: {integrity: sha512-YmFDH1fr6b3kWiTDld8JID80cI+O5IlYegYeqhvBZx/zh2GBHdeV7i+pdwDjATRY9FHahYkcYmHb27UQldh0qw==}
@@ -4961,6 +4967,8 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@juit/qrcode@1.0.78': {}
 
   '@line/bot-sdk@10.5.0':
     dependencies:
