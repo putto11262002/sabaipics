@@ -454,13 +454,14 @@ Cleanup
 ---
 
 ### T-18 — Gallery API
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-9
 - **Goal:** Create `GET /events/:id/photos` endpoint returning paginated photos with CF Images thumbnail URLs.
 - **PrimarySurface:** `API`
 - **Scope:** `apps/api/src/routes/photos.ts`
 - **Dependencies:** `T-1`, `T-2`
+- **PR:** https://github.com/putto11262002/sabaipics/pull/23
 - **Acceptance:**
   - Returns paginated photos (cursor-based, limit 50)
   - Each photo has: id, thumbnailUrl (400px), previewUrl (1200px), faceCount, status
