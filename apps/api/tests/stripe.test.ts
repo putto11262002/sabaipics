@@ -708,22 +708,6 @@ describe("Credit Fulfillment", () => {
       expect(mockDb.insert).not.toHaveBeenCalled();
     });
 
-    it("rejects invalid photographer_id format", async () => {
-      const mockDb = createMockDb();
-      const event = createCheckoutCompletedEvent();
-      const session = event.data.object as Stripe.Checkout.Session;
-      const metadata = {
-        photographer_id: "not-a-uuid",
-        credits: "100",
-      };
-
-      const result = await fulfillCheckout(mockDb as never, session, metadata);
-
-      expect(result.success).toBe(false);
-      expect(result.reason).toBe("invalid_photographer_id");
-      expect(mockDb.insert).not.toHaveBeenCalled();
-    });
-
     it("handles duplicate webhook (unique constraint violation)", async () => {
       const mockDb = createMockDb({
         insertShouldFail: true,

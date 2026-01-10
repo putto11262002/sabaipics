@@ -90,16 +90,6 @@ export async function fulfillCheckout(
     return { success: false, reason: "invalid_credits" };
   }
 
-  // Validate photographer_id is a valid UUID format
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(photographerId)) {
-    console.error(
-      `[Stripe Fulfillment] Invalid photographer_id format "${photographerId}" for session: ${session.id}`
-    );
-    return { success: false, reason: "invalid_photographer_id" };
-  }
-
   // Insert credit ledger entry
   // Unique constraint on stripe_session_id prevents duplicates
   try {
