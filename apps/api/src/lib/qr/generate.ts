@@ -35,6 +35,7 @@ export async function generateEventQR(
   const pngBytes = await generatePngQrCode(searchUrl, {
     ecLevel: "M", // Decision: Medium (15%) error correction
     margin: 4, // Standard quiet zone (4 modules)
+    scale: 10, // 10 pixels per module = ~250-400px total (sharp on all displays)
   });
 
   return pngBytes;
