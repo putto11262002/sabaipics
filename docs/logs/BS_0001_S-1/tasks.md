@@ -105,7 +105,7 @@ Cleanup
 
 ---
 
-### [ ] T-4 — Clerk webhook handler for user.created
+### [x] T-4 — Clerk webhook handler for user.created
 - **Type:** `feature`
 - **StoryRefs:** US-1
 - **Goal:** Handle Clerk `user.created` webhook to create photographer record in DB with email from Clerk user object.
