@@ -133,6 +133,7 @@ Cleanup
 - **PrimarySurface:** `API`
 - **Scope:** `apps/api/src/routes/consent.ts`
 - **Dependencies:** `T-1`, `T-2`
+- **PR:** https://github.com/putto11262002/sabaipics/pull/11
 - **Acceptance:**
   - `POST /consent` creates consent_record row
   - Updates `photographers.pdpa_consent_at`
