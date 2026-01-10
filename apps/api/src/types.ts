@@ -4,6 +4,8 @@ import type { Database } from "@sabaipics/db";
 // Extend CloudflareBindings with secrets not in wrangler.jsonc
 export type Bindings = CloudflareBindings & {
   ADMIN_API_KEY: string;
+  STRIPE_SECRET_KEY: string;
+  STRIPE_WEBHOOK_SECRET: string;
 };
 
 export type Variables = AuthVariables & {
