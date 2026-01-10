@@ -2,6 +2,7 @@
  * Clerk Webhook Event Schemas
  *
  * Zod schemas for validating and typing Clerk webhook events.
+ * Based on official Clerk types from @clerk/types.
  *
  * ## Clerk Event Structure
  *
@@ -14,11 +15,31 @@
  * ```
  *
  * ## References
- * - https://clerk.com/docs/guides/development/webhooks/overview
- * - https://github.com/clerk/javascript/blob/main/packages/backend/src/webhooks.ts
+ * - https://clerk.com/docs/webhooks/sync-data
+ * - @clerk/types UserJSON interface
  */
 
 import { z } from "zod";
+
+// =============================================================================
+// Verification
+// =============================================================================
+
+/**
+ * Verification object from Clerk.
+ * Based on VerificationJSON from @clerk/types.
+ */
+const VerificationSchema = z.object({
+	status: z.string(),
+	strategy: z.string(),
+	attempts: z.number().nullable(),
+	expire_at: z.number().nullable(),
+	verified_at_client: z.string().optional(),
+	nonce: z.string().optional().nullable(),
+	message: z.string().optional().nullable(),
+	external_verification_redirect_url: z.string().optional().nullable(),
+	error: z.any().optional().nullable(),
+});
 
 // =============================================================================
 // Email Address
@@ -26,19 +47,17 @@ import { z } from "zod";
 
 /**
  * Email address object from Clerk.
- * Contains the email address and verification status.
+ * Based on EmailAddressJSON from @clerk/types.
  */
 const EmailAddressSchema = z.object({
+	object: z.literal("email_address").optional(),
 	id: z.string(),
 	email_address: z.string(),
-	verification: z
-		.object({
-			status: z.enum(["verified", "unverified", "expired"]),
-			strategy: z.string().optional(),
-			attempts: z.number().optional(),
-			expireAt: z.number().optional(),
-		})
-		.optional(),
+	verification: VerificationSchema.nullable(),
+	linked_to: z.array(z.object({
+		id: z.string(),
+		type: z.string(),
+	})).optional(),
 	reserved: z.boolean().optional(),
 });
 
@@ -57,36 +76,64 @@ const UserDataBaseSchema = z.object({
 
 /**
  * User data with email information.
- * Used for user.created and user.updated events.
+ * Based on UserJSON from @clerk/types.
+ *
+ * Note: Clerk uses `| null` for optional fields, not undefined.
+ * We use `.nullable()` to match this behavior.
  */
 const UserDataWithEmailSchema = UserDataBaseSchema.extend({
+	/** Object type */
+	object: z.literal("user").optional(),
 	/** Array of email addresses associated with the user */
 	email_addresses: z.array(EmailAddressSchema),
-	/** ID of the primary email address (use to find correct email in array) */
-	primary_email_address_id: z.string().optional(),
+	/** ID of the primary email address */
+	primary_email_address_id: z.string().nullable(),
 	/** User's first name */
-	first_name: z.string().optional(),
+	first_name: z.string().nullable(),
 	/** User's last name */
-	last_name: z.string().optional(),
+	last_name: z.string().nullable(),
+	/** User's username */
+	username: z.string().nullable().optional(),
 	/** User's profile image URL */
 	image_url: z.string().optional(),
-	/** When the user was created (Unix timestamp) */
-	created_at: z.number().optional(),
-	/** When the user was last updated (Unix timestamp) */
-	updated_at: z.number().optional(),
+	/** Whether the user has a profile image */
+	has_image: z.boolean().optional(),
+	/** External ID (if user was synced from external system) */
+	external_id: z.string().nullable(),
+	/** When the user was created (Unix timestamp ms) */
+	created_at: z.number(),
+	/** When the user was last updated (Unix timestamp ms) */
+	updated_at: z.number(),
+	/** When the user last signed in */
+	last_sign_in_at: z.number().nullable().optional(),
 	/** Whether the user is banned */
 	banned: z.boolean().optional(),
-	/** Whether the user has verified their email */
+	/** Whether the user is locked */
 	locked: z.boolean().optional(),
-	/** External ID (if user was synced from external system) */
-	external_id: z.string().optional(),
-});
+	/** Whether password is enabled */
+	password_enabled: z.boolean().optional(),
+	/** Whether two factor is enabled */
+	two_factor_enabled: z.boolean().optional(),
+	/** Whether TOTP is enabled */
+	totp_enabled: z.boolean().optional(),
+	/** Whether backup codes are enabled */
+	backup_code_enabled: z.boolean().optional(),
+	/** Public metadata */
+	public_metadata: z.record(z.unknown()).optional(),
+	/** Unsafe metadata */
+	unsafe_metadata: z.record(z.unknown()).optional(),
+	/** Private metadata (only in some contexts) */
+	private_metadata: z.record(z.unknown()).optional(),
+}).passthrough(); // Allow additional fields we don't explicitly define
 
 /**
  * Minimal user data for user.deleted event.
  * Clerk only sends the user ID on deletion.
  */
-const UserDataDeletedSchema = UserDataBaseSchema;
+const UserDataDeletedSchema = UserDataBaseSchema.extend({
+	object: z.literal("user").optional(),
+	deleted: z.boolean().optional(),
+}).passthrough();
 
 // =============================================================================
 // Webhook Events
@@ -99,9 +146,7 @@ const UserDataDeletedSchema = UserDataBaseSchema;
 const ClerkWebhookEventBaseSchema = z.object({
 	/** Event type - discriminator for the union */
 	type: z.string(),
-	/** Timestamp when the event occurred (Unix milliseconds) */
-	created_at: z.number().optional(),
-	/** Internal Clerk ID - not typically used */
+	/** Event object type */
 	object: z.string().optional(),
 });
 
