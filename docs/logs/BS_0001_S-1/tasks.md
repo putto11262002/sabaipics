@@ -320,7 +320,7 @@ Cleanup
 ---
 
 ### T-13 — Events API (CRUD + QR generation)
-- [ ] Done
+- [x] Done
 - **PR:** https://github.com/putto11262002/sabaipics/pull/22
 - **Type:** `feature`
 - **StoryRefs:** US-5, US-6
