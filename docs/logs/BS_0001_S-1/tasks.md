@@ -154,7 +154,7 @@ Cleanup
 ---
 
 ### T-6 — Signup UI + PDPA consent modal
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-1, US-2
 - **Goal:** Create photographer signup page with Clerk components and PDPA consent modal that blocks dashboard access until accepted.
