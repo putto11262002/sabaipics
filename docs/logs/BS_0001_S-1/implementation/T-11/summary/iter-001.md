@@ -3,7 +3,7 @@
 Task: `T-11 — Dashboard UI`
 Root: `BS_0001_S-1`
 Branch: `task/T-11-dashboard-ui`
-PR: `pending`
+PR: https://github.com/putto11262002/sabaipics/pull/19
 Date: `2026-01-10`
 
 ## Outcome
