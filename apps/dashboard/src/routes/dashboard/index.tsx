@@ -54,7 +54,7 @@ export function DashboardPage() {
 	return (
 		<>
 			<PageHeader breadcrumbs={[{ label: "Dashboard" }]}>
-				<Button asChild>
+				<Button asChild size="sm">
 					<Link to="/credits/packages">
 						<CreditCard className="mr-2 size-4" />
 						Buy Credits
@@ -63,7 +63,7 @@ export function DashboardPage() {
 				<TooltipProvider>
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<Button variant="outline" disabled>
+							<Button variant="outline" size="sm" disabled>
 								<Calendar className="mr-2 size-4" />
 								Create Event
 							</Button>
@@ -225,7 +225,7 @@ export function DashboardPage() {
 											<TooltipProvider>
 												<Tooltip>
 													<TooltipTrigger asChild>
-														<Button disabled>
+														<Button size="sm" disabled>
 															<Calendar className="mr-2 size-4" />
 															Create Event
 														</Button>
