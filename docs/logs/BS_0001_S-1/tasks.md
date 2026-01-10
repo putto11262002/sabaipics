@@ -220,7 +220,7 @@ Cleanup
 ---
 
 ### T-9 — Stripe checkout API
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-4
 - **Refs:** `docs/logs/BS_0001_S-1/research/stripe-credit-flow.md`
