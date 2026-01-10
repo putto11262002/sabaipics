@@ -198,13 +198,14 @@ Cleanup
 ---
 
 ### T-8 — Credit packages public API
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-4
 - **Goal:** Create `GET /credit-packages` endpoint returning active packages for purchase.
 - **PrimarySurface:** `API`
 - **Scope:** `apps/api/src/routes/credits.ts`
 - **Dependencies:** `T-1`, `T-2`
+- **PR:** https://github.com/putto11262002/sabaipics/pull/13
 - **Acceptance:**
   - Returns only active packages
   - Sorted by sort_order
