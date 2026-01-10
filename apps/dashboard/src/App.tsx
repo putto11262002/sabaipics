@@ -27,6 +27,18 @@ export default function App() {
         }
       />
 
+      {/* Credits routes (auth + consent required, no sidebar) */}
+      <Route
+        path="/credits/packages"
+        element={
+          <ProtectedRoute>
+            <ConsentGate>
+              <CreditPackagesPage />
+            </ConsentGate>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Protected routes (auth + consent required) */}
       <Route
         element={
@@ -38,7 +50,6 @@ export default function App() {
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/credits/packages" element={<CreditPackagesPage />} />
         <Route path="/credits/success" element={<CreditSuccessPage />} />
         {/* Future: /events, /settings, etc. */}
       </Route>

@@ -1,4 +1,5 @@
-import { AlertCircle, Check, CreditCard, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, CreditCard, RefreshCw } from "lucide-react";
+import { Link } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
 import { Button } from "@sabaipics/ui/components/button";
 import {
@@ -10,7 +11,6 @@ import {
   CardTitle,
 } from "@sabaipics/ui/components/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@sabaipics/ui/components/empty";
-import { PageHeader } from "../../../components/shell/page-header";
 import { Skeleton } from "@sabaipics/ui/components/skeleton";
 import { Spinner } from "@sabaipics/ui/components/spinner";
 import { useCreditPackages } from "../../../hooks/credits/useCreditPackages";
@@ -47,14 +47,20 @@ export function CreditPackagesPage() {
   const displayPackages = data?.data.slice(0, 3) || [];
 
   return (
-    <div className="flex flex-1 flex-col">
-      <PageHeader
-        breadcrumbs={[
-          { label: "Dashboard", href: "/dashboard" },
-          { label: "Buy Credits" },
-        ]}
-      />
-      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+    <div className="flex min-h-screen flex-col bg-background">
+      <header className="border-b">
+        <div className="container mx-auto flex h-16 items-center gap-4 px-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/dashboard">
+              <ArrowLeft className="size-5" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-lg font-semibold">Buy Credits</h1>
+          </div>
+        </div>
+      </header>
+      <div className="container mx-auto flex flex-1 flex-col gap-6 p-4 md:p-6">
         {/* Header Section */}
         <div className="text-center">
           <h1 className="text-3xl font-bold tracking-tight">Choose Your Credit Package</h1>
