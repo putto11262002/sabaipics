@@ -7,6 +7,7 @@ import { webhookRouter } from "./routes/webhooks";
 import { dbTestRouter } from "./routes/db-test";
 import { adminRouter } from "./routes/admin";
 import { consentRouter } from "./routes/consent";
+import { dashboardRouter } from "./routes/dashboard";
 import type { Bindings, Variables } from "./types";
 
 // Queue consumer
@@ -56,7 +57,8 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
   .get("/health", (c) => c.json({ status: "ok", timestamp: Date.now() }))
   .route("/db-test", dbTestRouter)
   .route("/auth", authRouter)
-  .route("/consent", consentRouter);
+  .route("/consent", consentRouter)
+  .route("/dashboard", dashboardRouter);
 // Future protected routes:
 // .use('/events/*', requireAuth())
 // .route('/events', eventsRouter)
