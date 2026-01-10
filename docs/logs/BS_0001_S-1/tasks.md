@@ -298,13 +298,14 @@ Cleanup
 ---
 
 ### T-12 — Credit packages page UI
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-4
 - **Goal:** Create dedicated `/credits/packages` page for browsing and purchasing credit packages.
 - **PrimarySurface:** `UI`
 - **Scope:** `apps/dashboard/src/routes/credits/`
 - **Dependencies:** `T-8`, `T-9`
+- **PR:** https://github.com/putto11262002/sabaipics/pull/21
 - **Acceptance:**
   - Displays all active packages with price and credit amount
   - Select package → calls checkout API → redirects to Stripe
@@ -321,6 +322,7 @@ Cleanup
 
 ### T-13 — Events API (CRUD + QR generation)
 - [ ] Done
+- **PR:** https://github.com/putto11262002/sabaipics/pull/22
 - **Type:** `feature`
 - **StoryRefs:** US-5, US-6
 - **Refs:** `docs/logs/BS_0001_S-1/research/qr-code-library.md`
