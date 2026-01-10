@@ -44,6 +44,10 @@ STRIPE_SECRET_KEY=sk_test_xxxxx
 # Format: whsec_xxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxx
 
+# Admin API Key (for admin routes)
+# Generate a secure random string for admin operations
+ADMIN_API_KEY=admin-dev-key-change-in-production
+
 # LINE Messaging API Credentials
 # Get from: LINE Developers Console → Your Channel → Basic settings / Messaging API tab
 # Channel Secret: Basic settings → Channel secret
@@ -74,6 +78,6 @@ R2_BASE_URL=https://pub-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.r2.dev/sabaipics-photos
 # Get from: Cloudflare Dashboard → R2 → Manage R2 API Tokens
 # Create API Token with permissions: Object Read & Write for your bucket
 # Note: Only needed if using presigned URLs for downloads
-# R2_ACCESS_KEY_ID=xxxxxxxxxxxxxxxxxxxx
-# R2_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-# CLOUDFLARE_ACCOUNT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+R2_ACCESS_KEY_ID=xxxxxxxxxxxxxxxxxxxx
+R2_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+CF_ACCOUNT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

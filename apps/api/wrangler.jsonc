@@ -14,23 +14,10 @@
 		"AUTHORIZED_PARTIES": "http://localhost:5173",
 		"AWS_REGION": "us-west-2",
 		"APP_BASE_URL": "http://localhost:5173",
-		// Image URLs for CF Images transformations and R2 storage
 		"CF_ZONE": "https://sabaipics.com",
-
 		"CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
 		"PHOTO_BUCKET_NAME": "sabaipics-photos",
-		"PHOTO_R2_BASE_URL": "https://photos.sabaipics.com",
-
-		// Secrets (placeholders for type generation - actual values set via wrangler secret put)
-		"ADMIN_API_KEY": "",
-		"STRIPE_SECRET_KEY": "",
-		"STRIPE_WEBHOOK_SECRET": "",
-		"CLERK_WEBHOOK_SIGNING_SECRET": "",
-		"DATABASE_URL": "",
-		"AWS_ACCESS_KEY_ID": "",
-		"AWS_SECRET_ACCESS_KEY": "",
-		"R2_ACCESS_KEY_ID": "",
-		"R2_SECRET_ACCESS_KEY": ""
+		"PHOTO_R2_BASE_URL": "https://photos.sabaipics.com"
 	},
 
 	// R2 bucket for photo storage
@@ -90,17 +77,7 @@
 				"CF_ZONE": "https://sabaipics.com",
 				"CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
 				"PHOTO_BUCKET_NAME": "sabaipics-photos-staging",
-				"PHOTO_R2_BASE_URL": "https://photos-staging.sabaipics.com",
-				// Secrets (placeholders for type generation - actual values set via wrangler secret put)
-				"ADMIN_API_KEY": "",
-				"STRIPE_SECRET_KEY": "",
-				"STRIPE_WEBHOOK_SECRET": "",
-				"CLERK_WEBHOOK_SIGNING_SECRET": "",
-				"DATABASE_URL": "",
-				"AWS_ACCESS_KEY_ID": "",
-				"AWS_SECRET_ACCESS_KEY": "",
-				"R2_ACCESS_KEY_ID": "",
-				"R2_SECRET_ACCESS_KEY": ""
+				"PHOTO_R2_BASE_URL": "https://photos-staging.sabaipics.com"
 			},
 			"routes": [
 				{
@@ -156,17 +133,7 @@
 				"CF_ZONE": "https://sabaipics.com",
 				"CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
 				"PHOTO_BUCKET_NAME": "sabaipics-photos",
-				"PHOTO_R2_BASE_URL": "https://photos.sabaipics.com",
-				// Secrets (placeholders for type generation - actual values set via wrangler secret put)
-				"ADMIN_API_KEY": "",
-				"STRIPE_SECRET_KEY": "",
-				"STRIPE_WEBHOOK_SECRET": "",
-				"CLERK_WEBHOOK_SIGNING_SECRET": "",
-				"DATABASE_URL": "",
-				"AWS_ACCESS_KEY_ID": "",
-				"AWS_SECRET_ACCESS_KEY": "",
-				"R2_ACCESS_KEY_ID": "",
-				"R2_SECRET_ACCESS_KEY": ""
+				"PHOTO_R2_BASE_URL": "https://photos.sabaipics.com"
 			},
 			"routes": [
 				{

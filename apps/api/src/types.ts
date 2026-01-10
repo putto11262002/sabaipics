@@ -2,7 +2,7 @@ import type { AuthVariables } from "@sabaipics/auth/types";
 import type { Database } from "@sabaipics/db";
 
 // Bindings are auto-generated from wrangler.jsonc via: pnpm cf-typegen
-// Secrets are added as placeholders in wrangler.jsonc with empty string values
+// Additional secrets are typed from .dev.vars (local) and .dev.vars.example (documentation)
 export type Bindings = CloudflareBindings;
 
 export type Variables = AuthVariables & {
