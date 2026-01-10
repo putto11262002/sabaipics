@@ -6,6 +6,8 @@ import { SignInPage } from "./routes/sign-in";
 import { SignUpPage } from "./routes/sign-up";
 import { OnboardingPage } from "./routes/onboarding";
 import { DashboardPage } from "./routes/dashboard";
+import { CreditPackagesPage } from "./routes/credits/packages";
+import { CreditSuccessPage } from "./routes/credits/success";
 import { Layout } from "./components/Layout";
 
 export default function App() {
@@ -14,6 +16,7 @@ export default function App() {
       {/* Public routes */}
       <Route path="/sign-in/*" element={<SignInPage />} />
       <Route path="/sign-up/*" element={<SignUpPage />} />
+      <Route path="/credits/packages" element={<CreditPackagesPage />} />
 
       {/* Onboarding route (auth required, no consent required) */}
       <Route
@@ -36,6 +39,7 @@ export default function App() {
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/credits/success" element={<CreditSuccessPage />} />
         {/* Future: /events, /settings, etc. */}
       </Route>
 
