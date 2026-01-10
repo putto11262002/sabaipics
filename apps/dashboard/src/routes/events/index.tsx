@@ -1,9 +1,23 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@sabaipics/ui/components/button";
 import { Alert } from "@sabaipics/ui/components/alert";
 import { Skeleton } from "@sabaipics/ui/components/skeleton";
 import { Badge } from "@sabaipics/ui/components/badge";
+import { Input } from "@sabaipics/ui/components/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@sabaipics/ui/components/pagination";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@sabaipics/ui/components/toggle-group";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -26,16 +40,21 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@sabaipics/ui/components/empty";
-import { Calendar, Plus, MoreHorizontal, ExternalLink, Download, Trash2, Eye } from "lucide-react";
+import { Calendar, Plus, MoreHorizontal, ExternalLink, Download, Trash2, Eye, Search } from "lucide-react";
 import { formatDistanceToNow, parseISO, differenceInDays } from "date-fns";
 import { useEvents } from "../../hooks/events/useEvents";
 import { CreateEventModal } from "../../components/events/CreateEventModal";
 import { useCopyToClipboard } from "../../hooks/use-copy-to-clipboard";
 
+type StatusFilter = "all" | "active" | "expiring" | "expired";
+
 export default function EventsPage() {
   const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const { data, isLoading, error, refetch } = useEvents();
+  const [page, setPage] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const { data, isLoading, error, refetch } = useEvents(page, 20);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
 
   const handleDownloadQR = async (qrCodeUrl: string, accessCode: string) => {
@@ -59,6 +78,40 @@ export default function EventsPage() {
     const searchUrl = `${window.location.origin}/search/${accessCode}`;
     copyToClipboard(searchUrl);
   };
+
+  // Filter and search events
+  const filteredEvents = useMemo(() => {
+    if (!data?.data) return [];
+
+    let filtered = data.data;
+
+    // Apply search filter
+    if (searchQuery) {
+      filtered = filtered.filter((event) =>
+        event.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((event) => {
+        const daysUntilExpiry = differenceInDays(
+          parseISO(event.expiresAt),
+          new Date()
+        );
+        const isExpired = daysUntilExpiry <= 0;
+        const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0;
+        const isActive = daysUntilExpiry > 7;
+
+        if (statusFilter === "expired") return isExpired;
+        if (statusFilter === "expiring") return isExpiringSoon;
+        if (statusFilter === "active") return isActive;
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [data?.data, searchQuery, statusFilter]);
 
   if (isLoading) {
     return (
@@ -112,12 +165,10 @@ export default function EventsPage() {
     );
   }
 
-  const events = data?.data ?? [];
-
   return (
     <div className="container mx-auto p-6">
       {/* Header with Breadcrumb */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -135,8 +186,40 @@ export default function EventsPage() {
         </Button>
       </div>
 
+      {/* Search and Filters */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search events..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <ToggleGroup
+          type="single"
+          value={statusFilter}
+          onValueChange={(value) => value && setStatusFilter(value as StatusFilter)}
+          className="justify-start sm:justify-end"
+        >
+          <ToggleGroupItem value="all" aria-label="All events">
+            All
+          </ToggleGroupItem>
+          <ToggleGroupItem value="active" aria-label="Active events">
+            Active
+          </ToggleGroupItem>
+          <ToggleGroupItem value="expiring" aria-label="Expiring soon">
+            Expiring
+          </ToggleGroupItem>
+          <ToggleGroupItem value="expired" aria-label="Expired events">
+            Expired
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+
       {/* Empty State */}
-      {events.length === 0 && (
+      {filteredEvents.length === 0 && (data?.data.length ?? 0) === 0 && (
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -154,10 +237,31 @@ export default function EventsPage() {
         </Empty>
       )}
 
+      {/* No Results State (when filters applied but no matches) */}
+      {filteredEvents.length === 0 && (data?.data.length ?? 0) > 0 && (
+        <div className="text-center py-12">
+          <Search className="size-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No events found</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Try adjusting your search or filters
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSearchQuery("");
+              setStatusFilter("all");
+            }}
+          >
+            Clear filters
+          </Button>
+        </div>
+      )}
+
       {/* Event List */}
-      {events.length > 0 && (
+      {filteredEvents.length > 0 && (
+        <>
         <div className="space-y-3">
-          {events.map((event) => {
+          {filteredEvents.map((event) => {
             const daysUntilExpiry = differenceInDays(
               parseISO(event.expiresAt),
               new Date()
@@ -240,6 +344,60 @@ export default function EventsPage() {
             );
           })}
         </div>
+
+        {/* Pagination */}
+        {data && data.pagination.totalPages > 1 && (
+          <div className="mt-6 flex justify-center">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    className={!data.pagination.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                {Array.from({ length: data.pagination.totalPages }, (_, i) => i).map((pageNum) => {
+                  // Show first page, last page, current page, and pages around current
+                  const showPage =
+                    pageNum === 0 ||
+                    pageNum === data.pagination.totalPages - 1 ||
+                    Math.abs(pageNum - page) <= 1;
+
+                  if (!showPage) {
+                    // Show ellipsis for gaps
+                    if (pageNum === page - 2 || pageNum === page + 2) {
+                      return (
+                        <PaginationItem key={pageNum}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      );
+                    }
+                    return null;
+                  }
+
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        onClick={() => setPage(pageNum)}
+                        isActive={pageNum === page}
+                        className="cursor-pointer"
+                      >
+                        {pageNum + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setPage((p) => Math.min(data.pagination.totalPages - 1, p + 1))}
+                    className={!data.pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
+        </>
       )}
 
       {/* Create Event Modal */}
