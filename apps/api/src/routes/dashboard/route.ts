@@ -5,8 +5,9 @@ import {
   requirePhotographer,
   requireConsent,
   type PhotographerVariables,
-} from "../middleware";
-import type { Bindings } from "../types";
+} from "../../middleware";
+import type { Bindings } from "../../types";
+import type { DashboardEvent, DashboardResponse } from "./types";
 
 // =============================================================================
 // Types
@@ -15,29 +16,6 @@ import type { Bindings } from "../types";
 type Env = {
   Bindings: Bindings;
   Variables: PhotographerVariables;
-};
-
-type DashboardEvent = {
-  id: string;
-  name: string;
-  photoCount: number;
-  faceCount: number;
-  createdAt: string;
-  expiresAt: string;
-  startDate: string | null;
-  endDate: string | null;
-};
-
-type DashboardResponse = {
-  credits: {
-    balance: number;
-    nearestExpiry: string | null;
-  };
-  events: DashboardEvent[];
-  stats: {
-    totalPhotos: number;
-    totalFaces: number;
-  };
 };
 
 // =============================================================================
@@ -77,7 +55,27 @@ export const dashboardRouter = new Hono<Env>()
         )
       );
 
-    // Query 3: Events with photo/face counts using subqueries
+    // Query 3: Total stats across ALL events (not limited)
+    const [statsResult] = await db
+      .select({
+        totalPhotos: sql<number>`COALESCE((
+          SELECT COUNT(*)::int FROM ${photos}
+          WHERE ${photos.eventId} IN (
+            SELECT ${events.id} FROM ${events} WHERE ${events.photographerId} = ${photographer.id}
+          )
+        ), 0)`,
+        totalFaces: sql<number>`COALESCE((
+          SELECT SUM(${photos.faceCount})::int FROM ${photos}
+          WHERE ${photos.eventId} IN (
+            SELECT ${events.id} FROM ${events} WHERE ${events.photographerId} = ${photographer.id}
+          )
+        ), 0)`,
+      })
+      .from(events)
+      .where(eq(events.photographerId, photographer.id))
+      .limit(1);
+
+    // Query 4: Events with photo/face counts (limited to 10 most recent)
     const eventsWithCounts = await db
       .select({
         id: events.id,
@@ -95,17 +93,8 @@ export const dashboardRouter = new Hono<Env>()
       })
       .from(events)
       .where(eq(events.photographerId, photographer.id))
-      .orderBy(desc(events.createdAt));
-
-    // Compute total stats from events data
-    const totalPhotos = eventsWithCounts.reduce(
-      (sum, e) => sum + (e.photoCount ?? 0),
-      0
-    );
-    const totalFaces = eventsWithCounts.reduce(
-      (sum, e) => sum + (e.faceCount ?? 0),
-      0
-    );
+      .orderBy(desc(events.createdAt))
+      .limit(10);
 
     // Format events for response
     const formattedEvents: DashboardEvent[] = eventsWithCounts.map((e) => ({
@@ -126,8 +115,8 @@ export const dashboardRouter = new Hono<Env>()
       },
       events: formattedEvents,
       stats: {
-        totalPhotos,
-        totalFaces,
+        totalPhotos: statsResult?.totalPhotos ?? 0,
+        totalFaces: statsResult?.totalFaces ?? 0,
       },
     };
 

@@ -7,7 +7,7 @@ import { webhookRouter } from "./routes/webhooks";
 import { dbTestRouter } from "./routes/db-test";
 import { adminRouter } from "./routes/admin";
 import { consentRouter } from "./routes/consent";
-import { dashboardRouter } from "./routes/dashboard";
+import { dashboardRouter } from "./routes/dashboard/route";
 import type { Bindings, Variables } from "./types";
 
 // Queue consumer

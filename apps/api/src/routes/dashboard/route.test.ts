@@ -7,9 +7,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { Hono } from "hono";
 import { testClient } from "hono/testing";
-import { dashboardRouter } from "./dashboard";
+import { dashboardRouter } from "./route";
 import type { Database } from "@sabaipics/db";
-import type { PhotographerVariables } from "../middleware";
+import type { PhotographerVariables } from "../../middleware";
 
 // Type for error responses
 type ErrorResponse = {
@@ -33,6 +33,8 @@ const MOCK_EVENT_ID = "33333333-3333-3333-3333-333333333333";
 function createMockDb(options: {
   balance?: number;
   nearestExpiry?: string | null;
+  totalPhotos?: number;
+  totalFaces?: number;
   events?: Array<{
     id: string;
     name: string;
@@ -48,6 +50,8 @@ function createMockDb(options: {
   const {
     balance = 0,
     nearestExpiry = null,
+    totalPhotos = 0,
+    totalFaces = 0,
     events = [],
     photographer = {
       id: MOCK_PHOTOGRAPHER_ID,
@@ -60,8 +64,19 @@ function createMockDb(options: {
   // Create a thenable chain object that can be both chained and awaited
   const createChain = (resolveValue: unknown) => {
     const chainObj: Record<string, unknown> = {
-      limit: vi.fn().mockResolvedValue(photographer ? [photographer] : []),
-      orderBy: vi.fn().mockResolvedValue(events),
+      limit: vi.fn().mockImplementation(() => {
+        // For stats query (whereCallCount === 4), return stats
+        // For events query (whereCallCount === 5), return events
+        if (whereCallCount === 4) {
+          return Promise.resolve([{ totalPhotos, totalFaces }]);
+        }
+        if (whereCallCount === 5) {
+          return Promise.resolve(events);
+        }
+        // Default: photographer lookup
+        return Promise.resolve(photographer ? [photographer] : []);
+      }),
+      orderBy: vi.fn().mockReturnThis(),
       then: (resolve: (value: unknown) => void) => resolve(resolveValue),
     };
     return chainObj;
@@ -84,7 +99,11 @@ function createMockDb(options: {
       if (whereCallCount === 3) {
         return createChain([{ nearestExpiry }]);
       }
-      // Query 3: events - continues to orderBy
+      // Query 3: stats - chains to .limit()
+      if (whereCallCount === 4) {
+        return createChain([{ totalPhotos, totalFaces }]);
+      }
+      // Query 4: events - chains to .orderBy().limit()
       return createChain(events);
     }),
     limit: vi.fn().mockResolvedValue(photographer ? [photographer] : []),
@@ -97,6 +116,8 @@ function createMockDb(options: {
 function createTestApp(options: {
   balance?: number;
   nearestExpiry?: string | null;
+  totalPhotos?: number;
+  totalFaces?: number;
   events?: Array<{
     id: string;
     name: string;
@@ -113,6 +134,8 @@ function createTestApp(options: {
   const {
     balance = 0,
     nearestExpiry = null,
+    totalPhotos = 0,
+    totalFaces = 0,
     events = [],
     photographer = {
       id: MOCK_PHOTOGRAPHER_ID,
@@ -122,7 +145,14 @@ function createTestApp(options: {
   } = options;
 
   // Create mock with all options
-  const mockDb = createMockDb({ balance, nearestExpiry, events, photographer });
+  const mockDb = createMockDb({
+    balance,
+    nearestExpiry,
+    totalPhotos,
+    totalFaces,
+    events,
+    photographer,
+  });
 
   type Env = {
     Bindings: Record<string, unknown>;
@@ -198,6 +228,8 @@ describe("GET /dashboard - Empty State", () => {
     const { app } = createTestApp({
       balance: 0,
       nearestExpiry: null,
+      totalPhotos: 0,
+      totalFaces: 0,
       events: [],
     });
     const client = testClient(app);
@@ -301,7 +333,7 @@ describe("GET /dashboard - Events", () => {
 // =============================================================================
 
 describe("GET /dashboard - Stats", () => {
-  it("calculates total photos and faces from events", async () => {
+  it("returns total stats from separate query (not limited events)", async () => {
     const mockEvents = [
       {
         id: MOCK_EVENT_ID,
@@ -313,22 +345,15 @@ describe("GET /dashboard - Stats", () => {
         photoCount: 50,
         faceCount: 120,
       },
-      {
-        id: "44444444-4444-4444-4444-444444444444",
-        name: "Event 2",
-        createdAt: "2026-01-05T12:00:00Z",
-        expiresAt: "2026-02-04T12:00:00Z",
-        startDate: null,
-        endDate: null,
-        photoCount: 30,
-        faceCount: 45,
-      },
     ];
 
+    // Stats are from ALL events, not just the limited ones
     const { app } = createTestApp({
       balance: 0,
       nearestExpiry: null,
-      events: mockEvents,
+      totalPhotos: 500, // Total across all events
+      totalFaces: 1200,
+      events: mockEvents, // Only 1 event returned (limited)
     });
     const client = testClient(app);
 
@@ -337,8 +362,11 @@ describe("GET /dashboard - Stats", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     if ("data" in body) {
-      expect(body.data.stats.totalPhotos).toBe(80); // 50 + 30
-      expect(body.data.stats.totalFaces).toBe(165); // 120 + 45
+      // Stats reflect ALL events, not just the limited ones
+      expect(body.data.stats.totalPhotos).toBe(500);
+      expect(body.data.stats.totalFaces).toBe(1200);
+      // Events list is limited
+      expect(body.data.events).toHaveLength(1);
     } else {
       throw new Error("Expected data response");
     }
