@@ -39,7 +39,12 @@ type Variables = AuthVariables & {
 
 // Method chaining - NEVER break the chain for type inference
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
-  // Webhooks FIRST - no auth, no CORS (verified by signature)
+  // DB injection for webhooks (no auth, no CORS - verified by signature)
+  .use("/webhooks/*", (c, next) => {
+    c.set("db", () => createDb(c.env.DATABASE_URL));
+    return next();
+  })
+  // Webhooks route (uses c.var.db from above)
   .route("/webhooks", webhookRouter)
   // Then CORS and auth for all other routes
   .use("/*", (c, next) => {

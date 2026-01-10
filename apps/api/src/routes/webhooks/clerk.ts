@@ -1,5 +1,8 @@
 import { Hono } from "hono";
 import { Webhook } from "svix";
+import { photographers } from "@sabaipics/db/schema";
+import { eq } from "drizzle-orm";
+import type { Database } from "@sabaipics/db";
 
 /**
  * Clerk Webhook Types
@@ -32,125 +35,146 @@ type WebhookBindings = {
 	CLERK_WEBHOOK_SIGNING_SECRET: string;
 };
 
-export const clerkWebhookRouter = new Hono<{ Bindings: WebhookBindings }>().post(
-	"/",
-	async (c) => {
-		const secret = c.env.CLERK_WEBHOOK_SIGNING_SECRET;
+type WebhookVariables = {
+	db: () => Database;
+};
 
-		if (!secret) {
-			console.error("CLERK_WEBHOOK_SIGNING_SECRET not configured");
-			return c.json({ error: "Webhook secret not configured" }, 500);
-		}
+export const clerkWebhookRouter = new Hono<{
+	Bindings: WebhookBindings;
+	Variables: WebhookVariables;
+}>().post("/", async (c) => {
+	const secret = c.env.CLERK_WEBHOOK_SIGNING_SECRET;
 
-		// Get raw body for signature verification
-		const body = await c.req.text();
+	if (!secret) {
+		console.error("[Clerk Webhook] CLERK_WEBHOOK_SIGNING_SECRET not configured");
+		return c.json({ error: "Webhook secret not configured" }, 500);
+	}
 
-		// Get Svix headers
-		const svixId = c.req.header("svix-id");
-		const svixTimestamp = c.req.header("svix-timestamp");
-		const svixSignature = c.req.header("svix-signature");
+	// Get raw body for signature verification
+	const body = await c.req.text();
 
-		if (!svixId || !svixTimestamp || !svixSignature) {
-			console.error("Missing svix headers");
-			return c.json({ error: "Missing webhook headers" }, 400);
-		}
+	// Get Svix headers
+	const svixId = c.req.header("svix-id");
+	const svixTimestamp = c.req.header("svix-timestamp");
+	const svixSignature = c.req.header("svix-signature");
 
-		// Verify webhook signature
-		const wh = new Webhook(secret);
-		let event: ClerkWebhookEvent;
+	if (!svixId || !svixTimestamp || !svixSignature) {
+		console.error("[Clerk Webhook] Missing svix headers");
+		return c.json({ error: "Missing webhook headers" }, 400);
+	}
 
-		try {
-			event = wh.verify(body, {
-				"svix-id": svixId,
-				"svix-timestamp": svixTimestamp,
-				"svix-signature": svixSignature,
-			}) as ClerkWebhookEvent;
-		} catch (err) {
-			console.error("Webhook verification failed:", err);
-			return c.json({ error: "Invalid webhook signature" }, 400);
-		}
+	// Verify webhook signature
+	const wh = new Webhook(secret);
+	let event: ClerkWebhookEvent;
 
-		// Route to appropriate handler
+	try {
+		event = wh.verify(body, {
+			"svix-id": svixId,
+			"svix-timestamp": svixTimestamp,
+			"svix-signature": svixSignature,
+		}) as ClerkWebhookEvent;
+	} catch (err) {
+		console.error("[Clerk Webhook] Signature verification failed:", err);
+		return c.json({ error: "Invalid webhook signature" }, 400);
+	}
+
+	// Route to appropriate handler
+	try {
 		switch (event.type) {
 			case "user.created":
-				await handleUserCreated(event);
+				await handleUserCreated(event, c.var.db);
 				break;
 			case "user.updated":
-				await handleUserUpdated(event);
+				await handleUserUpdated(event, c.var.db);
 				break;
 			case "user.deleted":
-				await handleUserDeleted(event);
+				await handleUserDeleted(event, c.var.db);
 				break;
 			default:
-				console.log(`Unhandled webhook event type: ${event.type}`);
+				console.log(`[Clerk Webhook] Unhandled event type: ${event.type}`);
 		}
+	} catch (handlerError) {
+		// Log error but return 200 to prevent retries on bad data
+		console.error(
+			`[Clerk Webhook] Handler error for ${event.type}:`,
+			handlerError
+		);
+	}
 
-		return c.json({ success: true }, 200);
-	},
-);
+	return c.json({ success: true }, 200);
+});
 
 /**
  * Handle user.created event
- * Creates photographer or participant record based on user_type metadata
+ * Creates photographer record in database
+ * Per plan decision #4: only photographers sign up (no user_type check needed)
  */
-async function handleUserCreated(event: ClerkWebhookEvent) {
+async function handleUserCreated(
+	event: ClerkWebhookEvent,
+	getDb: () => Database
+) {
 	const user = event.data;
+	const db = getDb();
 
-	// Extract user type from unsafe_metadata
-	// TODO: SECURITY - user_type from unsafeMetadata is not secure
-	// Anyone can set this during signup. Should verify from signup URL/origin
-	// or use separate Clerk apps per user type. Flagged for post-MVP fix.
-	const userType =
-		(user.unsafe_metadata?.user_type as string) || "participant";
-
-	// Extract primary email
+	// Extract primary email (required per decision #10)
 	const email = user.email_addresses?.[0]?.email_address;
-
-	// Extract LINE user ID if signed up via LINE
-	const lineAccount = user.external_accounts?.find(
-		(acc) => acc.provider === "oauth_line",
-	);
-	const lineUserId = lineAccount?.provider_user_id;
+	if (!email) {
+		console.error(
+			"[Clerk Webhook] user.created: No email found for user",
+			user.id
+		);
+		return;
+	}
 
 	// Build display name
 	const displayName =
 		[user.first_name, user.last_name].filter(Boolean).join(" ") || null;
 
-	console.log("========== USER CREATED ==========");
-	console.log("Clerk User ID:", user.id);
-	console.log("User Type:", userType);
-	console.log("Email:", email);
-	console.log("Display Name:", displayName);
-	console.log("Avatar URL:", user.image_url);
-	console.log("LINE User ID:", lineUserId || "N/A");
-	console.log("Created At:", user.created_at);
-	console.log("===================================");
+	console.log("[Clerk Webhook] user.created:");
+	console.log("  Clerk User ID:", user.id);
+	console.log("  Email:", email);
+	console.log("  Display Name:", displayName || "(none)");
 
-	// TODO: Insert into database when Postgres is set up
-	// if (userType === 'photographer') {
-	//   await db.insert(photographers).values({
-	//     clerk_user_id: user.id,
-	//     email,
-	//     display_name: displayName,
-	//     avatar_url: user.image_url,
-	//   });
-	// } else {
-	//   await db.insert(participants).values({
-	//     clerk_user_id: user.id,
-	//     display_name: displayName,
-	//     avatar_url: user.image_url,
-	//     line_user_id: lineUserId,
-	//     line_linked: false, // Updated via LINE webhook
-	//   });
-	// }
+	// Idempotency check: see if photographer already exists
+	const [existing] = await db
+		.select({ id: photographers.id })
+		.from(photographers)
+		.where(eq(photographers.clerkId, user.id))
+		.limit(1);
+
+	if (existing) {
+		console.log("  → Photographer already exists, skipping (idempotent)");
+		return;
+	}
+
+	// Insert new photographer record
+	try {
+		const [newPhotographer] = await db
+			.insert(photographers)
+			.values({
+				clerkId: user.id,
+				email,
+				name: displayName,
+			})
+			.returning();
+
+		console.log("  ✓ Created photographer:", newPhotographer.id);
+	} catch (error) {
+		console.error("  ✗ Failed to create photographer:", error);
+		throw error;
+	}
 }
 
 /**
  * Handle user.updated event
- * Syncs profile changes to our database
+ * Syncs profile changes to database
  */
-async function handleUserUpdated(event: ClerkWebhookEvent) {
+async function handleUserUpdated(
+	event: ClerkWebhookEvent,
+	getDb: () => Database
+) {
 	const user = event.data;
+	const db = getDb();
 
 	// Extract primary email
 	const email = user.email_addresses?.[0]?.email_address;
@@ -159,50 +183,32 @@ async function handleUserUpdated(event: ClerkWebhookEvent) {
 	const displayName =
 		[user.first_name, user.last_name].filter(Boolean).join(" ") || null;
 
-	console.log("========== USER UPDATED ==========");
-	console.log("Clerk User ID:", user.id);
-	console.log("Email:", email);
-	console.log("Display Name:", displayName);
-	console.log("Avatar URL:", user.image_url);
-	console.log("Updated At:", user.updated_at);
-	console.log("===================================");
+	console.log("[Clerk Webhook] user.updated:");
+	console.log("  Clerk User ID:", user.id);
+	console.log("  Email:", email);
+	console.log("  Display Name:", displayName || "(none)");
 
-	// TODO: Update database when Postgres is set up
+	// TODO: Update photographer record when needed
 	// await db.update(photographers)
-	//   .set({
-	//     email,
-	//     display_name: displayName,
-	//     avatar_url: user.image_url,
-	//     updated_at: new Date(),
-	//   })
-	//   .where(eq(photographers.clerk_user_id, user.id));
-	//
-	// await db.update(participants)
-	//   .set({
-	//     display_name: displayName,
-	//     avatar_url: user.image_url,
-	//     updated_at: new Date(),
-	//   })
-	//   .where(eq(participants.clerk_user_id, user.id));
+	//   .set({ email, name: displayName })
+	//   .where(eq(photographers.clerkId, user.id));
 }
 
 /**
  * Handle user.deleted event
- * Soft deletes user record
+ * Soft deletes photographer record
  */
-async function handleUserDeleted(event: ClerkWebhookEvent) {
+async function handleUserDeleted(
+	event: ClerkWebhookEvent,
+	getDb: () => Database
+) {
 	const user = event.data;
 
-	console.log("========== USER DELETED ==========");
-	console.log("Clerk User ID:", user.id);
-	console.log("===================================");
+	console.log("[Clerk Webhook] user.deleted:");
+	console.log("  Clerk User ID:", user.id);
 
-	// TODO: Soft delete in database when Postgres is set up
+	// TODO: Soft delete photographer when needed
 	// await db.update(photographers)
-	//   .set({ deleted_at: new Date() })
-	//   .where(eq(photographers.clerk_user_id, user.id));
-	//
-	// await db.update(participants)
-	//   .set({ deleted_at: new Date() })
-	//   .where(eq(participants.clerk_user_id, user.id));
+	//   .set({ deletedAt: new Date() })
+	//   .where(eq(photographers.clerkId, user.id));
 }
