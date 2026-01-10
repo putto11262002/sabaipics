@@ -177,7 +177,7 @@ Cleanup
 ---
 
 ### T-7 — Dashboard API
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-3
 - **Goal:** Create `GET /dashboard` endpoint returning credit balance, events list, and stats.
