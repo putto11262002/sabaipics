@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@sabaipics/ui/components/dropdown-menu";
-import { ArrowLeft, Calendar, MoreVertical, Download, ExternalLink, Trash2, QrCode, Image as ImageIcon, Clock, Copy, Presentation, BarChart3 } from "lucide-react";
+import { ArrowLeft, Calendar, MoreVertical, Download, ExternalLink, Trash2, Image as ImageIcon, Clock, Copy, Presentation, BarChart3 } from "lucide-react";
 import { parseISO, differenceInDays, differenceInDays as daysBetween, format } from "date-fns";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
@@ -197,134 +197,28 @@ export default function EventDetailPage() {
         </TabsList>
 
         {/* Details Tab */}
-        <TabsContent value="details" className="space-y-6">
-          {/* QR Code Section */}
-          <div className="flex flex-col md:flex-row items-start gap-4 rounded-lg border bg-card p-6">
-            <div className="flex-shrink-0 w-full md:w-auto flex justify-center md:block">
-              {event.qrCodeUrl ? (
-                <div className="w-48 overflow-hidden rounded-lg border bg-white p-3">
-                  <img
-                    src={event.qrCodeUrl}
-                    alt="Event QR Code"
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="flex h-48 w-48 items-center justify-center rounded-lg border bg-muted">
-                  <p className="text-sm text-muted-foreground">QR Unavailable</p>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-1 flex-col justify-center gap-3 w-full md:w-auto">
-              <div>
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <QrCode className="size-5" />
-                  Event QR Code
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Share this QR code with guests to search for their photos
-                </p>
-              </div>
-
-              {/* Search URL */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Search URL</label>
-                <div className="flex items-center gap-2 mt-1">
-                  <a
-                    href={`${window.location.origin}/search/${event.accessCode}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 text-sm text-primary hover:underline truncate"
-                  >
-                    {window.location.origin}/search/{event.accessCode}
-                  </a>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => handleCopyLink(event.accessCode)}
-                    title="Copy search link"
-                  >
-                    <Copy className="size-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {event.qrCodeUrl && (
-                <Button
-                  onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}
-                  variant="outline"
-                  className="w-fit"
-                >
-                  <Download className="mr-2 size-4" />
-                  Download QR Code
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Slideshow Preview Section */}
-          <div className="flex flex-col md:flex-row items-start gap-4 rounded-lg border bg-card p-6">
-            <div className="flex-shrink-0 w-full md:w-auto flex justify-center md:block">
-              <div className="flex h-48 w-48 items-center justify-center rounded-lg border bg-muted">
-                <div className="text-center">
-                  <Presentation className="size-12 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">Preview Coming Soon</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-1 flex-col justify-center gap-3 w-full md:w-auto">
-              <div>
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <Presentation className="size-5" />
-                  Slideshow
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  View all event photos in slideshow mode
-                </p>
-              </div>
-
-              {/* Slideshow URL */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Slideshow URL</label>
-                <div className="flex items-center gap-2 mt-1">
-                  <a
-                    href={`${window.location.origin}/slideshow/${event.accessCode}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 text-sm text-primary hover:underline truncate"
-                  >
-                    {window.location.origin}/slideshow/{event.accessCode}
-                  </a>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => copyToClipboard(`${window.location.origin}/slideshow/${event.accessCode}`)}
-                    title="Copy slideshow link"
-                  >
-                    <Copy className="size-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <Button
-                variant="outline"
-                className="w-fit"
-                disabled
-              >
-                <ExternalLink className="mr-2 size-4" />
-                Open Slideshow (Coming Soon)
-              </Button>
-            </div>
-          </div>
-
-          {/* Event Information (no card) */}
+        <TabsContent value="details" className="space-y-8">
+          {/* Event Information (first) */}
           <div>
             <h3 className="text-lg font-semibold mb-4">Event Information</h3>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {/* Event Name */}
+              {/* Event Name with Status Badge */}
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Event Name</label>
-                <p className="mt-1 font-medium">{event.name}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <p className="font-medium">{event.name}</p>
+                  {isExpired ? (
+                    <Badge variant="destructive" className="text-xs">Expired</Badge>
+                  ) : isExpiringSoon ? (
+                    <Badge variant="outline" className="border-orange-500 text-orange-500 text-xs">
+                      Expires in {daysUntilExpiry}d
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                      Active
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               {/* Start Date */}
@@ -363,6 +257,119 @@ export default function EventDetailPage() {
                   )}
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* QR Code Section */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">QR Code</h3>
+            <div className="flex flex-col md:flex-row items-start gap-4">
+            <div className="flex-shrink-0 w-full md:w-auto flex justify-center md:block">
+              {event.qrCodeUrl ? (
+                <div className="w-48 overflow-hidden rounded-lg border bg-white p-3">
+                  <img
+                    src={event.qrCodeUrl}
+                    alt="Event QR Code"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="flex h-48 w-48 items-center justify-center rounded-lg border bg-muted">
+                  <p className="text-sm text-muted-foreground">QR Unavailable</p>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-1 flex-col justify-center gap-3 w-full md:w-auto">
+              <p className="text-sm text-muted-foreground">
+                Share this QR code with guests to search for their photos
+              </p>
+
+              {/* Search URL */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Search URL</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <a
+                    href={`${window.location.origin}/search/${event.accessCode}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 text-sm text-primary hover:underline truncate"
+                  >
+                    {window.location.origin}/search/{event.accessCode}
+                  </a>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => handleCopyLink(event.accessCode)}
+                    title="Copy search link"
+                  >
+                    <Copy className="size-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {event.qrCodeUrl && (
+                <Button
+                  onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}
+                  variant="outline"
+                  className="w-fit"
+                >
+                  <Download className="mr-2 size-4" />
+                  Download QR Code
+                </Button>
+              )}
+            </div>
+            </div>
+          </div>
+
+          {/* Slideshow Section */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Slideshow</h3>
+            <div className="flex flex-col md:flex-row items-start gap-4">
+            <div className="flex-shrink-0 w-full md:w-auto flex justify-center md:block">
+              <div className="flex h-48 w-48 items-center justify-center rounded-lg border bg-muted">
+                <div className="text-center">
+                  <Presentation className="size-12 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Preview Coming Soon</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-1 flex-col justify-center gap-3 w-full md:w-auto">
+              <p className="text-sm text-muted-foreground">
+                View all event photos in slideshow mode
+              </p>
+
+              {/* Slideshow URL */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Slideshow URL</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <a
+                    href={`${window.location.origin}/slideshow/${event.accessCode}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 text-sm text-primary hover:underline truncate"
+                  >
+                    {window.location.origin}/slideshow/{event.accessCode}
+                  </a>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => copyToClipboard(`${window.location.origin}/slideshow/${event.accessCode}`)}
+                    title="Copy slideshow link"
+                  >
+                    <Copy className="size-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-fit"
+                disabled
+              >
+                <ExternalLink className="mr-2 size-4" />
+                Open Slideshow (Coming Soon)
+              </Button>
+            </div>
             </div>
           </div>
         </TabsContent>
