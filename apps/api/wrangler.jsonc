@@ -13,7 +13,11 @@
 		"CORS_ORIGIN": "http://localhost:5173",
 		"AUTHORIZED_PARTIES": "http://localhost:5173",
 		"AWS_REGION": "us-west-2",
-		"APP_BASE_URL": "http://localhost:5173"
+		"APP_BASE_URL": "http://localhost:5173",
+		"CF_ZONE": "https://sabaipics.com",
+		"CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
+		"PHOTO_BUCKET_NAME": "sabaipics-photos",
+		"PHOTO_R2_BASE_URL": "https://photos.sabaipics.com"
 	},
 
 	// R2 bucket for photo storage
@@ -69,7 +73,11 @@
 				"CORS_ORIGIN": "https://app-staging.sabaipics.com",
 				"AUTHORIZED_PARTIES": "https://app-staging.sabaipics.com",
 				"AWS_REGION": "us-west-2",
-				"APP_BASE_URL": "https://app-staging.sabaipics.com"
+				"APP_BASE_URL": "https://app-staging.sabaipics.com",
+				"CF_ZONE": "https://sabaipics.com",
+				"CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
+				"PHOTO_BUCKET_NAME": "sabaipics-photos-staging",
+				"PHOTO_R2_BASE_URL": "https://photos-staging.sabaipics.com"
 			},
 			"routes": [
 				{
@@ -121,7 +129,11 @@
 				"CORS_ORIGIN": "https://app.sabaipics.com",
 				"AUTHORIZED_PARTIES": "https://app.sabaipics.com",
 				"AWS_REGION": "us-west-2",
-				"APP_BASE_URL": "https://sabaipics.com"
+				"APP_BASE_URL": "https://sabaipics.com",
+				"CF_ZONE": "https://sabaipics.com",
+				"CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
+				"PHOTO_BUCKET_NAME": "sabaipics-photos",
+				"PHOTO_R2_BASE_URL": "https://photos.sabaipics.com"
 			},
 			"routes": [
 				{

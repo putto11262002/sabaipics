@@ -1,13 +1,9 @@
 import type { AuthVariables } from "@sabaipics/auth/types";
 import type { Database } from "@sabaipics/db";
 
-// Extend CloudflareBindings with secrets not in wrangler.jsonc
-export type Bindings = CloudflareBindings & {
-  ADMIN_API_KEY: string;
-  STRIPE_SECRET_KEY: string;
-  STRIPE_WEBHOOK_SECRET: string;
-  APP_BASE_URL: string;
-};
+// Bindings are auto-generated from wrangler.jsonc via: pnpm cf-typegen
+// Additional secrets are typed from .dev.vars (local) and .dev.vars.example (documentation)
+export type Bindings = CloudflareBindings;
 
 export type Variables = AuthVariables & {
   db: () => Database;
