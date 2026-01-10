@@ -16,7 +16,6 @@ import { Button } from "@sabaipics/ui/components/button";
 import {
 	Card,
 	CardAction,
-	CardContent,
 	CardDescription,
 	CardFooter,
 	CardHeader,
