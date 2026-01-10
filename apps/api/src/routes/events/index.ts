@@ -1,19 +1,21 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and, desc, sql } from "drizzle-orm";
-import { events } from "@sabaipics/db";
+import { eq, and, desc, sql, asc, gt } from "drizzle-orm";
+import { events, photos, creditLedger, photographers } from "@sabaipics/db";
 import {
   requirePhotographer,
   requireConsent,
   type PhotographerVariables,
 } from "../../middleware";
 import type { Bindings } from "../../types";
+import type { PhotoJob } from "../../types/photo-job";
 import { generateEventQR } from "../../lib/qr";
 import { generateAccessCode } from "./access-code";
 import {
   createEventSchema,
   eventParamsSchema,
   listEventsQuerySchema,
+  uploadPhotoSchema,
 } from "./schema";
 
 // =============================================================================
@@ -82,6 +84,42 @@ function qrUploadFailedError(reason: string) {
     error: {
       code: "QR_UPLOAD_FAILED" as const,
       message: `Failed to upload QR code: ${reason}`,
+    },
+  };
+}
+
+function insufficientCreditsError() {
+  return {
+    error: {
+      code: "INSUFFICIENT_CREDITS" as const,
+      message: "Insufficient credits. Purchase more to continue.",
+    },
+  };
+}
+
+function eventExpiredError() {
+  return {
+    error: {
+      code: "EVENT_EXPIRED" as const,
+      message: "This event has expired",
+    },
+  };
+}
+
+function uploadFailedError(reason: string) {
+  return {
+    error: {
+      code: "UPLOAD_FAILED" as const,
+      message: `Upload failed: ${reason}`,
+    },
+  };
+}
+
+function imageTransformFailedError(reason: string) {
+  return {
+    error: {
+      code: "IMAGE_TRANSFORM_FAILED" as const,
+      message: `Image transformation failed: ${reason}`,
     },
   };
 }
@@ -305,5 +343,247 @@ export const eventsRouter = new Hono<Env>()
           createdAt: event.createdAt,
         },
       });
+    }
+  )
+
+  // POST /events/:id/photos - Upload photo to event
+  .post(
+    "/:id/photos",
+    requirePhotographer(),
+    requireConsent(),
+    zValidator("param", eventParamsSchema),
+    zValidator("form", uploadPhotoSchema),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id: eventId } = c.req.valid("param");
+      const { file } = c.req.valid("form");
+
+      // 1. Verify event exists, is owned by photographer, and not expired
+      const [event] = await db
+        .select({
+          id: events.id,
+          photographerId: events.photographerId,
+          expiresAt: events.expiresAt,
+        })
+        .from(events)
+        .where(eq(events.id, eventId))
+        .limit(1);
+
+      if (!event) {
+        return c.json(notFoundError(), 404);
+      }
+
+      // Authorization: ensure photographer owns this event
+      if (event.photographerId !== photographer.id) {
+        return c.json(notFoundError(), 404);
+      }
+
+      // Check if event has expired
+      if (new Date(event.expiresAt) < new Date()) {
+        return c.json(eventExpiredError(), 410);
+      }
+
+      // 2. Check credit balance and deduct within transaction
+      let photo: typeof photos.$inferSelect;
+
+      try {
+        photo = await db.transaction(async (tx) => {
+          // Lock photographer row to prevent race conditions
+          await tx
+            .select({ id: photographers.id })
+            .from(photographers)
+            .where(eq(photographers.id, photographer.id))
+            .for("update");
+
+          // Calculate current balance
+          const [balanceResult] = await tx
+            .select({
+              balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int`,
+            })
+            .from(creditLedger)
+            .where(
+              and(
+                eq(creditLedger.photographerId, photographer.id),
+                gt(creditLedger.expiresAt, sql`NOW()`)
+              )
+            );
+
+          const balance = balanceResult?.balance ?? 0;
+
+          if (balance < 1) {
+            throw new Error("INSUFFICIENT_CREDITS");
+          }
+
+          // Find oldest unexpired purchase for FIFO expiry
+          const [oldestCredit] = await tx
+            .select({ expiresAt: creditLedger.expiresAt })
+            .from(creditLedger)
+            .where(
+              and(
+                eq(creditLedger.photographerId, photographer.id),
+                gt(creditLedger.amount, 0),
+                gt(creditLedger.expiresAt, sql`NOW()`)
+              )
+            )
+            .orderBy(asc(creditLedger.expiresAt))
+            .limit(1);
+
+          if (!oldestCredit) {
+            throw new Error("NO_UNEXPIRED_CREDITS");
+          }
+
+          // Deduct 1 credit with FIFO expiry
+          await tx.insert(creditLedger).values({
+            photographerId: photographer.id,
+            amount: -1,
+            type: "upload",
+            expiresAt: oldestCredit.expiresAt,
+            stripeSessionId: null,
+          });
+
+          // Create photo record with status='processing'
+          const [newPhoto] = await tx
+            .insert(photos)
+            .values({
+              eventId,
+              r2Key: "", // Will be updated after upload
+              status: "processing",
+              faceCount: 0,
+            })
+            .returning();
+
+          return newPhoto;
+        });
+      } catch (err) {
+        const error = err as Error;
+        if (error.message === "INSUFFICIENT_CREDITS") {
+          return c.json(insufficientCreditsError(), 402);
+        }
+        if (error.message === "NO_UNEXPIRED_CREDITS") {
+          console.error("Data integrity error: Balance check passed but no unexpired credits found");
+          return c.json(insufficientCreditsError(), 402);
+        }
+        throw err;
+      }
+
+      // 3. Upload original file to R2
+      const fileExtension = file.type.split("/")[1] || "jpg";
+      const r2Key = `${eventId}/${photo.id}.${fileExtension}`;
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        await c.env.PHOTOS_BUCKET.put(r2Key, arrayBuffer, {
+          httpMetadata: { contentType: file.type },
+        });
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : "unknown error";
+        console.error(`R2 upload failed for photo ${photo.id}: ${reason}`, {
+          photographerId: photographer.id,
+          photoId: photo.id,
+          eventId,
+          creditsDeducted: 1,
+        });
+        return c.json(uploadFailedError(reason), 500);
+      }
+
+      // 4. Normalize to JPEG via Cloudflare Images Transform
+      let normalizedImageBytes: ArrayBuffer;
+      try {
+        const r2PublicUrl = `${c.env.PHOTO_R2_BASE_URL}/${r2Key}`;
+
+        const transformResponse = await fetch(r2PublicUrl, {
+          cf: {
+            image: {
+              format: "jpeg",
+              quality: 90,
+              fit: "scale-down",
+              width: 4000,
+              height: 4000,
+            },
+          },
+        });
+
+        if (!transformResponse.ok) {
+          throw new Error(`Transform failed with status ${transformResponse.status}`);
+        }
+
+        normalizedImageBytes = await transformResponse.arrayBuffer();
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : "unknown error";
+        console.error(`Image transformation failed for photo ${photo.id}: ${reason}`, {
+          photographerId: photographer.id,
+          photoId: photo.id,
+          eventId,
+          creditsDeducted: 1,
+        });
+        return c.json(imageTransformFailedError(reason), 500);
+      }
+
+      // 5. Overwrite R2 object with normalized JPEG
+      const normalizedR2Key = `${eventId}/${photo.id}.jpg`;
+      try {
+        await c.env.PHOTOS_BUCKET.put(normalizedR2Key, normalizedImageBytes, {
+          httpMetadata: { contentType: "image/jpeg" },
+        });
+
+        // Delete original if different extension
+        if (r2Key !== normalizedR2Key) {
+          await c.env.PHOTOS_BUCKET.delete(r2Key);
+        }
+
+        // Update photo record with normalized key
+        await db
+          .update(photos)
+          .set({ r2Key: normalizedR2Key })
+          .where(eq(photos.id, photo.id));
+
+        photo.r2Key = normalizedR2Key;
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : "unknown error";
+        console.error(`Failed to store normalized JPEG for photo ${photo.id}: ${reason}`, {
+          photographerId: photographer.id,
+          photoId: photo.id,
+          eventId,
+          creditsDeducted: 1,
+        });
+        return c.json(uploadFailedError(reason), 500);
+      }
+
+      // 6. Enqueue job for face detection
+      try {
+        const job: PhotoJob = {
+          photo_id: photo.id,
+          event_id: eventId,
+          r2_key: normalizedR2Key,
+        };
+        await c.env.PHOTO_QUEUE.send(job);
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : "unknown error";
+        console.error(`Queue enqueue failed for photo ${photo.id}: ${reason}`, {
+          photographerId: photographer.id,
+          photoId: photo.id,
+          eventId,
+          creditsDeducted: 1,
+        });
+        // Note: Photo is uploaded and credit deducted, but queue failed
+        // Return 500 but photo remains in 'processing' state
+        return c.json(uploadFailedError(`Queue enqueue failed: ${reason}`), 500);
+      }
+
+      // 7. Return success response
+      return c.json(
+        {
+          data: {
+            id: photo.id,
+            eventId: photo.eventId,
+            r2Key: photo.r2Key,
+            status: photo.status,
+            faceCount: photo.faceCount,
+            uploadedAt: photo.uploadedAt,
+          },
+        },
+        201
+      );
     }
   );

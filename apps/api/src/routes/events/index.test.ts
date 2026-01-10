@@ -639,3 +639,461 @@ describe("GET /events/:id", () => {
     expect(body).toHaveProperty("error");
   });
 });
+
+// =============================================================================
+// Photo Upload Tests
+// =============================================================================
+
+describe("POST /events/:id/photos - Photo Upload", () => {
+  const MOCK_PHOTO_ID = "33333333-3333-3333-3333-333333333333";
+  const mockPhoto = {
+    id: MOCK_PHOTO_ID,
+    eventId: MOCK_EVENT_ID,
+    r2Key: `${MOCK_EVENT_ID}/${MOCK_PHOTO_ID}.jpg`,
+    status: "processing" as const,
+    faceCount: 0,
+    uploadedAt: "2026-01-11T00:00:00Z",
+  };
+
+  // Create a mock File object
+  const createMockFile = (
+    size: number = 1024 * 1024, // 1MB default
+    type: string = "image/jpeg"
+  ): File => {
+    const blob = new Blob([new Uint8Array(size)], { type });
+    return new File([blob], "test.jpg", { type });
+  };
+
+  // Extended mock DB for upload tests
+  function createUploadMockDb(options: {
+    hasEvent?: boolean;
+    eventOwned?: boolean;
+    eventExpired?: boolean;
+    creditBalance?: number;
+    hasUnexpiredCredit?: boolean;
+  } = {}) {
+    const {
+      hasEvent = true,
+      eventOwned = true,
+      eventExpired = false,
+      creditBalance = 10,
+      hasUnexpiredCredit = true,
+    } = options;
+
+    const expiresAt = eventExpired
+      ? "2020-01-01T00:00:00Z"
+      : "2026-12-31T23:59:59Z";
+
+    const testEvent = hasEvent
+      ? {
+          ...mockEvent,
+          photographerId: eventOwned
+            ? MOCK_PHOTOGRAPHER_ID
+            : "other-photographer-id",
+          expiresAt,
+        }
+      : null;
+
+    let queryCount = 0;
+
+    const mockDb = {
+      select: vi.fn().mockImplementation(() => mockDb),
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockImplementation(() => {
+        queryCount++;
+        // Query 1: Event lookup
+        if (queryCount === 1) {
+          return Promise.resolve(testEvent ? [testEvent] : []);
+        }
+        // Query 2: Balance check (inside transaction)
+        if (queryCount === 2) {
+          return Promise.resolve([{ balance: creditBalance }]);
+        }
+        // Query 3: Oldest credit lookup (inside transaction)
+        if (queryCount === 3) {
+          return Promise.resolve(
+            hasUnexpiredCredit
+              ? [{ expiresAt: "2026-12-31T23:59:59Z" }]
+              : []
+          );
+        }
+        return Promise.resolve([]);
+      }),
+      for: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([mockPhoto]),
+      update: vi.fn().mockReturnThis(),
+      set: vi.fn().mockReturnThis(),
+      transaction: vi.fn().mockImplementation(async (callback) => {
+        // Reset query count for transaction
+        queryCount = 0;
+        return callback(mockDb);
+      }),
+    };
+    return mockDb;
+  }
+
+  // Extended test app for upload tests
+  function createUploadTestApp(options: {
+    mockDb?: ReturnType<typeof createUploadMockDb>;
+    photographer?: { id: string; pdpaConsentAt: string | null } | null;
+    hasAuth?: boolean;
+    mockBucket?: R2Bucket;
+    mockQueue?: { send: ReturnType<typeof vi.fn> };
+    mockFetch?: ReturnType<typeof vi.fn>;
+  }) {
+    const {
+      mockDb = createUploadMockDb(),
+      photographer = mockPhotographer,
+      hasAuth = true,
+      mockBucket = createMockR2Bucket() as unknown as R2Bucket,
+      mockQueue = { send: vi.fn().mockResolvedValue(undefined) },
+      mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
+      }),
+    } = options;
+
+    type Env = {
+      Bindings: {
+        APP_BASE_URL: string;
+        PHOTOS_BUCKET: R2Bucket;
+        PHOTO_QUEUE: typeof mockQueue;
+        PHOTO_R2_BASE_URL: string;
+      };
+      Variables: PhotographerVariables;
+    };
+
+    // Mock global fetch
+    global.fetch = mockFetch as any;
+
+    const app = new Hono<Env>()
+      .use("/*", (c, next) => {
+        if (hasAuth) {
+          c.set("auth", { userId: MOCK_CLERK_ID, sessionId: MOCK_SESSION_ID });
+        }
+        return next();
+      })
+      .use("/*", (c, next) => {
+        c.set("db", () => mockDb as unknown as Database);
+        return next();
+      })
+      .use("/*", (c, next) => {
+        const originalLimit = mockDb.limit;
+        let hasBeenCalled = false;
+        mockDb.limit = vi.fn().mockImplementation((...args) => {
+          if (!hasBeenCalled && typeof args[0] === "number") {
+            hasBeenCalled = true;
+            mockDb.limit = originalLimit;
+            return {
+              offset: vi.fn().mockResolvedValue(photographer ? [photographer] : []),
+              then: (resolve: (value: unknown) => void) =>
+                resolve(photographer ? [photographer] : []),
+            };
+          }
+          return originalLimit(...args);
+        });
+        return next();
+      })
+      .route("/events", eventsRouter);
+
+    return { app, mockDb, mockBucket, mockQueue, mockFetch };
+  }
+
+  const UPLOAD_MOCK_ENV = (
+    mockBucket: R2Bucket,
+    mockQueue: { send: ReturnType<typeof vi.fn> }
+  ) => ({
+    APP_BASE_URL: "https://sabaipics.com",
+    PHOTOS_BUCKET: mockBucket,
+    PHOTO_QUEUE: mockQueue,
+    PHOTO_R2_BASE_URL: "https://photos.sabaipics.com",
+  });
+
+  it("returns 401 without authentication", async () => {
+    const { app, mockBucket, mockQueue } = createUploadTestApp({
+      hasAuth: false,
+    });
+    const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
+
+    const file = createMockFile();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await client.events[":id"].photos.$post({
+      param: { id: MOCK_EVENT_ID },
+      form: formData as any,
+    });
+
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 for non-existent event", async () => {
+    const mockDb = createUploadMockDb({ hasEvent: false });
+    const { app, mockBucket, mockQueue } = createUploadTestApp({ mockDb });
+    const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
+
+    const file = createMockFile();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await client.events[":id"].photos.$post({
+      param: { id: MOCK_EVENT_ID },
+      form: formData as any,
+    });
+
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    if ("error" in body) {
+      expect(body.error.code).toBe("NOT_FOUND");
+    }
+  });
+
+  it("returns 404 for non-owned event", async () => {
+    const mockDb = createUploadMockDb({ eventOwned: false });
+    const { app, mockBucket, mockQueue } = createUploadTestApp({ mockDb });
+    const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
+
+    const file = createMockFile();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await client.events[":id"].photos.$post({
+      param: { id: MOCK_EVENT_ID },
+      form: formData as any,
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 410 for expired event", async () => {
+    const mockDb = createUploadMockDb({ eventExpired: true });
+    const { app, mockBucket, mockQueue } = createUploadTestApp({ mockDb });
+    const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
+
+    const file = createMockFile();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await client.events[":id"].photos.$post({
+      param: { id: MOCK_EVENT_ID },
+      form: formData as any,
+    });
+
+    expect(res.status).toBe(410);
+    const body = await res.json();
+    if ("error" in body) {
+      expect(body.error.code).toBe("EVENT_EXPIRED");
+    }
+  });
+
+  it("returns 402 for insufficient credits", async () => {
+    const mockDb = createUploadMockDb({ creditBalance: 0 });
+    const { app, mockBucket, mockQueue } = createUploadTestApp({ mockDb });
+    const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
+
+    const file = createMockFile();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await client.events[":id"].photos.$post({
+      param: { id: MOCK_EVENT_ID },
+      form: formData as any,
+    });
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    if ("error" in body) {
+      expect(body.error.code).toBe("INSUFFICIENT_CREDITS");
+    }
+  });
+
+  it("returns 400 for file size validation (via zod)", async () => {
+    const { app, mockBucket, mockQueue } = createUploadTestApp({});
+    const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
+
+    // Create a file that exceeds 20MB
+    const largeFile = createMockFile(21 * 1024 * 1024);
+    const formData = new FormData();
+    formData.append("file", largeFile);
+
+    const res = await client.events[":id"].photos.$post({
+      param: { id: MOCK_EVENT_ID },
+      form: formData as any,
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for unsupported file type (via zod)", async () => {
+    const { app, mockBucket, mockQueue } = createUploadTestApp({});
+    const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
+
+    const pdfFile = createMockFile(1024, "application/pdf");
+    const formData = new FormData();
+    formData.append("file", pdfFile);
+
+    const res = await client.events[":id"].photos.$post({
+      param: { id: MOCK_EVENT_ID },
+      form: formData as any,
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 201 for successful upload", async () => {
+    const mockDb = createUploadMockDb();
+    const mockBucket = createMockR2Bucket();
+    const mockQueue = { send: vi.fn().mockResolvedValue(undefined) };
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
+    });
+
+    const { app } = createUploadTestApp({
+      mockDb,
+      mockBucket: mockBucket as unknown as R2Bucket,
+      mockQueue,
+      mockFetch,
+    });
+    const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
+
+    const file = createMockFile();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await client.events[":id"].photos.$post({
+      param: { id: MOCK_EVENT_ID },
+      form: formData as any,
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+
+    if ("data" in body) {
+      expect(body.data).toHaveProperty("id");
+      expect(body.data).toHaveProperty("eventId");
+      expect(body.data).toHaveProperty("r2Key");
+      expect(body.data).toHaveProperty("status", "processing");
+      expect(body.data).toHaveProperty("faceCount", 0);
+      expect(body.data).toHaveProperty("uploadedAt");
+
+      // Verify R2 upload was called
+      expect(mockBucket.put).toHaveBeenCalled();
+
+      // Verify CF Images transform was called
+      expect(mockFetch).toHaveBeenCalled();
+
+      // Verify queue send was called
+      expect(mockQueue.send).toHaveBeenCalledWith({
+        photo_id: mockPhoto.id,
+        event_id: MOCK_EVENT_ID,
+        r2_key: expect.stringContaining(".jpg"),
+      });
+    } else {
+      throw new Error("Expected data response");
+    }
+  });
+
+  it("returns 500 when R2 upload fails (post-credit deduction)", async () => {
+    const mockDb = createUploadMockDb();
+    const mockBucket = {
+      put: vi.fn().mockRejectedValue(new Error("R2 error")),
+    };
+    const mockQueue = { send: vi.fn().mockResolvedValue(undefined) };
+
+    const { app } = createUploadTestApp({
+      mockDb,
+      mockBucket: mockBucket as unknown as R2Bucket,
+      mockQueue,
+    });
+    const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
+
+    const file = createMockFile();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await client.events[":id"].photos.$post({
+      param: { id: MOCK_EVENT_ID },
+      form: formData as any,
+    });
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    if ("error" in body) {
+      expect(body.error.code).toBe("UPLOAD_FAILED");
+    }
+  });
+
+  it("returns 500 when image transform fails (post-credit deduction)", async () => {
+    const mockDb = createUploadMockDb();
+    const mockBucket = createMockR2Bucket();
+    const mockQueue = { send: vi.fn().mockResolvedValue(undefined) };
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+    });
+
+    const { app } = createUploadTestApp({
+      mockDb,
+      mockBucket: mockBucket as unknown as R2Bucket,
+      mockQueue,
+      mockFetch,
+    });
+    const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
+
+    const file = createMockFile();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await client.events[":id"].photos.$post({
+      param: { id: MOCK_EVENT_ID },
+      form: formData as any,
+    });
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    if ("error" in body) {
+      expect(body.error.code).toBe("IMAGE_TRANSFORM_FAILED");
+    }
+  });
+
+  it("returns 500 when queue enqueue fails (post-credit deduction)", async () => {
+    const mockDb = createUploadMockDb();
+    const mockBucket = createMockR2Bucket();
+    const mockQueue = {
+      send: vi.fn().mockRejectedValue(new Error("Queue error")),
+    };
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
+    });
+
+    const { app } = createUploadTestApp({
+      mockDb,
+      mockBucket: mockBucket as unknown as R2Bucket,
+      mockQueue,
+      mockFetch,
+    });
+    const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
+
+    const file = createMockFile();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await client.events[":id"].photos.$post({
+      param: { id: MOCK_EVENT_ID },
+      form: formData as any,
+    });
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    if ("error" in body) {
+      expect(body.error.code).toBe("UPLOAD_FAILED");
+      expect(body.error.message).toContain("Queue enqueue failed");
+    }
+  });
+});
