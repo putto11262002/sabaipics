@@ -228,6 +228,7 @@ Cleanup
 - **PrimarySurface:** `API`
 - **Scope:** `apps/api/src/routes/credits.ts`, `apps/api/src/lib/stripe/`
 - **Dependencies:** `T-1`, `T-2`, `T-8`
+- **PR:** https://github.com/putto11262002/sabaipics/pull/15
 - **Acceptance:**
   - Validates package exists and is active
   - Creates Stripe Checkout session with package metadata
