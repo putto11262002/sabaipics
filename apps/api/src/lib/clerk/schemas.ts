@@ -34,12 +34,12 @@ const EmailAddressSchema = z.object({
 	verification: z
 		.object({
 			status: z.enum(["verified", "unverified", "expired"]),
-			strategy: z.string().optional(),
-			attempts: z.number().optional(),
-			expireAt: z.number().optional(),
+			strategy: z.string().nullish(),
+			attempts: z.number().nullish(),
+			expireAt: z.number().nullish(),
 		})
-		.optional(),
-	reserved: z.boolean().optional(),
+		.nullish(),
+	reserved: z.boolean().nullish(),
 });
 
 // =============================================================================
@@ -58,28 +58,31 @@ const UserDataBaseSchema = z.object({
 /**
  * User data with email information.
  * Used for user.created and user.updated events.
+ *
+ * Note: Clerk sends `null` for optional fields that are not set,
+ * so we use `.nullish()` (null | undefined) instead of `.optional()`.
  */
 const UserDataWithEmailSchema = UserDataBaseSchema.extend({
 	/** Array of email addresses associated with the user */
 	email_addresses: z.array(EmailAddressSchema),
 	/** ID of the primary email address (use to find correct email in array) */
-	primary_email_address_id: z.string().optional(),
+	primary_email_address_id: z.string().nullish(),
 	/** User's first name */
-	first_name: z.string().optional(),
+	first_name: z.string().nullish(),
 	/** User's last name */
-	last_name: z.string().optional(),
+	last_name: z.string().nullish(),
 	/** User's profile image URL */
-	image_url: z.string().optional(),
+	image_url: z.string().nullish(),
 	/** When the user was created (Unix timestamp) */
-	created_at: z.number().optional(),
+	created_at: z.number().nullish(),
 	/** When the user was last updated (Unix timestamp) */
-	updated_at: z.number().optional(),
+	updated_at: z.number().nullish(),
 	/** Whether the user is banned */
-	banned: z.boolean().optional(),
+	banned: z.boolean().nullish(),
 	/** Whether the user has verified their email */
-	locked: z.boolean().optional(),
+	locked: z.boolean().nullish(),
 	/** External ID (if user was synced from external system) */
-	external_id: z.string().optional(),
+	external_id: z.string().nullish(),
 });
 
 /**
@@ -100,9 +103,9 @@ const ClerkWebhookEventBaseSchema = z.object({
 	/** Event type - discriminator for the union */
 	type: z.string(),
 	/** Timestamp when the event occurred (Unix milliseconds) */
-	created_at: z.number().optional(),
+	created_at: z.number().nullish(),
 	/** Internal Clerk ID - not typically used */
-	object: z.string().optional(),
+	object: z.string().nullish(),
 });
 
 /**
