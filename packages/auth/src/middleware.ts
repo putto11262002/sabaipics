@@ -69,12 +69,3 @@ export function requireAuth(): MiddlewareHandler<{ Variables: AuthVariables }> {
   };
 }
 
-// Require photographer role (future: DB lookup)
-export function requirePhotographer(): MiddlewareHandler<{
-  Variables: AuthVariables;
-}> {
-  return async (c, next) => {
-    // TODO: Lookup user in DB, check role
-    return next();
-  };
-}
