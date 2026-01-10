@@ -19,9 +19,34 @@ export const listEventsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+// Photo upload validation
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+const ALLOWED_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+  "image/webp",
+] as const;
+
+export const uploadPhotoSchema = z.object({
+  file: z
+    .instanceof(File)
+    .refine((file) => file.size > 0, "File cannot be empty")
+    .refine(
+      (file) => file.size <= MAX_FILE_SIZE,
+      `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024} MB`
+    )
+    .refine(
+      (file) => ALLOWED_MIME_TYPES.includes(file.type as any),
+      `File type must be one of: ${ALLOWED_MIME_TYPES.join(", ")}`
+    ),
+});
+
 // =============================================================================
 // Types
 // =============================================================================
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;
+export type UploadPhotoInput = z.infer<typeof uploadPhotoSchema>;

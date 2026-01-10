@@ -393,7 +393,7 @@ Cleanup
 ---
 
 ### T-16 — Photo upload API (validation + normalization + credit deduction)
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-7
 - **Refs:** `docs/logs/BS_0001_S-1/research/cf-upload-limits.md`
@@ -401,6 +401,7 @@ Cleanup
 - **PrimarySurface:** `API`
 - **Scope:** `apps/api/src/routes/photos.ts`, `apps/api/src/lib/images/`
 - **Dependencies:** `T-1`, `T-2`, `T-13`
+- **PR:** https://github.com/putto11262002/sabaipics/pull/24
 - **Acceptance:**
   - Validates format (JPEG, PNG, HEIC, WebP only)
   - Validates size (≤ 20MB)
