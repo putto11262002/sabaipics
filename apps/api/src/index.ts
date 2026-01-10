@@ -9,6 +9,7 @@ import { adminRouter } from "./routes/admin";
 import { consentRouter } from "./routes/consent";
 import { dashboardRouter } from "./routes/dashboard/route";
 import { creditsRouter } from "./routes/credits";
+import { eventsRouter } from "./routes/events";
 import type { Bindings, Variables } from "./types";
 
 // Queue consumer
@@ -61,10 +62,8 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
   .route("/db-test", dbTestRouter)
   .route("/auth", authRouter)
   .route("/consent", consentRouter)
-  .route("/dashboard", dashboardRouter);
-// Future protected routes:
-// .use('/events/*', requireAuth())
-// .route('/events', eventsRouter)
+  .route("/dashboard", dashboardRouter)
+  .route("/events", eventsRouter);
 
 // =============================================================================
 // Worker Export
