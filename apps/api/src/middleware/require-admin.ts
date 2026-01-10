@@ -1,9 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { createAuthError } from "@sabaipics/auth/errors";
-
-type Env = {
-  Bindings: { ADMIN_API_KEY: string };
-};
+import type { Env } from "../types";
 
 /**
  * Middleware that requires admin API key authentication.

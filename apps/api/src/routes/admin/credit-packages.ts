@@ -1,22 +1,10 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { eq, asc } from "drizzle-orm";
-import { creditPackages, type Database } from "@sabaipics/db";
+import { creditPackages } from "@sabaipics/db";
 import { requireAdmin } from "../../middleware";
 import { zValidator } from "@hono/zod-validator";
-// =============================================================================
-// Types
-// =============================================================================
-
-type Bindings = {
-  ADMIN_API_KEY: string;
-};
-
-type Variables = {
-  db: () => Database;
-};
-
-type Env = { Bindings: Bindings; Variables: Variables };
+import type { Env } from "../../types";
 
 // =============================================================================
 // Validation Schemas
