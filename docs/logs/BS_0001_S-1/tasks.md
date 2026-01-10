@@ -393,7 +393,7 @@ Cleanup
 ---
 
 ### T-16 — Photo upload API (validation + normalization + credit deduction)
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-7
 - **Refs:** `docs/logs/BS_0001_S-1/research/cf-upload-limits.md`
