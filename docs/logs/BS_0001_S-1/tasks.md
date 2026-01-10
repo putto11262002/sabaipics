@@ -177,13 +177,14 @@ Cleanup
 ---
 
 ### T-7 — Dashboard API
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-3
 - **Goal:** Create `GET /dashboard` endpoint returning credit balance, events list, and stats.
 - **PrimarySurface:** `API`
 - **Scope:** `apps/api/src/routes/dashboard.ts`
 - **Dependencies:** `T-1`, `T-2`
+- **PR:** https://github.com/putto11262002/sabaipics/pull/12
 - **Acceptance:**
   - Returns `{ credits: { balance, nearestExpiry }, events: [...], stats: {...} }`
   - Balance uses FIFO unexpired sum query
