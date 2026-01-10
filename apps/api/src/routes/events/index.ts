@@ -1,16 +1,20 @@
 import { Hono } from "hono";
-import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { events } from "@sabaipics/db";
 import {
   requirePhotographer,
   requireConsent,
   type PhotographerVariables,
-} from "../middleware";
-import type { Bindings } from "../types";
-import { generateEventQR } from "../lib/qr";
-import { generateAccessCode } from "../lib/access-code";
+} from "../../middleware";
+import type { Bindings } from "../../types";
+import { generateEventQR } from "../../lib/qr";
+import { generateAccessCode } from "./access-code";
+import {
+  createEventSchema,
+  eventParamsSchema,
+  listEventsQuerySchema,
+} from "./schema";
 
 // =============================================================================
 // Types
@@ -21,19 +25,8 @@ type Env = {
   Variables: PhotographerVariables;
 };
 
-// =============================================================================
-// Validation Schemas
-// =============================================================================
-
-const createEventSchema = z.object({
-  name: z.string().min(1).max(200),
-  startDate: z.string().datetime().nullable().optional(),
-  endDate: z.string().datetime().nullable().optional(),
-});
-
-const eventParamsSchema = z.object({
-  id: z.string().uuid(),
-});
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
 
 // =============================================================================
 // Error Helpers
@@ -118,9 +111,8 @@ export const eventsRouter = new Hono<Env>()
       // Generate unique access code with retry logic
       const maxRetries = 5;
       let accessCode: string | null = null;
-      let attempts = 0;
 
-      for (attempts = 0; attempts < maxRetries; attempts++) {
+      for (let attempts = 0; attempts < maxRetries; attempts++) {
         const candidateCode = generateAccessCode();
 
         // Check if code already exists
@@ -203,37 +195,69 @@ export const eventsRouter = new Hono<Env>()
     }
   )
 
-  // GET /events - List photographer's events
-  .get("/", requirePhotographer(), requireConsent(), async (c) => {
-    const photographer = c.var.photographer;
-    const db = c.var.db();
+  // GET /events - List photographer's events (with pagination)
+  .get(
+    "/",
+    requirePhotographer(),
+    requireConsent(),
+    zValidator("query", listEventsQuerySchema),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { page, limit } = c.req.valid("query");
 
-    const eventsList = await db
-      .select({
-        id: events.id,
-        name: events.name,
-        startDate: events.startDate,
-        endDate: events.endDate,
-        accessCode: events.accessCode,
-        qrCodeR2Key: events.qrCodeR2Key,
-        createdAt: events.createdAt,
-        expiresAt: events.expiresAt,
-      })
-      .from(events)
-      .where(eq(events.photographerId, photographer.id))
-      .orderBy(desc(events.createdAt));
+      const offset = page * limit;
 
-    // Construct QR URLs
-    const baseUrl = c.env.APP_BASE_URL;
-    const data = eventsList.map((event) => ({
-      ...event,
-      qrCodeUrl: event.qrCodeR2Key
-        ? `${baseUrl}/r2/${event.qrCodeR2Key}`
-        : null,
-    }));
+      const eventsList = await db
+        .select({
+          id: events.id,
+          name: events.name,
+          startDate: events.startDate,
+          endDate: events.endDate,
+          accessCode: events.accessCode,
+          qrCodeR2Key: events.qrCodeR2Key,
+          createdAt: events.createdAt,
+          expiresAt: events.expiresAt,
+        })
+        .from(events)
+        .where(eq(events.photographerId, photographer.id))
+        .orderBy(desc(events.createdAt))
+        .limit(limit)
+        .offset(offset);
 
-    return c.json({ data });
-  })
+      // Get total count for pagination metadata
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(events)
+        .where(eq(events.photographerId, photographer.id));
+
+      const totalCount = countResult?.count ?? 0;
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page + 1 < totalPages;
+      const hasPrevPage = page > 0;
+
+      // Construct QR URLs
+      const baseUrl = c.env.APP_BASE_URL;
+      const data = eventsList.map((event) => ({
+        ...event,
+        qrCodeUrl: event.qrCodeR2Key
+          ? `${baseUrl}/r2/${event.qrCodeR2Key}`
+          : null,
+      }));
+
+      return c.json({
+        data,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages,
+          hasNextPage,
+          hasPrevPage,
+        },
+      });
+    }
+  )
 
   // GET /events/:id - Get single event
   .get(

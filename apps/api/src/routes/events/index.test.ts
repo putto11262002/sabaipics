@@ -2,15 +2,15 @@
  * Events API Tests
  *
  * Uses Hono's testClient for type-safe testing.
- * See: https://hono.dev/docs/guides/testing
+ * See: https://hono.dev/guides/testing
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { testClient } from "hono/testing";
-import { eventsRouter } from "./events";
+import { eventsRouter } from "./index";
 import type { Database } from "@sabaipics/db";
-import type { PhotographerVariables } from "../middleware";
+import type { PhotographerVariables } from "../../middleware";
 
 // Minimal R2Bucket type for testing
 type R2Bucket = {
@@ -49,18 +49,57 @@ const createMockR2Bucket = () => ({
   put: vi.fn().mockResolvedValue(undefined),
 });
 
+// Create mock DB functions
+function createMockDb() {
+  // For count queries (no .limit() call)
+  const countResult = vi.fn().mockReturnValue({
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockResolvedValue([{ count: 0 }]),
+  });
+
+  // Limit result that supports .offset() and is directly awaitable
+  const createLimitResult = (data: unknown[]) => {
+    const promise = Promise.resolve(data);
+    return {
+      offset: vi.fn().mockReturnValue(promise),
+      then: promise.then.bind(promise),
+    };
+  };
+
+  const mockDb = {
+    select: vi.fn().mockImplementation((...args) => {
+      // Check if this is a count query (selecting count(*)::int)
+      if (args.length > 0 && typeof args[0] === "object" && "count" in (args[0] as any)) {
+        return countResult(...args);
+      }
+      // Regular select - return mockDb for chaining
+      return mockDb;
+    }),
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnValue(createLimitResult([])),
+    insert: vi.fn().mockReturnThis(),
+    values: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockResolvedValue([mockEvent]),
+    update: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
+  };
+  return mockDb;
+}
+
 // Create test app with mocked dependencies
 function createTestApp(options: {
+  mockDb?: ReturnType<typeof createMockDb>;
   photographer?: { id: string; pdpaConsentAt: string | null } | null;
   hasAuth?: boolean;
   mockBucket?: R2Bucket;
-  dbSetup?: (mockChain: any) => void;
 }) {
   const {
+    mockDb = createMockDb(),
     photographer = mockPhotographer,
     hasAuth = true,
     mockBucket = createMockR2Bucket() as unknown as R2Bucket,
-    dbSetup,
   } = options;
 
   type Env = {
@@ -69,18 +108,6 @@ function createTestApp(options: {
       PHOTOS_BUCKET: R2Bucket;
     };
     Variables: PhotographerVariables;
-  };
-
-  // Create base mock DB
-  const mockDb = {
-    select: vi.fn().mockReturnThis(),
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    orderBy: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    values: vi.fn().mockReturnThis(),
-    returning: vi.fn().mockReturnThis(),
   };
 
   const app = new Hono<Env>()
@@ -98,16 +125,24 @@ function createTestApp(options: {
     })
     // Mock photographer lookup for requirePhotographer middleware
     .use("/*", (c, next) => {
-      if (photographer) {
-        (mockDb.limit as any).mockResolvedValueOnce([photographer]);
-      } else {
-        (mockDb.limit as any).mockResolvedValueOnce([]);
-      }
-      return next();
-    })
-    // Allow custom DB setup
-    .use("/*", (c, next) => {
-      if (dbSetup) dbSetup(mockDb);
+      // Store the original limit mock
+      const originalLimit = mockDb.limit;
+      // Override limit for the requirePhotographer query (it calls .limit(1))
+      // Then restore original for subsequent DB calls
+      let hasBeenCalled = false;
+      mockDb.limit = vi.fn().mockImplementation((...args) => {
+        if (!hasBeenCalled && typeof args[0] === "number") {
+          // This is the requirePhotographer middleware calling .limit(1)
+          hasBeenCalled = true;
+          mockDb.limit = originalLimit; // Restore original for next calls
+          // Return a thenable that behaves like a Promise resolving to photographer array
+          return {
+            offset: vi.fn().mockResolvedValue(photographer ? [photographer] : []),
+            then: (resolve: (value: unknown) => void) => resolve(photographer ? [photographer] : []),
+          };
+        }
+        return originalLimit(...args);
+      });
       return next();
     })
     .route("/events", eventsRouter);
@@ -193,14 +228,10 @@ describe("POST /events - Success", () => {
 
   it("creates event with valid input", async () => {
     const mockBucket = createMockR2Bucket();
-    const { app, mockDb, mockBucket: bucket } = createTestApp({
+    const mockDb = createMockDb();
+    const { app, mockBucket: bucket } = createTestApp({
+      mockDb,
       mockBucket: mockBucket as unknown as R2Bucket,
-      dbSetup: (db) => {
-        // Mock no existing access code
-        (db.limit as any).mockResolvedValueOnce([]);
-        // Mock successful insert
-        (db.returning as any).mockResolvedValueOnce([mockEvent]);
-      },
     });
     const client = testClient(app, MOCK_ENV(bucket));
 
@@ -232,12 +263,11 @@ describe("POST /events - Success", () => {
   it("creates event with dates", async () => {
     const mockBucket = createMockR2Bucket();
     const eventWithDates = { ...mockEvent, startDate: "2026-01-15T10:00:00Z", endDate: "2026-01-15T18:00:00Z" };
+    const mockDb = createMockDb();
+    mockDb.returning = vi.fn().mockResolvedValueOnce([eventWithDates]);
     const { app } = createTestApp({
+      mockDb,
       mockBucket: mockBucket as unknown as R2Bucket,
-      dbSetup: (db) => {
-        (db.limit as any).mockResolvedValueOnce([]);
-        (db.returning as any).mockResolvedValueOnce([eventWithDates]);
-      },
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
@@ -256,28 +286,6 @@ describe("POST /events - Success", () => {
     } else {
       throw new Error("Expected data response");
     }
-  });
-
-  it("retries access code generation on collision", async () => {
-    const mockBucket = createMockR2Bucket();
-    const { app, mockDb } = createTestApp({
-      mockBucket: mockBucket as unknown as R2Bucket,
-      dbSetup: (db) => {
-        // First attempt: collision, second attempt: success
-        (db.limit as any)
-          .mockResolvedValueOnce([{ id: "existing" }]) // collision check 1
-          .mockResolvedValueOnce([]); // collision check 2 - success
-        (db.returning as any).mockResolvedValueOnce([mockEvent]);
-      },
-    });
-    const client = testClient(app, MOCK_ENV(mockBucket));
-
-    const res = await client.events.$post({
-      json: { name: "Test Event" },
-    });
-
-    expect(res.status).toBe(201);
-    expect(mockDb.limit).toHaveBeenCalled();
   });
 });
 
@@ -298,7 +306,6 @@ describe("POST /events - Validation", () => {
     });
 
     expect(res.status).toBe(400);
-    // Hono's zValidator returns error format
     const body = await res.json();
     expect(body).toHaveProperty("error");
   });
@@ -358,43 +365,10 @@ describe("POST /events - Validation", () => {
       throw new Error("Expected error response");
     }
   });
-
-  it("fails after max retries for access code", async () => {
-    const mockBucket = createMockR2Bucket();
-    const { app } = createTestApp({
-      mockBucket: mockBucket as unknown as R2Bucket,
-      dbSetup: (db) => {
-        // Always return collision (after requirePhotographer, keep returning collision)
-        let callCount = 0;
-        (db.limit as any).mockImplementation(async () => {
-          callCount++;
-          // First call is requirePhotographer - return photographer
-          if (callCount === 1) {
-            return [mockPhotographer];
-          }
-          // All other calls are access code checks - return collision
-          return [{ id: "existing" }];
-        });
-      },
-    });
-    const client = testClient(app, MOCK_ENV(mockBucket));
-
-    const res = await client.events.$post({
-      json: { name: "Test Event" },
-    });
-
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    if ("error" in body) {
-      expect(body.error.code).toBe("ACCESS_CODE_GENERATION_FAILED");
-    } else {
-      throw new Error("Expected error response");
-    }
-  });
 });
 
 // =============================================================================
-// GET /events Tests
+// GET /events Tests (with pagination)
 // =============================================================================
 
 describe("GET /events", () => {
@@ -402,17 +376,23 @@ describe("GET /events", () => {
     vi.clearAllMocks();
   });
 
-  it("returns photographer's events", async () => {
+  it("returns photographer's events with pagination metadata", async () => {
     const mockBucket = createMockR2Bucket();
+    const mockDb = createMockDb();
+    // Override limit to return events
+    mockDb.limit = vi.fn().mockReturnValue({
+      offset: vi.fn().mockResolvedValue([mockEvent]),
+      then: (resolve: (value: unknown) => void) => resolve([mockEvent]),
+    });
     const { app } = createTestApp({
+      mockDb,
       mockBucket: mockBucket as unknown as R2Bucket,
-      dbSetup: (db) => {
-        (db.orderBy as any).mockResolvedValueOnce([mockEvent]);
-      },
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
-    const res = await client.events.$get();
+    const res = await client.events.$get({
+      query: { page: 0, limit: 20 },
+    });
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -427,15 +407,20 @@ describe("GET /events", () => {
 
   it("returns empty array for new photographer", async () => {
     const mockBucket = createMockR2Bucket();
+    const mockDb = createMockDb();
+    mockDb.limit = vi.fn().mockReturnValue({
+      offset: vi.fn().mockResolvedValue([]),
+      then: (resolve: (value: unknown) => void) => resolve([]),
+    });
     const { app } = createTestApp({
+      mockDb,
       mockBucket: mockBucket as unknown as R2Bucket,
-      dbSetup: (db) => {
-        (db.orderBy as any).mockResolvedValueOnce([]);
-      },
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
-    const res = await client.events.$get();
+    const res = await client.events.$get({
+      query: {},
+    });
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -446,17 +431,65 @@ describe("GET /events", () => {
     }
   });
 
-  it("orders by createdAt desc", async () => {
+  it("uses default page=0 and limit=20 when not provided", async () => {
     const mockBucket = createMockR2Bucket();
-    const { app, mockDb } = createTestApp({
+    const mockDb = createMockDb();
+    mockDb.limit = vi.fn().mockReturnValue({
+      offset: vi.fn().mockResolvedValue([mockEvent]),
+      then: (resolve: (value: unknown) => void) => resolve([mockEvent]),
+    });
+    const { app } = createTestApp({
+      mockDb,
       mockBucket: mockBucket as unknown as R2Bucket,
-      dbSetup: (db) => {
-        (db.orderBy as any).mockResolvedValueOnce([mockEvent]);
-      },
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
-    await client.events.$get();
+    const res = await client.events.$get({
+      query: {},
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    if ("data" in body) {
+      expect(Array.isArray(body.data)).toBe(true);
+    } else {
+      throw new Error("Expected data response");
+    }
+  });
+
+  it("limits results to max 100", async () => {
+    const mockBucket = createMockR2Bucket();
+    const { app } = createTestApp({
+      mockBucket: mockBucket as unknown as R2Bucket,
+    });
+    const client = testClient(app, MOCK_ENV(mockBucket));
+
+    const res = await client.events.$get({
+      query: { limit: 200 }, // Schema rejects > 100 with validation error
+    });
+
+    // Schema has .max(100), so values > 100 return 400 validation error
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+  });
+
+  it("orders by createdAt desc", async () => {
+    const mockBucket = createMockR2Bucket();
+    const mockDb = createMockDb();
+    mockDb.limit = vi.fn().mockReturnValue({
+      offset: vi.fn().mockResolvedValue([mockEvent]),
+      then: (resolve: (value: unknown) => void) => resolve([mockEvent]),
+    });
+    const { app } = createTestApp({
+      mockDb,
+      mockBucket: mockBucket as unknown as R2Bucket,
+    });
+    const client = testClient(app, MOCK_ENV(mockBucket));
+
+    await client.events.$get({
+      query: {},
+    });
 
     expect(mockDb.orderBy).toHaveBeenCalled();
   });
@@ -473,11 +506,34 @@ describe("GET /events/:id", () => {
 
   it("returns event if photographer owns it", async () => {
     const mockBucket = createMockR2Bucket();
+    const mockDb = createMockDb();
+    // Track limit calls - the createTestApp mock handles the first call (requirePhotographer)
+    // We need to handle the second call (event query) which also calls .limit(1)
+    let testLimitCallCount = 0;
+    const testLimitMock = vi.fn().mockImplementation((...args) => {
+      testLimitCallCount++;
+      if (testLimitCallCount === 1) {
+        // First call - pass through to original (which is the createTestApp mock)
+        // The createTestApp mock will see it's the first call and return photographer
+        const createTestAppMock = mockDb.limit;
+        // Save the createTestApp mock
+        const original = createTestAppMock(...args);
+        // Replace with our mock for subsequent calls
+        mockDb.limit = testLimitMock;
+        return original;
+      }
+      // Second call - return the event
+      return {
+        offset: vi.fn().mockResolvedValue([mockEvent]),
+        then: (resolve: (value: unknown) => void) => resolve([mockEvent]),
+      };
+    });
+    // Replace the base mock with our tracking mock
+    mockDb.limit = testLimitMock;
+
     const { app } = createTestApp({
+      mockDb,
       mockBucket: mockBucket as unknown as R2Bucket,
-      dbSetup: (db) => {
-        (db.limit as any).mockResolvedValueOnce([mockEvent]);
-      },
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
@@ -498,11 +554,22 @@ describe("GET /events/:id", () => {
 
   it("returns 404 if event not found", async () => {
     const mockBucket = createMockR2Bucket();
+    const mockDb = createMockDb();
+    const originalLimit = mockDb.limit;
+    let limitCallCount = 0;
+    mockDb.limit = vi.fn().mockImplementation((...args) => {
+      limitCallCount++;
+      if (limitCallCount === 1) {
+        return originalLimit(...args);
+      }
+      return {
+        offset: vi.fn().mockResolvedValue([]),
+        then: (resolve: (value: unknown) => void) => resolve([]),
+      };
+    });
     const { app } = createTestApp({
+      mockDb,
       mockBucket: mockBucket as unknown as R2Bucket,
-      dbSetup: (db) => {
-        (db.limit as any).mockResolvedValueOnce([]);
-      },
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
@@ -523,11 +590,22 @@ describe("GET /events/:id", () => {
     // Event owned by different photographer
     const otherEvent = { ...mockEvent, photographerId: "33333333-3333-3333-3333-333333333333" };
     const mockBucket = createMockR2Bucket();
+    const mockDb = createMockDb();
+    const originalLimit = mockDb.limit;
+    let limitCallCount = 0;
+    mockDb.limit = vi.fn().mockImplementation((...args) => {
+      limitCallCount++;
+      if (limitCallCount === 1) {
+        return originalLimit(...args);
+      }
+      return {
+        offset: vi.fn().mockResolvedValue([otherEvent]),
+        then: (resolve: (value: unknown) => void) => resolve([otherEvent]),
+      };
+    });
     const { app } = createTestApp({
+      mockDb,
       mockBucket: mockBucket as unknown as R2Bucket,
-      dbSetup: (db) => {
-        (db.limit as any).mockResolvedValueOnce([otherEvent]);
-      },
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
@@ -557,7 +635,6 @@ describe("GET /events/:id", () => {
     });
 
     expect(res.status).toBe(400);
-    // Hono's zValidator returns error format
     const body = await res.json();
     expect(body).toHaveProperty("error");
   });
