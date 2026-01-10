@@ -22,50 +22,49 @@ import {
 } from "@sabaipics/ui/components/alert";
 import { Spinner } from "@sabaipics/ui/components/spinner";
 import { PageHeader } from "../../../components/shell/page-header";
-import { useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "../../../lib/api";
 
-interface DashboardData {
-  data: {
-    credits: {
-      balance: number;
-      nearestExpiry: string | null;
-    };
-  };
+interface PurchaseStatusResponse {
+  fulfilled: boolean;
+  credits: number | null;
+  expiresAt?: string;
 }
 
 export function CreditSuccessPage() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get("session_id");
-  const queryClient = useQueryClient();
   const { getToken } = useApiClient();
   const navigate = useNavigate();
 
-  const [initialBalance, setInitialBalance] = useState<number | null>(null);
-  const [currentBalance, setCurrentBalance] = useState<number | null>(null);
-  const [creditsAdded, setCreditsAdded] = useState(false);
+  const [purchaseStatus, setPurchaseStatus] = useState<PurchaseStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const redirectRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch dashboard data to check credit balance
-  const fetchBalance = async (): Promise<number> => {
+  // Fetch purchase status from dedicated endpoint
+  const fetchPurchaseStatus = async (): Promise<PurchaseStatusResponse> => {
     const token = await getToken();
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/credit-packages/purchase/${sessionId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const errorData = await response.json().catch(() => null);
+      throw new Error(
+        errorData?.error?.message || `HTTP ${response.status}: ${response.statusText}`
+      );
     }
 
-    const data = (await response.json()) as DashboardData;
-    return data.data.credits.balance;
+    return response.json() as Promise<PurchaseStatusResponse>;
   };
 
-  // Poll for credit balance updates
+  // Poll for purchase fulfillment
   useEffect(() => {
     if (!sessionId) return;
 
@@ -73,23 +72,17 @@ export function CreditSuccessPage() {
     let pollCount = 0;
     const MAX_POLLS = 15; // Poll for up to 30 seconds (15 * 2s)
 
-    const pollBalance = async () => {
+    const pollStatus = async () => {
       try {
-        const balance = await fetchBalance();
+        const status = await fetchPurchaseStatus();
 
         if (!isMounted) return;
 
-        // Store initial balance on first fetch
-        if (initialBalance === null) {
-          setInitialBalance(balance);
-          setCurrentBalance(balance);
-        } else {
-          setCurrentBalance(balance);
-        }
+        setPurchaseStatus(status);
+        setError(null);
 
-        // Check if balance increased (webhook fulfilled)
-        if (initialBalance !== null && balance > initialBalance) {
-          setCreditsAdded(true);
+        // Check if purchase is fulfilled
+        if (status.fulfilled) {
           setLoading(false);
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
@@ -111,17 +104,19 @@ export function CreditSuccessPage() {
             clearInterval(pollingRef.current);
           }
         }
-      } catch (error) {
-        console.error("Error polling balance:", error);
-        // Continue polling on error
+      } catch (err) {
+        if (!isMounted) return;
+        const errorMessage = err instanceof Error ? err.message : "Failed to check purchase status";
+        setError(errorMessage);
+        // Continue polling on error (might be temporary network issue)
       }
     };
 
     // Initial fetch
-    pollBalance();
+    pollStatus();
 
     // Poll every 2 seconds
-    pollingRef.current = setInterval(pollBalance, 2000);
+    pollingRef.current = setInterval(pollStatus, 2000);
 
     // Cleanup
     return () => {
@@ -133,14 +128,7 @@ export function CreditSuccessPage() {
         clearTimeout(redirectRef.current);
       }
     };
-  }, [sessionId, initialBalance, getToken, navigate]);
-
-  // Also invalidate queries for other components
-  useEffect(() => {
-    if (sessionId) {
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-    }
-  }, [sessionId, queryClient]);
+  }, [sessionId, getToken, navigate]);
 
   if (!sessionId) {
     return (
@@ -170,8 +158,8 @@ export function CreditSuccessPage() {
     );
   }
 
-  if (loading && initialBalance !== null) {
-    // Still waiting for webhook
+  // Loading state - waiting for webhook
+  if (loading) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <header className="border-b">
@@ -196,20 +184,26 @@ export function CreditSuccessPage() {
                 seconds.
               </EmptyDescription>
             </EmptyHeader>
-            <EmptyContent>
-              <div className="text-sm text-muted-foreground">
-                Your balance: {initialBalance.toLocaleString()} credits
-              </div>
-            </EmptyContent>
+            {error && (
+              <EmptyContent>
+                <Alert variant="destructive">
+                  <AlertCircle className="size-4" />
+                  <AlertTitle>Connection issue</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+                <div className="text-xs text-muted-foreground mt-2">
+                  Retrying...
+                </div>
+              </EmptyContent>
+            )}
           </Empty>
         </div>
       </div>
     );
   }
 
-  if (creditsAdded && currentBalance !== null) {
-    // Credits successfully added
-    const creditsGained = currentBalance - (initialBalance || 0);
+  // Success state - webhook fulfilled
+  if (purchaseStatus?.fulfilled && purchaseStatus.credits !== null) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <header className="border-b">
@@ -228,22 +222,28 @@ export function CreditSuccessPage() {
               </EmptyMedia>
               <EmptyTitle>Credits added!</EmptyTitle>
               <EmptyDescription>
-                {creditsGained > 0
-                  ? `+${creditsGained.toLocaleString()} credits have been added to your account.`
-                  : "Your credits have been added to your account."}
+                +{purchaseStatus.credits.toLocaleString()} credits have been
+                added to your account.
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <div className="flex items-center gap-4">
-                <div className="text-sm">
-                  <span className="text-muted-foreground">New balance: </span>
-                  <span className="font-semibold tabular-nums">
-                    {currentBalance.toLocaleString()} credits
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Redirecting to dashboard...
-                </div>
+              <div className="text-sm">
+                <span className="text-muted-foreground">Valid until: </span>
+                <span className="font-semibold">
+                  {purchaseStatus.expiresAt
+                    ? new Date(purchaseStatus.expiresAt).toLocaleDateString(
+                        "th-TH",
+                        {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        }
+                      )
+                    : "6 months from now"}
+                </span>
+              </div>
+              <div className="text-xs text-muted-foreground mt-2">
+                Redirecting to dashboard...
               </div>
             </EmptyContent>
           </Empty>
@@ -252,7 +252,7 @@ export function CreditSuccessPage() {
     );
   }
 
-  // Polling exhausted or initial load
+  // Fallback / timeout state
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b">
@@ -275,8 +275,8 @@ export function CreditSuccessPage() {
             </EmptyMedia>
             <EmptyTitle>Purchase successful!</EmptyTitle>
             <EmptyDescription>
-              Thank you for your purchase. Your credits have been added to your
-              account.
+              Thank you for your purchase. Your credits will appear in your
+              account shortly.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

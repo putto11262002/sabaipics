@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { eq, asc } from "drizzle-orm";
-import { creditPackages, photographers } from "@sabaipics/db";
+import { eq, asc, and } from "drizzle-orm";
+import { creditPackages, photographers, creditLedger } from "@sabaipics/db";
 import {
   requirePhotographer,
   requireConsent,
@@ -154,6 +154,63 @@ export const creditsRouter = new Hono<Env>()
           checkoutUrl: result.url,
           sessionId: result.sessionId,
         },
+      });
+    }
+  )
+  /**
+   * GET /credit-packages/purchase/:sessionId
+   *
+   * Checks if a Stripe checkout session has been fulfilled (credits added).
+   * Requires authenticated photographer with PDPA consent.
+   *
+   * Response:
+   * - { fulfilled: false, credits: null } - Webhook not received yet
+   * - { fulfilled: true, credits: 500, expiresAt: "..." } - Webhook fulfilled
+   *
+   * Security: Users can only check their own purchases (filtered by photographerId)
+   */
+  .get(
+    "/purchase/:sessionId",
+    requirePhotographer(),
+    requireConsent(),
+    async (c) => {
+      const sessionId = c.req.param("sessionId");
+      const auth = c.get("auth");
+      const db = c.var.db();
+
+      if (!sessionId) {
+        return c.json(
+          { error: { code: "INVALID_REQUEST", message: "sessionId is required" } },
+          400
+        );
+      }
+
+      // Query credit_ledger by stripeSessionId AND photographerId (security)
+      const [purchase] = await db
+        .select({
+          credits: creditLedger.amount,
+          expiresAt: creditLedger.expiresAt,
+        })
+        .from(creditLedger)
+        .where(
+          and(
+            eq(creditLedger.stripeSessionId, sessionId),
+            eq(creditLedger.photographerId, auth.userId),
+            eq(creditLedger.type, "purchase")
+          )
+        )
+        .limit(1);
+
+      if (!purchase) {
+        // No ledger entry found = webhook not received yet
+        return c.json({ fulfilled: false, credits: null });
+      }
+
+      // Ledger entry exists = webhook fulfilled
+      return c.json({
+        fulfilled: true,
+        credits: purchase.credits,
+        expiresAt: purchase.expiresAt,
       });
     }
   );
