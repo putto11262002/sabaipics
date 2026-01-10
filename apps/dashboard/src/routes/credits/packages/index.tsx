@@ -1,16 +1,16 @@
-import { AlertCircle, ArrowLeft, CreditCard, RefreshCw } from "lucide-react";
-import { Link } from "react-router";
+import { AlertCircle, Check, CreditCard, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
 import { Button } from "@sabaipics/ui/components/button";
 import {
   Card,
-  CardAction,
+  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@sabaipics/ui/components/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@sabaipics/ui/components/empty";
+import { PageHeader } from "../../../components/shell/page-header";
 import { Skeleton } from "@sabaipics/ui/components/skeleton";
 import { Spinner } from "@sabaipics/ui/components/spinner";
 import { useCreditPackages } from "../../../hooks/credits/useCreditPackages";
@@ -37,41 +37,42 @@ export function CreditPackagesPage() {
   const formatPrice = (priceInSatang: number) => {
     const priceInThb = priceInSatang / 100;
     return new Intl.NumberFormat("th-TH", {
-      style: "currency",
-      currency: "THB",
+      style: "decimal",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(priceInThb);
   };
 
+  // Only show first 3 packages
+  const displayPackages = data?.data.slice(0, 3) || [];
+
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to="/dashboard">
-                <ArrowLeft className="size-5" />
-              </Link>
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold">Credit Packages</h1>
-              <p className="text-sm text-muted-foreground">Choose a package to get started</p>
-            </div>
-          </div>
+    <div className="flex flex-1 flex-col">
+      <PageHeader
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Buy Credits" },
+        ]}
+      />
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        {/* Header Section */}
+        <div className="text-center">
+          <h1 className="text-3xl font-bold tracking-tight">Choose Your Credit Package</h1>
+          <p className="mt-2 text-muted-foreground">
+            Select a package that fits your needs. Credits expire 6 months after purchase.
+          </p>
         </div>
-      </header>
-      <div className="container mx-auto flex flex-1 flex-col gap-4 p-4">
+
         {isLoading && (
-          <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-            <Skeleton className="h-40 w-full rounded-xl" />
-            <Skeleton className="h-40 w-full rounded-xl" />
-            <Skeleton className="h-40 w-full rounded-xl" />
+          <div className="mx-auto grid w-full max-w-5xl gap-6 md:grid-cols-3">
+            <Skeleton className="h-96 w-full rounded-xl" />
+            <Skeleton className="h-96 w-full rounded-xl" />
+            <Skeleton className="h-96 w-full rounded-xl" />
           </div>
         )}
 
         {error && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="mx-auto max-w-2xl">
             <AlertCircle className="size-4" />
             <AlertTitle>Error loading packages</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
@@ -94,7 +95,7 @@ export function CreditPackagesPage() {
         )}
 
         {checkoutMutation.isError && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="mx-auto max-w-2xl">
             <AlertCircle className="size-4" />
             <AlertTitle>Checkout failed</AlertTitle>
             <AlertDescription>
@@ -103,8 +104,8 @@ export function CreditPackagesPage() {
           </Alert>
         )}
 
-        {data && data.data.length === 0 && (
-          <Empty>
+        {data && displayPackages.length === 0 && (
+          <Empty className="mx-auto max-w-md">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <CreditCard className="size-12 text-muted-foreground" />
@@ -117,52 +118,99 @@ export function CreditPackagesPage() {
           </Empty>
         )}
 
-        {data && data.data.length > 0 && (
-          <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-            {data.data.map((pkg) => {
+        {data && displayPackages.length > 0 && (
+          <div className="mx-auto grid w-full max-w-5xl gap-6 md:grid-cols-3">
+            {displayPackages.map((pkg, index) => {
               const isPurchasing = purchasingPackageId === pkg.id;
+              const isPopular = index === 1; // Middle package is "popular"
 
               return (
-                <Card key={pkg.id} className="@container/card">
-                  <CardHeader>
-                    <CardDescription>Credit Package</CardDescription>
-                    <CardTitle className="text-2xl font-semibold">
-                      {pkg.name}
-                    </CardTitle>
-                    <CardAction>
-                      <Button
-                        onClick={() => handlePurchase(pkg.id)}
-                        disabled={isPurchasing || checkoutMutation.isPending}
-                        size="sm"
-                      >
-                        {isPurchasing ? (
-                          <>
-                            <Spinner className="mr-2 size-3" />
-                            Processing...
-                          </>
-                        ) : (
-                          "Purchase"
-                        )}
-                      </Button>
-                    </CardAction>
-                  </CardHeader>
-                  <CardFooter className="flex-col items-start gap-2 text-sm">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-bold tabular-nums">
-                        {pkg.credits.toLocaleString()}
+                <Card
+                  key={pkg.id}
+                  className={isPopular ? "relative border-primary shadow-lg" : ""}
+                >
+                  {isPopular && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                        Popular
                       </span>
-                      <span className="text-muted-foreground">credits</span>
                     </div>
-                    <div className="text-muted-foreground">
-                      {formatPrice(pkg.priceThb)}
+                  )}
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-2xl">{pkg.name}</CardTitle>
+                    <CardDescription>Perfect for getting started</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Price */}
+                    <div className="text-center">
+                      <div className="flex items-baseline justify-center gap-1">
+                        <span className="text-4xl font-bold tabular-nums">
+                          ฿{formatPrice(pkg.priceThb)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">One-time payment</p>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      Credits expire 6 months after purchase
+
+                    {/* Credits */}
+                    <div className="rounded-lg bg-muted p-4 text-center">
+                      <div className="text-3xl font-bold tabular-nums">{pkg.credits.toLocaleString()}</div>
+                      <div className="text-sm text-muted-foreground">Credits</div>
                     </div>
+
+                    {/* Features */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Check className="size-4 text-primary" />
+                        <span>Upload {pkg.credits.toLocaleString()} photos</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Check className="size-4 text-primary" />
+                        <span>Face recognition included</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Check className="size-4 text-primary" />
+                        <span>6 months validity</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Check className="size-4 text-primary" />
+                        <span>QR code sharing</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button
+                      onClick={() => handlePurchase(pkg.id)}
+                      disabled={isPurchasing || checkoutMutation.isPending}
+                      className="w-full"
+                      size="lg"
+                      variant={isPopular ? "default" : "outline"}
+                    >
+                      {isPurchasing ? (
+                        <>
+                          <Spinner className="mr-2 size-4" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="mr-2 size-4" />
+                          Buy Now
+                        </>
+                      )}
+                    </Button>
                   </CardFooter>
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {/* Info Section */}
+        {data && displayPackages.length > 0 && (
+          <div className="mx-auto max-w-2xl text-center text-sm text-muted-foreground">
+            <p>
+              Secure payment powered by Stripe. Credits expire 6 months after purchase.
+              Need more credits? Contact us for enterprise plans.
+            </p>
           </div>
         )}
       </div>

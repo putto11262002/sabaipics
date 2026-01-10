@@ -16,7 +16,6 @@ export default function App() {
       {/* Public routes */}
       <Route path="/sign-in/*" element={<SignInPage />} />
       <Route path="/sign-up/*" element={<SignUpPage />} />
-      <Route path="/credits/packages" element={<CreditPackagesPage />} />
 
       {/* Onboarding route (auth required, no consent required) */}
       <Route
@@ -39,6 +38,7 @@ export default function App() {
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/credits/packages" element={<CreditPackagesPage />} />
         <Route path="/credits/success" element={<CreditSuccessPage />} />
         {/* Future: /events, /settings, etc. */}
       </Route>

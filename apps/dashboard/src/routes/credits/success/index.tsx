@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { useSearchParams, Link } from "react-router";
-import { CheckCircle2, CreditCard, AlertCircle, ArrowLeft } from "lucide-react";
+import { CheckCircle2, CreditCard, AlertCircle } from "lucide-react";
 import { Button } from "@sabaipics/ui/components/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@sabaipics/ui/components/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@sabaipics/ui/components/empty";
 import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
+import { PageHeader } from "../../../components/shell/page-header";
 import { useQueryClient } from "@tanstack/react-query";
 
 export function CreditSuccessPage() {
@@ -22,18 +23,14 @@ export function CreditSuccessPage() {
 
   if (!sessionId) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <header className="border-b">
-          <div className="container mx-auto flex h-16 items-center gap-4 px-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to="/dashboard">
-                <ArrowLeft className="size-5" />
-              </Link>
-            </Button>
-            <h1 className="text-xl font-semibold">Purchase Status</h1>
-          </div>
-        </header>
-        <div className="container mx-auto flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col">
+        <PageHeader
+          breadcrumbs={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Purchase Status" },
+          ]}
+        />
+        <div className="flex flex-1 flex-col gap-4 p-4">
           <Alert variant="destructive">
             <AlertCircle className="size-4" />
             <AlertTitle>Invalid session</AlertTitle>
@@ -52,18 +49,14 @@ export function CreditSuccessPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b">
-        <div className="container mx-auto flex h-16 items-center gap-4 px-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link to="/dashboard">
-              <ArrowLeft className="size-5" />
-            </Link>
-          </Button>
-          <h1 className="text-xl font-semibold">Purchase Successful</h1>
-        </div>
-      </header>
-      <div className="container mx-auto flex flex-1 flex-col items-center justify-center gap-4 p-4">
+    <div className="flex flex-1 flex-col">
+      <PageHeader
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Purchase Successful" },
+        ]}
+      />
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
         <Empty className="max-w-md">
           <EmptyHeader>
             <EmptyMedia variant="icon">

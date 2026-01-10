@@ -34,13 +34,15 @@ export function usePurchaseCheckout() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(request),
-        }
+          credentials: "include",
+        },
       );
 
       if (!response.ok) {
         const errorData = (await response.json()) as CheckoutError;
         throw new Error(
-          errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`
+          errorData.error?.message ||
+            `HTTP ${response.status}: ${response.statusText}`,
         );
       }
 
