@@ -35,6 +35,7 @@ import {
   TEST_WEBHOOK_SECRET,
   createRawEventPayload,
 } from "./fixtures/stripe-events";
+import { fulfillCheckout } from "../src/routes/webhooks/stripe";
 
 // =============================================================================
 // Error Classification Tests
@@ -562,5 +563,185 @@ describe("Webhook Signature Verification", () => {
         TEST_WEBHOOK_SECRET
       );
     }).toThrow();
+  });
+});
+
+// =============================================================================
+// Credit Fulfillment Tests
+// =============================================================================
+
+describe("Credit Fulfillment", () => {
+  /**
+   * Create a mock database for testing fulfillment
+   */
+  function createMockDb(options: {
+    insertShouldFail?: boolean;
+    insertError?: string;
+  } = {}) {
+    const insertedValues: unknown[] = [];
+
+    return {
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockImplementation((values: unknown) => {
+          if (options.insertShouldFail) {
+            throw new Error(options.insertError ?? "DB error");
+          }
+          insertedValues.push(values);
+          return Promise.resolve();
+        }),
+      }),
+      // Expose for assertions
+      _insertedValues: insertedValues,
+    };
+  }
+
+  describe("fulfillCheckout", () => {
+    it("adds credits for valid paid checkout", async () => {
+      const mockDb = createMockDb();
+      const event = createCheckoutCompletedEvent();
+      const session = event.data.object as Stripe.Checkout.Session;
+      const metadata = {
+        photographer_id: MOCK_IDS.photographer,
+        credits: "100",
+        package_name: "starter",
+      };
+
+      const result = await fulfillCheckout(mockDb as never, session, metadata);
+
+      expect(result.success).toBe(true);
+      expect(result.reason).toBe("fulfilled");
+      expect(mockDb.insert).toHaveBeenCalledOnce();
+      expect(mockDb._insertedValues[0]).toMatchObject({
+        photographerId: MOCK_IDS.photographer,
+        amount: 100,
+        type: "purchase",
+        stripeSessionId: session.id,
+      });
+      // Check expiry is approximately 6 months in the future
+      const inserted = mockDb._insertedValues[0] as { expiresAt: string };
+      const sixMonthsFromNow = new Date();
+      sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+      const insertedDate = new Date(inserted.expiresAt);
+      const timeDiff = Math.abs(
+        insertedDate.getTime() - sixMonthsFromNow.getTime()
+      );
+      expect(timeDiff).toBeLessThan(60000); // Within 1 minute
+    });
+
+    it("skips unpaid sessions", async () => {
+      const mockDb = createMockDb();
+      const event = createCheckoutCompletedEvent({ payment_status: "unpaid" });
+      const session = event.data.object as Stripe.Checkout.Session;
+      const metadata = {
+        photographer_id: MOCK_IDS.photographer,
+        credits: "100",
+      };
+
+      const result = await fulfillCheckout(mockDb as never, session, metadata);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe("unpaid");
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it("rejects missing photographer_id", async () => {
+      const mockDb = createMockDb();
+      const event = createCheckoutCompletedEvent();
+      const session = event.data.object as Stripe.Checkout.Session;
+      const metadata = {
+        credits: "100",
+        // missing photographer_id
+      };
+
+      const result = await fulfillCheckout(mockDb as never, session, metadata);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe("missing_photographer_id");
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it("rejects missing credits", async () => {
+      const mockDb = createMockDb();
+      const event = createCheckoutCompletedEvent();
+      const session = event.data.object as Stripe.Checkout.Session;
+      const metadata = {
+        photographer_id: MOCK_IDS.photographer,
+        // missing credits
+      };
+
+      const result = await fulfillCheckout(mockDb as never, session, metadata);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe("missing_credits");
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it("rejects invalid credits value", async () => {
+      const mockDb = createMockDb();
+      const event = createCheckoutCompletedEvent();
+      const session = event.data.object as Stripe.Checkout.Session;
+      const metadata = {
+        photographer_id: MOCK_IDS.photographer,
+        credits: "not-a-number",
+      };
+
+      const result = await fulfillCheckout(mockDb as never, session, metadata);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe("invalid_credits");
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it("rejects zero credits", async () => {
+      const mockDb = createMockDb();
+      const event = createCheckoutCompletedEvent();
+      const session = event.data.object as Stripe.Checkout.Session;
+      const metadata = {
+        photographer_id: MOCK_IDS.photographer,
+        credits: "0",
+      };
+
+      const result = await fulfillCheckout(mockDb as never, session, metadata);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe("invalid_credits");
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it("handles duplicate webhook (unique constraint violation)", async () => {
+      const mockDb = createMockDb({
+        insertShouldFail: true,
+        insertError: "duplicate key value violates unique constraint",
+      });
+      const event = createCheckoutCompletedEvent();
+      const session = event.data.object as Stripe.Checkout.Session;
+      const metadata = {
+        photographer_id: MOCK_IDS.photographer,
+        credits: "100",
+      };
+
+      const result = await fulfillCheckout(mockDb as never, session, metadata);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe("duplicate");
+    });
+
+    it("handles other DB errors", async () => {
+      const mockDb = createMockDb({
+        insertShouldFail: true,
+        insertError: "Foreign key constraint violation",
+      });
+      const event = createCheckoutCompletedEvent();
+      const session = event.data.object as Stripe.Checkout.Session;
+      const metadata = {
+        photographer_id: MOCK_IDS.photographer,
+        credits: "100",
+      };
+
+      const result = await fulfillCheckout(mockDb as never, session, metadata);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe("db_error");
+    });
   });
 });

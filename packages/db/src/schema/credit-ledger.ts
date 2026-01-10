@@ -1,4 +1,11 @@
-import { pgTable, text, integer, index, uuid } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  integer,
+  index,
+  uuid,
+  unique,
+} from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { timestamptz, createdAtCol } from "./common";
 import { photographers } from "./photographers";
@@ -28,6 +35,8 @@ export const creditLedger = pgTable(
       table.expiresAt
     ),
     index("credit_ledger_stripe_session_idx").on(table.stripeSessionId),
+    // Unique constraint for idempotency - prevents duplicate credit grants
+    unique("credit_ledger_stripe_session_unique").on(table.stripeSessionId),
   ]
 );
 
