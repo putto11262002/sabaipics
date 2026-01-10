@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router";
+import { Routes, Route, Navigate, Outlet } from "react-router";
 import { SignedIn, SignedOut } from "@sabaipics/auth/react";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { ConsentGate } from "./components/auth/ConsentGate";
@@ -29,15 +29,17 @@ export default function App() {
 
       {/* Credits routes (auth + consent required, no sidebar) */}
       <Route
-        path="/credits/packages"
         element={
           <ProtectedRoute>
             <ConsentGate>
-              <CreditPackagesPage />
+              <Outlet />
             </ConsentGate>
           </ProtectedRoute>
         }
-      />
+      >
+        <Route path="/credits/packages" element={<CreditPackagesPage />} />
+        <Route path="/credits/success" element={<CreditSuccessPage />} />
+      </Route>
 
       {/* Protected routes (auth + consent required) */}
       <Route
@@ -50,7 +52,6 @@ export default function App() {
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/credits/success" element={<CreditSuccessPage />} />
         {/* Future: /events, /settings, etc. */}
       </Route>
 
