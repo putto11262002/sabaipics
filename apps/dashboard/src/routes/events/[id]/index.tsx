@@ -241,9 +241,127 @@ export default function EventDetailPage() {
       {/* Tab Content */}
       {/* Details Tab */}
       {activeTab === "details" && (
-        <div className="space-y-8">
-          {/* Event Information (first) */}
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Left Column: QR Code + Slideshow */}
+          <div className="md:col-span-1 space-y-6">
+            {/* QR Code Section */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4">QR Code</h3>
+              <div className="space-y-4">
+                <div className="flex justify-center">
+                  {event.qrCodeUrl ? (
+                    <div className="w-48 overflow-hidden rounded-lg border bg-white p-3">
+                      <img
+                        src={event.qrCodeUrl}
+                        alt="Event QR Code"
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-48 w-48 items-center justify-center rounded-lg border bg-muted">
+                      <p className="text-sm text-muted-foreground">QR Unavailable</p>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground text-center">
+                    Share this QR code with guests to search for their photos
+                  </p>
+
+                  {/* Search URL */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Search URL</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <a
+                        href={`${window.location.origin}/search/${event.accessCode}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 text-sm text-primary hover:underline truncate"
+                      >
+                        {window.location.origin}/search/{event.accessCode}
+                      </a>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => handleCopyLink(event.accessCode)}
+                        title="Copy search link"
+                      >
+                        <Copy className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {event.qrCodeUrl && (
+                    <Button
+                      onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <Download className="mr-2 size-4" />
+                      Download QR Code
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Slideshow Section */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Slideshow</h3>
+              <div className="space-y-4">
+                <div className="flex justify-center">
+                  <div className="flex h-48 w-48 items-center justify-center rounded-lg border bg-muted">
+                    <div className="text-center">
+                      <Presentation className="size-12 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">Preview Coming Soon</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground text-center">
+                    View all event photos in slideshow mode
+                  </p>
+
+                  {/* Slideshow URL */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Slideshow URL</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <a
+                        href={`${window.location.origin}/slideshow/${event.accessCode}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 text-sm text-primary hover:underline truncate"
+                      >
+                        {window.location.origin}/slideshow/{event.accessCode}
+                      </a>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => copyToClipboard(`${window.location.origin}/slideshow/${event.accessCode}`)}
+                        title="Copy slideshow link"
+                      >
+                        <Copy className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled
+                  >
+                    <ExternalLink className="mr-2 size-4" />
+                    Open Slideshow (Coming Soon)
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Event Information */}
+          <div className="md:col-span-2">
             <h3 className="text-lg font-semibold mb-4">Event Information</h3>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               {/* Event Name with Status Badge */}
@@ -301,123 +419,6 @@ export default function EventDetailPage() {
                   )}
                 </p>
               </div>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* QR Code Section */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">QR Code</h3>
-            <div className="flex flex-col md:flex-row items-start gap-4">
-            <div className="flex-shrink-0 w-full md:w-auto flex justify-center md:block">
-              {event.qrCodeUrl ? (
-                <div className="w-48 overflow-hidden rounded-lg border bg-white p-3">
-                  <img
-                    src={event.qrCodeUrl}
-                    alt="Event QR Code"
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="flex h-48 w-48 items-center justify-center rounded-lg border bg-muted">
-                  <p className="text-sm text-muted-foreground">QR Unavailable</p>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-1 flex-col justify-center gap-3 w-full md:w-auto">
-              <p className="text-sm text-muted-foreground">
-                Share this QR code with guests to search for their photos
-              </p>
-
-              {/* Search URL */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Search URL</label>
-                <div className="flex items-center gap-2 mt-1">
-                  <a
-                    href={`${window.location.origin}/search/${event.accessCode}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 text-sm text-primary hover:underline truncate"
-                  >
-                    {window.location.origin}/search/{event.accessCode}
-                  </a>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => handleCopyLink(event.accessCode)}
-                    title="Copy search link"
-                  >
-                    <Copy className="size-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {event.qrCodeUrl && (
-                <Button
-                  onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}
-                  variant="outline"
-                  className="w-fit"
-                >
-                  <Download className="mr-2 size-4" />
-                  Download QR Code
-                </Button>
-              )}
-            </div>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Slideshow Section */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Slideshow</h3>
-            <div className="flex flex-col md:flex-row items-start gap-4">
-            <div className="flex-shrink-0 w-full md:w-auto flex justify-center md:block">
-              <div className="flex h-48 w-48 items-center justify-center rounded-lg border bg-muted">
-                <div className="text-center">
-                  <Presentation className="size-12 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">Preview Coming Soon</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-1 flex-col justify-center gap-3 w-full md:w-auto">
-              <p className="text-sm text-muted-foreground">
-                View all event photos in slideshow mode
-              </p>
-
-              {/* Slideshow URL */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Slideshow URL</label>
-                <div className="flex items-center gap-2 mt-1">
-                  <a
-                    href={`${window.location.origin}/slideshow/${event.accessCode}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 text-sm text-primary hover:underline truncate"
-                  >
-                    {window.location.origin}/slideshow/{event.accessCode}
-                  </a>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => copyToClipboard(`${window.location.origin}/slideshow/${event.accessCode}`)}
-                    title="Copy slideshow link"
-                  >
-                    <Copy className="size-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <Button
-                variant="outline"
-                className="w-fit"
-                disabled
-              >
-                <ExternalLink className="mr-2 size-4" />
-                Open Slideshow (Coming Soon)
-              </Button>
-            </div>
             </div>
           </div>
         </div>
