@@ -40,7 +40,7 @@ Cleanup
 
 ## Tasks
 
-### T-1 — Create database schema (all domain tables)
+### [x] T-1 — Create database schema (all domain tables)
 - **Type:** `scaffold`
 - **StoryRefs:** All (foundation)
 - **Refs:** `docs/logs/BS_0001_S-1/plan/final.md#database-schema`
@@ -63,7 +63,7 @@ Cleanup
 
 ---
 
-### T-2 — Implement requirePhotographer middleware
+### [x] T-2 — Implement requirePhotographer middleware
 - **Type:** `scaffold`
 - **StoryRefs:** All (foundation)
 - **Goal:** Create middleware that verifies Clerk auth AND checks photographer exists in DB. Attach photographer to request context.
@@ -84,7 +84,7 @@ Cleanup
 
 ---
 
-### T-3 — Admin credit packages API
+### [ ] T-3 — Admin credit packages API
 - **Type:** `scaffold`
 - **StoryRefs:** US-4 (foundation for credit purchase)
 - **Goal:** Create admin endpoints to manage credit packages: GET/POST/PATCH /admin/credit-packages.
@@ -105,7 +105,7 @@ Cleanup
 
 ---
 
-### T-4 — Clerk webhook handler for user.created
+### [ ] T-4 — Clerk webhook handler for user.created
 - **Type:** `feature`
 - **StoryRefs:** US-1
 - **Goal:** Handle Clerk `user.created` webhook to create photographer record in DB with email from Clerk user object.
@@ -126,7 +126,7 @@ Cleanup
 
 ---
 
-### T-5 — PDPA consent API
+### [ ] T-5 — PDPA consent API
 - **Type:** `feature`
 - **StoryRefs:** US-1
 - **Goal:** Create `POST /consent` endpoint to record PDPA consent and update photographer record.
@@ -147,7 +147,7 @@ Cleanup
 
 ---
 
-### T-6 — Signup UI + PDPA consent modal
+### [ ] T-6 — Signup UI + PDPA consent modal
 - **Type:** `feature`
 - **StoryRefs:** US-1, US-2
 - **Goal:** Create photographer signup page with Clerk components and PDPA consent modal that blocks dashboard access until accepted.
@@ -169,7 +169,7 @@ Cleanup
 
 ---
 
-### T-7 — Dashboard API
+### [ ] T-7 — Dashboard API
 - **Type:** `feature`
 - **StoryRefs:** US-3
 - **Goal:** Create `GET /dashboard` endpoint returning credit balance, events list, and stats.
@@ -189,7 +189,7 @@ Cleanup
 
 ---
 
-### T-8 — Credit packages public API
+### [ ] T-8 — Credit packages public API
 - **Type:** `feature`
 - **StoryRefs:** US-4
 - **Goal:** Create `GET /credit-packages` endpoint returning active packages for purchase.
@@ -207,7 +207,7 @@ Cleanup
 
 ---
 
-### T-9 — Stripe checkout API
+### [ ] T-9 — Stripe checkout API
 - **Type:** `feature`
 - **StoryRefs:** US-4
 - **Refs:** `docs/logs/BS_0001_S-1/research/stripe-credit-flow.md`
@@ -232,7 +232,7 @@ Cleanup
 
 ---
 
-### T-10 — Stripe webhook handler
+### [ ] T-10 — Stripe webhook handler
 - **Type:** `integration`
 - **StoryRefs:** US-4
 - **Refs:** `docs/logs/BS_0001_S-1/research/stripe-credit-flow.md`
@@ -257,7 +257,7 @@ Cleanup
 
 ---
 
-### T-11 — Dashboard UI
+### [ ] T-11 — Dashboard UI
 - **Type:** `feature`
 - **StoryRefs:** US-3
 - **Goal:** Create dashboard page showing credit balance, event list, and action buttons.
@@ -279,7 +279,7 @@ Cleanup
 
 ---
 
-### T-12 — Credit packages page UI
+### [ ] T-12 — Credit packages page UI
 - **Type:** `feature`
 - **StoryRefs:** US-4
 - **Goal:** Create dedicated `/credits/packages` page for browsing and purchasing credit packages.
@@ -300,7 +300,7 @@ Cleanup
 
 ---
 
-### T-13 — Events API (CRUD + QR generation)
+### [ ] T-13 — Events API (CRUD + QR generation)
 - **Type:** `feature`
 - **StoryRefs:** US-5, US-6
 - **Refs:** `docs/logs/BS_0001_S-1/research/qr-code-library.md`
@@ -326,7 +326,7 @@ Cleanup
 
 ---
 
-### T-14 — QR code generation library
+### [ ] T-14 — QR code generation library
 - **Type:** `scaffold`
 - **StoryRefs:** US-5, US-6
 - **Refs:** `docs/logs/BS_0001_S-1/research/qr-code-library.md`
@@ -346,7 +346,7 @@ Cleanup
 
 ---
 
-### T-15 — Events UI (list + create modal + QR display)
+### [ ] T-15 — Events UI (list + create modal + QR display)
 - **Type:** `feature`
 - **StoryRefs:** US-5, US-6
 - **Goal:** Create events list on dashboard, event creation modal, and QR code display/download.
@@ -367,7 +367,7 @@ Cleanup
 
 ---
 
-### T-16 — Photo upload API (validation + normalization + credit deduction)
+### [ ] T-16 — Photo upload API (validation + normalization + credit deduction)
 - **Type:** `feature`
 - **StoryRefs:** US-7
 - **Refs:** `docs/logs/BS_0001_S-1/research/cf-upload-limits.md`
@@ -397,7 +397,7 @@ Cleanup
 
 ---
 
-### T-17 — Photo queue consumer (Rekognition indexing)
+### [ ] T-17 — Photo queue consumer (Rekognition indexing)
 - **Type:** `feature`
 - **StoryRefs:** US-8
 - **Refs:** `docs/logs/BS_0001_S-1/research/heic-rekognition.md`
@@ -426,7 +426,7 @@ Cleanup
 
 ---
 
-### T-18 — Gallery API
+### [ ] T-18 — Gallery API
 - **Type:** `feature`
 - **StoryRefs:** US-9
 - **Goal:** Create `GET /events/:id/photos` endpoint returning paginated photos with CF Images thumbnail URLs.
@@ -447,7 +447,7 @@ Cleanup
 
 ---
 
-### T-19 — Upload dropzone + Gallery UI
+### [ ] T-19 — Upload dropzone + Gallery UI
 - **Type:** `feature`
 - **StoryRefs:** US-7, US-9
 - **Goal:** Create upload dropzone with progress tracking and photo gallery grid with lightbox.
@@ -474,7 +474,7 @@ Cleanup
 
 ---
 
-### T-20 — Rekognition cleanup cron job
+### [ ] T-20 — Rekognition cleanup cron job
 - **Type:** `hardening`
 - **StoryRefs:** None (ops)
 - **Goal:** Create cron job to delete Rekognition collections for events older than 30 days.
