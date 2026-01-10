@@ -10,7 +10,7 @@
 	"scripts": {
 		"dev": "node scripts/dev-tunnel.js",
 		"dev:local": "wrangler dev",
-		"build": "pnpm cf-typegen && tsc",
+		"build": "tsc",
 		"deploy:staging": "node scripts/deploy.js staging",
 		"deploy:prod": "node scripts/deploy.js production",
 		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
