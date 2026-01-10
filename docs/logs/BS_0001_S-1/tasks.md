@@ -84,7 +84,7 @@ Cleanup
 
 ---
 
-### [ ] T-3 — Admin credit packages API
+### [x] T-3 — Admin credit packages API
 - **Type:** `scaffold`
 - **StoryRefs:** US-4 (foundation for credit purchase)
 - **Goal:** Create admin endpoints to manage credit packages: GET/POST/PATCH /admin/credit-packages.

@@ -6,6 +6,7 @@ import { createDb, type Database } from "@sabaipics/db";
 import { authRouter } from "./routes/auth";
 import { webhookRouter } from "./routes/webhooks";
 import { dbTestRouter } from "./routes/db-test";
+import { adminRouter } from "./routes/admin";
 
 // Queue consumer
 import { queue } from "./queue/photo-consumer";
@@ -52,6 +53,8 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
     c.set("db", () => createDb(c.env.DATABASE_URL));
     return next();
   })
+  // Admin routes - API key auth, no Clerk (must be before Clerk middleware)
+  .route("/admin", adminRouter)
   .use("/*", createClerkAuth())
   .get("/", (c) => c.text("SabaiPics API"))
   .get("/health", (c) => c.json({ status: "ok", timestamp: Date.now() }))
