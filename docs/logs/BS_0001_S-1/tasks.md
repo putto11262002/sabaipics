@@ -298,7 +298,7 @@ Cleanup
 ---
 
 ### T-12 — Credit packages page UI
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-4
 - **Goal:** Create dedicated `/credits/packages` page for browsing and purchasing credit packages.
