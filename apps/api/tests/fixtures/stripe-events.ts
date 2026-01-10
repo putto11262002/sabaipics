@@ -15,7 +15,7 @@ export const MOCK_IDS = {
   customer: "cus_test123456",
   session: "cs_test_session_123",
   paymentIntent: "pi_test_intent_123",
-  photographer: "photo_test_123",
+  photographer: "550e8400-e29b-41d4-a716-446655440000", // Valid UUID for testing
   event: "evt_test_event_123",
 } as const;
 
