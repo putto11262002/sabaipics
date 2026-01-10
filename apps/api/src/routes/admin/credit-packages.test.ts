@@ -98,8 +98,12 @@ describe("Admin Auth", () => {
     const res = await client["credit-packages"].$get();
 
     expect(res.status).toBe(401);
-    const body = (await res.json()) as unknown as { error: { code: string } };
-    expect(body.error.code).toBe("UNAUTHENTICATED");
+    const body = await res.json();
+    if ("error" in body) {
+      expect(body.error.code).toBe("UNAUTHENTICATED");
+    } else {
+      throw new Error("Expected error response");
+    }
   });
 
   it("rejects request with invalid API key", async () => {
@@ -111,8 +115,12 @@ describe("Admin Auth", () => {
     });
 
     expect(res.status).toBe(401);
-    const body = (await res.json()) as unknown as { error: { code: string } };
-    expect(body.error.code).toBe("UNAUTHENTICATED");
+    const body = await res.json();
+    if ("error" in body) {
+      expect(body.error.code).toBe("UNAUTHENTICATED");
+    } else {
+      throw new Error("Expected error response");
+    }
   });
 
   it("accepts request with valid API key", async () => {
@@ -143,7 +151,11 @@ describe("GET /credit-packages", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.data).toEqual(mockPackages);
+    if ("data" in body) {
+      expect(body.data).toEqual(mockPackages);
+    } else {
+      throw new Error("Expected data response");
+    }
     expect(mockDb.orderBy).toHaveBeenCalled();
   });
 
@@ -159,7 +171,11 @@ describe("GET /credit-packages", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.data).toEqual([]);
+    if ("data" in body) {
+      expect(body.data).toEqual([]);
+    } else {
+      throw new Error("Expected data response");
+    }
   });
 });
 
@@ -201,7 +217,11 @@ describe("POST /credit-packages", () => {
 
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.data).toEqual(newPackage);
+    if ("data" in body) {
+      expect(body.data).toEqual(newPackage);
+    } else {
+      throw new Error("Expected data response");
+    }
   });
 
   it("creates package with defaults (active=true, sortOrder=0)", async () => {
@@ -260,8 +280,12 @@ describe("PATCH /credit-packages/:id", () => {
     );
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: { name: string } };
-    expect(body.data.name).toBe("Updated Name");
+    const body = await res.json();
+    if ("data" in body) {
+      expect(body.data.name).toBe("Updated Name");
+    } else {
+      throw new Error("Expected data response");
+    }
   });
 
   it("updates multiple fields", async () => {
@@ -293,8 +317,12 @@ describe("PATCH /credit-packages/:id", () => {
     );
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: typeof updatedPackage };
-    expect(body.data).toEqual(updatedPackage);
+    const body = await res.json();
+    if ("data" in body) {
+      expect(body.data).toEqual(updatedPackage);
+    } else {
+      throw new Error("Expected data response");
+    }
   });
 
   it("returns 404 for non-existent package", async () => {
@@ -314,7 +342,11 @@ describe("PATCH /credit-packages/:id", () => {
     );
 
     expect(res.status).toBe(404);
-    const body = (await res.json()) as unknown as { error: { code: string } };
-    expect(body.error.code).toBe("NOT_FOUND");
+    const body = await res.json();
+    if ("error" in body) {
+      expect(body.error.code).toBe("NOT_FOUND");
+    } else {
+      throw new Error("Expected error response");
+    }
   });
 });

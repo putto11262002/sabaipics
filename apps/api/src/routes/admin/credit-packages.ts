@@ -56,9 +56,8 @@ function notFoundError(message: string) {
 // =============================================================================
 
 export const adminCreditPackagesRouter = new Hono<Env>()
-  .use("/*", requireAdmin())
   // GET / - List all packages
-  .get("/", async (c) => {
+  .get("/", requireAdmin(), async (c) => {
     const db = c.var.db();
     const packages = await db
       .select()
@@ -70,6 +69,7 @@ export const adminCreditPackagesRouter = new Hono<Env>()
   // POST / - Create package
   .post(
     "/",
+    requireAdmin(),
     zValidator("json", createPackageSchema),
     async (c) => {
       const data = c.req.valid("json");
@@ -87,11 +87,12 @@ export const adminCreditPackagesRouter = new Hono<Env>()
         .returning();
 
       return c.json({ data: created }, 201);
-    }
+    },
   )
   // PATCH /:id - Update package
   .patch(
     "/:id",
+    requireAdmin(),
     zValidator("json", updatePackageSchema),
     zValidator("param", z.object({ id: z.string().uuid() })),
     async (c) => {

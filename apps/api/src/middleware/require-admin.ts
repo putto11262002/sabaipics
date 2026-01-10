@@ -1,5 +1,5 @@
-import type { MiddlewareHandler } from "hono";
-import { createAuthError } from "@sabaipics/auth/errors";
+import type { MiddlewareHandler, TypedResponse } from "hono";
+import { AuthErrorResponse, createAuthError } from "@sabaipics/auth/errors";
 import type { Env } from "../types";
 
 /**
@@ -10,21 +10,26 @@ import type { Env } from "../types";
  *
  * @returns 401 if API key is missing or invalid
  */
-export function requireAdmin(): MiddlewareHandler<Env> {
+export function requireAdmin(): MiddlewareHandler<
+  Env,
+  string,
+  {},
+  TypedResponse<AuthErrorResponse, 401, "json">
+> {
   return async (c, next) => {
     const apiKey = c.req.header("X-Admin-API-Key");
 
     if (!apiKey) {
       return c.json(
         createAuthError("UNAUTHENTICATED", "Admin API key required"),
-        401
+        401,
       );
     }
 
     if (apiKey !== c.env.ADMIN_API_KEY) {
       return c.json(
         createAuthError("UNAUTHENTICATED", "Invalid admin API key"),
-        401
+        401,
       );
     }
 
