@@ -8,6 +8,7 @@ import { dbTestRouter } from "./routes/db-test";
 import { adminRouter } from "./routes/admin";
 import { consentRouter } from "./routes/consent";
 import { dashboardRouter } from "./routes/dashboard/route";
+import { creditsRouter } from "./routes/credits";
 import type { Bindings, Variables } from "./types";
 
 // Queue consumer
@@ -52,6 +53,8 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
   })
   // Admin routes - API key auth, no Clerk (must be before Clerk middleware)
   .route("/admin", adminRouter)
+  // Public credit packages - no auth required
+  .route("/credit-packages", creditsRouter)
   .use("/*", createClerkAuth())
   .get("/", (c) => c.text("SabaiPics API"))
   .get("/health", (c) => c.json({ status: "ok", timestamp: Date.now() }))
