@@ -175,7 +175,7 @@ export const creditsRouter = new Hono<Env>()
     requireConsent(),
     async (c) => {
       const sessionId = c.req.param("sessionId");
-      const auth = c.get("auth");
+      const photographer = c.var.photographer;
       const db = c.var.db();
 
       if (!sessionId) {
@@ -195,7 +195,7 @@ export const creditsRouter = new Hono<Env>()
         .where(
           and(
             eq(creditLedger.stripeSessionId, sessionId),
-            eq(creditLedger.photographerId, auth.userId),
+            eq(creditLedger.photographerId, photographer.id),
             eq(creditLedger.type, "purchase")
           )
         )
