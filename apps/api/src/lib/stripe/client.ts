@@ -33,8 +33,6 @@ export function createStripeClient(env: StripeEnv): Stripe {
   }
 
   return new Stripe(env.STRIPE_SECRET_KEY, {
-    // Use latest API version - update periodically
-    apiVersion: "2025-11-17.clover",
     // Required for Cloudflare Workers (no Node.js http module)
     httpClient: Stripe.createFetchHttpClient(),
     // Auto-retry with exponential backoff for transient errors
