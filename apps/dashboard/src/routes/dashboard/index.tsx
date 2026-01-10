@@ -24,7 +24,6 @@ import {
 } from "@sabaipics/ui/components/card";
 import {
 	Empty,
-	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
@@ -60,19 +59,6 @@ export function DashboardPage() {
 						Buy Credits
 					</Link>
 				</Button>
-				<TooltipProvider>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button variant="outline" size="sm" disabled>
-								<Calendar className="mr-2 size-4" />
-								Create Event
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent>
-							<p>Event creation coming soon</p>
-						</TooltipContent>
-					</Tooltip>
-				</TooltipProvider>
 			</PageHeader>
 
 			<div className="flex flex-1 flex-col gap-4 p-4">
@@ -201,83 +187,75 @@ export function DashboardPage() {
 						</div>
 
 						{/* Events Section */}
-						<Card>
-							<CardHeader>
-								<CardTitle>Recent Events</CardTitle>
-								<CardDescription>
-									Your last {dashboardData.events.length} event
-									{dashboardData.events.length !== 1 ? "s" : ""}
-								</CardDescription>
-							</CardHeader>
-							<CardContent>
-								{dashboardData.events.length === 0 ? (
-									<Empty>
-										<EmptyHeader>
-											<EmptyMedia variant="icon">
-												<Calendar className="size-12 text-muted-foreground" />
-											</EmptyMedia>
-											<EmptyTitle>No events yet</EmptyTitle>
-											<EmptyDescription>
-												Create your first event to start organizing and sharing photos
-											</EmptyDescription>
-										</EmptyHeader>
-										<EmptyContent>
-											<TooltipProvider>
-												<Tooltip>
-													<TooltipTrigger asChild>
-														<Button size="sm" disabled>
-															<Calendar className="mr-2 size-4" />
-															Create Event
-														</Button>
-													</TooltipTrigger>
-													<TooltipContent>
-														<p>Event creation coming soon</p>
-													</TooltipContent>
-												</Tooltip>
-											</TooltipProvider>
-										</EmptyContent>
-									</Empty>
-								) : (
-									<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-										{dashboardData.events.map((event) => (
-											<Card key={event.id} className="@container/card">
-												<CardHeader>
-													<CardTitle className="text-lg">{event.name}</CardTitle>
-													<CardDescription>
-														Created {formatDistanceToNow(parseISO(event.createdAt))}{" "}
-														ago
-													</CardDescription>
-												</CardHeader>
-												<CardContent>
-													<div className="grid grid-cols-2 gap-4">
-														<div className="flex flex-col items-center">
-															<div className="text-3xl font-bold tabular-nums">
-																{event.photoCount}
-															</div>
-															<div className="text-sm text-muted-foreground">
-																Photos
-															</div>
-														</div>
-														<div className="flex flex-col items-center">
-															<div className="text-3xl font-bold tabular-nums">
-																{event.faceCount}
-															</div>
-															<div className="text-sm text-muted-foreground">
-																Faces
-															</div>
-														</div>
+						<div className="space-y-4">
+							<div className="flex items-start justify-between">
+								<div>
+									<h2 className="text-lg font-semibold">Recent Events</h2>
+									<p className="text-sm text-muted-foreground">
+										Your last {dashboardData.events.length} event
+										{dashboardData.events.length !== 1 ? "s" : ""}
+									</p>
+								</div>
+								<TooltipProvider>
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<Button variant="outline" size="sm" disabled>
+												<Calendar className="mr-2 size-4" />
+												Create Event
+											</Button>
+										</TooltipTrigger>
+										<TooltipContent>
+											<p>Event creation coming soon</p>
+										</TooltipContent>
+									</Tooltip>
+								</TooltipProvider>
+							</div>
+
+							{dashboardData.events.length === 0 ? (
+								<Empty>
+									<EmptyHeader>
+										<EmptyMedia variant="icon">
+											<Calendar className="size-12 text-muted-foreground" />
+										</EmptyMedia>
+										<EmptyTitle>No events yet</EmptyTitle>
+										<EmptyDescription>
+											Create your first event to start organizing and sharing photos
+										</EmptyDescription>
+									</EmptyHeader>
+								</Empty>
+							) : (
+								<div className="space-y-2">
+									{dashboardData.events.map((event) => (
+										<div
+											key={event.id}
+											className="flex items-center justify-between rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors"
+										>
+											<div className="flex-1 space-y-1">
+												<div className="font-semibold">{event.name}</div>
+												<div className="text-sm text-muted-foreground">
+													Created {formatDistanceToNow(parseISO(event.createdAt))} ago •
+													Expires {formatDistanceToNow(parseISO(event.expiresAt))} from now
+												</div>
+											</div>
+											<div className="flex gap-6 text-center">
+												<div>
+													<div className="text-2xl font-bold tabular-nums">
+														{event.photoCount}
 													</div>
-												</CardContent>
-												<CardFooter className="text-xs text-muted-foreground">
-													Expires {formatDistanceToNow(parseISO(event.expiresAt))}{" "}
-													from now
-												</CardFooter>
-											</Card>
-										))}
-									</div>
-								)}
-							</CardContent>
-						</Card>
+													<div className="text-xs text-muted-foreground">Photos</div>
+												</div>
+												<div>
+													<div className="text-2xl font-bold tabular-nums">
+														{event.faceCount}
+													</div>
+													<div className="text-xs text-muted-foreground">Faces</div>
+												</div>
+											</div>
+										</div>
+									))}
+								</div>
+							)}
+						</div>
 					</>
 				)}
 			</div>
