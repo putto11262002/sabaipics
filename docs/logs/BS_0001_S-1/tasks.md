@@ -247,7 +247,7 @@ Cleanup
 ---
 
 ### T-10 — Stripe webhook handler
-- [ ] Done
+- [x] Done
 - **PR:** https://github.com/putto11262002/sabaipics/pull/17
 - **Type:** `integration`
 - **StoryRefs:** US-4
@@ -274,7 +274,7 @@ Cleanup
 ---
 
 ### T-11 — Dashboard UI
-- [ ] Done
+- [x] Done
 - **PR:** https://github.com/putto11262002/sabaipics/pull/19
 - **Type:** `feature`
 - **StoryRefs:** US-3
@@ -321,7 +321,7 @@ Cleanup
 ---
 
 ### T-13 — Events API (CRUD + QR generation)
-- [ ] Done
+- [x] Done
 - **PR:** https://github.com/putto11262002/sabaipics/pull/22
 - **Type:** `feature`
 - **StoryRefs:** US-5, US-6
