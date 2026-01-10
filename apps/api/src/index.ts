@@ -6,6 +6,7 @@ import { authRouter } from "./routes/auth";
 import { webhookRouter } from "./routes/webhooks";
 import { dbTestRouter } from "./routes/db-test";
 import { adminRouter } from "./routes/admin";
+import { consentRouter } from "./routes/consent";
 import type { Bindings, Variables } from "./types";
 
 // Queue consumer
@@ -54,7 +55,8 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
   .get("/", (c) => c.text("SabaiPics API"))
   .get("/health", (c) => c.json({ status: "ok", timestamp: Date.now() }))
   .route("/db-test", dbTestRouter)
-  .route("/auth", authRouter);
+  .route("/auth", authRouter)
+  .route("/consent", consentRouter);
 // Future protected routes:
 // .use('/events/*', requireAuth())
 // .route('/events', eventsRouter)
