@@ -50,3 +50,8 @@ STRIPE_WEBHOOK_SECRET=whsec_xxxxx
 # Access Token: Messaging API → Channel access token (long-lived) → Issue
 LINE_CHANNEL_SECRET=xxxxx
 LINE_CHANNEL_ACCESS_TOKEN=xxxxx
+
+# App Base URL for QR code generation
+# Local development: Use your local frontend URL
+# This is used to generate QR codes that encode event search URLs
+APP_BASE_URL=http://localhost:5173
