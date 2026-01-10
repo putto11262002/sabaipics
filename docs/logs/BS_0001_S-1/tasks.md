@@ -126,7 +126,7 @@ Cleanup
 
 ---
 
-### [ ] T-5 — PDPA consent API
+### [x] T-5 — PDPA consent API
 - **Type:** `feature`
 - **StoryRefs:** US-1
 - **Goal:** Create `POST /consent` endpoint to record PDPA consent and update photographer record.
