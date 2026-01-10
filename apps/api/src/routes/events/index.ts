@@ -12,6 +12,10 @@ import type { PhotoJob } from "../../types/photo-job";
 import { generateEventQR } from "../../lib/qr";
 import { generateAccessCode } from "./access-code";
 import {
+  normalizeImage,
+  DEFAULT_NORMALIZE_OPTIONS,
+} from "../../lib/images/normalize";
+import {
   createEventSchema,
   eventParamsSchema,
   listEventsQuerySchema,
@@ -384,6 +388,9 @@ export const eventsRouter = new Hono<Env>()
         return c.json(eventExpiredError(), 410);
       }
 
+      // Extract file bytes for normalization (after validation, before deduction)
+      const arrayBuffer = await file.arrayBuffer();
+
       // 2. Check credit balance and deduct within transaction
       let photo: typeof photos.$inferSelect;
 
@@ -447,13 +454,20 @@ export const eventsRouter = new Hono<Env>()
             .insert(photos)
             .values({
               eventId,
-              r2Key: "", // Will be updated after upload
+              r2Key: "", // Temporary, will be set below
               status: "processing",
               faceCount: 0,
             })
             .returning();
 
-          return newPhoto;
+          // Set correct r2Key now that we have photo.id
+          const r2Key = `${eventId}/${newPhoto.id}.jpg`;
+          await tx
+            .update(photos)
+            .set({ r2Key })
+            .where(eq(photos.id, newPhoto.id));
+
+          return { ...newPhoto, r2Key };
         });
       } catch (err) {
         const error = err as Error;
@@ -467,14 +481,31 @@ export const eventsRouter = new Hono<Env>()
         throw err;
       }
 
-      // 3. Upload original file to R2
-      const fileExtension = file.type.split("/")[1] || "jpg";
-      const r2Key = `${eventId}/${photo.id}.${fileExtension}`;
-
+      // 3. Normalize image in-memory (before R2 upload)
+      let normalizedImageBytes: ArrayBuffer;
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        await c.env.PHOTOS_BUCKET.put(r2Key, arrayBuffer, {
-          httpMetadata: { contentType: file.type },
+        normalizedImageBytes = await normalizeImage(
+          arrayBuffer,
+          file.type,
+          c.env.PHOTOS_BUCKET,
+          c.env.PHOTO_R2_BASE_URL,
+          DEFAULT_NORMALIZE_OPTIONS
+        );
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : "unknown error";
+        console.error(`Image normalization failed for photo ${photo.id}: ${reason}`, {
+          photographerId: photographer.id,
+          photoId: photo.id,
+          eventId,
+          creditsDeducted: 1,
+        });
+        return c.json(imageTransformFailedError(reason), 500);
+      }
+
+      // 4. Upload normalized JPEG to R2 (single operation)
+      try {
+        await c.env.PHOTOS_BUCKET.put(photo.r2Key, normalizedImageBytes, {
+          httpMetadata: { contentType: "image/jpeg" },
         });
       } catch (err) {
         const reason = err instanceof Error ? err.message : "unknown error";
@@ -487,75 +518,12 @@ export const eventsRouter = new Hono<Env>()
         return c.json(uploadFailedError(reason), 500);
       }
 
-      // 4. Normalize to JPEG via Cloudflare Images Transform
-      let normalizedImageBytes: ArrayBuffer;
-      try {
-        const r2PublicUrl = `${c.env.PHOTO_R2_BASE_URL}/${r2Key}`;
-
-        const transformResponse = await fetch(r2PublicUrl, {
-          cf: {
-            image: {
-              format: "jpeg",
-              quality: 90,
-              fit: "scale-down",
-              width: 4000,
-              height: 4000,
-            },
-          },
-        });
-
-        if (!transformResponse.ok) {
-          throw new Error(`Transform failed with status ${transformResponse.status}`);
-        }
-
-        normalizedImageBytes = await transformResponse.arrayBuffer();
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : "unknown error";
-        console.error(`Image transformation failed for photo ${photo.id}: ${reason}`, {
-          photographerId: photographer.id,
-          photoId: photo.id,
-          eventId,
-          creditsDeducted: 1,
-        });
-        return c.json(imageTransformFailedError(reason), 500);
-      }
-
-      // 5. Overwrite R2 object with normalized JPEG
-      const normalizedR2Key = `${eventId}/${photo.id}.jpg`;
-      try {
-        await c.env.PHOTOS_BUCKET.put(normalizedR2Key, normalizedImageBytes, {
-          httpMetadata: { contentType: "image/jpeg" },
-        });
-
-        // Delete original if different extension
-        if (r2Key !== normalizedR2Key) {
-          await c.env.PHOTOS_BUCKET.delete(r2Key);
-        }
-
-        // Update photo record with normalized key
-        await db
-          .update(photos)
-          .set({ r2Key: normalizedR2Key })
-          .where(eq(photos.id, photo.id));
-
-        photo.r2Key = normalizedR2Key;
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : "unknown error";
-        console.error(`Failed to store normalized JPEG for photo ${photo.id}: ${reason}`, {
-          photographerId: photographer.id,
-          photoId: photo.id,
-          eventId,
-          creditsDeducted: 1,
-        });
-        return c.json(uploadFailedError(reason), 500);
-      }
-
-      // 6. Enqueue job for face detection
+      // 5. Enqueue job for face detection
       try {
         const job: PhotoJob = {
           photo_id: photo.id,
           event_id: eventId,
-          r2_key: normalizedR2Key,
+          r2_key: photo.r2Key,
         };
         await c.env.PHOTO_QUEUE.send(job);
       } catch (err) {
@@ -571,7 +539,7 @@ export const eventsRouter = new Hono<Env>()
         return c.json(uploadFailedError(`Queue enqueue failed: ${reason}`), 500);
       }
 
-      // 7. Return success response
+      // 6. Return success response
       return c.json(
         {
           data: {

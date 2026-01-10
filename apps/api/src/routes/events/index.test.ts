@@ -12,9 +12,22 @@ import { eventsRouter } from "./index";
 import type { Database } from "@sabaipics/db";
 import type { PhotographerVariables } from "../../middleware";
 
+// Mock the normalizeImage function
+vi.mock("../../lib/images/normalize", () => ({
+  normalizeImage: vi.fn().mockResolvedValue(new ArrayBuffer(1024)),
+  DEFAULT_NORMALIZE_OPTIONS: {
+    format: "jpeg",
+    maxWidth: 4000,
+    maxHeight: 4000,
+    quality: 90,
+    fit: "scale-down",
+  },
+}));
+
 // Minimal R2Bucket type for testing
 type R2Bucket = {
   put: (key: string, value: Uint8Array, options?: { httpMetadata?: { contentType: string } }) => Promise<void>;
+  delete: (key: string) => Promise<void>;
 };
 
 // =============================================================================
@@ -47,6 +60,7 @@ const mockEvent = {
 // Mock R2 bucket factory
 const createMockR2Bucket = () => ({
   put: vi.fn().mockResolvedValue(undefined),
+  delete: vi.fn().mockResolvedValue(undefined),
 });
 
 // Create mock DB functions
@@ -743,7 +757,6 @@ describe("POST /events/:id/photos - Photo Upload", () => {
     hasAuth?: boolean;
     mockBucket?: R2Bucket;
     mockQueue?: { send: ReturnType<typeof vi.fn> };
-    mockFetch?: ReturnType<typeof vi.fn>;
   }) {
     const {
       mockDb = createUploadMockDb(),
@@ -751,10 +764,6 @@ describe("POST /events/:id/photos - Photo Upload", () => {
       hasAuth = true,
       mockBucket = createMockR2Bucket() as unknown as R2Bucket,
       mockQueue = { send: vi.fn().mockResolvedValue(undefined) },
-      mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
-      }),
     } = options;
 
     type Env = {
@@ -766,9 +775,6 @@ describe("POST /events/:id/photos - Photo Upload", () => {
       };
       Variables: PhotographerVariables;
     };
-
-    // Mock global fetch
-    global.fetch = mockFetch as any;
 
     const app = new Hono<Env>()
       .use("/*", (c, next) => {
@@ -800,7 +806,7 @@ describe("POST /events/:id/photos - Photo Upload", () => {
       })
       .route("/events", eventsRouter);
 
-    return { app, mockDb, mockBucket, mockQueue, mockFetch };
+    return { app, mockDb, mockBucket, mockQueue };
   }
 
   const UPLOAD_MOCK_ENV = (
@@ -948,16 +954,11 @@ describe("POST /events/:id/photos - Photo Upload", () => {
     const mockDb = createUploadMockDb();
     const mockBucket = createMockR2Bucket();
     const mockQueue = { send: vi.fn().mockResolvedValue(undefined) };
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
-    });
 
     const { app } = createUploadTestApp({
       mockDb,
       mockBucket: mockBucket as unknown as R2Bucket,
       mockQueue,
-      mockFetch,
     });
     const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
 
@@ -981,11 +982,10 @@ describe("POST /events/:id/photos - Photo Upload", () => {
       expect(body.data).toHaveProperty("faceCount", 0);
       expect(body.data).toHaveProperty("uploadedAt");
 
-      // Verify R2 upload was called
+      // Verify R2 upload was called (normalized image)
       expect(mockBucket.put).toHaveBeenCalled();
 
-      // Verify CF Images transform was called
-      expect(mockFetch).toHaveBeenCalled();
+      // Note: normalizeImage is mocked at module level
 
       // Verify queue send was called
       expect(mockQueue.send).toHaveBeenCalledWith({
@@ -1002,6 +1002,7 @@ describe("POST /events/:id/photos - Photo Upload", () => {
     const mockDb = createUploadMockDb();
     const mockBucket = {
       put: vi.fn().mockRejectedValue(new Error("R2 error")),
+      delete: vi.fn().mockResolvedValue(undefined),
     };
     const mockQueue = { send: vi.fn().mockResolvedValue(undefined) };
 
@@ -1028,20 +1029,21 @@ describe("POST /events/:id/photos - Photo Upload", () => {
     }
   });
 
-  it("returns 500 when image transform fails (post-credit deduction)", async () => {
+  it("returns 500 when image normalization fails (post-credit deduction)", async () => {
+    // Mock normalizeImage to fail for this test
+    const { normalizeImage } = await import("../../lib/images/normalize");
+    vi.mocked(normalizeImage).mockRejectedValueOnce(
+      new Error("Normalization failed")
+    );
+
     const mockDb = createUploadMockDb();
     const mockBucket = createMockR2Bucket();
     const mockQueue = { send: vi.fn().mockResolvedValue(undefined) };
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-    });
 
     const { app } = createUploadTestApp({
       mockDb,
       mockBucket: mockBucket as unknown as R2Bucket,
       mockQueue,
-      mockFetch,
     });
     const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
 
@@ -1067,16 +1069,11 @@ describe("POST /events/:id/photos - Photo Upload", () => {
     const mockQueue = {
       send: vi.fn().mockRejectedValue(new Error("Queue error")),
     };
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
-    });
 
     const { app } = createUploadTestApp({
       mockDb,
       mockBucket: mockBucket as unknown as R2Bucket,
       mockQueue,
-      mockFetch,
     });
     const client = testClient(app, UPLOAD_MOCK_ENV(mockBucket, mockQueue));
 
