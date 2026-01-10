@@ -11,8 +11,10 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@sabaipics/ui/components/dialog";
+import { ScrollArea } from "@sabaipics/ui/components/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { Spinner } from "@sabaipics/ui/components/spinner";
 
 interface PDPAConsentModalProps {
 	open: boolean;
@@ -68,8 +70,8 @@ export function PDPAConsentModal({
 				</DialogHeader>
 
 				{/* Scrollable PDPA text */}
-				<div className="max-h-[300px] overflow-y-auto border rounded-lg p-4 bg-muted/30">
-					<div className="text-sm space-y-3">
+				<ScrollArea className="h-[300px] border rounded-lg bg-muted/30">
+					<div className="p-4 text-sm space-y-3">
 						<p>
 							<strong>Data Processing & Storage</strong>
 							<br />
@@ -109,7 +111,7 @@ export function PDPAConsentModal({
 							For full details, see our Privacy Policy and Terms of Service.
 						</p>
 					</div>
-				</div>
+				</ScrollArea>
 
 				{/* Consent checkbox */}
 				<div className="flex items-start gap-3">
@@ -154,7 +156,7 @@ export function PDPAConsentModal({
 					>
 						{mutation.isPending ? (
 							<>
-								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+								<Spinner className="mr-2" />
 								Accepting...
 							</>
 						) : (

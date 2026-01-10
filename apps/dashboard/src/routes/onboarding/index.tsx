@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@sabaipics/auth/react";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@sabaipics/ui/components/empty";
+import { Spinner } from "@sabaipics/ui/components/spinner";
 import { Button } from "@sabaipics/ui/components/button";
 import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
-import { PDPAConsentModal } from "../components/consent/PDPAConsentModal";
-import { useConsentStatus } from "../hooks/useConsentStatus";
+import { PDPAConsentModal } from "./_components/PDPAConsentModal";
+import { useConsentStatus } from "../../hooks/consent/useConsentStatus";
 
 const MAX_POLL_ATTEMPTS = 30;
 const POLL_INTERVAL = 1000;
@@ -125,13 +133,17 @@ export function OnboardingPage() {
 
 	// Loading state (polling for photographer record)
 	return (
-		<div className="flex min-h-screen items-center justify-center">
-			<div className="flex flex-col items-center gap-4">
-				<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-				<p className="text-muted-foreground text-sm">
-					Setting up your account...
-				</p>
-			</div>
+		<Empty className="min-h-screen">
+			<EmptyHeader>
+				<EmptyMedia variant="icon">
+					<Spinner className="size-5" />
+				</EmptyMedia>
+				<EmptyTitle>Setting up your account...</EmptyTitle>
+				<EmptyDescription>
+					We're preparing your photographer profile. This usually takes a few
+					seconds.
+				</EmptyDescription>
+			</EmptyHeader>
 
 			{/* Modal appears once photographer exists */}
 			<PDPAConsentModal
@@ -145,6 +157,6 @@ export function OnboardingPage() {
 					setShowDecline(true);
 				}}
 			/>
-		</div>
+		</Empty>
 	);
 }

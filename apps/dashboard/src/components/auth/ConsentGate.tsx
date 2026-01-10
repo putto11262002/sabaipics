@@ -1,6 +1,13 @@
 import { Navigate, useLocation } from "react-router";
-import { Loader2 } from "lucide-react";
-import { useConsentStatus } from "../../hooks/useConsentStatus";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@sabaipics/ui/components/empty";
+import { Spinner } from "@sabaipics/ui/components/spinner";
+import { useConsentStatus } from "../../hooks/consent/useConsentStatus";
 
 interface ConsentGateProps {
 	children: React.ReactNode;
@@ -20,9 +27,17 @@ export function ConsentGate({ children }: ConsentGateProps) {
 	// Still checking consent status
 	if (isLoading) {
 		return (
-			<div className="flex min-h-screen items-center justify-center">
-				<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-			</div>
+			<Empty className="min-h-screen">
+				<EmptyHeader>
+					<EmptyMedia variant="icon">
+						<Spinner className="size-5" />
+					</EmptyMedia>
+					<EmptyTitle>Loading your profile...</EmptyTitle>
+					<EmptyDescription>
+						Checking your account status. This won't take long.
+					</EmptyDescription>
+				</EmptyHeader>
+			</Empty>
 		);
 	}
 
