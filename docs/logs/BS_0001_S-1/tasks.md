@@ -198,7 +198,7 @@ Cleanup
 ---
 
 ### T-8 — Credit packages public API
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-4
 - **Goal:** Create `GET /credit-packages` endpoint returning active packages for purchase.
