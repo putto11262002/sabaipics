@@ -35,6 +35,18 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Generate QR code URL using direct R2 URL
+ * Note: Uses PHOTO_R2_BASE_URL which points to the public R2 bucket
+ */
+function getQrCodeUrl(r2Key: string, photoBaseUrl: string): string {
+  return `${photoBaseUrl}/${r2Key}`;
+}
+
+// =============================================================================
 // Error Helpers
 // =============================================================================
 
@@ -174,25 +186,43 @@ export const eventsRouter = new Hono<Env>()
         return c.json(accessCodeGenerationFailedError(), 500);
       }
 
+      console.log(`[QR] Starting QR generation for access code: ${accessCode}`);
+      console.log(`[QR] APP_BASE_URL: ${c.env.APP_BASE_URL}`);
+
       // Generate QR code PNG
       let qrPng: Uint8Array;
       try {
         qrPng = await generateEventQR(accessCode, c.env.APP_BASE_URL);
+        console.log(`[QR] QR code generated successfully`);
+        console.log(`[QR] - Type: ${qrPng.constructor.name}`);
+        console.log(`[QR] - Length: ${qrPng.length} bytes`);
+        console.log(`[QR] - First 8 bytes (PNG magic): ${Array.from(qrPng.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
       } catch (e) {
+        console.error(`[QR] QR generation failed:`, e);
         const reason = e instanceof Error ? e.message : "unknown error";
         return c.json(qrGenerationFailedError(reason), 500);
       }
 
       // Upload QR to R2
       const r2Key = `qr/${accessCode}.png`;
+      console.log(`[QR] Uploading to R2 with key: ${r2Key}`);
+      console.log(`[QR] Bucket binding: PHOTOS_BUCKET`);
+
       try {
         await c.env.PHOTOS_BUCKET.put(r2Key, qrPng, {
           httpMetadata: { contentType: "image/png" },
         });
+        console.log(`[QR] Successfully uploaded to R2`);
       } catch (e) {
+        console.error(`[QR] R2 upload failed:`, e);
         const reason = e instanceof Error ? e.message : "unknown error";
         return c.json(qrUploadFailedError(reason), 500);
       }
+
+      // Use direct R2 URL
+      const qrCodeUrl = getQrCodeUrl(r2Key, c.env.PHOTO_R2_BASE_URL);
+      console.log(`[QR] Final QR code URL: ${qrCodeUrl}`);
+      console.log(`[QR] PHOTO_R2_BASE_URL: ${c.env.PHOTO_R2_BASE_URL}`);
 
       // Calculate expiry date (30 days from now)
       const expiresAt = new Date();
@@ -212,10 +242,6 @@ export const eventsRouter = new Hono<Env>()
           expiresAt: expiresAt.toISOString(),
         })
         .returning();
-
-      // Construct QR URL (using R2 public URL pattern)
-      // TODO: Confirm R2 public URL format - may need adjustment based on bucket config
-      const qrCodeUrl = `${c.env.APP_BASE_URL}/r2/${r2Key}`;
 
       return c.json(
         {
@@ -278,12 +304,12 @@ export const eventsRouter = new Hono<Env>()
       const hasNextPage = page + 1 < totalPages;
       const hasPrevPage = page > 0;
 
-      // Construct QR URLs
-      const baseUrl = c.env.APP_BASE_URL;
+      // Construct QR URLs using direct R2 URL
+      const photoBaseUrl = c.env.PHOTO_R2_BASE_URL;
       const data = eventsList.map((event) => ({
         ...event,
         qrCodeUrl: event.qrCodeR2Key
-          ? `${baseUrl}/r2/${event.qrCodeR2Key}`
+          ? getQrCodeUrl(event.qrCodeR2Key, photoBaseUrl)
           : null,
       }));
 
@@ -328,9 +354,9 @@ export const eventsRouter = new Hono<Env>()
         return c.json(notFoundError(), 404);
       }
 
-      const baseUrl = c.env.APP_BASE_URL;
+      const photoBaseUrl = c.env.PHOTO_R2_BASE_URL;
       const qrCodeUrl = event.qrCodeR2Key
-        ? `${baseUrl}/r2/${event.qrCodeR2Key}`
+        ? getQrCodeUrl(event.qrCodeR2Key, photoBaseUrl)
         : null;
 
       return c.json({

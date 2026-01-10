@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Camera, LayoutDashboard } from "lucide-react";
+import { Camera, LayoutDashboard, CalendarDays } from "lucide-react";
 
 import { NavMain } from "./nav-main";
 import { NavSecondary } from "./nav-secondary";
@@ -22,26 +22,11 @@ const data = {
       icon: LayoutDashboard,
       isActive: true,
     },
-    // Hidden until implemented (T-15)
-    // {
-    // 	title: "Events",
-    // 	url: "/events",
-    // 	icon: CalendarDays,
-    // 	items: [
-    // 		{
-    // 			title: "All Events",
-    // 			url: "/events",
-    // 		},
-    // 		{
-    // 			title: "Active",
-    // 			url: "/events?status=active",
-    // 		},
-    // 		{
-    // 			title: "Past",
-    // 			url: "/events?status=past",
-    // 		},
-    // 	],
-    // },
+    {
+      title: "Events",
+      url: "/events",
+      icon: CalendarDays,
+    },
     // {
     // 	title: "Galleries",
     // 	url: "/galleries",

@@ -30,12 +30,6 @@ import {
 } from "@sabaipics/ui/components/empty";
 import { Skeleton } from "@sabaipics/ui/components/skeleton";
 import { Spinner } from "@sabaipics/ui/components/spinner";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "@sabaipics/ui/components/tooltip";
 
 export function DashboardPage() {
 	const { data, isLoading, error, refetch, isRefetching } = useDashboardData();
@@ -195,19 +189,12 @@ export function DashboardPage() {
 										{dashboardData.events.length !== 1 ? "s" : ""}
 									</p>
 								</div>
-								<TooltipProvider>
-									<Tooltip>
-										<TooltipTrigger asChild>
-											<Button variant="outline" size="sm" disabled>
-												<Calendar className="mr-2 size-4" />
-												Create Event
-											</Button>
-										</TooltipTrigger>
-										<TooltipContent>
-											<p>Event creation coming soon</p>
-										</TooltipContent>
-									</Tooltip>
-								</TooltipProvider>
+								<Button asChild variant="outline" size="sm">
+									<Link to="/events">
+										<Calendar className="mr-2 size-4" />
+										View All Events
+									</Link>
+								</Button>
 							</div>
 
 							{dashboardData.events.length === 0 ? (

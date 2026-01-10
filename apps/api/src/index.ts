@@ -9,7 +9,9 @@ import { adminRouter } from './routes/admin';
 import { consentRouter } from './routes/consent';
 import { dashboardRouter } from './routes/dashboard/route';
 import { creditsRouter } from './routes/credits';
+import { eventsRouter } from './routes/events';
 import { photosRouter } from './routes/photos';
+import { r2Router } from './routes/r2';
 import type { Env } from './types';
 
 // Queue consumer
@@ -40,6 +42,8 @@ const app = new Hono<Env>()
 		c.set('db', () => createDb(c.env.DATABASE_URL));
 		return next();
 	})
+	// R2 proxy route (public, no auth - serves QR codes and other assets)
+	.route('/r2', r2Router)
 	// Webhooks route (uses c.var.db from above)
 	.route('/webhooks', webhookRouter)
 	// Then CORS and auth for all other routes
@@ -59,6 +63,7 @@ const app = new Hono<Env>()
 	.route('/auth', authRouter)
 	.route('/consent', consentRouter)
 	.route('/dashboard', dashboardRouter)
+	.route('/events', eventsRouter)
 	.route('/events', photosRouter);
 
 // =============================================================================

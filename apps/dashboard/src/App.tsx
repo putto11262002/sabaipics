@@ -8,6 +8,8 @@ import { OnboardingPage } from "./routes/onboarding";
 import { DashboardPage } from "./routes/dashboard";
 import { CreditPackagesPage } from "./routes/credits/packages";
 import { CreditSuccessPage } from "./routes/credits/success";
+import EventsPage from "./routes/events";
+import EventDetailPage from "./routes/events/[id]";
 import { Layout } from "./components/Layout";
 
 export default function App() {
@@ -52,7 +54,9 @@ export default function App() {
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
-        {/* Future: /events, /settings, etc. */}
+        <Route path="/events" element={<EventsPage />} />
+        <Route path="/events/:id" element={<EventDetailPage />} />
+        {/* Future: /settings, etc. */}
       </Route>
 
       {/* Root redirect */}
