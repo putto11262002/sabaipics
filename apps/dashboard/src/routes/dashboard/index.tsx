@@ -1,93 +1,262 @@
-import { useUser } from "@sabaipics/auth/react";
-import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../lib/api";
+import { Link } from "react-router";
+import { differenceInDays, formatDistanceToNow, parseISO } from "date-fns";
+import {
+	AlertCircle,
+	Calendar,
+	CreditCard,
+	Image as ImageIcon,
+	RefreshCw,
+	Smile,
+} from "lucide-react";
+
+import { PageHeader } from "../../components/shell/page-header";
+import { useDashboardData } from "../../hooks/dashboard/useDashboardData";
+import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
+import { Button } from "@sabaipics/ui/components/button";
 import {
 	Card,
-	CardContent,
+	CardAction,
 	CardDescription,
+	CardFooter,
 	CardHeader,
 	CardTitle,
 } from "@sabaipics/ui/components/card";
-import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
-import { PageHeader } from "../../components/shell/page-header";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@sabaipics/ui/components/empty";
+import { Skeleton } from "@sabaipics/ui/components/skeleton";
+import { Spinner } from "@sabaipics/ui/components/spinner";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@sabaipics/ui/components/tooltip";
 
 export function DashboardPage() {
-	const { user } = useUser();
-	const { getToken } = useApiClient();
+	const { data, isLoading, error, refetch, isRefetching } = useDashboardData();
 
-	// Test protected route
-	const { data: profile, isLoading, error } = useQuery({
-		queryKey: ["profile"],
-		queryFn: async () => {
-			const token = await getToken();
-			const response = await fetch(
-				`${import.meta.env.VITE_API_URL}/auth/profile`,
-				{
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				}
-			);
+	const dashboardData = data?.data;
 
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-			}
-
-			return response.json();
-		},
-	});
+	// Helper to check if credits are expiring soon (within 7 days)
+	const isExpiringSoon = (expiry: string | null) => {
+		if (!expiry) return false;
+		const days = differenceInDays(parseISO(expiry), new Date());
+		return days <= 7 && days >= 0;
+	};
 
 	return (
 		<>
-			<PageHeader breadcrumbs={[{ label: "Dashboard" }]} />
+			<PageHeader breadcrumbs={[{ label: "Dashboard" }]}>
+				<Button asChild size="sm">
+					<Link to="/credits/packages">
+						<CreditCard className="mr-2 size-4" />
+						Buy Credits
+					</Link>
+				</Button>
+			</PageHeader>
 
 			<div className="flex flex-1 flex-col gap-4 p-4">
-				<div>
-					<h1 className="text-2xl font-bold mb-2">Dashboard</h1>
-					<p className="text-muted-foreground">
-						Welcome back,{" "}
-						{user?.firstName || user?.emailAddresses[0]?.emailAddress}!
-					</p>
-				</div>
+				{/* Loading State */}
+				{isLoading && (
+					<>
+						<div className="grid auto-rows-min gap-4 md:grid-cols-3">
+							<Skeleton className="h-32 w-full rounded-xl" />
+							<Skeleton className="h-32 w-full rounded-xl" />
+							<Skeleton className="h-32 w-full rounded-xl" />
+						</div>
+						<Skeleton className="h-64 w-full rounded-xl" />
+					</>
+				)}
 
-				{/* Placeholder cards */}
-				<div className="grid auto-rows-min gap-4 md:grid-cols-3">
-					<div className="bg-muted/50 aspect-video rounded-xl" />
-					<div className="bg-muted/50 aspect-video rounded-xl" />
-					<div className="bg-muted/50 aspect-video rounded-xl" />
-				</div>
+				{/* Error State */}
+				{error && (
+					<Alert variant="destructive">
+						<AlertCircle className="size-4" />
+						<AlertTitle>Error loading dashboard</AlertTitle>
+						<AlertDescription className="flex items-center justify-between">
+							<span>{error.message}</span>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => refetch()}
+								disabled={isRefetching}
+							>
+								{isRefetching ? (
+									<Spinner className="mr-2 size-3" />
+								) : (
+									<RefreshCw className="mr-2 size-3" />
+								)}
+								Retry
+							</Button>
+						</AlertDescription>
+					</Alert>
+				)}
 
-				{/* Test Protected API Call */}
-				<Card>
-					<CardHeader>
-						<CardTitle>Protected API Test</CardTitle>
-						<CardDescription>
-							Testing authenticated request to /auth/profile
-						</CardDescription>
-					</CardHeader>
-					<CardContent>
-						{isLoading && <p>Loading...</p>}
-
-						{error && (
-							<Alert variant="destructive">
-								<AlertTitle>Error</AlertTitle>
-								<AlertDescription>{error.message}</AlertDescription>
-							</Alert>
-						)}
-
-						{profile && (
-							<div className="space-y-2">
-								<Alert>
-									<AlertTitle>Success!</AlertTitle>
-									<AlertDescription>{profile.message}</AlertDescription>
+				{/* Success State */}
+				{dashboardData && (
+					<>
+						{/* Credit Expiry Warning */}
+						{dashboardData.credits.nearestExpiry &&
+							isExpiringSoon(dashboardData.credits.nearestExpiry) && (
+								<Alert variant="destructive">
+									<AlertCircle className="size-4" />
+									<AlertTitle>Credits Expiring Soon</AlertTitle>
+									<AlertDescription>
+										{dashboardData.credits.balance} credits expire on{" "}
+										{new Date(dashboardData.credits.nearestExpiry).toLocaleDateString()}.
+										Purchase more credits to avoid service interruption.
+									</AlertDescription>
 								</Alert>
-								<pre className="bg-slate-100 p-4 rounded text-sm overflow-auto">
-									{JSON.stringify(profile, null, 2)}
-								</pre>
+							)}
+
+						{/* Stats Cards Grid */}
+						<div className="grid auto-rows-min gap-4 md:grid-cols-3">
+							{/* Credit Balance Card */}
+							<Card className="@container/card">
+								<CardHeader>
+									<CardDescription>Credit Balance</CardDescription>
+									<CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+										{dashboardData.credits.balance} credits
+									</CardTitle>
+									<CardAction>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => refetch()}
+											disabled={isRefetching}
+											title="Refresh balance"
+										>
+											<RefreshCw
+												className={`size-4 ${isRefetching ? "animate-spin" : ""}`}
+											/>
+										</Button>
+									</CardAction>
+								</CardHeader>
+								<CardFooter className="flex-col items-start gap-1.5 text-sm">
+									{dashboardData.credits.nearestExpiry ? (
+										<div className="text-muted-foreground">
+											Expires{" "}
+											{formatDistanceToNow(
+												parseISO(dashboardData.credits.nearestExpiry),
+												{ addSuffix: true }
+											)}
+										</div>
+									) : (
+										<div className="text-muted-foreground">
+											{dashboardData.credits.balance === 0
+												? "Purchase credits to get started"
+												: "No expiry"}
+										</div>
+									)}
+								</CardFooter>
+							</Card>
+
+							{/* Total Photos Card */}
+							<Card className="@container/card">
+								<CardHeader>
+									<CardDescription>Total Photos</CardDescription>
+									<CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+										{dashboardData.stats.totalPhotos}
+									</CardTitle>
+								</CardHeader>
+								<CardFooter className="text-sm text-muted-foreground">
+									<ImageIcon className="mr-2 size-4" />
+									Across all events
+								</CardFooter>
+							</Card>
+
+							{/* Total Faces Card */}
+							<Card className="@container/card">
+								<CardHeader>
+									<CardDescription>Total Faces</CardDescription>
+									<CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+										{dashboardData.stats.totalFaces}
+									</CardTitle>
+								</CardHeader>
+								<CardFooter className="text-sm text-muted-foreground">
+									<Smile className="mr-2 size-4" />
+									Detected and indexed
+								</CardFooter>
+							</Card>
+						</div>
+
+						{/* Events Section */}
+						<div className="space-y-4">
+							<div className="flex items-start justify-between">
+								<div>
+									<h2 className="text-lg font-semibold">Recent Events</h2>
+									<p className="text-sm text-muted-foreground">
+										Your last {dashboardData.events.length} event
+										{dashboardData.events.length !== 1 ? "s" : ""}
+									</p>
+								</div>
+								<TooltipProvider>
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<Button variant="outline" size="sm" disabled>
+												<Calendar className="mr-2 size-4" />
+												Create Event
+											</Button>
+										</TooltipTrigger>
+										<TooltipContent>
+											<p>Event creation coming soon</p>
+										</TooltipContent>
+									</Tooltip>
+								</TooltipProvider>
 							</div>
-						)}
-					</CardContent>
-				</Card>
+
+							{dashboardData.events.length === 0 ? (
+								<Empty>
+									<EmptyHeader>
+										<EmptyMedia variant="icon">
+											<Calendar className="size-12 text-muted-foreground" />
+										</EmptyMedia>
+										<EmptyTitle>No events yet</EmptyTitle>
+										<EmptyDescription>
+											Create your first event to start organizing and sharing photos
+										</EmptyDescription>
+									</EmptyHeader>
+								</Empty>
+							) : (
+								<div className="space-y-2">
+									{dashboardData.events.map((event) => (
+										<div
+											key={event.id}
+											className="flex items-center justify-between rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors"
+										>
+											<div className="flex-1 space-y-1">
+												<div className="font-semibold">{event.name}</div>
+												<div className="text-sm text-muted-foreground">
+													Created {formatDistanceToNow(parseISO(event.createdAt))} ago •
+													Expires {formatDistanceToNow(parseISO(event.expiresAt))} from now
+												</div>
+											</div>
+											<div className="flex gap-6 text-center">
+												<div>
+													<div className="text-2xl font-bold tabular-nums">
+														{event.photoCount}
+													</div>
+													<div className="text-xs text-muted-foreground">Photos</div>
+												</div>
+												<div>
+													<div className="text-2xl font-bold tabular-nums">
+														{event.faceCount}
+													</div>
+													<div className="text-xs text-muted-foreground">Faces</div>
+												</div>
+											</div>
+										</div>
+									))}
+								</div>
+							)}
+						</div>
+					</>
+				)}
 			</div>
 		</>
 	);

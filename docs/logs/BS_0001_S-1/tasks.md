@@ -275,6 +275,7 @@ Cleanup
 
 ### T-11 — Dashboard UI
 - [ ] Done
+- **PR:** https://github.com/putto11262002/sabaipics/pull/19
 - **Type:** `feature`
 - **StoryRefs:** US-3
 - **Goal:** Create dashboard page showing credit balance, event list, and action buttons.
