@@ -161,6 +161,7 @@ Cleanup
 - **PrimarySurface:** `UI`
 - **Scope:** `apps/dashboard/src/routes/auth/`, `apps/dashboard/src/components/`
 - **Dependencies:** `T-4`, `T-5`
+- **PR:** https://github.com/putto11262002/sabaipics/pull/14
 - **Acceptance:**
   - `/photographer/signup` shows Clerk SignUp component
   - After signup, PDPA modal appears (blocking)

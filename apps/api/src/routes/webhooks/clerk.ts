@@ -3,11 +3,6 @@ import { Webhook } from "svix";
 import { photographers } from "@sabaipics/db/schema";
 import { eq } from "drizzle-orm";
 import type { Database } from "@sabaipics/db";
-import {
-	ClerkWebhookEventSchema,
-	getPrimaryEmail,
-	type ClerkWebhookEvent,
-} from "../../lib/clerk";
 
 // Use shared Bindings and Variables from index.ts
 type Bindings = CloudflareBindings;
@@ -19,6 +14,43 @@ type Env = {
 	Bindings: Bindings;
 	Variables: Variables;
 };
+
+// Minimal type for Clerk webhook events (no validation, trust Svix signature)
+interface ClerkWebhookEvent {
+	type: string;
+	data: {
+		id: string;
+		email_addresses?: Array<{
+			id: string;
+			email_address: string;
+			verification?: { status: string } | null;
+		}>;
+		primary_email_address_id?: string | null;
+		first_name?: string | null;
+		last_name?: string | null;
+	};
+}
+
+/**
+ * Extract the primary email address from user data.
+ */
+function getPrimaryEmail(user: ClerkWebhookEvent["data"]): string | null {
+	const emails = user.email_addresses;
+	if (!emails?.length) return null;
+
+	// Find by primary_email_address_id
+	if (user.primary_email_address_id) {
+		const primary = emails.find((e) => e.id === user.primary_email_address_id);
+		if (primary) return primary.email_address;
+	}
+
+	// Fallback: first verified email
+	const verified = emails.find((e) => e.verification?.status === "verified");
+	if (verified) return verified.email_address;
+
+	// Last resort: first email
+	return emails[0]?.email_address ?? null;
+}
 
 export const clerkWebhookRouter = new Hono<Env>().post("/", async (c) => {
 	const secret = c.env.CLERK_WEBHOOK_SIGNING_SECRET;
@@ -40,28 +72,20 @@ export const clerkWebhookRouter = new Hono<Env>().post("/", async (c) => {
 		return c.json({ error: "Bad request" }, 400);
 	}
 
-	// Verify webhook signature
+	// Verify webhook signature (Svix ensures payload integrity)
 	const wh = new Webhook(secret);
-	let verifiedEvent: unknown;
+	let event: ClerkWebhookEvent;
 
 	try {
-		verifiedEvent = wh.verify(body, {
+		event = wh.verify(body, {
 			"svix-id": svixId,
 			"svix-timestamp": svixTimestamp,
 			"svix-signature": svixSignature,
-		});
+		}) as ClerkWebhookEvent;
 	} catch (err) {
+		console.error("[Clerk Webhook] Signature verification failed:", err);
 		return c.json({ error: "Bad request" }, 400);
 	}
-
-	// Parse and validate event with Zod schema
-	const parseResult = ClerkWebhookEventSchema.safeParse(verifiedEvent);
-	if (!parseResult.success) {
-		console.error("[Clerk Webhook] Invalid event shape:", parseResult.error);
-		return c.json({ error: "Bad request" }, 400);
-	}
-
-	const event = parseResult.data as ClerkWebhookEvent;
 
 	// Route to appropriate handler
 	try {
