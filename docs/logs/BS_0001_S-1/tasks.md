@@ -353,6 +353,7 @@ Cleanup
 - **PrimarySurface:** `API`
 - **Scope:** `apps/api/src/lib/qr/`
 - **Dependencies:** None
+- **PR:** https://github.com/putto11262002/sabaipics/pull/18
 - **Acceptance:**
   - `generateEventQR(accessCode)` returns PNG Uint8Array
   - QR contains both search and slideshow URLs

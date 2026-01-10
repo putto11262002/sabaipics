@@ -12,7 +12,8 @@
 	"vars": {
 		"CORS_ORIGIN": "http://localhost:5173",
 		"AUTHORIZED_PARTIES": "http://localhost:5173",
-		"AWS_REGION": "us-west-2"
+		"AWS_REGION": "us-west-2",
+		"APP_BASE_URL": "http://localhost:5173"
 	},
 
 	// R2 bucket for photo storage
@@ -67,7 +68,8 @@
 			"vars": {
 				"CORS_ORIGIN": "https://app-staging.sabaipics.com",
 				"AUTHORIZED_PARTIES": "https://app-staging.sabaipics.com",
-				"AWS_REGION": "us-west-2"
+				"AWS_REGION": "us-west-2",
+				"APP_BASE_URL": "https://app-staging.sabaipics.com"
 			},
 			"routes": [
 				{
@@ -118,7 +120,8 @@
 			"vars": {
 				"CORS_ORIGIN": "https://app.sabaipics.com",
 				"AUTHORIZED_PARTIES": "https://app.sabaipics.com",
-				"AWS_REGION": "us-west-2"
+				"AWS_REGION": "us-west-2",
+				"APP_BASE_URL": "https://sabaipics.com"
 			},
 			"routes": [
 				{
