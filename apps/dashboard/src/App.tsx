@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router";
+import { Routes, Route, Navigate, Outlet } from "react-router";
 import { SignedIn, SignedOut } from "@sabaipics/auth/react";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { ConsentGate } from "./components/auth/ConsentGate";
@@ -6,6 +6,8 @@ import { SignInPage } from "./routes/sign-in";
 import { SignUpPage } from "./routes/sign-up";
 import { OnboardingPage } from "./routes/onboarding";
 import { DashboardPage } from "./routes/dashboard";
+import { CreditPackagesPage } from "./routes/credits/packages";
+import { CreditSuccessPage } from "./routes/credits/success";
 import { Layout } from "./components/Layout";
 
 export default function App() {
@@ -24,6 +26,20 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* Credits routes (auth + consent required, no sidebar) */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <ConsentGate>
+              <Outlet />
+            </ConsentGate>
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/credits/packages" element={<CreditPackagesPage />} />
+        <Route path="/credits/success" element={<CreditSuccessPage />} />
+      </Route>
 
       {/* Protected routes (auth + consent required) */}
       <Route

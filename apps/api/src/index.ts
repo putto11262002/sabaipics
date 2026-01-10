@@ -45,6 +45,8 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
     return cors({
       origin: c.env.CORS_ORIGIN,
       credentials: true,
+      allowHeaders: ["Content-Type", "Authorization"],
+      allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     })(c, next);
   })
   .use("/*", (c, next) => {
@@ -53,9 +55,9 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
   })
   // Admin routes - API key auth, no Clerk (must be before Clerk middleware)
   .route("/admin", adminRouter)
-  // Public credit packages - no auth required
-  .route("/credit-packages", creditsRouter)
+  // Clerk auth for all routes below (GET /credit-packages is public, POST /credit-packages/checkout requires auth)
   .use("/*", createClerkAuth())
+  .route("/credit-packages", creditsRouter)
   .get("/", (c) => c.text("SabaiPics API"))
   .get("/health", (c) => c.json({ status: "ok", timestamp: Date.now() }))
   .route("/db-test", dbTestRouter)
