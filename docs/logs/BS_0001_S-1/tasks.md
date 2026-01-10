@@ -248,6 +248,7 @@ Cleanup
 
 ### T-10 — Stripe webhook handler
 - [ ] Done
+- **PR:** https://github.com/putto11262002/sabaipics/pull/17
 - **Type:** `integration`
 - **StoryRefs:** US-4
 - **Refs:** `docs/logs/BS_0001_S-1/research/stripe-credit-flow.md`
