@@ -4,7 +4,6 @@ import { Alert } from "@sabaipics/ui/components/alert";
 import { Skeleton } from "@sabaipics/ui/components/skeleton";
 import { Badge } from "@sabaipics/ui/components/badge";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@sabaipics/ui/components/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@sabaipics/ui/components/tabs";
 import { Separator } from "@sabaipics/ui/components/separator";
 import {
   Breadcrumb,
@@ -68,12 +67,15 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+type TabValue = "details" | "statistics" | "photos" | "faces";
+
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data, isLoading, error, refetch } = useEvent(id);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "all">("30d");
+  const [activeTab, setActiveTab] = useState<TabValue>("details");
 
   const handleDownloadQR = async (qrCodeUrl: string, accessCode: string) => {
     try {
@@ -152,66 +154,94 @@ export default function EventDetailPage() {
 
   return (
     <div className="container mx-auto p-6">
-      {/* Breadcrumb */}
-      <div className="mb-6 flex items-center justify-between">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/events">Events</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{event.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon">
-              <MoreVertical className="size-4" />
-              <span className="sr-only">Open menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => handleCopyLink(event.accessCode)}>
-              <ExternalLink className="mr-2 size-4" />
-              {isCopied ? "Link Copied!" : "Copy Search Link"}
-            </DropdownMenuItem>
-            {event.qrCodeUrl && (
-              <DropdownMenuItem onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}>
-                <Download className="mr-2 size-4" />
-                Download QR Code
+      {/* Header Section with Tabs */}
+      <div className="mb-6 border-b">
+        {/* Breadcrumb and Actions */}
+        <div className="mb-4 flex items-center justify-between">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/events">Events</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{event.name}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <MoreVertical className="size-4" />
+                <span className="sr-only">Open menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleCopyLink(event.accessCode)}>
+                <ExternalLink className="mr-2 size-4" />
+                {isCopied ? "Link Copied!" : "Copy Search Link"}
               </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
-              <Trash2 className="mr-2 size-4" />
-              Delete Event
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {event.qrCodeUrl && (
+                <DropdownMenuItem onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}>
+                  <Download className="mr-2 size-4" />
+                  Download QR Code
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive">
+                <Trash2 className="mr-2 size-4" />
+                Delete Event
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Custom Tabs at Bottom of Header */}
+        <div className="flex gap-6 -mb-px">
+          <button
+            onClick={() => setActiveTab("details")}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === "details"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Details
+          </button>
+          <button
+            onClick={() => setActiveTab("statistics")}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === "statistics"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Statistics
+          </button>
+          <button
+            disabled
+            className="pb-3 text-sm font-medium text-muted-foreground opacity-50 cursor-not-allowed border-b-2 border-transparent"
+          >
+            Photos
+          </button>
+          <button
+            disabled
+            className="pb-3 text-sm font-medium text-muted-foreground opacity-50 cursor-not-allowed border-b-2 border-transparent"
+          >
+            Faces
+          </button>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="details" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="statistics">Statistics</TabsTrigger>
-          <TabsTrigger value="photos" disabled>
-            Photos
-          </TabsTrigger>
-          <TabsTrigger value="faces" disabled>
-            Faces
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Details Tab */}
-        <TabsContent value="details" className="space-y-8">
+      {/* Tab Content */}
+      {/* Details Tab */}
+      {activeTab === "details" && (
+        <div className="space-y-8">
           {/* Event Information (first) */}
           <div>
             <h3 className="text-lg font-semibold mb-4">Event Information</h3>
@@ -390,10 +420,12 @@ export default function EventDetailPage() {
             </div>
             </div>
           </div>
-        </TabsContent>
+        </div>
+      )}
 
-        {/* Statistics Tab */}
-        <TabsContent value="statistics" className="space-y-6">
+      {/* Statistics Tab */}
+      {activeTab === "statistics" && (
+        <div className="space-y-6">
           {/* KPI Cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* Total Photos Stat */}
@@ -575,42 +607,42 @@ export default function EventDetailPage() {
               </ChartContainer>
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
+      )}
 
-        {/* Photos Tab (Placeholder) */}
-        <TabsContent value="photos">
-          <Card>
-            <CardContent className="py-12">
-              <div className="flex flex-col items-center gap-4 text-center">
-                <ImageIcon className="size-12 text-muted-foreground" />
-                <div>
-                  <h3 className="text-lg font-semibold">Photos Coming Soon</h3>
-                  <p className="text-sm text-muted-foreground">
-                    This feature will be available in a future update
-                  </p>
-                </div>
+      {/* Photos Tab (Placeholder) */}
+      {activeTab === "photos" && (
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <ImageIcon className="size-12 text-muted-foreground" />
+              <div>
+                <h3 className="text-lg font-semibold">Photos Coming Soon</h3>
+                <p className="text-sm text-muted-foreground">
+                  This feature will be available in a future update
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Faces Tab (Placeholder) */}
-        <TabsContent value="faces">
-          <Card>
-            <CardContent className="py-12">
-              <div className="flex flex-col items-center gap-4 text-center">
-                <Calendar className="size-12 text-muted-foreground" />
-                <div>
-                  <h3 className="text-lg font-semibold">Face Recognition Coming Soon</h3>
-                  <p className="text-sm text-muted-foreground">
-                    This feature will be available in a future update
-                  </p>
-                </div>
+      {/* Faces Tab (Placeholder) */}
+      {activeTab === "faces" && (
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <Calendar className="size-12 text-muted-foreground" />
+              <div>
+                <h3 className="text-lg font-semibold">Face Recognition Coming Soon</h3>
+                <p className="text-sm text-muted-foreground">
+                  This feature will be available in a future update
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
