@@ -346,7 +346,7 @@ Cleanup
 ---
 
 ### T-14 — QR code generation library
-- [ ] Done
+- [x] Done
 - **Type:** `scaffold`
 - **StoryRefs:** US-5, US-6
 - **Refs:** `docs/logs/BS_0001_S-1/research/qr-code-library.md`
