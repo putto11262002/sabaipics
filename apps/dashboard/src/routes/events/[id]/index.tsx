@@ -4,7 +4,6 @@ import { Alert } from "@sabaipics/ui/components/alert";
 import { Skeleton } from "@sabaipics/ui/components/skeleton";
 import { Badge } from "@sabaipics/ui/components/badge";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@sabaipics/ui/components/card";
-import { Separator } from "@sabaipics/ui/components/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -245,9 +244,14 @@ export default function EventDetailPage() {
           {/* Left Column: QR Code + Slideshow (60%) */}
           <div className="md:col-span-3 space-y-6">
             {/* QR Code Section */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">QR Code</h3>
-              <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>QR Code</CardTitle>
+                <CardDescription>
+                  Share this QR code with guests to search for their photos
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
                   {event.qrCodeUrl ? (
                     <div className="w-64 overflow-hidden rounded-lg border bg-white p-4">
@@ -263,54 +267,52 @@ export default function EventDetailPage() {
                     </div>
                   )}
                 </div>
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Share this QR code with guests to search for their photos
-                  </p>
 
-                  {/* Search URL */}
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Search URL</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <a
-                        href={`${window.location.origin}/search/${event.accessCode}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 text-sm text-primary hover:underline truncate"
-                      >
-                        {window.location.origin}/search/{event.accessCode}
-                      </a>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => handleCopyLink(event.accessCode)}
-                        title="Copy search link"
-                      >
-                        <Copy className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {event.qrCodeUrl && (
-                    <Button
-                      onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}
-                      variant="outline"
-                      className="w-full"
+                {/* Search URL */}
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Search URL</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <a
+                      href={`${window.location.origin}/search/${event.accessCode}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-sm text-primary hover:underline truncate"
                     >
-                      <Download className="mr-2 size-4" />
-                      Download QR Code
+                      {window.location.origin}/search/{event.accessCode}
+                    </a>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => handleCopyLink(event.accessCode)}
+                      title="Copy search link"
+                    >
+                      <Copy className="size-4" />
                     </Button>
-                  )}
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <Separator />
+                {event.qrCodeUrl && (
+                  <Button
+                    onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <Download className="mr-2 size-4" />
+                    Download QR Code
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Slideshow Section */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Slideshow</h3>
-              <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Slideshow</CardTitle>
+                <CardDescription>
+                  View all event photos in slideshow mode
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
                   <div className="flex h-64 w-64 items-center justify-center rounded-lg border bg-muted">
                     <div className="text-center">
@@ -319,45 +321,40 @@ export default function EventDetailPage() {
                     </div>
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    View all event photos in slideshow mode
-                  </p>
 
-                  {/* Slideshow URL */}
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Slideshow URL</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <a
-                        href={`${window.location.origin}/slideshow/${event.accessCode}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 text-sm text-primary hover:underline truncate"
-                      >
-                        {window.location.origin}/slideshow/{event.accessCode}
-                      </a>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => copyToClipboard(`${window.location.origin}/slideshow/${event.accessCode}`)}
-                        title="Copy slideshow link"
-                      >
-                        <Copy className="size-4" />
-                      </Button>
-                    </div>
+                {/* Slideshow URL */}
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Slideshow URL</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <a
+                      href={`${window.location.origin}/slideshow/${event.accessCode}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-sm text-primary hover:underline truncate"
+                    >
+                      {window.location.origin}/slideshow/{event.accessCode}
+                    </a>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => copyToClipboard(`${window.location.origin}/slideshow/${event.accessCode}`)}
+                      title="Copy slideshow link"
+                    >
+                      <Copy className="size-4" />
+                    </Button>
                   </div>
-
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    disabled
-                  >
-                    <ExternalLink className="mr-2 size-4" />
-                    Open Slideshow (Coming Soon)
-                  </Button>
                 </div>
-              </div>
-            </div>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled
+                >
+                  <ExternalLink className="mr-2 size-4" />
+                  Open Slideshow (Coming Soon)
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right Column: Event Information (40%) */}
