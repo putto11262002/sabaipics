@@ -31,6 +31,16 @@ function alreadyConsentedError() {
 // =============================================================================
 
 export const consentRouter = new Hono<Env>()
+  // GET / - Check consent status
+  .get("/", requirePhotographer(), (c) => {
+    const photographer = c.var.photographer;
+    return c.json({
+      data: {
+        isConsented: !!photographer.pdpaConsentAt,
+        consentedAt: photographer.pdpaConsentAt,
+      },
+    });
+  })
   // POST / - Record PDPA consent
   .post("/", requirePhotographer(), async (c) => {
     const photographer = c.var.photographer;
