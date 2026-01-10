@@ -25,6 +25,14 @@ export function usePurchaseCheckout() {
   return useMutation({
     mutationFn: async (request: CheckoutRequest) => {
       const token = await getToken();
+
+      // Debug: Log token status
+      console.log("Token exists:", !!token);
+
+      if (!token) {
+        throw new Error("Not authenticated. Please sign in and try again.");
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/credit-packages/checkout`,
         {
