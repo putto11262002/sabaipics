@@ -241,16 +241,16 @@ export default function EventDetailPage() {
       {/* Tab Content */}
       {/* Details Tab */}
       {activeTab === "details" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Left Column: QR Code + Slideshow */}
-          <div className="md:col-span-1 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          {/* Left Column: QR Code + Slideshow (60%) */}
+          <div className="md:col-span-3 space-y-6">
             {/* QR Code Section */}
             <div>
               <h3 className="text-lg font-semibold mb-4">QR Code</h3>
               <div className="space-y-4">
-                <div className="flex justify-center">
+                <div>
                   {event.qrCodeUrl ? (
-                    <div className="w-48 overflow-hidden rounded-lg border bg-white p-3">
+                    <div className="w-64 overflow-hidden rounded-lg border bg-white p-4">
                       <img
                         src={event.qrCodeUrl}
                         alt="Event QR Code"
@@ -258,13 +258,13 @@ export default function EventDetailPage() {
                       />
                     </div>
                   ) : (
-                    <div className="flex h-48 w-48 items-center justify-center rounded-lg border bg-muted">
+                    <div className="flex h-64 w-64 items-center justify-center rounded-lg border bg-muted">
                       <p className="text-sm text-muted-foreground">QR Unavailable</p>
                     </div>
                   )}
                 </div>
                 <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground text-center">
+                  <p className="text-sm text-muted-foreground">
                     Share this QR code with guests to search for their photos
                   </p>
 
@@ -311,8 +311,8 @@ export default function EventDetailPage() {
             <div>
               <h3 className="text-lg font-semibold mb-4">Slideshow</h3>
               <div className="space-y-4">
-                <div className="flex justify-center">
-                  <div className="flex h-48 w-48 items-center justify-center rounded-lg border bg-muted">
+                <div>
+                  <div className="flex h-64 w-64 items-center justify-center rounded-lg border bg-muted">
                     <div className="text-center">
                       <Presentation className="size-12 text-muted-foreground mx-auto mb-2" />
                       <p className="text-sm text-muted-foreground">Preview Coming Soon</p>
@@ -320,7 +320,7 @@ export default function EventDetailPage() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground text-center">
+                  <p className="text-sm text-muted-foreground">
                     View all event photos in slideshow mode
                   </p>
 
@@ -360,10 +360,10 @@ export default function EventDetailPage() {
             </div>
           </div>
 
-          {/* Right Column: Event Information */}
+          {/* Right Column: Event Information (40%) */}
           <div className="md:col-span-2">
             <h3 className="text-lg font-semibold mb-4">Event Information</h3>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div className="space-y-4">
               {/* Event Name with Status Badge */}
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Event Name</label>
