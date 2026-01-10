@@ -1,12 +1,7 @@
 import * as React from "react";
 import {
 	Camera,
-	CalendarDays,
-	Images,
 	LayoutDashboard,
-	LifeBuoy,
-	Send,
-	Settings2,
 } from "lucide-react";
 
 import { NavMain } from "./nav-main";
@@ -30,57 +25,59 @@ const data = {
 			icon: LayoutDashboard,
 			isActive: true,
 		},
-		{
-			title: "Events",
-			url: "/events",
-			icon: CalendarDays,
-			items: [
-				{
-					title: "All Events",
-					url: "/events",
-				},
-				{
-					title: "Active",
-					url: "/events?status=active",
-				},
-				{
-					title: "Past",
-					url: "/events?status=past",
-				},
-			],
-		},
-		{
-			title: "Galleries",
-			url: "/galleries",
-			icon: Images,
-		},
-		{
-			title: "Settings",
-			url: "/settings",
-			icon: Settings2,
-			items: [
-				{
-					title: "Profile",
-					url: "/settings/profile",
-				},
-				{
-					title: "Billing",
-					url: "/settings/billing",
-				},
-			],
-		},
+		// Hidden until implemented (T-15)
+		// {
+		// 	title: "Events",
+		// 	url: "/events",
+		// 	icon: CalendarDays,
+		// 	items: [
+		// 		{
+		// 			title: "All Events",
+		// 			url: "/events",
+		// 		},
+		// 		{
+		// 			title: "Active",
+		// 			url: "/events?status=active",
+		// 		},
+		// 		{
+		// 			title: "Past",
+		// 			url: "/events?status=past",
+		// 		},
+		// 	],
+		// },
+		// {
+		// 	title: "Galleries",
+		// 	url: "/galleries",
+		// 	icon: Images,
+		// },
+		// {
+		// 	title: "Settings",
+		// 	url: "/settings",
+		// 	icon: Settings2,
+		// 	items: [
+		// 		{
+		// 			title: "Profile",
+		// 			url: "/settings/profile",
+		// 		},
+		// 		{
+		// 			title: "Billing",
+		// 			url: "/settings/billing",
+		// 		},
+		// 	],
+		// },
 	],
 	navSecondary: [
-		{
-			title: "Support",
-			url: "/support",
-			icon: LifeBuoy,
-		},
-		{
-			title: "Feedback",
-			url: "/feedback",
-			icon: Send,
-		},
+		// Hidden until implemented
+		// {
+		// 	title: "Support",
+		// 	url: "/support",
+		// 	icon: LifeBuoy,
+		// },
+		// {
+		// 	title: "Feedback",
+		// 	url: "/feedback",
+		// 	icon: Send,
+		// },
 	],
 };
 
