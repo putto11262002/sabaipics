@@ -59,8 +59,8 @@ export const clerkWebhookRouter = new Hono<Env>().post("/", async (c) => {
 				// Extract primary email (required)
 				const email = user.email_addresses?.[0]?.email_address;
 				if (!email) {
-					console.error("[Clerk Webhook] user.created: No email found");
-					return c.json({ success: true }, 200);
+					console.error("[Clerk Webhook] ERROR: user.created without required email");
+					return c.json({ error: "Bad request" }, 500);
 				}
 
 				// Build display name
