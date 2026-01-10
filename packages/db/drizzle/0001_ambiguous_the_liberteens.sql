@@ -64,7 +64,7 @@ CREATE TABLE "consent_records" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"photographer_id" uuid NOT NULL,
 	"consent_type" text NOT NULL,
-	"granted_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"ip_address" text
 );
 --> statement-breakpoint

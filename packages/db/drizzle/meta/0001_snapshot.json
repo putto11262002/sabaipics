@@ -1,5 +1,5 @@
 {
-  "id": "7e9f4a38-f2d7-446f-a357-2bd6a6c96650",
+  "id": "481b0e19-9d47-4be7-a91c-4b68bd196454",
   "prevId": "dd9953b0-6b43-4cbb-8c9e-7c52fa0d038a",
   "version": "7",
   "dialect": "postgresql",
@@ -608,8 +608,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "granted_at": {
-          "name": "granted_at",
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
