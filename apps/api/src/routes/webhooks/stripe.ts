@@ -4,10 +4,10 @@
  * Handles incoming webhooks from Stripe for payment events.
  * Signature verification is done via Stripe's SDK.
  *
- * This route acts as a producer, emitting events to the event bus.
- * Business logic is handled by consumers registered in handlers/stripe.ts.
+ * Fulfillment logic for checkout.session.completed is implemented directly
+ * here (with db access) rather than via event bus handlers.
  *
- * Events emitted:
+ * Events emitted (for logging/analytics only):
  * - stripe:checkout.completed: Payment successful
  * - stripe:checkout.expired: Session timed out
  * - stripe:payment.succeeded: Payment confirmed
@@ -17,6 +17,8 @@
 
 import { Hono } from "hono";
 import type Stripe from "stripe";
+import { addMonths } from "date-fns";
+import { creditLedger, type Database } from "@sabaipics/db";
 import {
   createStripeClient,
   verifyWebhookSignature,
@@ -34,11 +36,110 @@ type StripeWebhookBindings = {
   STRIPE_WEBHOOK_SECRET: string;
 };
 
+type StripeWebhookVariables = {
+  db: () => Database;
+};
+
 // Create typed producer for Stripe events
 const stripeProducer = eventBus.producer<StripeEvents>();
 
+/**
+ * Fulfill checkout by adding credits to photographer's ledger.
+ *
+ * Idempotency is enforced via unique constraint on stripe_session_id.
+ * If duplicate webhook arrives, DB will reject the insert and we return success.
+ *
+ * @returns true if credits were added, false if skipped (duplicate or invalid)
+ */
+export async function fulfillCheckout(
+  db: Database,
+  session: Stripe.Checkout.Session,
+  metadata: Record<string, string>
+): Promise<{ success: boolean; reason: string }> {
+  // Check payment status - only fulfill if paid
+  if (session.payment_status !== "paid") {
+    console.log(
+      `[Stripe Fulfillment] Skipping unpaid session: ${session.id} (status: ${session.payment_status})`
+    );
+    return { success: false, reason: "unpaid" };
+  }
+
+  // Validate required metadata
+  const photographerId = metadata.photographer_id;
+  const creditsStr = metadata.credits;
+
+  if (!photographerId) {
+    console.error(
+      `[Stripe Fulfillment] Missing photographer_id in metadata for session: ${session.id}`
+    );
+    return { success: false, reason: "missing_photographer_id" };
+  }
+
+  if (!creditsStr) {
+    console.error(
+      `[Stripe Fulfillment] Missing credits in metadata for session: ${session.id}`
+    );
+    return { success: false, reason: "missing_credits" };
+  }
+
+  const credits = parseInt(creditsStr, 10);
+  if (isNaN(credits) || credits <= 0) {
+    console.error(
+      `[Stripe Fulfillment] Invalid credits value "${creditsStr}" for session: ${session.id}`
+    );
+    return { success: false, reason: "invalid_credits" };
+  }
+
+  // Validate photographer_id is a valid UUID format
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(photographerId)) {
+    console.error(
+      `[Stripe Fulfillment] Invalid photographer_id format "${photographerId}" for session: ${session.id}`
+    );
+    return { success: false, reason: "invalid_photographer_id" };
+  }
+
+  // Insert credit ledger entry
+  // Unique constraint on stripe_session_id prevents duplicates
+  try {
+    await db.insert(creditLedger).values({
+      photographerId,
+      amount: credits,
+      type: "purchase",
+      stripeSessionId: session.id,
+      expiresAt: addMonths(new Date(), 6).toISOString(),
+    });
+
+    console.log(
+      `[Stripe Fulfillment] Added ${credits} credits for photographer ${photographerId} (session: ${session.id})`
+    );
+    return { success: true, reason: "fulfilled" };
+  } catch (err) {
+    // Check for unique constraint violation (duplicate webhook)
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    if (
+      errorMessage.includes("unique") ||
+      errorMessage.includes("duplicate") ||
+      errorMessage.includes("credit_ledger_stripe_session_unique")
+    ) {
+      console.log(
+        `[Stripe Fulfillment] Duplicate webhook ignored for session: ${session.id}`
+      );
+      return { success: false, reason: "duplicate" };
+    }
+
+    // Other DB errors (e.g., FK violation if photographer doesn't exist)
+    console.error(
+      `[Stripe Fulfillment] DB error for session ${session.id}: ${errorMessage}`
+    );
+    return { success: false, reason: "db_error" };
+  }
+}
+
 export const stripeWebhookRouter = new Hono<{
   Bindings: StripeWebhookBindings;
+  Variables: StripeWebhookVariables;
 }>().post("/", async (c) => {
   // Validate environment
   if (!c.env.STRIPE_SECRET_KEY) {
@@ -80,9 +181,19 @@ export const stripeWebhookRouter = new Hono<{
       // Checkout events
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+        const metadata = getSessionMetadata(session);
+
+        // Fulfill the checkout (add credits to ledger)
+        const db = c.var.db();
+        const result = await fulfillCheckout(db, session, metadata);
+        console.log(
+          `[Stripe Webhook] Fulfillment result: ${result.reason} (session: ${session.id})`
+        );
+
+        // Emit event for logging/analytics (not for fulfillment)
         stripeProducer.emit("stripe:checkout.completed", {
           session,
-          metadata: getSessionMetadata(session),
+          metadata,
           customerId: extractCustomerId(session),
         });
         break;
