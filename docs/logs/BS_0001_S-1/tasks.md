@@ -184,6 +184,7 @@ Cleanup
 - **PrimarySurface:** `API`
 - **Scope:** `apps/api/src/routes/dashboard.ts`
 - **Dependencies:** `T-1`, `T-2`
+- **PR:** https://github.com/putto11262002/sabaipics/pull/12
 - **Acceptance:**
   - Returns `{ credits: { balance, nearestExpiry }, events: [...], stats: {...} }`
   - Balance uses FIFO unexpired sum query
