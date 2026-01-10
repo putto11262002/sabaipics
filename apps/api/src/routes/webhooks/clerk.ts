@@ -3,6 +3,11 @@ import { Webhook } from "svix";
 import { photographers } from "@sabaipics/db/schema";
 import { eq } from "drizzle-orm";
 import type { Database } from "@sabaipics/db";
+import {
+	ClerkWebhookEventSchema,
+	getPrimaryEmail,
+	type ClerkWebhookEvent,
+} from "../../lib/clerk";
 
 // Use shared Bindings and Variables from index.ts
 type Bindings = CloudflareBindings;
@@ -37,10 +42,10 @@ export const clerkWebhookRouter = new Hono<Env>().post("/", async (c) => {
 
 	// Verify webhook signature
 	const wh = new Webhook(secret);
-	let event: any;
+	let verifiedEvent: unknown;
 
 	try {
-		event = wh.verify(body, {
+		verifiedEvent = wh.verify(body, {
 			"svix-id": svixId,
 			"svix-timestamp": svixTimestamp,
 			"svix-signature": svixSignature,
@@ -48,6 +53,15 @@ export const clerkWebhookRouter = new Hono<Env>().post("/", async (c) => {
 	} catch (err) {
 		return c.json({ error: "Bad request" }, 400);
 	}
+
+	// Parse and validate event with Zod schema
+	const parseResult = ClerkWebhookEventSchema.safeParse(verifiedEvent);
+	if (!parseResult.success) {
+		console.error("[Clerk Webhook] Invalid event shape:", parseResult.error);
+		return c.json({ error: "Bad request" }, 400);
+	}
+
+	const event = parseResult.data as ClerkWebhookEvent;
 
 	// Route to appropriate handler
 	try {
@@ -57,7 +71,7 @@ export const clerkWebhookRouter = new Hono<Env>().post("/", async (c) => {
 				const user = event.data;
 
 				// Extract primary email (required)
-				const email = user.email_addresses?.[0]?.email_address;
+				const email = getPrimaryEmail(user);
 				if (!email) {
 					console.error("[Clerk Webhook] ERROR: user.created without required email");
 					return c.json({ error: "Bad request" }, 500);
