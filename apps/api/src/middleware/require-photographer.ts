@@ -1,29 +1,25 @@
 import type { MiddlewareHandler } from "hono";
 import { eq } from "drizzle-orm";
-import { photographers } from "@sabaipics/db/schema";
+import { photographers, type Photographer, type Database } from "@sabaipics/db";
 import { createAuthError } from "@sabaipics/auth/errors";
 import type { AuthVariables } from "@sabaipics/auth/types";
-import { getDb } from "../lib/db";
 
 /**
  * Minimal photographer context stored in request
  * Contains only fields needed by most routes
  */
-export type PhotographerContext = {
-  id: string;
-  pdpaConsentAt: string | null;
-};
+export type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
 
 /**
  * Extended variables including photographer context
  * Use this type for routes that require photographer auth
  */
 export type PhotographerVariables = AuthVariables & {
+  db: () => Database;
   photographer: PhotographerContext;
 };
 
 type Env = {
-  Bindings: { DATABASE_URL: string };
   Variables: PhotographerVariables;
 };
 
@@ -49,7 +45,7 @@ export function requirePhotographer(): MiddlewareHandler<Env> {
       );
     }
 
-    const db = getDb(c);
+    const db = c.var.db();
     const [row] = await db
       .select({
         id: photographers.id,
