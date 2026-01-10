@@ -305,6 +305,7 @@ Cleanup
 - **PrimarySurface:** `UI`
 - **Scope:** `apps/dashboard/src/routes/credits/`
 - **Dependencies:** `T-8`, `T-9`
+- **PR:** https://github.com/putto11262002/sabaipics/pull/21
 - **Acceptance:**
   - Displays all active packages with price and credit amount
   - Select package → calls checkout API → redirects to Stripe
