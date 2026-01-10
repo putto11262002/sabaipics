@@ -10,7 +10,7 @@ import { consentRouter } from "./routes/consent";
 import { dashboardRouter } from "./routes/dashboard/route";
 import { creditsRouter } from "./routes/credits";
 import { photosRouter } from "./routes/photos";
-import type { Bindings, Variables } from "./types";
+import type { Env } from "./types";
 
 // Queue consumer
 import { queue } from "./queue/photo-consumer";
@@ -26,6 +26,7 @@ export { RekognitionRateLimiter } from "./durable-objects/rate-limiter";
 // =============================================================================
 
 // Register all event handlers at startup
+// Will n
 registerStripeHandlers();
 
 // =============================================================================
@@ -33,9 +34,9 @@ registerStripeHandlers();
 // =============================================================================
 
 // Method chaining - NEVER break the chain for type inference
-const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
+const app = new Hono<Env>()
   // DB injection for webhooks (no auth, no CORS - verified by signature)
-  .use("/webhooks/*", (c, next) => {
+  .use((c, next) => {
     c.set("db", () => createDb(c.env.DATABASE_URL));
     return next();
   })
@@ -47,10 +48,6 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
       origin: c.env.CORS_ORIGIN,
       credentials: true,
     })(c, next);
-  })
-  .use("/*", (c, next) => {
-    c.set("db", () => createDb(c.env.DATABASE_URL));
-    return next();
   })
   // Admin routes - API key auth, no Clerk (must be before Clerk middleware)
   .route("/admin", adminRouter)

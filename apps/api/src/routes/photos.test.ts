@@ -116,12 +116,13 @@ function createTestApp(options: {
     .use("/*", (c, next) => {
       // Initialize env object (required for tests since it's not auto-initialized)
       c.env = c.env || {};
-      // Set mock environment for CF_DOMAIN and R2_BASE_URL
-      c.env.CF_DOMAIN = "https://sabaipics.com";
-      c.env.R2_BASE_URL = "https://photos.sabaipics.com";
+      // Set mock environment for CF_ZONE and PHOTO_R2_BASE_URL
+      c.env.CF_ZONE = "https://sabaipics.com";
+      c.env.PHOTO_R2_BASE_URL = "https://photos.sabaipics.com";
       c.env.R2_ACCESS_KEY_ID = "test-key-id";
       c.env.R2_SECRET_ACCESS_KEY = "test-secret-key";
-      c.env.CLOUDFLARE_ACCOUNT_ID = "test-account-id";
+      c.env.CF_ACCOUNT_ID = "test-account-id";
+      c.env.PHOTO_BUCKET_NAME = "sabaipics-photos";
       if (photographer) {
         c.set("photographer", photographer);
       }
@@ -235,7 +236,7 @@ describe("GET /events/:id/photos", () => {
             id: MOCK_PHOTOGRAPHER_ID,
             pdpaConsentAt: "2026-01-01T00:00:00Z",
           });
-          c.env.CF_DOMAIN = "https://sabaipics.com";
+          c.env.CF_ZONE = "https://sabaipics.com";
           c.env.R2_BASE_URL = "https://photos.sabaipics.com";
           c.env.R2_ACCESS_KEY_ID = "test-key-id";
           c.env.R2_SECRET_ACCESS_KEY = "test-secret-key";

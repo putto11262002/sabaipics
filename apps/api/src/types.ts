@@ -3,7 +3,7 @@ import type { Database } from "@sabaipics/db";
 
 // Extend CloudflareBindings with secrets not in wrangler.jsonc
 export type Bindings = CloudflareBindings;
-// I dont think we need this because wrangler types generate thses types for us base on the wrangler.jsonc
+//   I dont think we need this because wrangler types generate thses types for us base on the wrangler.jsonc
 // & {
 //   ADMIN_API_KEY: string;
 //   STRIPE_SECRET_KEY: string;
@@ -23,9 +23,3 @@ export type Variables = AuthVariables & {
 };
 
 export type Env = { Bindings: Bindings; Variables: Variables };
-
-// Image URL env vars (from wrangler.jsonc vars)
-export type ImageUrlEnv = {
-  CF_DOMAIN: string;
-  R2_BASE_URL: string;
-};
