@@ -1,4 +1,5 @@
-import { AlertCircle, CreditCard, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, CreditCard, RefreshCw } from "lucide-react";
+import { Link } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
 import { Button } from "@sabaipics/ui/components/button";
 import {
@@ -10,7 +11,6 @@ import {
   CardTitle,
 } from "@sabaipics/ui/components/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@sabaipics/ui/components/empty";
-import { PageHeader } from "../../../components/shell/page-header";
 import { Skeleton } from "@sabaipics/ui/components/skeleton";
 import { Spinner } from "@sabaipics/ui/components/spinner";
 import { useCreditPackages } from "../../../hooks/credits/useCreditPackages";
@@ -45,14 +45,23 @@ export function CreditPackagesPage() {
   };
 
   return (
-    <div className="flex flex-1 flex-col">
-      <PageHeader
-        breadcrumbs={[
-          { label: "Credits", href: "/credits/packages" },
-          { label: "Packages" },
-        ]}
-      />
-      <div className="flex flex-1 flex-col gap-4 p-4">
+    <div className="flex min-h-screen flex-col bg-background">
+      <header className="border-b">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild>
+              <Link to="/dashboard">
+                <ArrowLeft className="size-5" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold">Credit Packages</h1>
+              <p className="text-sm text-muted-foreground">Choose a package to get started</p>
+            </div>
+          </div>
+        </div>
+      </header>
+      <div className="container mx-auto flex flex-1 flex-col gap-4 p-4">
         {isLoading && (
           <div className="grid auto-rows-min gap-4 md:grid-cols-3">
             <Skeleton className="h-40 w-full rounded-xl" />
