@@ -1,6 +1,7 @@
 import {
 	useAuth as useClerkAuth,
 	useUser as useClerkUser,
+	useClerk as useClerkInstance,
 } from "@clerk/clerk-react";
 
 /**
@@ -72,5 +73,21 @@ export function useUser() {
 			})),
 		} as User,
 		isLoaded,
+	};
+}
+
+/**
+ * useClerk - Access Clerk instance for advanced operations
+ *
+ * Provides access to Clerk methods like openUserProfile(), signOut(), etc.
+ */
+export function useClerk() {
+	const clerk = useClerkInstance();
+
+	return {
+		openUserProfile: () => clerk.openUserProfile(),
+		openSignIn: () => clerk.openSignIn(),
+		openSignUp: () => clerk.openSignUp(),
+		signOut: () => clerk.signOut(),
 	};
 }
