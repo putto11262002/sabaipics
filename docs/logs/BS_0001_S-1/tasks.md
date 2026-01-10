@@ -87,7 +87,7 @@ Cleanup
 ---
 
 ### T-3 — Admin credit packages API
-- [ ] Done
+- [x] Done
 - **Type:** `scaffold`
 - **StoryRefs:** US-4 (foundation for credit purchase)
 - **Goal:** Create admin endpoints to manage credit packages: GET/POST/PATCH /admin/credit-packages.
@@ -109,7 +109,7 @@ Cleanup
 ---
 
 ### T-4 — Clerk webhook handler for user.created
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-1
 - **Goal:** Handle Clerk `user.created` webhook to create photographer record in DB with email from Clerk user object.
@@ -131,7 +131,7 @@ Cleanup
 ---
 
 ### T-5 — PDPA consent API
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-1
 - **Goal:** Create `POST /consent` endpoint to record PDPA consent and update photographer record.
