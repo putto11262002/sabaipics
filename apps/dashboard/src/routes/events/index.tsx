@@ -5,6 +5,14 @@ import { Alert } from "@sabaipics/ui/components/alert";
 import { Skeleton } from "@sabaipics/ui/components/skeleton";
 import { Badge } from "@sabaipics/ui/components/badge";
 import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@sabaipics/ui/components/breadcrumb";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -56,10 +64,17 @@ export default function EventsPage() {
     return (
       <div className="container mx-auto p-6">
         <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Events</h1>
-            <p className="text-muted-foreground">Manage your photography events</p>
-          </div>
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Events</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
           <Skeleton className="h-10 w-32" />
         </div>
         <div className="space-y-2">
@@ -75,8 +90,17 @@ export default function EventsPage() {
     return (
       <div className="container mx-auto p-6">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">Events</h1>
-          <p className="text-muted-foreground">Manage your photography events</p>
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Events</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
         </div>
         <Alert variant="destructive">
           <p className="mb-3">{error.message}</p>
@@ -92,12 +116,19 @@ export default function EventsPage() {
 
   return (
     <div className="container mx-auto p-6">
-      {/* Header */}
+      {/* Header with Breadcrumb */}
       <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Events</h1>
-          <p className="text-muted-foreground">Manage your photography events</p>
-        </div>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Events</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <Button onClick={() => setIsCreateModalOpen(true)}>
           <Plus className="mr-2 size-4" />
           Create Event
@@ -137,12 +168,12 @@ export default function EventsPage() {
             return (
               <div
                 key={event.id}
-                className="group flex items-center justify-between rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors cursor-pointer"
+                className="group flex items-center justify-between gap-4 rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors cursor-pointer"
                 onClick={() => navigate(`/events/${event.id}`)}
               >
-                <div className="flex-1 space-y-1.5">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-semibold text-lg">{event.name}</h3>
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold text-lg truncate">{event.name}</h3>
                     {isExpired ? (
                       <Badge variant="destructive" className="text-xs">Expired</Badge>
                     ) : isExpiringSoon ? (
@@ -155,61 +186,49 @@ export default function EventsPage() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
                     <span>
                       Created {formatDistanceToNow(parseISO(event.createdAt), { addSuffix: true })}
                     </span>
                     {event.startDate && event.endDate && (
                       <>
-                        <span>•</span>
-                        <span>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="hidden sm:inline">
                           {new Date(event.startDate).toLocaleDateString()} - {new Date(event.endDate).toLocaleDateString()}
                         </span>
                       </>
                     )}
-                    <span>•</span>
+                    <span className="hidden sm:inline">•</span>
                     <span>
                       Expires {formatDistanceToNow(parseISO(event.expiresAt), { addSuffix: true })}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/events/${event.id}`)}
-                  >
-                    <Eye className="mr-2 size-4" />
-                    View
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleCopyLink(event.accessCode)}
-                  >
-                    <ExternalLink className="mr-2 size-4" />
-                    {isCopied ? "Copied!" : "Copy Link"}
-                  </Button>
-                  {event.qrCodeUrl && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}
-                    >
-                      <Download className="mr-2 size-4" />
-                      QR
-                    </Button>
-                  )}
+                <div className="flex-shrink-0" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8">
                         <MoreHorizontal className="size-4" />
-                        <span className="sr-only">More options</span>
+                        <span className="sr-only">Actions</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>More Actions</DropdownMenuLabel>
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => navigate(`/events/${event.id}`)}>
+                        <Eye className="mr-2 size-4" />
+                        View Event
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleCopyLink(event.accessCode)}>
+                        <ExternalLink className="mr-2 size-4" />
+                        {isCopied ? "Link Copied!" : "Copy Search Link"}
+                      </DropdownMenuItem>
+                      {event.qrCodeUrl && (
+                        <DropdownMenuItem onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}>
+                          <Download className="mr-2 size-4" />
+                          Download QR Code
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem className="text-destructive">
                         <Trash2 className="mr-2 size-4" />
                         Delete Event

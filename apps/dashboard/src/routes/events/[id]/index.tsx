@@ -5,6 +5,15 @@ import { Skeleton } from "@sabaipics/ui/components/skeleton";
 import { Badge } from "@sabaipics/ui/components/badge";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@sabaipics/ui/components/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@sabaipics/ui/components/tabs";
+import { Separator } from "@sabaipics/ui/components/separator";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@sabaipics/ui/components/breadcrumb";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -143,44 +152,49 @@ export default function EventDetailPage() {
 
   return (
     <div className="container mx-auto p-6">
-      {/* Header */}
-      <div className="mb-6 flex items-center gap-4">
-        <Button
-          onClick={() => navigate("/events")}
-          variant="ghost"
-          size="icon"
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
-        <div className="flex flex-1 items-center justify-between">
-          <h1 className="text-3xl font-bold">{event.name}</h1>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <MoreVertical className="size-4" />
-                <span className="sr-only">Open menu</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleCopyLink(event.accessCode)}>
-                <ExternalLink className="mr-2 size-4" />
-                {isCopied ? "Link Copied!" : "Copy Search Link"}
+      {/* Breadcrumb */}
+      <div className="mb-6 flex items-center justify-between">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/events">Events</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{event.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon">
+              <MoreVertical className="size-4" />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleCopyLink(event.accessCode)}>
+              <ExternalLink className="mr-2 size-4" />
+              {isCopied ? "Link Copied!" : "Copy Search Link"}
+            </DropdownMenuItem>
+            {event.qrCodeUrl && (
+              <DropdownMenuItem onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}>
+                <Download className="mr-2 size-4" />
+                Download QR Code
               </DropdownMenuItem>
-              {event.qrCodeUrl && (
-                <DropdownMenuItem onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}>
-                  <Download className="mr-2 size-4" />
-                  Download QR Code
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
-                <Trash2 className="mr-2 size-4" />
-                Delete Event
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive">
+              <Trash2 className="mr-2 size-4" />
+              Delete Event
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Tabs */}
@@ -260,6 +274,8 @@ export default function EventDetailPage() {
             </div>
           </div>
 
+          <Separator />
+
           {/* QR Code Section */}
           <div>
             <h3 className="text-lg font-semibold mb-4">QR Code</h3>
@@ -320,6 +336,8 @@ export default function EventDetailPage() {
             </div>
             </div>
           </div>
+
+          <Separator />
 
           {/* Slideshow Section */}
           <div>
