@@ -3,7 +3,7 @@
 Task: `T-6 — Signup UI + PDPA consent modal`
 Root: `BS_0001_S-1`
 Branch: `task/T-6-signup-pdpa-consent`
-PR: `pending`
+PR: https://github.com/putto11262002/sabaipics/pull/14
 Date: `2026-01-10`
 
 ## Outcome
