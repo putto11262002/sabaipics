@@ -22,6 +22,7 @@
 	"dependencies": {
 		"@aws-sdk/client-rekognition": "^3.946.0",
 		"@hono/zod-validator": "^0.7.6",
+		"@juit/qrcode": "^1.0.78",
 		"@line/bot-sdk": "^10.5.0",
 		"@sabaipics/auth": "workspace:*",
 		"@sabaipics/db": "workspace:*",

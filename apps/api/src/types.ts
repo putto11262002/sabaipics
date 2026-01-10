@@ -6,6 +6,7 @@ export type Bindings = CloudflareBindings & {
   ADMIN_API_KEY: string;
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
+  APP_BASE_URL: string;
 };
 
 export type Variables = AuthVariables & {

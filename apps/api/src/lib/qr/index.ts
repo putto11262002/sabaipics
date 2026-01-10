@@ -1,0 +1,1 @@
+export { generateEventQR } from "./generate";

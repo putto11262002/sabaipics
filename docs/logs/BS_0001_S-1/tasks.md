@@ -346,7 +346,7 @@ Cleanup
 ---
 
 ### T-14 — QR code generation library
-- [ ] Done
+- [x] Done
 - **Type:** `scaffold`
 - **StoryRefs:** US-5, US-6
 - **Refs:** `docs/logs/BS_0001_S-1/research/qr-code-library.md`
@@ -354,6 +354,7 @@ Cleanup
 - **PrimarySurface:** `API`
 - **Scope:** `apps/api/src/lib/qr/`
 - **Dependencies:** None
+- **PR:** https://github.com/putto11262002/sabaipics/pull/18
 - **Acceptance:**
   - `generateEventQR(accessCode)` returns PNG Uint8Array
   - QR contains both search and slideshow URLs
