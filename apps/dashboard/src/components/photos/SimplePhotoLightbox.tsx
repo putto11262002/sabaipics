@@ -24,7 +24,6 @@ export function SimplePhotoLightbox({
       close={onClose}
       slides={slides}
       index={index}
-      toolbar={{ buttons: [] }}
     />
   );
 }

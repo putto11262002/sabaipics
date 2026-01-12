@@ -20,12 +20,24 @@ export const photos = pgTable(
     status: text("status", { enum: photoStatuses }).notNull().default("uploading"),
     faceCount: integer("face_count").default(0),
     retryable: boolean("retryable"), // null=success, true=retryable, false=non-retryable
-    errorMessage: text("error_message"),
+    errorName: text("error_name"), // AWS error name (e.g., "ThrottlingException")
     uploadedAt: timestamptz("uploaded_at").defaultNow().notNull(),
+    // Normalized image metadata
+    width: integer("width"), // pixel width after normalization
+    height: integer("height"), // pixel height after normalization
+    fileSize: integer("file_size"), // bytes of stored JPEG
+    // Original upload metadata
+    originalMimeType: text("original_mime_type"), // original upload mime type
+    originalFileSize: integer("original_file_size"), // original size before normalization
+    // Indexing timestamp
+    indexedAt: timestamptz("indexed_at"), // when indexing completed
+    // Soft delete
+    deletedAt: timestamptz("deleted_at"), // null = active, set = soft deleted
   },
   (table) => [
     index("photos_event_id_idx").on(table.eventId),
     index("photos_status_idx").on(table.status),
+    index("photos_deleted_at_idx").on(table.deletedAt),
   ]
 );
 

@@ -1,6 +1,6 @@
 {
-  "id": "8e4c4d60-4102-4568-8363-4cf28ae80c1b",
-  "prevId": "29f9c86e-a800-4388-8c17-8ff1c220165e",
+  "id": "a1e91e28-79ed-45c3-b6fb-13a9df61acd9",
+  "prevId": "0a123d3f-f8e3-4a0f-a19f-1eef534fbbac",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -485,8 +485,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "error_message": {
-          "name": "error_message",
+        "error_name": {
+          "name": "error_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -497,6 +497,48 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_size": {
+          "name": "file_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "original_mime_type": {
+          "name": "original_mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "original_file_size": {
+          "name": "original_file_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "indexed_at": {
+          "name": "indexed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -520,6 +562,21 @@
           "columns": [
             {
               "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "photos_deleted_at_idx": {
+          "name": "photos_deleted_at_idx",
+          "columns": [
+            {
+              "expression": "deleted_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

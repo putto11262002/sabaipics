@@ -9,7 +9,12 @@ import { DashboardPage } from "./routes/dashboard";
 import { CreditPackagesPage } from "./routes/credits/packages";
 import { CreditSuccessPage } from "./routes/credits/success";
 import EventsPage from "./routes/events";
-import EventDetailPage from "./routes/events/[id]";
+import EventDetailLayout from "./routes/events/[id]/layout";
+import EventDetailsTab from "./routes/events/[id]/details";
+import EventUploadTab from "./routes/events/[id]/upload";
+import EventStatisticsTab from "./routes/events/[id]/statistics";
+import EventPhotosTab from "./routes/events/[id]/photos";
+import EventFacesTab from "./routes/events/[id]/faces";
 import { Layout } from "./components/Layout";
 
 export default function App() {
@@ -55,7 +60,14 @@ export default function App() {
       >
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/events" element={<EventsPage />} />
-        <Route path="/events/:id" element={<EventDetailPage />} />
+        <Route path="/events/:id" element={<EventDetailLayout />}>
+          <Route index element={<Navigate to="details" replace />} />
+          <Route path="details" element={<EventDetailsTab />} />
+          <Route path="upload" element={<EventUploadTab />} />
+          <Route path="statistics" element={<EventStatisticsTab />} />
+          <Route path="photos" element={<EventPhotosTab />} />
+          <Route path="faces" element={<EventFacesTab />} />
+        </Route>
         {/* Future: /settings, etc. */}
       </Route>
 

@@ -1,6 +1,6 @@
 {
-  "id": "8b4e4bd1-09a1-4ac1-adb6-e507fefee30c",
-  "prevId": "89982b0a-2c40-4990-b455-c71d57db6576",
+  "id": "0a123d3f-f8e3-4a0f-a19f-1eef534fbbac",
+  "prevId": "f2b67ef6-f520-4c85-ba86-ed77e3b11127",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -485,8 +485,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "error_message": {
-          "name": "error_message",
+        "error_name": {
+          "name": "error_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -497,6 +497,42 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_size": {
+          "name": "file_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "original_mime_type": {
+          "name": "original_mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "original_file_size": {
+          "name": "original_file_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "indexed_at": {
+          "name": "indexed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {

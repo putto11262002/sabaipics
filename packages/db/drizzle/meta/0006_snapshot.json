@@ -1,6 +1,6 @@
 {
-  "id": "8b4e4bd1-09a1-4ac1-adb6-e507fefee30c",
-  "prevId": "89982b0a-2c40-4990-b455-c71d57db6576",
+  "id": "f2b67ef6-f520-4c85-ba86-ed77e3b11127",
+  "prevId": "8b4e4bd1-09a1-4ac1-adb6-e507fefee30c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -485,8 +485,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "error_message": {
-          "name": "error_message",
+        "error_name": {
+          "name": "error_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false
