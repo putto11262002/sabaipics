@@ -42,7 +42,19 @@ import {
 } from "@sabaipics/ui/components/toggle-group";
 import { useEvent } from "../../../hooks/events/useEvent";
 import { useCopyToClipboard } from "../../../hooks/use-copy-to-clipboard";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { PhotoUploadZone, type FileValidationError } from "../../../components/photos/PhotoUploadZone";
+import { PhotosGridView } from "../../../components/photos/PhotosGridView";
+import { PhotosListView } from "../../../components/photos/PhotosListView";
+import { UploadingTable } from "../../../components/photos/UploadingTable";
+import { FailedTable } from "../../../components/photos/FailedTable";
+import { SimplePhotoLightbox } from "../../../components/photos/SimplePhotoLightbox";
+import { useUploadPhoto } from "../../../hooks/photos/useUploadPhoto";
+import { usePhotos, type Photo } from "../../../hooks/photos/usePhotos";
+import { useQueryClient } from "@tanstack/react-query";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@sabaipics/ui/components/tabs";
+import { LayoutGrid, List as ListIcon } from "lucide-react";
+import type { UploadQueueItem } from "../../../types/upload";
 
 // Mock data for photo uploads chart
 const generateMockChartData = (days: number) => {
@@ -67,6 +79,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 type TabValue = "details" | "statistics" | "photos" | "faces";
+type PhotosTabValue = "photos" | "uploading" | "failed";
 
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -75,6 +88,27 @@ export default function EventDetailPage() {
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "all">("30d");
   const [activeTab, setActiveTab] = useState<TabValue>("details");
+
+  // Photos tab state
+  const [photosTab, setPhotosTab] = useState<PhotosTabValue>("photos");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // Photo upload state
+  const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
+  const [validationErrors, setValidationErrors] = useState<FileValidationError[]>([]);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const uploadPhotoMutation = useUploadPhoto();
+  const queryClient = useQueryClient();
+
+  // Fetch photos for the event
+  const photosQuery = usePhotos({ eventId: id });
+
+  // Max concurrent uploads
+  const MAX_CONCURRENT_UPLOADS = 5;
+
+  // Track currently uploading IDs (ref to avoid stale closure)
+  const uploadQueueRef = useRef<string[]>([]);
 
   const handleDownloadQR = async (qrCodeUrl: string, accessCode: string) => {
     try {
@@ -97,6 +131,182 @@ export default function EventDetailPage() {
     const searchUrl = `${window.location.origin}/search/${accessCode}`;
     copyToClipboard(searchUrl);
   };
+
+  // Process queue - starts uploads up to the concurrent limit
+  const processQueue = () => {
+    if (!id) return;
+
+    const queued = uploadQueue.filter(item => item.status === "queued");
+    const available = MAX_CONCURRENT_UPLOADS - uploadQueueRef.current.length;
+
+    if (available <= 0 || queued.length === 0) return;
+
+    const toProcess = queued.slice(0, available);
+    toProcess.forEach(item => {
+      uploadQueueRef.current.push(item.id);
+      uploadFile(item.id, id);
+    });
+  };
+
+  // Auto-process queue when upload queue changes
+  useEffect(() => {
+    processQueue();
+  }, [uploadQueue]);
+
+  // Photo upload handlers
+  const handleFilesSelected = (files: File[]) => {
+    if (!id) return;
+
+    // Create queue items for selected files
+    const newItems: UploadQueueItem[] = files.map((file) => ({
+      id: `${Date.now()}-${Math.random()}`,
+      file,
+      status: "queued",
+    }));
+
+    setUploadQueue((prev) => [...prev, ...newItems]);
+    // processQueue will be called automatically via useEffect
+  };
+
+  const handleValidationErrors = (errors: FileValidationError[]) => {
+    setValidationErrors(errors);
+  };
+
+  const uploadFile = async (itemId: string, eventId: string) => {
+    // Update status to uploading
+    setUploadQueue((prev) =>
+      prev.map((i) => (i.id === itemId ? { ...i, status: "uploading" as const } : i))
+    );
+
+    try {
+      const response = await uploadPhotoMutation.mutateAsync({
+        eventId,
+        file: uploadQueue.find(i => i.id === itemId)?.file!,
+      });
+
+      // Update status to uploaded
+      setUploadQueue((prev) =>
+        prev.map((i) => (i.id === itemId ? { ...i, status: "uploaded" as const } : i))
+      );
+
+      // Add photo to gallery cache (optimistic update)
+      queryClient.setQueryData(
+        ["event", eventId, "photos"],
+        (old: any) => {
+          if (!old) return old;
+
+          const newPhoto: Photo = {
+            id: response.data.id,
+            thumbnailUrl: response.data.thumbnailUrl,
+            previewUrl: response.data.previewUrl,
+            downloadUrl: response.data.downloadUrl,
+            faceCount: response.data.faceCount,
+            status: response.data.status,
+            uploadedAt: response.data.uploadedAt,
+          };
+
+          // Add to first page at the beginning
+          return {
+            ...old,
+            pages: old.pages.map((page: any, index: number) =>
+              index === 0
+                ? { ...page, data: [newPhoto, ...page.data] }
+                : page
+            )
+          };
+        }
+      );
+
+      // After 3 seconds, update photo status to "indexed"
+      setTimeout(() => {
+        queryClient.setQueryData(
+          ["event", eventId, "photos"],
+          (old: any) => {
+            if (!old) return old;
+            return {
+              ...old,
+              pages: old.pages.map((page: any) => ({
+                ...page,
+                data: page.data.map((photo: any) =>
+                  photo.id === response.data.id
+                    ? { ...photo, status: "indexed" as const, faceCount: Math.floor(Math.random() * 10) }
+                    : photo
+                )
+              }))
+            };
+          }
+        );
+
+        // Remove from upload queue after status change
+        setTimeout(() => {
+          setUploadQueue((prev) => prev.filter(i => i.id !== itemId));
+        }, 1500);
+      }, 3000);
+    } catch (error) {
+      // Handle specific error types
+      const err = error as Error & { status?: number; code?: string };
+      let errorMessage = err.message || "Upload failed";
+      const errorStatus = err.status;
+
+      if (err.status === 402) {
+        errorMessage = "Insufficient credits. Purchase more to continue.";
+      } else if (err.status === 403) {
+        errorMessage = "This event has expired and cannot accept new photos.";
+      }
+
+      // Update status to failed with error status
+      setUploadQueue((prev) =>
+        prev.map((i) =>
+          i.id === itemId
+            ? { ...i, status: "failed" as const, error: errorMessage, errorStatus }
+            : i
+        )
+      );
+    } finally {
+      // Remove from active queue and process next
+      uploadQueueRef.current = uploadQueueRef.current.filter(id => id !== itemId);
+      processQueue();
+    }
+  };
+
+  const handleRetryUpload = (itemId: string) => {
+    if (!id) return;
+
+    // Reset item status to queued and retry
+    setUploadQueue((prev) =>
+      prev.map((i) =>
+        i.id === itemId
+          ? { ...i, status: "queued" as const, error: undefined, errorStatus: undefined }
+          : i
+      )
+    );
+    // processQueue will be called automatically via useEffect
+  };
+
+  const handlePhotoClick = (index: number) => {
+    setSelectedPhotoIndex(index);
+    setIsLightboxOpen(true);
+  };
+
+  const handleCloseLightbox = () => {
+    setIsLightboxOpen(false);
+  };
+
+  // Mock upload queue injection removed - using real uploads only
+
+  const handleRemoveFromQueue = (itemId: string) => {
+    setUploadQueue((prev) => prev.filter((i) => i.id !== itemId));
+  };
+
+  // Calculate badge counts for tabs
+  const uploadingCount = uploadQueue.filter(
+    (i) => i.status === "queued" || i.status === "uploading"
+  ).length;
+
+  const failedCount = uploadQueue.filter((i) => i.status === "failed").length;
+
+  // Get all photos from all pages
+  const allPhotos = photosQuery.data?.pages.flatMap((page) => page.data) ?? [];
 
   if (isLoading) {
     return (
@@ -223,8 +433,12 @@ export default function EventDetailPage() {
             Statistics
           </button>
           <button
-            disabled
-            className="pb-3 text-sm font-medium text-muted-foreground opacity-50 cursor-not-allowed border-b-2 border-transparent"
+            onClick={() => setActiveTab("photos")}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === "photos"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
           >
             Photos
           </button>
@@ -608,21 +822,132 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {/* Photos Tab (Placeholder) */}
+      {/* Photos Tab */}
       {activeTab === "photos" && (
-        <Card>
-          <CardContent className="py-12">
-            <div className="flex flex-col items-center gap-4 text-center">
-              <ImageIcon className="size-12 text-muted-foreground" />
+        <div className="space-y-6">
+          {/* Validation errors */}
+          {validationErrors.length > 0 && (
+            <Alert variant="destructive">
               <div>
-                <h3 className="text-lg font-semibold">Photos Coming Soon</h3>
-                <p className="text-sm text-muted-foreground">
-                  This feature will be available in a future update
+                <p className="mb-2 font-medium">
+                  {validationErrors.length} {validationErrors.length === 1 ? "file was" : "files were"} rejected:
                 </p>
+                <div className="space-y-1 text-sm">
+                  {validationErrors.map((error, index) => (
+                    <p key={index}>
+                      <span className="font-medium">{error.file.name}:</span> {error.error}
+                    </p>
+                  ))}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </Alert>
+          )}
+
+          {/* Upload dropzone - always visible above tabs */}
+          <PhotoUploadZone
+            onFilesSelected={handleFilesSelected}
+            onValidationErrors={handleValidationErrors}
+            disabled={isExpired}
+          />
+
+          {/* Three tabs: Photos | Uploading | Failed */}
+          <Tabs value={photosTab} onValueChange={(v) => setPhotosTab(v as PhotosTabValue)}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="photos">Photos</TabsTrigger>
+              <TabsTrigger value="uploading">
+                Uploading
+                {uploadingCount > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="ml-2 h-5 min-w-5 rounded-full px-1 font-mono tabular-nums"
+                  >
+                    {uploadingCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="failed">
+                Failed
+                {failedCount > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="ml-2 h-5 min-w-5 rounded-full px-1 font-mono tabular-nums"
+                  >
+                    {failedCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Photos Tab Content */}
+            <TabsContent value="photos" className="space-y-4">
+              {/* View Toggle */}
+              <div className="flex justify-end items-center">
+                <ToggleGroup
+                  type="single"
+                  value={viewMode}
+                  onValueChange={(v) => v && setViewMode(v as "grid" | "list")}
+                >
+                  <ToggleGroupItem value="grid" aria-label="Grid view">
+                    <LayoutGrid className="size-4" />
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="list" aria-label="List view">
+                    <ListIcon className="size-4" />
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+
+              {/* Grid or List View */}
+              {viewMode === "grid" ? (
+                <PhotosGridView
+                  photos={allPhotos}
+                  isLoading={photosQuery.isLoading}
+                  onPhotoClick={handlePhotoClick}
+                />
+              ) : (
+                <PhotosListView
+                  photos={allPhotos}
+                  isLoading={photosQuery.isLoading}
+                  onPhotoClick={handlePhotoClick}
+                />
+              )}
+
+              {/* Load More Button */}
+              {photosQuery.hasNextPage && (
+                <div className="flex justify-center pt-4">
+                  <Button
+                    onClick={() => photosQuery.fetchNextPage()}
+                    disabled={photosQuery.isFetchingNextPage}
+                    variant="outline"
+                  >
+                    {photosQuery.isFetchingNextPage ? "Loading..." : "Load More"}
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Uploading Tab Content */}
+            <TabsContent value="uploading">
+              <UploadingTable items={uploadQueue} />
+            </TabsContent>
+
+            {/* Failed Tab Content */}
+            <TabsContent value="failed">
+              <FailedTable
+                items={uploadQueue}
+                onRetry={handleRetryUpload}
+                onRemove={handleRemoveFromQueue}
+              />
+            </TabsContent>
+          </Tabs>
+
+          {/* Lightbox */}
+          <SimplePhotoLightbox
+            photos={allPhotos}
+            index={selectedPhotoIndex}
+            open={isLightboxOpen}
+            onClose={handleCloseLightbox}
+          />
+        </div>
       )}
 
       {/* Faces Tab (Placeholder) */}

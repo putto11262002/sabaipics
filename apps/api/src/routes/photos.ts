@@ -21,6 +21,7 @@ const querySchema = z.object({
 		.min(1, 'Limit must be at least 1')
 		.max(50, 'Limit cannot exceed 50')
 		.default(20),
+	status: z.enum(['processing', 'indexed', 'failed']).optional(), // Optional status filter
 });
 
 // Error helpers
@@ -40,7 +41,7 @@ export const photosRouter = new Hono<Env>().get(
 	zValidator('query', querySchema),
 	async (c) => {
 		const { eventId } = c.req.valid('param');
-		const { cursor, limit } = c.req.valid('query');
+		const { cursor, limit, status } = c.req.valid('query');
 
 		const photographer = c.var.photographer;
 		const db = c.var.db();
@@ -69,7 +70,13 @@ export const photosRouter = new Hono<Env>().get(
 				uploadedAt: photos.uploadedAt,
 			})
 			.from(photos)
-			.where(and(eq(photos.eventId, eventId), cursor ? lt(photos.uploadedAt, cursor) : undefined))
+			.where(
+				and(
+					eq(photos.eventId, eventId),
+					status ? eq(photos.status, status) : undefined,
+					cursor ? lt(photos.uploadedAt, cursor) : undefined
+				)
+			)
 			.orderBy(desc(photos.uploadedAt))
 			.limit(cursorLimit);
 
