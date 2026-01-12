@@ -6,19 +6,23 @@ import {
   TableHeader,
   TableRow,
 } from "@sabaipics/ui/components/table";
-import { Button } from "@sabaipics/ui/components/button";
 import { Checkbox } from "@sabaipics/ui/components/checkbox";
 import { Skeleton } from "@sabaipics/ui/components/skeleton";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@sabaipics/ui/components/empty";
-import { Download, Image as ImageIcon } from "lucide-react";
+import { Check, Image as ImageIcon } from "lucide-react";
 import type { Photo } from "../../hooks/photos/usePhotos";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from "@tanstack/react-table";
+import { toast } from "sonner";
+
+const MAX_SELECTION = 15;
 
 interface PhotosListViewProps {
   photos: Photo[];
   isLoading: boolean;
   onPhotoClick: (index: number) => void;
+  onSelectionChange?: (photoIds: string[]) => void;
+  isSelectionMode?: boolean;
 }
 
 // Format file size utility
@@ -43,8 +47,15 @@ function formatDate(isoString: string): string {
 
 const columnHelper = createColumnHelper<Photo & { index: number }>();
 
-export function PhotosListView({ photos, isLoading, onPhotoClick }: PhotosListViewProps) {
+export function PhotosListView({
+  photos,
+  isLoading,
+  onPhotoClick,
+  onSelectionChange,
+  isSelectionMode = false
+}: PhotosListViewProps) {
   const [rowSelection, setRowSelection] = useState({});
+  const previousPhotoIdsRef = useRef<string[]>([]);
 
   const photosWithIndex = photos.map((photo, index) => ({ ...photo, index }));
 
@@ -52,41 +63,63 @@ export function PhotosListView({ photos, isLoading, onPhotoClick }: PhotosListVi
     columnHelper.display({
       id: "select",
       header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
+        isSelectionMode ? (
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+          />
+        ) : null
       ),
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          onCheckedChange={(value) => handleToggleRowSelection(row.id, !!value)}
           aria-label="Select row"
         />
       ),
     }),
     columnHelper.accessor("thumbnailUrl", {
       header: "Preview",
-      cell: (info) => (
-        <img
-          src={info.getValue()}
-          className="size-12 rounded object-cover cursor-pointer"
-          onClick={() => onPhotoClick(info.row.original.index)}
-          alt=""
-        />
-      ),
+      cell: (info) => {
+        const photo = info.row.original;
+        const isSelected = info.row.getIsSelected();
+        return (
+          <div className="relative size-12">
+            <img
+              src={info.getValue()}
+              className={`size-12 rounded object-cover ${isSelectionMode ? 'cursor-pointer' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => {
+                if (isSelectionMode) {
+                  handleToggleRowSelection(info.row.id, !isSelected);
+                } else {
+                  onPhotoClick(photo.index);
+                }
+              }}
+              alt=""
+            />
+            {isSelected && (
+              <div className="absolute inset-0 bg-black/50 rounded flex items-center justify-center">
+                <Check className="size-4 text-white" />
+              </div>
+            )}
+          </div>
+        );
+      },
     }),
     columnHelper.accessor("uploadedAt", {
       header: "Uploaded At",
       cell: (info) => formatDate(info.getValue()),
     }),
-    columnHelper.display({
-      id: "fileSize",
+    columnHelper.accessor("fileSize", {
       header: "File Size",
-      cell: () => {
-        const estimatedSize = Math.floor(Math.random() * 3 + 2) * 1024 * 1024;
-        return <span className="text-muted-foreground">{formatFileSize(estimatedSize)}</span>;
+      cell: (info) => {
+        const fileSize = info.getValue();
+        return (
+          <span className="text-muted-foreground">
+            {fileSize ? formatFileSize(fileSize) : "-"}
+          </span>
+        );
       },
     }),
     columnHelper.accessor("faceCount", {
@@ -103,27 +136,35 @@ export function PhotosListView({ photos, isLoading, onPhotoClick }: PhotosListVi
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
     getRowId: (_, index) => String(index),
+    enableMultiRowSelection: true,
   });
 
-  const handleBulkDownload = async () => {
+  // Notify parent of selection changes (only when actually changed)
+  useEffect(() => {
     const selectedRows = table.getFilteredSelectedRowModel().rows;
-    for (const row of selectedRows) {
-      const photo = row.original;
-      try {
-        const response = await fetch(photo.downloadUrl);
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `photo-${photo.id}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error("Failed to download photo:", error);
-      }
+    const photoIds = selectedRows.map((row) => row.original.id);
+
+    // Only notify if the actual photo IDs changed
+    const prevIds = previousPhotoIdsRef.current;
+    const hasChanged = photoIds.length !== prevIds.length ||
+      photoIds.some((id, i) => prevIds[i] !== id);
+
+    if (hasChanged) {
+      previousPhotoIdsRef.current = photoIds;
+      onSelectionChange?.(photoIds);
     }
+  }, [rowSelection, photosWithIndex, onSelectionChange]);
+
+  const handleToggleRowSelection = (rowId: string, value: boolean) => {
+    const row = table.getRow(rowId);
+    const currentSelectionCount = table.getFilteredSelectedRowModel().rows.length;
+    const isCurrentlySelected = row.getIsSelected();
+
+    if (value && !isCurrentlySelected && currentSelectionCount >= MAX_SELECTION) {
+      toast.error(`Maximum ${MAX_SELECTION} photos can be selected`);
+      return;
+    }
+    row.toggleSelected(!!value);
   };
 
   // Loading state
@@ -194,32 +235,28 @@ export function PhotosListView({ photos, isLoading, onPhotoClick }: PhotosListVi
           ))}
         </TableHeader>
         <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id} className="cursor-pointer hover:bg-muted/50">
-              {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
+          {table.getRowModel().rows.map((row) => {
+            const isSelected = row.getIsSelected();
+            return (
+              <TableRow
+                key={row.id}
+                className={`cursor-pointer hover:bg-muted/50 ${isSelected ? 'bg-muted/50' : ''}`}
+                onClick={() => {
+                  if (isSelectionMode) {
+                    handleToggleRowSelection(row.id, !isSelected);
+                  }
+                }}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
-
-      {/* Bulk action bar */}
-      {table.getFilteredSelectedRowModel().rows.length > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-background border rounded-lg shadow-lg p-4 z-50">
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium">
-              {table.getFilteredSelectedRowModel().rows.length} selected
-            </span>
-            <Button size="sm" onClick={handleBulkDownload}>
-              <Download className="size-4 mr-2" />
-              Download Selected
-            </Button>
-          </div>
-        </div>
-      )}
     </>
   );
 }

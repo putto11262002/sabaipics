@@ -2,16 +2,19 @@
  * Rekognition Integration
  *
  * Re-exports for clean imports:
- * import { indexFaces, isRetryableError } from "../lib/rekognition";
+ * import { indexFacesSafe, RekognitionError } from "../lib/rekognition";
  */
 
 // Client and operations
 export {
   createRekognitionClient,
   createCollection,
+  createCollectionSafe,
   deleteCollection,
   indexFaces,
+  indexFacesSafe,
   getCollectionId,
+  RekognitionError,
   type RekognitionEnv,
   type IndexFacesResult,
   // SDK types
@@ -26,9 +29,12 @@ export {
   type Pose,
   type ImageQuality,
   type Reason,
-} from "./client";
+} from './client';
 
-// Error handling
+// Base error types
+export { MyError, type MyErrorOptions } from '../error';
+
+// Legacy error helpers (still work with RekognitionError)
 export {
   isRetryableError,
   isNonRetryableError,
@@ -36,4 +42,4 @@ export {
   getBackoffDelay,
   getThrottleBackoffDelay,
   formatErrorMessage,
-} from "./errors";
+} from './errors';

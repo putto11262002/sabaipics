@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 // =============================================================================
 // Request Schemas
@@ -22,25 +22,26 @@ export const listEventsQuerySchema = z.object({
 // Photo upload validation
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/heic",
-  "image/heif",
-  "image/webp",
+  'image/jpeg',
+  'image/png',
+  'image/heic',
+  'image/heif',
+  'image/webp',
 ] as const;
 
 export const uploadPhotoSchema = z.object({
   file: z
     .instanceof(File)
-    .refine((file) => file.size > 0, "File cannot be empty")
+    .refine((file) => file.size > 0, 'File cannot be empty')
     .refine(
       (file) => file.size <= MAX_FILE_SIZE,
-      `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024} MB`
+      `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024} MB`,
     )
     .refine(
       (file) => ALLOWED_MIME_TYPES.includes(file.type as any),
-      `File type must be one of: ${ALLOWED_MIME_TYPES.join(", ")}`
+      `File type must be one of: ${ALLOWED_MIME_TYPES.join(', ')}`,
     ),
+  eventId: z.string().uuid(),
 });
 
 // =============================================================================
