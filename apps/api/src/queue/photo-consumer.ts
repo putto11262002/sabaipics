@@ -52,6 +52,60 @@ interface ProcessingResult {
 }
 
 // =============================================================================
+// Image Transformation
+// =============================================================================
+
+/**
+ * Transform image to meet Rekognition size requirements.
+ *
+ * Uses browser APIs available in Cloudflare Workers:
+ * - createImageBitmap for decoding
+ * - OffscreenCanvas for resizing
+ * - JPEG encoding at quality 85
+ *
+ * @param imageBytes - Original image as ArrayBuffer
+ * @returns Transformed image as ArrayBuffer (JPEG, quality 85, max 4096x4096)
+ */
+async function transformImageForRekognition(
+  imageBytes: ArrayBuffer
+): Promise<ArrayBuffer> {
+  // Step 1: Create a Blob from the ArrayBuffer
+  const blob = new Blob([imageBytes]);
+
+  // Step 2: Decode the image using createImageBitmap
+  const imageBitmap = await createImageBitmap(blob);
+
+  // Step 3: Calculate new dimensions (max 4096x4096, maintain aspect ratio)
+  const maxDimension = 4096;
+  let { width, height } = imageBitmap;
+
+  if (width > maxDimension || height > maxDimension) {
+    const scale = Math.min(maxDimension / width, maxDimension / height);
+    width = Math.floor(width * scale);
+    height = Math.floor(height * scale);
+  }
+
+  // Step 4: Create an OffscreenCanvas and draw the resized image
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) {
+    throw new Error("Failed to get 2D context from OffscreenCanvas");
+  }
+
+  ctx.drawImage(imageBitmap, 0, 0, width, height);
+
+  // Step 5: Convert to JPEG blob with quality 85
+  const transformedBlob = await canvas.convertToBlob({
+    type: "image/jpeg",
+    quality: 0.85,
+  });
+
+  // Step 6: Convert blob back to ArrayBuffer
+  return await transformedBlob.arrayBuffer();
+}
+
+// =============================================================================
 // Database Persistence
 // =============================================================================
 
@@ -212,7 +266,29 @@ export async function queue(
           };
         }
 
-        const imageBytes = await object.arrayBuffer();
+        let imageBytes = await object.arrayBuffer();
+
+        // Check size and transform if needed for Rekognition
+        const MAX_REKOGNITION_SIZE = 5 * 1024 * 1024; // 5 MB
+
+        if (imageBytes.byteLength > MAX_REKOGNITION_SIZE) {
+          console.log(
+            `[Queue] Image too large (${(imageBytes.byteLength / 1024 / 1024).toFixed(2)} MB), transforming...`
+          );
+
+          try {
+            // Transform image using Workers Image API
+            const transformedBytes = await transformImageForRekognition(imageBytes);
+            imageBytes = transformedBytes;
+
+            console.log(
+              `[Queue] Transformed to ${(imageBytes.byteLength / 1024 / 1024).toFixed(2)} MB`
+            );
+          } catch (transformError) {
+            console.error(`[Queue] Image transformation failed:`, transformError);
+            // Continue with original image - let Rekognition reject if too large
+          }
+        }
 
         // Call Rekognition IndexFaces
         const result = await indexFaces(
