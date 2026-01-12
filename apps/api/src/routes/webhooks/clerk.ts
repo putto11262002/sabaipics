@@ -3,17 +3,9 @@ import { Webhook } from "svix";
 import { photographers } from "@sabaipics/db/schema";
 import { eq } from "drizzle-orm";
 import type { Database } from "@sabaipics/db";
+import type { Env } from "../../types";
 
-// Use shared Bindings and Variables from index.ts
-type Bindings = CloudflareBindings;
-type Variables = {
-	db: () => Database;
-};
-
-type Env = {
-	Bindings: Bindings;
-	Variables: Variables;
-};
+// Use shared types from ../../types
 
 // Minimal type for Clerk webhook events (no validation, trust Svix signature)
 interface ClerkWebhookEvent {

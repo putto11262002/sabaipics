@@ -475,13 +475,13 @@ export const eventsRouter = new Hono<Env>()
             stripeSessionId: null,
           });
 
-          // Create photo record with status='processing'
+          // Create photo record with status='uploading'
           const [newPhoto] = await tx
             .insert(photos)
             .values({
               eventId,
               r2Key: "", // Temporary, will be set below
-              status: "processing",
+              status: "uploading",
               faceCount: 0,
             })
             .returning();
