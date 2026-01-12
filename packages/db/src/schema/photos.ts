@@ -1,10 +1,10 @@
-import { pgTable, text, integer, index, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, index, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { timestamptz } from "./common";
 import { events } from "./events";
 
 // Enum for photo processing status (DBSCHEMA-001)
-export const photoStatuses = ["processing", "indexed", "failed"] as const;
+export const photoStatuses = ["uploading", "indexing", "indexed", "failed"] as const;
 export type PhotoStatus = (typeof photoStatuses)[number];
 
 export const photos = pgTable(
@@ -17,8 +17,10 @@ export const photos = pgTable(
       .notNull()
       .references(() => events.id, { onDelete: "restrict" }),
     r2Key: text("r2_key").notNull(), // Single normalized JPEG
-    status: text("status", { enum: photoStatuses }).notNull().default("processing"),
+    status: text("status", { enum: photoStatuses }).notNull().default("uploading"),
     faceCount: integer("face_count").default(0),
+    retryable: boolean("retryable"), // null=success, true=retryable, false=non-retryable
+    errorMessage: text("error_message"),
     uploadedAt: timestamptz("uploaded_at").defaultNow().notNull(),
   },
   (table) => [

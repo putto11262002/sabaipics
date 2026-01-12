@@ -664,7 +664,7 @@ describe("POST /events/:id/photos - Photo Upload", () => {
     id: MOCK_PHOTO_ID,
     eventId: MOCK_EVENT_ID,
     r2Key: `${MOCK_EVENT_ID}/${MOCK_PHOTO_ID}.jpg`,
-    status: "processing" as const,
+    status: "uploading" as const,
     faceCount: 0,
     uploadedAt: "2026-01-11T00:00:00Z",
   };
@@ -978,7 +978,7 @@ describe("POST /events/:id/photos - Photo Upload", () => {
       expect(body.data).toHaveProperty("id");
       expect(body.data).toHaveProperty("eventId");
       expect(body.data).toHaveProperty("r2Key");
-      expect(body.data).toHaveProperty("status", "processing");
+      expect(body.data).toHaveProperty("status", "uploading");
       expect(body.data).toHaveProperty("faceCount", 0);
       expect(body.data).toHaveProperty("uploadedAt");
 
