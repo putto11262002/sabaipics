@@ -29,6 +29,11 @@
 		}
 	],
 
+	// Images API binding for transformation
+	"images": {
+		"binding": "IMAGES"
+	},
+
 	// Queue bindings
 	"queues": {
 		"producers": [

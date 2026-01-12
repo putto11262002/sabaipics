@@ -1,0 +1,1 @@
+ALTER TABLE "photos" ALTER COLUMN "retryable" SET DATA TYPE boolean;

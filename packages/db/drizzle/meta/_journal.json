@@ -29,6 +29,20 @@
       "when": 1768057637986,
       "tag": "0003_misty_nomad",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1768196397998,
+      "tag": "0004_quiet_magus",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1768196604776,
+      "tag": "0005_concerned_wendell_rand",
+      "breakpoints": true
     }
   ]
 }
