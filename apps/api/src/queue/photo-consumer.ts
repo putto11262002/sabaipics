@@ -18,6 +18,7 @@
  */
 
 import type { PhotoJob } from "../types/photo-job";
+import type { Bindings } from "../types";
 import {
   createRekognitionClient,
   indexFaces,
@@ -58,51 +59,33 @@ interface ProcessingResult {
 /**
  * Transform image to meet Rekognition size requirements.
  *
- * Uses browser APIs available in Cloudflare Workers:
- * - createImageBitmap for decoding
- * - OffscreenCanvas for resizing
+ * Uses Cloudflare Images API binding for optimized image transformation:
+ * - Resize to max 4096x4096 (maintains aspect ratio)
  * - JPEG encoding at quality 85
  *
+ * @param env - Cloudflare bindings (includes IMAGES binding)
  * @param imageBytes - Original image as ArrayBuffer
  * @returns Transformed image as ArrayBuffer (JPEG, quality 85, max 4096x4096)
  */
 async function transformImageForRekognition(
+  env: Bindings,
   imageBytes: ArrayBuffer
 ): Promise<ArrayBuffer> {
-  // Step 1: Create a Blob from the ArrayBuffer
-  const blob = new Blob([imageBytes]);
-
-  // Step 2: Decode the image using createImageBitmap
-  const imageBitmap = await createImageBitmap(blob);
-
-  // Step 3: Calculate new dimensions (max 4096x4096, maintain aspect ratio)
-  const maxDimension = 4096;
-  let { width, height } = imageBitmap;
-
-  if (width > maxDimension || height > maxDimension) {
-    const scale = Math.min(maxDimension / width, maxDimension / height);
-    width = Math.floor(width * scale);
-    height = Math.floor(height * scale);
-  }
-
-  // Step 4: Create an OffscreenCanvas and draw the resized image
-  const canvas = new OffscreenCanvas(width, height);
-  const ctx = canvas.getContext("2d");
-
-  if (!ctx) {
-    throw new Error("Failed to get 2D context from OffscreenCanvas");
-  }
-
-  ctx.drawImage(imageBitmap, 0, 0, width, height);
-
-  // Step 5: Convert to JPEG blob with quality 85
-  const transformedBlob = await canvas.convertToBlob({
-    type: "image/jpeg",
-    quality: 0.85,
+  // Convert ArrayBuffer to ReadableStream for CF Images API
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(imageBytes));
+      controller.close();
+    },
   });
 
-  // Step 6: Convert blob back to ArrayBuffer
-  return await transformedBlob.arrayBuffer();
+  // Transform using CF Images API
+  const response = await env.IMAGES.input(stream)
+    .transform({ width: 4096, height: 4096 })
+    .output({ format: "image/jpeg", quality: 85 });
+
+  // Get the transformed image as ArrayBuffer
+  return await response.response().arrayBuffer();
 }
 
 // =============================================================================
@@ -216,7 +199,7 @@ async function persistFacesAndUpdatePhoto(
  */
 export async function queue(
   batch: MessageBatch<PhotoJob>,
-  env: CloudflareBindings,
+  env: Bindings,
   ctx: ExecutionContext
 ): Promise<void> {
   if (batch.messages.length === 0) {
@@ -277,8 +260,8 @@ export async function queue(
           );
 
           try {
-            // Transform image using Workers Image API
-            const transformedBytes = await transformImageForRekognition(imageBytes);
+            // Transform image using CF Images API
+            const transformedBytes = await transformImageForRekognition(env, imageBytes);
             imageBytes = transformedBytes;
 
             console.log(
