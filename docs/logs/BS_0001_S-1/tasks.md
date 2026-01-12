@@ -371,9 +371,10 @@ Cleanup
 ---
 
 ### T-15 — Events UI (list + create modal + QR display)
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-5, US-6
+- **PR:** https://github.com/putto11262002/sabaipics/pull/25
 - **Goal:** Create events list on dashboard, event creation modal, and QR code display/download.
 - **PrimarySurface:** `UI`
 - **Scope:** `apps/dashboard/src/routes/events/`, `apps/dashboard/src/components/`
@@ -425,9 +426,10 @@ Cleanup
 ---
 
 ### T-17 — Photo queue consumer (Rekognition indexing)
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-8
+- **PR:** https://github.com/putto11262002/sabaipics/pull/29
 - **Refs:** `docs/logs/BS_0001_S-1/research/heic-rekognition.md`
 - **Goal:** Update queue consumer to create Rekognition collection on first photo, call IndexFaces, and store full response.
 - **PrimarySurface:** `Jobs`
@@ -478,9 +480,10 @@ Cleanup
 ---
 
 ### T-19 — Upload dropzone + Gallery UI
-- [ ] Done
+- [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-7, US-9
+- **PR:** https://github.com/putto11262002/sabaipics/pull/27
 - **Goal:** Create upload dropzone with progress tracking and photo gallery grid with lightbox.
 - **PrimarySurface:** `UI`
 - **Scope:** `apps/dashboard/src/routes/events/[id]/`, `apps/dashboard/src/components/`
