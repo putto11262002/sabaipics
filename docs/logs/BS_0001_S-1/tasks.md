@@ -509,7 +509,7 @@ Cleanup
 ---
 
 ### T-20 — Rekognition cleanup cron job
-- [ ] Done
+- [x] Done
 - **Type:** `hardening`
 - **StoryRefs:** None (ops)
 - **Goal:** Create cron job to delete Rekognition collections for events older than 30 days.
