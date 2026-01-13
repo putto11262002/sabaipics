@@ -17,7 +17,9 @@
 		"CF_ZONE": "https://sabaipics.com",
 		"CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
 		"PHOTO_BUCKET_NAME": "sabaipics-photos",
-		"PHOTO_R2_BASE_URL": "https://photo.sabaipics.com"
+		"PHOTO_R2_BASE_URL": "https://photo.sabaipics.com",
+		"RETENTION_DAYS": "30",
+		"CLEANUP_BATCH_SIZE": "10"
 	},
 
 	// R2 bucket for photo storage
@@ -40,6 +42,10 @@
 			{
 				"queue": "photo-processing",
 				"binding": "PHOTO_QUEUE"
+			},
+			{
+				"queue": "rekognition-cleanup",
+				"binding": "CLEANUP_QUEUE"
 			}
 		],
 		"consumers": [
@@ -50,6 +56,14 @@
 				"max_retries": 3,
 				"max_concurrency": 1,
 				"dead_letter_queue": "photo-processing-dlq"
+			},
+			{
+				"queue": "rekognition-cleanup",
+				"max_batch_size": 10,
+				"max_batch_timeout": 30,
+				"max_retries": 3,
+				"max_concurrency": 1,
+				"dead_letter_queue": "rekognition-cleanup-dlq"
 			}
 		]
 	},
@@ -83,7 +97,9 @@
 				"CF_ZONE": "https://sabaipics.com",
 				"CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
 				"PHOTO_BUCKET_NAME": "sabaipics-photos-staging",
-				"PHOTO_R2_BASE_URL": "https://photos-staging.sabaipics.com"
+				"PHOTO_R2_BASE_URL": "https://photos-staging.sabaipics.com",
+				"RETENTION_DAYS": "30",
+				"CLEANUP_BATCH_SIZE": "10"
 			},
 			"routes": [
 				{
@@ -103,6 +119,10 @@
 					{
 						"queue": "photo-processing-staging",
 						"binding": "PHOTO_QUEUE"
+					},
+					{
+						"queue": "rekognition-cleanup-staging",
+						"binding": "CLEANUP_QUEUE"
 					}
 				],
 				"consumers": [
@@ -113,6 +133,14 @@
 						"max_retries": 3,
 						"max_concurrency": 1,
 						"dead_letter_queue": "photo-processing-dlq-staging"
+					},
+					{
+						"queue": "rekognition-cleanup-staging",
+						"max_batch_size": 10,
+						"max_batch_timeout": 30,
+						"max_retries": 3,
+						"max_concurrency": 1,
+						"dead_letter_queue": "rekognition-cleanup-dlq-staging"
 					}
 				]
 			},
@@ -123,6 +151,9 @@
 						"class_name": "RekognitionRateLimiter"
 					}
 				]
+			},
+			"triggers": {
+				"crons": ["0 20 * * *"]
 			},
 			"observability": {
 				"enabled": true,
@@ -139,7 +170,9 @@
 				"CF_ZONE": "https://sabaipics.com",
 				"CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
 				"PHOTO_BUCKET_NAME": "sabaipics-photos",
-				"PHOTO_R2_BASE_URL": "https://photo.sabaipics.com"
+				"PHOTO_R2_BASE_URL": "https://photo.sabaipics.com",
+				"RETENTION_DAYS": "30",
+				"CLEANUP_BATCH_SIZE": "10"
 			},
 			"routes": [
 				{
@@ -159,6 +192,10 @@
 					{
 						"queue": "photo-processing",
 						"binding": "PHOTO_QUEUE"
+					},
+					{
+						"queue": "rekognition-cleanup",
+						"binding": "CLEANUP_QUEUE"
 					}
 				],
 				"consumers": [
@@ -169,6 +206,14 @@
 						"max_retries": 3,
 						"max_concurrency": 1,
 						"dead_letter_queue": "photo-processing-dlq"
+					},
+					{
+						"queue": "rekognition-cleanup",
+						"max_batch_size": 10,
+						"max_batch_timeout": 30,
+						"max_retries": 3,
+						"max_concurrency": 1,
+						"dead_letter_queue": "rekognition-cleanup-dlq"
 					}
 				]
 			},
@@ -179,6 +224,9 @@
 						"class_name": "RekognitionRateLimiter"
 					}
 				]
+			},
+			"triggers": {
+				"crons": ["0 20 * * *"]
 			},
 			"preview_urls": false,
 			"observability": {
