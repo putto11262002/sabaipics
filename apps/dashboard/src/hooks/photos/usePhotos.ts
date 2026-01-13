@@ -1,25 +1,27 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { api, useApiClient } from '../../lib/api';
+import { api } from '../../lib/api';
 import { type InferResponseType } from 'hono/client';
 
-const getPhoto = api.events[':eventId'].photos.$get;
+const listPhotos = api.events[':eventId'].photos.$post;
 
-export type Photo = InferResponseType<typeof getPhoto, 200>['data'][0];
+export type Photo = InferResponseType<typeof listPhotos, 200>['data'][0];
+export type PhotoStatus = 'uploading' | 'indexing' | 'indexed' | 'failed';
 
-export function usePhotos({ eventId }: { eventId: string | undefined }) {
-  const { api } = useApiClient();
-
+export function usePhotos({ eventId, status }: { eventId: string | undefined; status?: PhotoStatus[] }) {
   return useInfiniteQuery({
-    queryKey: ['event', eventId, 'photos'],
+    queryKey: ['event', eventId, 'photos', status],
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
       if (!eventId) {
         throw new Error('eventId is required');
       }
 
-      const res = await api.events[':eventId'].photos.$get(
+      const res = await listPhotos(
         {
           param: { eventId },
-          query: pageParam ? { cursor: pageParam } : {},
+          json: {
+            ...(pageParam ? { cursor: pageParam } : {}),
+            ...(status ? { status } : {}),
+          },
         },
         {
           init: {
@@ -32,7 +34,7 @@ export function usePhotos({ eventId }: { eventId: string | undefined }) {
         throw new Error(`Failed to fetch photos: ${res.status}`);
       }
 
-      return (await res.json()) as InferResponseType<typeof getPhoto, 200>;
+      return (await res.json()) as InferResponseType<typeof listPhotos, 200>;
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => {

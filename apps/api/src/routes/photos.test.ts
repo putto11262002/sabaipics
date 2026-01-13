@@ -133,14 +133,14 @@ function createTestApp(options: {
   return { app };
 }
 
-describe("GET /events/:id/photos", () => {
+describe("POST /events/:id/photos", () => {
   describe("Auth tests", () => {
     it("returns 401 without authentication", async () => {
       const { app } = createTestApp({ hasAuth: false });
       const client = testClient(app);
-      const res = await client.events[":eventId"].photos.$get({
+      const res = await client.events[":eventId"].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
-        query: {},
+        json: {},
       });
 
       expect(res.status).toBe(401);
@@ -149,9 +149,9 @@ describe("GET /events/:id/photos", () => {
     it("returns 403 without photographer in context", async () => {
       const { app } = createTestApp({ photographer: null });
       const client = testClient(app);
-      const res = await client.events[":eventId"].photos.$get({
+      const res = await client.events[":eventId"].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
-        query: {},
+        json: {},
       });
 
       // Note: requirePhotographer() middleware returns 403 when no photographer found
@@ -164,9 +164,9 @@ describe("GET /events/:id/photos", () => {
       const { app } = createTestApp({ event: null });
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$get({
+      const res = await client.events[":eventId"].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
-        query: {},
+        json: {},
       });
 
       expect(res.status).toBe(404);
@@ -191,9 +191,9 @@ describe("GET /events/:id/photos", () => {
       const { app } = createTestApp({ photos: mockPhotos });
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$get({
+      const res = await client.events[":eventId"].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
-        query: {},
+        json: {},
       });
 
       expect(res.status).toBe(200);
@@ -247,9 +247,9 @@ describe("GET /events/:id/photos", () => {
 
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$get({
+      const res = await client.events[":eventId"].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
-        query: { limit: 20 },
+        json: { limit: 20 },
       });
 
       expect(res.status).toBe(200);
@@ -262,9 +262,9 @@ describe("GET /events/:id/photos", () => {
       const { app } = createTestApp({ photos: [] });
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$get({
+      const res = await client.events[":eventId"].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
-        query: {},
+        json: {},
       });
 
       expect(res.status).toBe(200);
@@ -280,9 +280,9 @@ describe("GET /events/:id/photos", () => {
       const { app } = createTestApp();
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$get({
+      const res = await client.events[":eventId"].photos.$post({
         param: { eventId: "not-a-uuid" },
-        query: {},
+        json: {},
       });
 
       expect(res.status).toBe(400);
@@ -292,9 +292,9 @@ describe("GET /events/:id/photos", () => {
       const { app } = createTestApp();
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$get({
+      const res = await client.events[":eventId"].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
-        query: { limit: 51 },
+        json: { limit: 51 },
       });
 
       expect(res.status).toBe(400);
@@ -304,9 +304,9 @@ describe("GET /events/:id/photos", () => {
       const { app } = createTestApp();
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$get({
+      const res = await client.events[":eventId"].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
-        query: { limit: 0 },
+        json: { limit: 0 },
       });
 
       expect(res.status).toBe(400);
@@ -316,9 +316,9 @@ describe("GET /events/:id/photos", () => {
       const { app } = createTestApp();
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$get({
+      const res = await client.events[":eventId"].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
-        query: { cursor: "not-a-datetime" },
+        json: { cursor: "not-a-datetime" },
       });
 
       expect(res.status).toBe(400);

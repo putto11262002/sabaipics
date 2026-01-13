@@ -1,6 +1,5 @@
 import { AspectRatio } from "@sabaipics/ui/components/aspect-ratio";
 import { Badge } from "@sabaipics/ui/components/badge";
-import { Checkbox } from "@sabaipics/ui/components/checkbox";
 import { Skeleton } from "@sabaipics/ui/components/skeleton";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@sabaipics/ui/components/empty";
 import { Check, Image as ImageIcon } from "lucide-react";
@@ -128,23 +127,6 @@ export function PhotosGridView({
                 </div>
               )}
 
-              {/* Selection mode checkbox (visible in selection mode or on hover) */}
-              {(isSelectionMode || (!isSelectionMode && isSelected)) && (
-                <div
-                  className={`absolute top-2 left-2 z-20 ${isSelected || isSelectionMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggleRowSelection(String(index), !isSelected);
-                  }}
-                >
-                  <Checkbox
-                    checked={isSelected}
-                    className="bg-background"
-                    aria-label={`Select photo ${photo.id}`}
-                  />
-                </div>
-              )}
-
               {/* Photo display */}
               <div>
                 <AspectRatio ratio={1} className="overflow-hidden">
@@ -156,15 +138,33 @@ export function PhotosGridView({
                   />
                 </AspectRatio>
 
-                {/* Face count badge overlay */}
-                {!isSelectionMode && (photo.status === 'uploading' || photo.status === 'indexing') ? (
-                  <Badge className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Skeleton className="h-4 w-12 inline-block align-middle" />
-                  </Badge>
-                ) : !isSelectionMode && photo.status === 'indexed' && (
-                  <Badge className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {photo.faceCount} {photo.faceCount === 1 ? "face" : "faces"}
-                  </Badge>
+                {/* Status and face count badges */}
+                {!isSelectionMode && (
+                  <>
+                    {/* Status badge (for non-indexed photos) */}
+                    {photo.status === 'uploading' && (
+                      <Badge variant="secondary" className="absolute top-2 right-2">
+                        Uploading
+                      </Badge>
+                    )}
+                    {photo.status === 'indexing' && (
+                      <Badge variant="secondary" className="absolute top-2 right-2">
+                        Indexing
+                      </Badge>
+                    )}
+                    {photo.status === 'failed' && (
+                      <Badge variant="destructive" className="absolute top-2 right-2">
+                        Failed
+                      </Badge>
+                    )}
+
+                    {/* Face count badge (only for indexed photos on hover) */}
+                    {photo.status === 'indexed' && (
+                      <Badge className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {photo.faceCount} {photo.faceCount === 1 ? "face" : "faces"}
+                      </Badge>
+                    )}
+                  </>
                 )}
               </div>
             </div>
