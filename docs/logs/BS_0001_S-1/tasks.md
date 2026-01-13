@@ -516,6 +516,7 @@ Cleanup
 - **PrimarySurface:** `Jobs`
 - **Scope:** `apps/api/src/cron/`, `apps/api/wrangler.jsonc`
 - **Dependencies:** `T-1`, `T-17`
+- **PR:** https://github.com/putto11262002/sabaipics/pull/31
 - **Acceptance:**
   - Runs daily via Cloudflare Cron Trigger
   - Finds events where `created_at < NOW - 30 days` AND `rekognition_collection_id IS NOT NULL`
