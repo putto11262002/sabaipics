@@ -32,7 +32,7 @@ const listPhotosParamsSchema = z.object({
   eventId: z.string().uuid('Invalid event ID format'),
 });
 
-const listPhotosQuerySchema = z.object({
+const listPhotosBodySchema = z.object({
   cursor: z.string().datetime('Invalid cursor format').optional(),
   limit: z.coerce
     .number()
@@ -91,78 +91,102 @@ function generatePreviewUrl(r2Key: string, cfDomain: string, r2BaseUrl: string):
 // Routes
 // =============================================================================
 
-// Photos listing router - mounted at /events
-export const photosListRouter = new Hono<Env>().get(
+// Photos listing router (POST) - mounted at /events
+export const photosListRouter = new Hono<Env>().post(
   '/:eventId/photos',
   requirePhotographer(),
   zValidator('param', listPhotosParamsSchema),
-  zValidator('query', listPhotosQuerySchema),
+  zValidator('json', listPhotosBodySchema),
   async (c) => {
     const { eventId } = c.req.valid('param');
-    const { cursor, limit, status } = c.req.valid('query');
+    const { cursor, limit, status } = c.req.valid('json');
 
     const photographer = c.var.photographer;
     const db = c.var.db();
 
-    // CRITICAL: Verify event ownership BEFORE querying photos
-    const [event] = await db
-      .select({ id: events.id })
-      .from(events)
-      .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
-      .limit(1);
+    // Use neverthrow pattern - wrap all async operations
+    return await safeTry(async function* () {
+      // CRITICAL: Verify event ownership BEFORE querying photos
+      const [event] = yield* ResultAsync.fromPromise(
+        db
+          .select({ id: events.id })
+          .from(events)
+          .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
+          .limit(1)
+          .then((rows) => rows),
+        (error): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to fetch event',
+          cause: error,
+        }),
+      );
 
-    if (!event) {
-      return apiError(c, 'NOT_FOUND', 'Event not found');
-    }
+      if (!event) {
+        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+      }
 
-    // Cursor-based pagination: fetch limit + 1 to determine hasMore
-    const parsedLimit = Math.min(limit, 50);
-    const cursorLimit = parsedLimit + 1;
+      // Cursor-based pagination: fetch limit + 1 to determine hasMore
+      const parsedLimit = Math.min(limit, 50);
+      const cursorLimit = parsedLimit + 1;
 
-    const photoRows = await db
-      .select({
-        id: photos.id,
-        r2Key: photos.r2Key,
-        status: photos.status,
-        faceCount: photos.faceCount,
-        fileSize: photos.fileSize,
-        uploadedAt: photos.uploadedAt,
-      })
-      .from(photos)
-      .where(
-        and(
-          eq(photos.eventId, eventId),
-          isNull(photos.deletedAt), // Exclude soft-deleted photos
-          status ? inArray(photos.status, status) : undefined,
-          cursor ? lt(photos.uploadedAt, cursor) : undefined,
-        ),
-      )
-      .orderBy(desc(photos.uploadedAt))
-      .limit(cursorLimit);
+      const photoRows = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            id: photos.id,
+            r2Key: photos.r2Key,
+            status: photos.status,
+            faceCount: photos.faceCount,
+            fileSize: photos.fileSize,
+            uploadedAt: photos.uploadedAt,
+          })
+          .from(photos)
+          .where(
+            and(
+              eq(photos.eventId, eventId),
+              isNull(photos.deletedAt), // Exclude soft-deleted photos
+              status ? inArray(photos.status, status) : undefined,
+              cursor ? lt(photos.uploadedAt, cursor) : undefined,
+            ),
+          )
+          .orderBy(desc(photos.uploadedAt))
+          .limit(cursorLimit)
+          .then((rows) => rows),
+        (error): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to fetch photos',
+          cause: error,
+        }),
+      );
 
-    // Determine hasMore and trim extra row
-    const hasMore = photoRows.length > parsedLimit;
-    const items = hasMore ? photoRows.slice(0, parsedLimit) : photoRows;
-    const nextCursor = hasMore ? items[parsedLimit - 1].uploadedAt : null;
+      // Determine hasMore and trim extra row
+      const hasMore = photoRows.length > parsedLimit;
+      const items = hasMore ? photoRows.slice(0, parsedLimit) : photoRows;
+      const nextCursor = hasMore ? items[parsedLimit - 1].uploadedAt : null;
 
-    // Generate URLs for each photo
-    const data = items.map((photo) => ({
-      id: photo.id,
-      thumbnailUrl: generateThumbnailUrl(photo.r2Key, c.env.CF_ZONE, c.env.PHOTO_R2_BASE_URL),
-      previewUrl: generatePreviewUrl(photo.r2Key, c.env.CF_ZONE, c.env.PHOTO_R2_BASE_URL),
-      faceCount: photo.faceCount,
-      fileSize: photo.fileSize,
-      status: photo.status,
-      uploadedAt: photo.uploadedAt,
-    }));
+      // Generate URLs for each photo
+      const data = items.map((photo) => ({
+        id: photo.id,
+        thumbnailUrl: generateThumbnailUrl(photo.r2Key, c.env.CF_ZONE, c.env.PHOTO_R2_BASE_URL),
+        previewUrl: generatePreviewUrl(photo.r2Key, c.env.CF_ZONE, c.env.PHOTO_R2_BASE_URL),
+        faceCount: photo.faceCount,
+        fileSize: photo.fileSize,
+        status: photo.status,
+        uploadedAt: photo.uploadedAt,
+      }));
 
-    return c.json({
-      data,
-      pagination: {
-        nextCursor,
-        hasMore,
-      },
-    });
+      return ok({
+        data,
+        pagination: {
+          nextCursor,
+          hasMore,
+        },
+      });
+    })
+      .orTee((e) => e.cause && console.error(`[${c.req.url}] ${e.code}:`, e.cause))
+      .match(
+        (result) => c.json(result),
+        (e) => apiError(c, e),
+      );
   },
 );
 

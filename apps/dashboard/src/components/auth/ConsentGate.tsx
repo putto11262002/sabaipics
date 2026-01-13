@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from "react-router";
+import { Navigate, useLocation, Outlet } from "react-router";
 import {
 	Empty,
 	EmptyDescription,
@@ -10,7 +10,7 @@ import { Spinner } from "@sabaipics/ui/components/spinner";
 import { useConsentStatus } from "../../hooks/consent/useConsentStatus";
 
 interface ConsentGateProps {
-	children: React.ReactNode;
+	children?: React.ReactNode;
 }
 
 /**
@@ -52,6 +52,6 @@ export function ConsentGate({ children }: ConsentGateProps) {
 		);
 	}
 
-	// User has consented - render children
-	return <>{children}</>;
+	// User has consented - render children or outlet
+	return <>{children || <Outlet />}</>;
 }

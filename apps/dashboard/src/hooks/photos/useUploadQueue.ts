@@ -42,16 +42,14 @@ export function useUploadQueue(eventId: string | undefined) {
     async (item: UploadQueueItem, processNext: () => void) => {
       if (!eventId) return;
 
-      // Add to log immediately (prepend - newest first)
-      setUploadLog((prev) => [
-        {
-          id: item.id,
-          fileName: item.file.name,
-          uploadStatus: 'uploading',
-          startedAt: Date.now(),
-        },
-        ...prev,
-      ]);
+      // Update existing log entry from 'queued' to 'uploading'
+      setUploadLog((prev) =>
+        prev.map((entry) =>
+          entry.id === item.id
+            ? { ...entry, uploadStatus: 'uploading' as const, startedAt: Date.now() }
+            : entry,
+        ),
+      );
 
       try {
         const result = await uploadPhotoMutation.mutateAsync({
@@ -131,11 +129,22 @@ export function useUploadQueue(eventId: string | undefined) {
   // Add files to queue
   const addFiles = useCallback(
     (files: File[]) => {
+      const now = Date.now();
       const newItems: UploadQueueItem[] = files.map((file) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        id: `${now}-${Math.random().toString(36).slice(2)}`,
         file,
         status: 'queued' as const,
       }));
+
+      // Create log entries immediately for queued files (prepend - newest first)
+      const newLogEntries: UploadLogEntry[] = newItems.map((item) => ({
+        id: item.id,
+        fileName: item.file.name,
+        uploadStatus: 'queued' as const,
+        queuedAt: now,
+      }));
+
+      setUploadLog((prev) => [...newLogEntries, ...prev]);
 
       pendingQueueRef.current.push(...newItems);
       processQueue();
