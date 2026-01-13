@@ -13,8 +13,7 @@ import {
   type FaceRecord,
   type UnindexedFace,
 } from '@aws-sdk/client-rekognition';
-import { ResultAsync, ok, err } from 'neverthrow';
-import { MyError, type MyErrorOptions } from '../error';
+import { ResultAsync } from 'neverthrow';
 
 // =============================================================================
 // Types
@@ -35,23 +34,6 @@ export interface IndexFacesResult {
 // =============================================================================
 // Error Types
 // =============================================================================
-
-/**
- * Base error for all Rekognition operations.
- * Extends MyError with AWS-specific error name preservation.
- *
- * @example
- * const err = new RekognitionError('Collection already exists', {
- *   retryable: false,
- *   name: 'ResourceAlreadyExistsException',
- *   cause: originalAwsError,
- * });
- */
-export class RekognitionError extends MyError {
-  constructor(message: string, options: MyErrorOptions) {
-    super(message, options);
-  }
-}
 
 /**
  * AWS SDK errors that are retryable (transient failures).
@@ -75,24 +57,33 @@ const THROTTLE_AWS_ERRORS = new Set([
 ]);
 
 /**
- * Map AWS SDK error to RekognitionError.
- * Determines retryable and isThrottle based on error name.
- * Preserves original error name and cause for debugging.
+ * Plain object error type for Rekognition operations.
+ * Uses discriminated union pattern for typed error handling.
  */
-function mapAwsError(awsError: unknown): RekognitionError {
-  const e = awsError as { name?: string; message?: string };
+export type AWSRekognitionError = {
+  type: 'AWSRekognitionError';
+  name: string;
+  retryable: boolean;
+  throttle: boolean;
+  cause: unknown;
+};
 
-  const errorName = e.name ?? 'UnknownError';
-  const retryable = RETRYABLE_AWS_ERRORS.has(errorName);
-  const isThrottle = THROTTLE_AWS_ERRORS.has(errorName);
+/**
+ * Convert unknown error to typed AWSRekognitionError.
+ * Wraps AWS SDK exceptions at the boundary.
+ */
+export const toAWSRekognitionError = (e: unknown): AWSRekognitionError => {
+  const awsErr = e as { name?: string };
+  const name = awsErr.name ?? 'UnknownError';
 
-  return new RekognitionError(e.message ?? 'AWS error occurred', {
-    name: errorName,
-    retryable,
-    isThrottle,
-    cause: awsError,
-  });
-}
+  return {
+    type: 'AWSRekognitionError',
+    name,
+    retryable: RETRYABLE_AWS_ERRORS.has(name),
+    throttle: THROTTLE_AWS_ERRORS.has(name),
+    cause: e,
+  };
+};
 
 // =============================================================================
 // Client Factory
@@ -116,65 +107,51 @@ export function createRekognitionClient(env: RekognitionEnv): RekognitionClient 
 // =============================================================================
 
 /**
- * Create a Rekognition collection for an event.
- * Collection ID = event_id (UUID)
- *
- * @param client - Rekognition client
- * @param eventId - Event UUID
- * @returns Collection ARN
- */
-export async function createCollection(
-  client: RekognitionClient,
-  eventId: string,
-): Promise<string> {
-  const collectionId = getCollectionId(eventId);
-
-  const command = new CreateCollectionCommand({
-    CollectionId: collectionId,
-  });
-
-  const response = await client.send(command);
-  return response.CollectionArn ?? collectionId;
-}
-
-/**
  * Safe wrapper for createCollection using neverthrow Result.
- * Returns ResultAsync<string, RekognitionError> where string is the Collection ARN.
+ * Returns ResultAsync<string, AWSRekognitionError> where string is the Collection ARN.
+ *
+ * Uses plain object error pattern (discriminated union) for typed error handling.
  *
  * @param client - Rekognition client
  * @param eventId - Event UUID
- * @returns ResultAsync with Collection ARN or RekognitionError
+ * @returns ResultAsync with Collection ARN or AWSRekognitionError
  */
 export function createCollectionSafe(
   client: RekognitionClient,
   eventId: string,
-): ResultAsync<string, RekognitionError> {
+): ResultAsync<string, AWSRekognitionError> {
   const collectionId = getCollectionId(eventId);
 
   const command = new CreateCollectionCommand({
     CollectionId: collectionId,
   });
 
-  return ResultAsync.fromPromise(client.send(command), mapAwsError).map(
+  return ResultAsync.fromPromise(client.send(command), toAWSRekognitionError).map(
     (response) => response.CollectionArn ?? collectionId,
   );
 }
 
 /**
- * Delete a Rekognition collection.
- * Called when event expires or is deleted.
+ * Safe wrapper for deleteCollection using neverthrow Result.
+ * Returns ResultAsync<void, AWSRekognitionError>.
+ *
+ * Uses plain object error pattern (discriminated union) for typed error handling.
  *
  * @param client - Rekognition client
  * @param eventId - Event UUID
+ * @returns ResultAsync with void or AWSRekognitionError
  */
-export async function deleteCollection(client: RekognitionClient, eventId: string): Promise<void> {
+export function deleteCollectionSafe(
+  client: RekognitionClient,
+  eventId: string,
+): ResultAsync<void, AWSRekognitionError> {
   const collectionId = getCollectionId(eventId);
 
   const command = new DeleteCollectionCommand({
     CollectionId: collectionId,
   });
 
-  await client.send(command);
+  return ResultAsync.fromPromise(client.send(command), toAWSRekognitionError).map(() => undefined);
 }
 
 // =============================================================================
@@ -220,20 +197,23 @@ export async function indexFaces(
 
 /**
  * Safe wrapper for indexFaces using neverthrow Result.
- * Returns ResultAsync<IndexFacesResult, RekognitionError>.
+ * Returns ResultAsync<IndexFacesResult, AWSRekognitionError>.
+ *
+ * Uses plain object error pattern (discriminated union) for typed error handling.
+ * Callers can switch on err.name for specific AWS error handling.
  *
  * @param client - Rekognition client
  * @param eventId - Event UUID (determines collection)
  * @param imageBytes - Image data as ArrayBuffer
  * @param photoId - Photo UUID (stored as ExternalImageId for reverse lookup)
- * @returns ResultAsync with IndexFacesResult or RekognitionError
+ * @returns ResultAsync with IndexFacesResult or AWSRekognitionError
  */
 export function indexFacesSafe(
   client: RekognitionClient,
   eventId: string,
   imageBytes: ArrayBuffer,
   photoId: string,
-): ResultAsync<IndexFacesResult, RekognitionError> {
+): ResultAsync<IndexFacesResult, AWSRekognitionError> {
   const collectionId = getCollectionId(eventId);
 
   const command = new IndexFacesCommand({
@@ -247,7 +227,7 @@ export function indexFacesSafe(
     QualityFilter: 'AUTO', // Let Rekognition filter low quality
   });
 
-  return ResultAsync.fromPromise(client.send(command), mapAwsError).map((response) => ({
+  return ResultAsync.fromPromise(client.send(command), toAWSRekognitionError).map((response) => ({
     faceRecords: response.FaceRecords ?? [],
     unindexedFaces: response.UnindexedFaces ?? [],
     faceModelVersion: response.FaceModelVersion,
@@ -280,3 +260,4 @@ export type {
   ImageQuality,
   Reason,
 } from '@aws-sdk/client-rekognition';
+

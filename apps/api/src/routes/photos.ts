@@ -12,6 +12,8 @@ import {
   type NormalizeResult,
 } from '../lib/images/normalize';
 import { createZip } from 'littlezipper';
+import { apiError, type HandlerError } from '../lib/error';
+import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 
 // =============================================================================
 // Types
@@ -67,55 +69,6 @@ const uploadPhotoSchema = z.object({
 });
 
 // =============================================================================
-// Error Helpers
-// =============================================================================
-
-function notFoundError(message: string = 'Not found') {
-  return {
-    error: {
-      code: 'NOT_FOUND' as const,
-      message,
-    },
-  };
-}
-
-function insufficientCreditsError() {
-  return {
-    error: {
-      code: 'INSUFFICIENT_CREDITS' as const,
-      message: 'Insufficient credits. Purchase more to continue.',
-    },
-  };
-}
-
-function eventExpiredError() {
-  return {
-    error: {
-      code: 'EVENT_EXPIRED' as const,
-      message: 'This event has expired',
-    },
-  };
-}
-
-function uploadFailedError(reason: string) {
-  return {
-    error: {
-      code: 'UPLOAD_FAILED' as const,
-      message: `Upload failed: ${reason}`,
-    },
-  };
-}
-
-function imageTransformFailedError(reason: string) {
-  return {
-    error: {
-      code: 'IMAGE_TRANSFORM_FAILED' as const,
-      message: `Image transformation failed: ${reason}`,
-    },
-  };
-}
-
-// =============================================================================
 // URL Generators
 // =============================================================================
 
@@ -159,7 +112,7 @@ export const photosListRouter = new Hono<Env>().get(
       .limit(1);
 
     if (!event) {
-      return c.json(notFoundError('Event not found'), 404);
+      return apiError(c, 'NOT_FOUND', 'Event not found');
     }
 
     // Cursor-based pagination: fetch limit + 1 to determine hasMore
@@ -215,7 +168,10 @@ export const photosListRouter = new Hono<Env>().get(
 
 // Bulk download router - mounted at /events
 const bulkDownloadSchema = z.object({
-  photoIds: z.array(z.string().uuid('Invalid photo ID format')).min(1).max(15, 'Maximum 15 photos per download'),
+  photoIds: z
+    .array(z.string().uuid('Invalid photo ID format'))
+    .min(1)
+    .max(15, 'Maximum 15 photos per download'),
 });
 
 export const bulkDownloadRouter = new Hono<Env>().post(
@@ -229,12 +185,6 @@ export const bulkDownloadRouter = new Hono<Env>().post(
     const photographer = c.var.photographer;
     const db = c.var.db();
 
-    console.log(`[Bulk Download] Starting download`, {
-      eventId,
-      photoIds,
-      photographerId: photographer.id,
-    });
-
     // CRITICAL: Verify event ownership BEFORE fetching photos
     const [event] = await db
       .select({ id: events.id })
@@ -243,8 +193,7 @@ export const bulkDownloadRouter = new Hono<Env>().post(
       .limit(1);
 
     if (!event) {
-      console.log(`[Bulk Download] Event not found or access denied`);
-      return c.json(notFoundError('Event not found'), 404);
+      return apiError(c, 'NOT_FOUND', 'Event not found');
     }
 
     // Fetch photos with ownership verification (exclude deleted)
@@ -255,32 +204,14 @@ export const bulkDownloadRouter = new Hono<Env>().post(
         uploadedAt: photos.uploadedAt,
       })
       .from(photos)
-      .where(and(
-        eq(photos.eventId, eventId),
-        inArray(photos.id, photoIds),
-        isNull(photos.deletedAt),
-      ));
+      .where(
+        and(eq(photos.eventId, eventId), inArray(photos.id, photoIds), isNull(photos.deletedAt)),
+      );
 
     // Verify all requested photos exist
     if (photoRows.length !== photoIds.length) {
-      console.log(`[Bulk Download] Some photos not found`, {
-        requested: photoIds.length,
-        found: photoRows.length,
-      });
-      return c.json(
-        {
-          error: {
-            code: 'PHOTOS_NOT_FOUND',
-            message: 'Some photos were not found',
-          },
-        },
-        404,
-      );
+      return apiError(c, 'NOT_FOUND', 'Some photos were not found');
     }
-
-    console.log(`[Bulk Download] Fetching photos from R2`, {
-      count: photoRows.length,
-    });
 
     // Fetch all photos from R2 and prepare zip entries
     const zipEntries = await Promise.all(
@@ -301,19 +232,9 @@ export const bulkDownloadRouter = new Hono<Env>().post(
       }),
     );
 
-    console.log(`[Bulk Download] Creating zip file`, {
-      entryCount: zipEntries.length,
-    });
-
     // Create zip file
     const zipData = await createZip(zipEntries);
-
     const filename = `${eventId}-photos.zip`;
-
-    console.log(`[Bulk Download] Zip created`, {
-      filename,
-      size: zipData.length,
-    });
 
     // Convert to proper ArrayBuffer for Response
     const arrayBuffer = new ArrayBuffer(zipData.length);
@@ -337,306 +258,201 @@ export const photosUploadRouter = new Hono<Env>().post(
   requireConsent(),
   zValidator('form', uploadPhotoSchema),
   async (c) => {
-    const photographer = c.var.photographer;
-    const db = c.var.db();
-    const { file, eventId } = c.req.valid('form');
-
-    console.log(`[Upload] Starting photo upload`, {
-      photographerId: photographer.id,
-      eventId,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type,
-    });
-
-    // 1. Verify event exists, is owned by photographer, and not expired
-    const [event] = await db
-      .select({
-        id: events.id,
-        photographerId: events.photographerId,
-        expiresAt: events.expiresAt,
-      })
-      .from(events)
-      .where(eq(events.id, eventId))
-      .limit(1);
-
-    if (!event) {
-      console.log(`[Upload] Event not found: ${eventId}`);
-      return c.json(notFoundError('Event not found'), 404);
-    }
-
-    // Authorization: ensure photographer owns this event
-    if (event.photographerId !== photographer.id) {
-      console.log(`[Upload] Photographer does not own event`, {
-        photographerId: photographer.id,
-        eventPhotographerId: event.photographerId,
-      });
-      return c.json(notFoundError('Event not found'), 404);
-    }
-
-    // Check if event has expired
-    if (new Date(event.expiresAt) < new Date()) {
-      console.log(`[Upload] Event expired`, {
-        eventId,
-        expiresAt: event.expiresAt,
-      });
-      return c.json(eventExpiredError(), 410);
-    }
-
-    // Capture original file metadata before normalization
-    const originalMimeType = file.type;
-    const originalFileSize = file.size;
-
-    // Extract file bytes for normalization (after validation, before deduction)
-    const arrayBuffer = await file.arrayBuffer();
-    console.log(`[Upload] File bytes extracted`, {
-      size: arrayBuffer.byteLength,
-      originalMimeType,
-      originalFileSize,
-    });
-
-    // 2. Check credit balance and deduct within transaction
-    let photo: Photo;
-
-    try {
-      console.log(`[Upload] Checking credit balance`, {
-        photographerId: photographer.id,
-      });
-
-      // Lock photographer row to prevent race conditions
-      await db
-        .select({ id: photographers.id })
-        .from(photographers)
-        .where(eq(photographers.id, photographer.id))
-        .for('update');
-
-      // Calculate current balance
-      const [balanceResult] = await db
-        .select({
-          balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int`,
-        })
-        .from(creditLedger)
-        .where(
-          and(
-            eq(creditLedger.photographerId, photographer.id),
-            gt(creditLedger.expiresAt, sql`NOW()`),
-          ),
-        );
-
-      const balance = balanceResult?.balance ?? 0;
-
-      console.log(`[Upload] Credit balance: ${balance}`);
-
-      if (balance < 1) {
-        console.log(`[Upload] Insufficient credits`, { balance });
-        throw new Error('INSUFFICIENT_CREDITS');
-      }
-
-      // Find oldest unexpired purchase for FIFO expiry
-      const [oldestCredit] = await db
-        .select({ expiresAt: creditLedger.expiresAt })
-        .from(creditLedger)
-        .where(
-          and(
-            eq(creditLedger.photographerId, photographer.id),
-            gt(creditLedger.amount, 0),
-            gt(creditLedger.expiresAt, sql`NOW()`),
-          ),
-        )
-        .orderBy(asc(creditLedger.expiresAt))
-        .limit(1);
-
-      if (!oldestCredit) {
-        throw new Error('NO_UNEXPIRED_CREDITS');
-      }
-
-      // Deduct 1 credit with FIFO expiry
-      await db.insert(creditLedger).values({
-        photographerId: photographer.id,
-        amount: -1,
-        type: 'upload',
-        expiresAt: oldestCredit.expiresAt,
-        stripeSessionId: null,
-      });
-
-      console.log(`[Upload] Credit deducted`, {
-        newBalance: balance - 1,
-      });
-
-      // Create photo record with status='uploading'
-      const [newPhoto] = await db
-        .insert(photos)
-        .values({
-          eventId,
-          r2Key: '', // Temporary, will be set below
-          status: 'uploading',
-          faceCount: 0,
-        })
-        .returning();
-
-      console.log(`[Upload] Photo record created`, {
-        photoId: newPhoto.id,
-        status: newPhoto.status,
-      });
-
-      // Set correct r2Key now that we have photo.id
-      const r2Key = `${eventId}/${newPhoto.id}.jpg`;
-      await db.update(photos).set({ r2Key }).where(eq(photos.id, newPhoto.id));
-
-      console.log(`[Upload] R2 key set`, {
-        photoId: newPhoto.id,
-        r2Key,
-      });
-
-      photo = { ...newPhoto, r2Key };
-    } catch (err) {
-      const error = err as Error;
-      if (error.message === 'INSUFFICIENT_CREDITS') {
-        return c.json(insufficientCreditsError(), 402);
-      }
-      if (error.message === 'NO_UNEXPIRED_CREDITS') {
-        console.error('Data integrity error: Balance check passed but no unexpired credits found');
-        return c.json(insufficientCreditsError(), 402);
-      }
-      throw err;
-    }
-
-    // 3. Normalize image in-memory (before R2 upload)
-    let normalizeResult: NormalizeResult;
-    try {
-      console.log(`[Upload] Starting image normalization`, {
-        photoId: photo.id,
-        originalSize: arrayBuffer.byteLength,
-      });
-
-      normalizeResult = await normalizeImage(
-        arrayBuffer,
-        originalMimeType,
-        c.env.PHOTOS_BUCKET,
-        c.env.PHOTO_R2_BASE_URL,
-        DEFAULT_NORMALIZE_OPTIONS,
+    return safeTry(async function* () {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { file, eventId } = c.req.valid('form');
+      const originalMimeType = file.type;
+      const originalFileSize = file.size;
+      // 1. Verify event exists, is owned by photographer, and not expired
+      const [event] = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            id: events.id,
+            photographerId: events.photographerId,
+            expiresAt: events.expiresAt,
+          })
+          .from(events)
+          .where(eq(events.id, eventId))
+          .limit(1),
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
       );
 
-      console.log(`[Upload] Image normalized`, {
-        photoId: photo.id,
-        normalizedSize: normalizeResult.bytes.byteLength,
-        width: normalizeResult.width,
-        height: normalizeResult.height,
-      });
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : 'unknown error';
-      console.error(`[Upload] Image normalization failed for photo ${photo.id}: ${reason}`, {
-        photographerId: photographer.id,
-        photoId: photo.id,
-        eventId,
-        creditsDeducted: 1,
-      });
-      return c.json(imageTransformFailedError(reason), 500);
-    }
+      if (!event || event.photographerId !== photographer.id) {
+        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+      }
 
-    // Capture normalized image metadata
-    const { bytes: normalizedImageBytes, width, height } = normalizeResult;
-    const fileSize = normalizedImageBytes.byteLength;
+      if (new Date(event.expiresAt) < new Date()) {
+        return err<never, HandlerError>({ code: 'GONE', message: 'This event has expired' });
+      }
 
-    // 4. Upload normalized JPEG to R2 (single operation)
-    try {
-      console.log(`[Upload] Uploading to R2`, {
-        photoId: photo.id,
-        r2Key: photo.r2Key,
-        size: normalizedImageBytes.byteLength,
-      });
+      // 2. Quick credit check (fail fast, no lock)
+      const [balanceCheck] = yield* ResultAsync.fromPromise(
+        db
+          .select({ balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int` })
+          .from(creditLedger)
+          .where(
+            and(
+              eq(creditLedger.photographerId, photographer.id),
+              gt(creditLedger.expiresAt, sql`NOW()`),
+            ),
+          ),
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+      );
 
-      await c.env.PHOTOS_BUCKET.put(photo.r2Key, normalizedImageBytes, {
-        httpMetadata: { contentType: 'image/jpeg' },
-      });
+      if ((balanceCheck?.balance ?? 0) < 1) {
+        return err<never, HandlerError>({
+          code: 'PAYMENT_REQUIRED',
+          message: 'Insufficient credits. Purchase more to continue.',
+        });
+      }
 
-      console.log(`[Upload] R2 upload successful`, {
-        photoId: photo.id,
-        r2Key: photo.r2Key,
-      });
+      // 3. Generate photo ID and r2Key upfront
+      const photoId = crypto.randomUUID();
+      const r2Key = `${eventId}/${photoId}.jpg`;
 
-      // Update photo record with metadata
-      await db
-        .update(photos)
-        .set({
+      // 4. Get file bytes and normalize image
+      const arrayBuffer = await file.arrayBuffer();
+
+      const normalizeResult = yield* ResultAsync.fromPromise(
+        normalizeImage(
+          arrayBuffer,
           originalMimeType,
-          originalFileSize,
-          width,
-          height,
-          fileSize,
-        })
-        .where(eq(photos.id, photo.id));
+          c.env.PHOTOS_BUCKET,
+          c.env.PHOTO_R2_BASE_URL,
+          DEFAULT_NORMALIZE_OPTIONS,
+        ),
+        (e): HandlerError => ({
+          code: 'UNPROCESSABLE',
+          message: 'Image processing failed',
+          cause: e,
+        }),
+      );
 
-      console.log(`[Upload] Photo metadata saved`, {
-        photoId: photo.id,
-        originalMimeType,
-        originalFileSize,
-        width,
-        height,
-        fileSize,
-      });
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : 'unknown error';
-      console.error(`[Upload] R2 upload failed for photo ${photo.id}: ${reason}`, {
-        photographerId: photographer.id,
-        photoId: photo.id,
-        eventId,
-        creditsDeducted: 1,
-      });
-      return c.json(uploadFailedError(reason), 500);
-    }
+      const { bytes: normalizedImageBytes, width, height } = normalizeResult;
+      const fileSize = normalizedImageBytes.byteLength;
 
-    // 5. Enqueue job for face detection
-    try {
-      const job: PhotoJob = {
-        photo_id: photo.id,
-        event_id: eventId,
-        r2_key: photo.r2Key,
-      };
+      // 5. Upload to R2 (before deducting credit)
+      yield* ResultAsync.fromPromise(
+        c.env.PHOTOS_BUCKET.put(r2Key, normalizedImageBytes, {
+          httpMetadata: { contentType: 'image/jpeg' },
+        }),
+        (e): HandlerError => ({ code: 'BAD_GATEWAY', message: 'Storage upload failed', cause: e }),
+      );
 
-      console.log(`[Upload] Enqueueing to PHOTO_QUEUE`, {
-        photoId: photo.id,
-        r2Key: photo.r2Key,
-        eventId,
-      });
+      // 6. Deduct credit + create photo record (atomic, only after R2 success)
+      const photo = yield* ResultAsync.fromPromise(
+        (async () => {
+          // Lock photographer row to prevent race conditions
+          await db
+            .select({ id: photographers.id })
+            .from(photographers)
+            .where(eq(photographers.id, photographer.id))
+            .for('update');
 
-      await c.env.PHOTO_QUEUE.send(job);
+          // Re-check balance under lock
+          const [balanceResult] = await db
+            .select({ balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int` })
+            .from(creditLedger)
+            .where(
+              and(
+                eq(creditLedger.photographerId, photographer.id),
+                gt(creditLedger.expiresAt, sql`NOW()`),
+              ),
+            );
 
-      console.log(`[Upload] Successfully enqueued to PHOTO_QUEUE`, {
-        photoId: photo.id,
-      });
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : 'unknown error';
-      console.error(`[Upload] Queue enqueue failed for photo ${photo.id}: ${reason}`, {
-        photographerId: photographer.id,
-        photoId: photo.id,
-        eventId,
-        creditsDeducted: 1,
-      });
-      return c.json(uploadFailedError(`Queue enqueue failed: ${reason}`), 500);
-    }
+          if ((balanceResult?.balance ?? 0) < 1) {
+            throw new Error('INSUFFICIENT_CREDITS');
+          }
 
-    // 6. Return success response
-    console.log(`[Upload] Upload complete`, {
-      photoId: photo.id,
-      eventId,
-      r2Key: photo.r2Key,
-    });
+          // Find oldest unexpired purchase for FIFO expiry
+          const [oldestCredit] = await db
+            .select({ expiresAt: creditLedger.expiresAt })
+            .from(creditLedger)
+            .where(
+              and(
+                eq(creditLedger.photographerId, photographer.id),
+                gt(creditLedger.amount, 0),
+                gt(creditLedger.expiresAt, sql`NOW()`),
+              ),
+            )
+            .orderBy(asc(creditLedger.expiresAt))
+            .limit(1);
 
-    return c.json(
-      {
-        data: {
-          id: photo.id,
-          eventId: photo.eventId,
-          r2Key: photo.r2Key,
-          status: photo.status,
-          faceCount: photo.faceCount,
-          fileSize,
-          uploadedAt: photo.uploadedAt,
+          if (!oldestCredit) {
+            throw new Error('INSUFFICIENT_CREDITS');
+          }
+
+          // Deduct 1 credit with FIFO expiry
+          await db.insert(creditLedger).values({
+            photographerId: photographer.id,
+            amount: -1,
+            type: 'upload',
+            expiresAt: oldestCredit.expiresAt,
+            stripeSessionId: null,
+          });
+
+          // Create photo record
+          const [newPhoto] = await db
+            .insert(photos)
+            .values({
+              id: photoId,
+              eventId,
+              r2Key,
+              status: 'uploading',
+              faceCount: 0,
+              originalMimeType,
+              originalFileSize,
+              width,
+              height,
+              fileSize,
+            })
+            .returning();
+
+          return newPhoto;
+        })(),
+        (e): HandlerError => {
+          const msg = e instanceof Error ? e.message : '';
+          if (msg === 'INSUFFICIENT_CREDITS') {
+            return {
+              code: 'PAYMENT_REQUIRED',
+              message: 'Insufficient credits. Purchase more to continue.',
+            };
+          }
+          return { code: 'INTERNAL_ERROR', message: 'Database error', cause: e };
         },
-      },
-      201,
-    );
+      );
+
+      // 7. Enqueue job for face detection
+      yield* ResultAsync.fromPromise(
+        c.env.PHOTO_QUEUE.send({
+          photo_id: photo.id,
+          event_id: eventId,
+          r2_key: photo.r2Key,
+        } as PhotoJob),
+        (e): HandlerError => ({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Queue unavailable',
+          cause: e,
+        }),
+      );
+
+      // Return success data
+      return ok({
+        id: photo.id,
+        eventId: photo.eventId,
+        r2Key: photo.r2Key,
+        status: photo.status,
+        faceCount: photo.faceCount,
+        fileSize,
+        uploadedAt: photo.uploadedAt,
+      });
+    })
+      .orTee((e) => e.cause && console.error(`[${c.req.url}] ${e.code}:`, e.cause))
+      .match(
+        (data) => c.json({ data }, 201),
+        (e) => apiError(c, e),
+      );
   },
 );
 
@@ -693,7 +509,10 @@ export const photoStatusRouter = new Hono<Env>().get(
 
 // Bulk soft delete router - mounted at /events
 const bulkDeleteSchema = z.object({
-  photoIds: z.array(z.string().uuid('Invalid photo ID format')).min(1).max(50, 'Maximum 50 photos per delete'),
+  photoIds: z
+    .array(z.string().uuid('Invalid photo ID format'))
+    .min(1)
+    .max(50, 'Maximum 50 photos per delete'),
 });
 
 export const bulkDeleteRouter = new Hono<Env>().post(
@@ -707,12 +526,6 @@ export const bulkDeleteRouter = new Hono<Env>().post(
     const photographer = c.var.photographer;
     const db = c.var.db();
 
-    console.log(`[Bulk Delete] Starting soft delete`, {
-      eventId,
-      photoIds,
-      photographerId: photographer.id,
-    });
-
     // CRITICAL: Verify event ownership BEFORE deleting photos
     const [event] = await db
       .select({ id: events.id })
@@ -721,25 +534,17 @@ export const bulkDeleteRouter = new Hono<Env>().post(
       .limit(1);
 
     if (!event) {
-      console.log(`[Bulk Delete] Event not found or access denied`);
-      return c.json(notFoundError('Event not found'), 404);
+      return apiError(c, 'NOT_FOUND', 'Event not found');
     }
 
     // Soft delete photos (only non-deleted photos belonging to this event)
     const result = await db
       .update(photos)
       .set({ deletedAt: new Date().toISOString() })
-      .where(and(
-        eq(photos.eventId, eventId),
-        inArray(photos.id, photoIds),
-        isNull(photos.deletedAt),
-      ))
+      .where(
+        and(eq(photos.eventId, eventId), inArray(photos.id, photoIds), isNull(photos.deletedAt)),
+      )
       .returning({ id: photos.id });
-
-    console.log(`[Bulk Delete] Soft deleted photos`, {
-      requested: photoIds.length,
-      deleted: result.length,
-    });
 
     return c.json({
       data: {
