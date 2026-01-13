@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Database migrations
+drizzle/
+
+# Local data (LanceDB storage)
+data/
+
+# Model files (large binary files - download separately)
+models/*.bin
+models/*.json
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Testing
+coverage/

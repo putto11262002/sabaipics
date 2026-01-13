@@ -1,0 +1,62 @@
+[
+  {
+    "image": "./tests/fixtures/images/1.jpg",
+    "faceCount": 4
+  },
+  {
+    "image": "./tests/fixtures/images/2.jpg",
+    "faceCount": 7
+  },
+  {
+    "image": "./tests/fixtures/images/3.jpg",
+    "faceCount": 4
+  },
+  {
+    "image": "./tests/fixtures/images/4.jpg",
+    "faceCount": 4
+  },
+  {
+    "image": "./tests/fixtures/images/5.jpg",
+    "faceCount": 7
+  },
+  {
+    "image": "./tests/fixtures/images/6.jpg",
+    "faceCount": 4
+  },
+  {
+    "image": "./tests/fixtures/images/7.jpg",
+    "faceCount": 6
+  },
+  {
+    "image": "./tests/fixtures/images/8.jpg",
+    "faceCount": 3
+  },
+  {
+    "image": "./tests/fixtures/images/9.jpg",
+    "faceCount": 6
+  },
+  {
+    "image": "./tests/fixtures/images/10.jpg",
+    "faceCount": 1
+  },
+  {
+    "image": "./tests/fixtures/images/11.jpg",
+    "faceCount": 5
+  },
+  {
+    "image": "./tests/fixtures/images/12.jpg",
+    "faceCount": 1
+  },
+  {
+    "image": "./tests/fixtures/images/13.jpg",
+    "faceCount": 5
+  },
+  {
+    "image": "./tests/fixtures/images/14.jpg",
+    "faceCount": 5
+  },
+  {
+    "image": "./tests/fixtures/images/15.jpg",
+    "faceCount": 6
+  }
+]
