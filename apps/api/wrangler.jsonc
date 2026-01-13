@@ -42,6 +42,10 @@
 			{
 				"queue": "photo-processing",
 				"binding": "PHOTO_QUEUE"
+			},
+			{
+				"queue": "rekognition-cleanup",
+				"binding": "CLEANUP_QUEUE"
 			}
 		],
 		"consumers": [
@@ -52,6 +56,14 @@
 				"max_retries": 3,
 				"max_concurrency": 1,
 				"dead_letter_queue": "photo-processing-dlq"
+			},
+			{
+				"queue": "rekognition-cleanup",
+				"max_batch_size": 10,
+				"max_batch_timeout": 30,
+				"max_retries": 3,
+				"max_concurrency": 1,
+				"dead_letter_queue": "rekognition-cleanup-dlq"
 			}
 		]
 	},
@@ -107,6 +119,10 @@
 					{
 						"queue": "photo-processing-staging",
 						"binding": "PHOTO_QUEUE"
+					},
+					{
+						"queue": "rekognition-cleanup-staging",
+						"binding": "CLEANUP_QUEUE"
 					}
 				],
 				"consumers": [
@@ -117,6 +133,14 @@
 						"max_retries": 3,
 						"max_concurrency": 1,
 						"dead_letter_queue": "photo-processing-dlq-staging"
+					},
+					{
+						"queue": "rekognition-cleanup-staging",
+						"max_batch_size": 10,
+						"max_batch_timeout": 30,
+						"max_retries": 3,
+						"max_concurrency": 1,
+						"dead_letter_queue": "rekognition-cleanup-dlq-staging"
 					}
 				]
 			},
@@ -168,6 +192,10 @@
 					{
 						"queue": "photo-processing",
 						"binding": "PHOTO_QUEUE"
+					},
+					{
+						"queue": "rekognition-cleanup",
+						"binding": "CLEANUP_QUEUE"
 					}
 				],
 				"consumers": [
@@ -178,6 +206,14 @@
 						"max_retries": 3,
 						"max_concurrency": 1,
 						"dead_letter_queue": "photo-processing-dlq"
+					},
+					{
+						"queue": "rekognition-cleanup",
+						"max_batch_size": 10,
+						"max_batch_timeout": 30,
+						"max_retries": 3,
+						"max_concurrency": 1,
+						"dead_letter_queue": "rekognition-cleanup-dlq"
 					}
 				]
 			},

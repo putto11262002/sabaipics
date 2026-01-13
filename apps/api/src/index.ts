@@ -12,10 +12,11 @@ import { creditsRouter } from './routes/credits';
 import { eventsRouter } from './routes/events';
 import { photosRouter, photosUploadRouter, photoStatusRouter, bulkDownloadRouter, bulkDeleteRouter } from './routes/photos';
 import { r2Router } from './routes/r2';
-import type { Env } from './types';
+import type { Env, Bindings } from './types';
 
-// Queue consumer
-import { queue } from './queue/photo-consumer';
+// Queue consumers
+import { queue as photoQueue } from './queue/photo-consumer';
+import { queue as cleanupQueue } from './queue/cleanup-consumer';
 
 // Cron handlers
 import { scheduled } from './crons';
@@ -82,6 +83,15 @@ export type AppType = typeof app;
 // Export worker with fetch, queue, and scheduled handlers
 export default {
 	fetch: app.fetch,
-	queue,
+	queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
+		// Route by queue name
+		if (batch.queue === 'photo-processing' || batch.queue === 'photo-processing-staging') {
+			return photoQueue(batch as MessageBatch<any>, env, ctx);
+		}
+		if (batch.queue === 'rekognition-cleanup' || batch.queue === 'rekognition-cleanup-staging') {
+			return cleanupQueue(batch as MessageBatch<any>, env);
+		}
+		console.error('[Queue] Unknown queue:', batch.queue);
+	},
 	scheduled,
 };
