@@ -17,6 +17,9 @@ import type { Env } from './types';
 // Queue consumer
 import { queue } from './queue/photo-consumer';
 
+// Cron handlers
+import { scheduled } from './crons';
+
 // Event handlers - registered at module load time
 import { registerStripeHandlers } from './handlers/stripe';
 
@@ -76,8 +79,9 @@ const app = new Hono<Env>()
 // Export type for Hono RPC client
 export type AppType = typeof app;
 
-// Export worker with both fetch and queue handlers
+// Export worker with fetch, queue, and scheduled handlers
 export default {
 	fetch: app.fetch,
 	queue,
+	scheduled,
 };
