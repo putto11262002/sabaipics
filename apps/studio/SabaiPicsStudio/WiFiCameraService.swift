@@ -21,6 +21,9 @@ class WiFiCameraService: NSObject, ObservableObject {
     /// Connection error message (nil if no error)
     @Published var connectionError: String? = nil
 
+    /// Detected photos (Phase 3)
+    @Published var detectedPhotos: [(filename: String, folder: String)] = []
+
     // MARK: - Private Properties
 
     /// The underlying Objective-C manager
@@ -116,10 +119,12 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
     // MARK: - Photo Detection (Phase 3)
 
     /// Called when a new photo is detected on the camera
-    /// Phase 3: Will implement photo detection
+    /// Phase 3: FULL IMPLEMENTATION
     func cameraManager(_ manager: Any, didDetectNewPhoto filename: String, folder: String) {
-        print("📸 [WiFiCameraService] New photo detected: \(filename) in \(folder)")
-        // Phase 3: Implement photo detection logic
+        print("📸 [WiFiCameraService] Photo detected in Swift: \(filename)")
+        DispatchQueue.main.async {
+            self.detectedPhotos.append((filename: filename, folder: folder))
+        }
     }
 
     // MARK: - Photo Download (Phase 4)

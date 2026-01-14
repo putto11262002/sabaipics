@@ -385,6 +385,9 @@ static GPContext* createGPhoto2Context(void) {
             });
         }
 
+        // Auto-start event monitoring after successful connection
+        [self startEventMonitoring];
+
         NSLog(@"[WiFiCameraManager] === Connection Successful ===");
         return YES;
 
@@ -433,10 +436,8 @@ static GPContext* createGPhoto2Context(void) {
 - (void)disconnect {
     NSLog(@"[WiFiCameraManager] === Disconnecting from camera ===");
 
-    // Stop monitoring if active
-    if (self.isMonitoring) {
-        [self stopEventMonitoring];
-    }
+    // Stop event monitoring before disconnecting
+    [self stopEventMonitoring];
 
     // Disconnect and free camera
     if (_camera != NULL) {
@@ -460,54 +461,90 @@ static GPContext* createGPhoto2Context(void) {
 
 /**
  * Start event monitoring
- * Phase 1: SKELETON IMPLEMENTATION - will be completed in Phase 3
+ * Phase 3: FULL IMPLEMENTATION
+ * Creates background thread to monitor camera events
  */
 - (BOOL)startEventMonitoring {
-    NSLog(@"[WiFiCameraManager] startEventMonitoring called (Phase 1 skeleton)");
-
-    if (self.connectionState != WiFiCameraConnectionStateConnected) {
-        NSLog(@"[WiFiCameraManager] Cannot start monitoring - not connected");
+    if (_isMonitoring || _connectionState != WiFiCameraConnectionStateConnected) {
+        NSLog(@"⚠️ Cannot start monitoring: not connected or already monitoring");
         return NO;
     }
 
-    if (self.isMonitoring) {
-        NSLog(@"[WiFiCameraManager] Already monitoring");
-        return YES;
+    NSLog(@"📡 Starting event monitoring");
+    _isMonitoring = YES;
+
+    // Create background thread for monitoring
+    _monitoringThread = [[NSThread alloc] initWithTarget:self
+                                                selector:@selector(monitoringLoop)
+                                                  object:nil];
+    [_monitoringThread start];
+
+    return YES;
+}
+
+/**
+ * Event monitoring loop
+ * Phase 3: FULL IMPLEMENTATION
+ * Runs on background thread, polls camera for events
+ */
+- (void)monitoringLoop {
+    NSLog(@"📡 Event monitoring loop started");
+
+    while (_isMonitoring && [[NSThread currentThread] isCancelled] == NO) {
+        @autoreleasepool {
+            CameraEventType evttype;
+            void *evtdata = NULL;
+
+            // Poll camera for events (1 second timeout)
+            int ret = gp_camera_wait_for_event(_camera, 1000, &evttype, &evtdata, _context);
+
+            if (ret != GP_OK) {
+                NSLog(@"⚠️ Event polling error: %d", ret);
+                continue;
+            }
+
+            // Check if file was added (photo taken)
+            if (evttype == GP_EVENT_FILE_ADDED) {
+                CameraFilePath *path = (CameraFilePath*)evtdata;
+                NSString *filename = [NSString stringWithUTF8String:path->name];
+                NSString *folder = [NSString stringWithUTF8String:path->folder];
+
+                NSLog(@"📸 NEW PHOTO DETECTED: %@ in %@", filename, folder);
+
+                // Call delegate on main thread
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if ([self.delegate respondsToSelector:@selector(cameraManager:didDetectNewPhoto:folder:)]) {
+                        [self.delegate cameraManager:self didDetectNewPhoto:filename folder:folder];
+                    }
+                });
+            }
+
+            // Free event data if allocated
+            if (evtdata) {
+                free(evtdata);
+            }
+        }
     }
 
-    // Phase 3: Will implement event monitoring here
-    // - Create background NSThread
-    // - Run gp_camera_wait_for_event() loop
-    // - Detect GP_EVENT_FILE_ADDED
-    // - Call delegate didDetectNewPhoto
-
-    self.isMonitoring = YES;
-    NSLog(@"[WiFiCameraManager] Phase 1: Event monitoring not yet implemented");
-
-    return NO;
+    NSLog(@"📡 Event monitoring loop stopped");
 }
 
 /**
  * Stop event monitoring
- * Phase 1: SKELETON IMPLEMENTATION - will be completed in Phase 3
+ * Phase 3: FULL IMPLEMENTATION
  */
 - (void)stopEventMonitoring {
-    NSLog(@"[WiFiCameraManager] stopEventMonitoring called (Phase 1 skeleton)");
-
-    if (!self.isMonitoring) {
-        NSLog(@"[WiFiCameraManager] Not currently monitoring");
+    if (!_isMonitoring) {
         return;
     }
 
-    // Phase 3: Will implement stop logic here
-    // - Signal monitoring thread to stop
-    // - Wait for thread to finish
-    // - Clean up monitoring thread
+    NSLog(@"📡 Stopping event monitoring");
+    _isMonitoring = NO;
 
-    self.isMonitoring = NO;
-    self.monitoringThread = nil;
-
-    NSLog(@"[WiFiCameraManager] Monitoring stopped");
+    if (_monitoringThread) {
+        [_monitoringThread cancel];
+        _monitoringThread = nil;
+    }
 }
 
 #pragma mark - Photo Download Methods

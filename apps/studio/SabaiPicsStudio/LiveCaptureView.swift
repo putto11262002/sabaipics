@@ -22,7 +22,8 @@ struct LiveCaptureView: View {
             // Stats header
             StatsHeader(
                 photoCount: viewModel.photoCount,
-                downloadingCount: viewModel.downloadingCount
+                downloadingCount: viewModel.downloadingCount,
+                detectedCount: viewModel.detectedPhotoCount
             )
             .padding()
             .background(Color(.systemBackground))
@@ -31,7 +32,7 @@ struct LiveCaptureView: View {
 
             // Photo grid
             if viewModel.capturedPhotos.isEmpty {
-                EmptyStateView()
+                EmptyStateView(detectedCount: viewModel.detectedPhotoCount)
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 12) {
@@ -88,9 +89,11 @@ struct LiveCaptureView: View {
 struct StatsHeader: View {
     let photoCount: Int
     let downloadingCount: Int
+    let detectedCount: Int
 
     var body: some View {
         HStack(spacing: 24) {
+            StatItem(icon: "bell.fill", label: "Detected", value: "\(detectedCount)")
             StatItem(icon: "camera.fill", label: "Captured", value: "\(photoCount)")
             StatItem(icon: "arrow.down.circle.fill", label: "Downloading", value: "\(downloadingCount)")
 
@@ -137,6 +140,8 @@ struct StatItem: View {
 
 /// Empty state when no photos captured yet
 struct EmptyStateView: View {
+    let detectedCount: Int
+
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
@@ -145,17 +150,29 @@ struct EmptyStateView: View {
                 .font(.system(size: 80))
                 .foregroundColor(.gray.opacity(0.5))
 
-            Text("Ready to Shoot")
-                .font(.title)
-                .fontWeight(.bold)
+            if detectedCount > 0 {
+                // Show detection feedback
+                Text("\(detectedCount) Photo\(detectedCount == 1 ? "" : "s") Detected")
+                    .font(.title)
+                    .fontWeight(.bold)
 
-            Text("Take photos with camera shutter")
-                .font(.body)
-                .foregroundColor(.secondary)
+                Text("Download starting soon...")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            } else {
+                // Original empty state
+                Text("Ready to Shoot")
+                    .font(.title)
+                    .fontWeight(.bold)
 
-            Text("Photos will appear here automatically")
-                .font(.caption)
-                .foregroundColor(.secondary)
+                Text("Take photos with camera shutter")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+
+                Text("Photos will appear here automatically")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
 
             Spacer()
         }

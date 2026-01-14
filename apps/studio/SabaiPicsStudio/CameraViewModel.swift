@@ -51,6 +51,7 @@ class CameraViewModel: NSObject, ObservableObject {
     @Published var capturedPhotos: [CapturedPhoto] = []
     @Published var photoCount: Int = 0
     @Published var downloadingCount: Int = 0
+    @Published var detectedPhotoCount: Int = 0 // Phase 3: Photo detection counter
     @Published var connectionMode: ConnectionMode = .wifi // Default to WiFi
 
     // MARK: - Private Properties
@@ -120,6 +121,25 @@ class CameraViewModel: NSObject, ObservableObject {
             .sink { [weak self] error in
                 print("❌ [CameraViewModel] WiFi connection error: \(error)")
                 self?.appState = .error(error)
+            }
+            .store(in: &wifiCancellables)
+
+        // Listen to detected photos (Phase 3)
+        wifiService.$detectedPhotos
+            .sink { [weak self] photos in
+                guard let self = self else { return }
+
+                self.detectedPhotoCount = photos.count
+
+                if !photos.isEmpty {
+                    print("📸 ViewModel received \(photos.count) detected photo(s)")
+
+                    // For Phase 3: Just log the detection
+                    // Phase 4 will implement actual download
+                    for (filename, folder) in photos {
+                        print("📸 Detected: \(filename) in \(folder)")
+                    }
+                }
             }
             .store(in: &wifiCancellables)
     }

@@ -134,30 +134,30 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 
 ---
 
-### ☐ Phase 3: Photo Event Monitoring (2 hours)
+### ✅ Phase 3: Photo Event Monitoring (2 hours) - COMPLETE
 
 **Goal:** Detect when photographer takes photo on Canon camera
 
 **Tasks:**
 
-- [ ] **3.1** Implement event monitoring in WiFiCameraManager
+- [x] **3.1** Implement event monitoring in WiFiCameraManager
   - Add `startEventMonitoring` method
   - Create background monitoring thread
   - Implement `monitoringLoop` with `gp_camera_wait_for_event()`
   - Detect `GP_EVENT_FILE_ADDED` events
   - Call delegate when photo detected
 
-- [ ] **3.2** Add photo detection to WiFiCameraService
+- [x] **3.2** Add photo detection to WiFiCameraService
   - Add `@Published var detectedPhotos: [(filename: String, folder: String)]`
   - Implement delegate method `didDetectNewPhoto`
   - Append detected photos to array
 
-- [ ] **3.3** Wire photo detection to ViewModel
+- [x] **3.3** Wire photo detection to ViewModel
   - Listen to `wifiService.$detectedPhotos`
   - Log when new photos detected
   - Prepare for download (next phase)
 
-- [ ] **3.4** Add simple detection indicator to UI
+- [x] **3.4** Add simple detection indicator to UI
   - Update LiveCaptureView to show detection
   - Add "Waiting for photos..." state
   - Add photo counter (detected but not downloaded)
@@ -504,7 +504,7 @@ Use this checklist to track overall progress:
 ### Implementation Progress
 - [x] Phase 1: Framework Setup & Bridge Foundation (2h) ✅
 - [x] Phase 2: WiFi Connection (Canon Only) (2h) ✅
-- [ ] Phase 3: Photo Event Monitoring (2h)
+- [x] Phase 3: Photo Event Monitoring (2h) ✅
 - [ ] Phase 4: Photo Download (JPEG Only) (2h)
 - [ ] Phase 5: List View UI (1.5h)
 - [ ] Phase 6: Session Management (1.5h)
@@ -512,12 +512,12 @@ Use this checklist to track overall progress:
 - [ ] Phase 8: Final Testing & Documentation (1h)
 
 **Total Time:** 13 hours (conservative)
-**Completed:** 4 hours | **Remaining:** 9 hours
+**Completed:** 6 hours | **Remaining:** 7 hours
 
 ### Milestone Checkpoints
 - [x] **Milestone 1:** Project builds with GPhoto2 (after Phase 1) ✅
 - [x] **Milestone 2:** Can connect to Canon camera (after Phase 2) ✅
-- [ ] **Milestone 3:** Can detect new photos (after Phase 3)
+- [x] **Milestone 3:** Can detect new photos (after Phase 3) ✅
 - [ ] **Milestone 4:** Photos auto-download and display (after Phase 4)
 - [ ] **Milestone 5:** Professional UI complete (after Phase 5)
 - [ ] **Milestone 6:** Full session flow works (after Phase 6)
