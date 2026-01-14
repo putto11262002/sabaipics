@@ -16,6 +16,7 @@
   },
   "scripts": {
     "models:download": "tsx scripts/download-models.ts",
+    "postinstall": "tsx scripts/download-models.ts",
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "build": "tsc",
