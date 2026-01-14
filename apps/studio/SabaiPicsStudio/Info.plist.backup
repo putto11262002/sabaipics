@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSCameraUsageDescription</key>
+	<string>SabaiPics Studio needs access to detect and download photos from your professional camera via USB or WiFi.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>SabaiPics Studio needs local network access to discover and connect to cameras on your WiFi network.</string>
+</dict>
+</plist>

@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="17701" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="BYZ-38-t0r">
+    <device id="retina4_7" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="17703"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="tne-QT-ifu">
+            <objects>
+                <viewController id="BYZ-38-t0r" customClass="ViewController" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="8bC-Xf-vdC">
+                        <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" spacing="6" translatesAutoresizingMaskIntoConstraints="NO" id="hXu-Vb-kE5">
+                                <rect key="frame" x="40" y="30" width="295" height="581.5"/>
+                                <subviews>
+                                    <stackView opaque="NO" contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="xxc-ka-7lu">
+                                        <rect key="frame" x="0.0" y="0.0" width="295" height="34"/>
+                                        <subviews>
+                                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Camera IP:" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="NJl-tq-nRC">
+                                                <rect key="frame" x="0.0" y="0.0" width="150" height="34"/>
+                                                <constraints>
+                                                    <constraint firstAttribute="width" relation="greaterThanOrEqual" constant="150" id="aeH-GP-Rbe"/>
+                                                </constraints>
+                                                <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="15"/>
+                                                <nil key="textColor"/>
+                                                <nil key="highlightedColor"/>
+                                            </label>
+                                            <textField opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" text="192.168.1.2" borderStyle="roundedRect" textAlignment="natural" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="uuM-j7-K53">
+                                                <rect key="frame" x="150" y="0.0" width="145" height="34"/>
+                                                <fontDescription key="fontDescription" type="system" pointSize="15"/>
+                                                <textInputTraits key="textInputTraits"/>
+                                            </textField>
+                                        </subviews>
+                                    </stackView>
+                                    <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" spacing="8" translatesAutoresizingMaskIntoConstraints="NO" id="Fb4-XA-X4M">
+                                        <rect key="frame" x="0.0" y="40" width="295" height="106"/>
+                                        <subviews>
+                                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Z5e-ni-gaM">
+                                                <rect key="frame" x="0.0" y="0.0" width="295" height="30"/>
+                                                <state key="normal" title="Connect PTP/IP"/>
+                                                <connections>
+                                                    <action selector="connectTouchedPTP:" destination="BYZ-38-t0r" eventType="touchUpInside" id="qSl-lA-Kc9"/>
+                                                </connections>
+                                            </button>
+                                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Pn7-kc-baq">
+                                                <rect key="frame" x="0.0" y="38" width="295" height="30"/>
+                                                <state key="normal" title="Connect Fuji"/>
+                                                <connections>
+                                                    <action selector="connectFujiTouched:" destination="BYZ-38-t0r" eventType="touchUpInside" id="E6b-u6-WCD"/>
+                                                </connections>
+                                            </button>
+                                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="J3K-pW-zZr">
+                                                <rect key="frame" x="0.0" y="76" width="295" height="30"/>
+                                                <state key="normal" title="Connect Lumix"/>
+                                                <connections>
+                                                    <action selector="connectLumixTouched:" destination="BYZ-38-t0r" eventType="touchUpInside" id="6e2-7n-H53"/>
+                                                </connections>
+                                            </button>
+                                        </subviews>
+                                    </stackView>
+                                    <button opaque="NO" contentMode="scaleToFill" enabled="NO" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="xTL-10-yoG">
+                                        <rect key="frame" x="0.0" y="152" width="295" height="30"/>
+                                        <state key="normal" title="List Content"/>
+                                        <connections>
+                                            <action selector="listTouched:" destination="BYZ-38-t0r" eventType="touchUpInside" id="jRC-Vy-eql"/>
+                                        </connections>
+                                    </button>
+                                    <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="IeT-hD-jg2">
+                                        <rect key="frame" x="0.0" y="188" width="295" height="30"/>
+                                        <state key="normal" title="Download File"/>
+                                        <connections>
+                                            <action selector="downloadFile:" destination="BYZ-38-t0r" eventType="touchUpInside" id="pLX-SQ-b4A"/>
+                                        </connections>
+                                    </button>
+                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Console output:" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="5Kl-Wn-uUu">
+                                        <rect key="frame" x="0.0" y="224" width="295" height="18"/>
+                                        <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="15"/>
+                                        <nil key="textColor"/>
+                                        <nil key="highlightedColor"/>
+                                    </label>
+                                    <textView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" showsHorizontalScrollIndicator="NO" bouncesZoom="NO" editable="NO" text="Touch &quot;Connect&quot;" adjustsFontForContentSizeCategory="YES" selectable="NO" translatesAutoresizingMaskIntoConstraints="NO" id="0Iw-lU-Wtu">
+                                        <rect key="frame" x="0.0" y="248" width="295" height="333.5"/>
+                                        <color key="backgroundColor" systemColor="darkTextColor"/>
+                                        <color key="textColor" red="0.0" green="0.97680455450000003" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                        <fontDescription key="fontDescription" type="system" pointSize="11"/>
+                                        <textInputTraits key="textInputTraits" autocapitalizationType="sentences"/>
+                                    </textView>
+                                </subviews>
+                            </stackView>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
+                        <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="0Iw-lU-Wtu" firstAttribute="height" secondItem="8bC-Xf-vdC" secondAttribute="height" multiplier="0.5" id="0WT-Ba-J33"/>
+                            <constraint firstItem="6Tk-OE-BBY" firstAttribute="trailing" secondItem="hXu-Vb-kE5" secondAttribute="trailing" constant="40" id="fNG-dt-Evk"/>
+                            <constraint firstItem="hXu-Vb-kE5" firstAttribute="leading" secondItem="6Tk-OE-BBY" secondAttribute="leading" constant="40" id="pSC-eY-YbN"/>
+                            <constraint firstItem="hXu-Vb-kE5" firstAttribute="top" secondItem="6Tk-OE-BBY" secondAttribute="top" constant="30" id="rJb-Nu-Te7"/>
+                        </constraints>
+                    </view>
+                    <connections>
+                        <outlet property="connectButtonLumix" destination="J3K-pW-zZr" id="IYP-5h-Fsa"/>
+                        <outlet property="connectButtonPTP" destination="Z5e-ni-gaM" id="dLm-26-jcg"/>
+                        <outlet property="consoleTextView" destination="0Iw-lU-Wtu" id="jOI-qv-iBW"/>
+                        <outlet property="ipTextField" destination="uuM-j7-K53" id="FNo-s1-ucm"/>
+                        <outlet property="listButton" destination="xTL-10-yoG" id="DEf-VD-z06"/>
+                    </connections>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="dkx-z0-nzr" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="56.799999999999997" y="26.53673163418291"/>
+        </scene>
+    </scenes>
+    <resources>
+        <systemColor name="darkTextColor">
+            <color white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+        </systemColor>
+    </resources>
+</document>
