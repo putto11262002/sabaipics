@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { createClerkAuth } from '@sabaipics/auth/middleware';
-import { createDb } from '@sabaipics/db';
+import { createDbHttp, createDbTx } from '@sabaipics/db';
 import { authRouter } from './routes/auth';
 import { webhookRouter } from './routes/webhooks';
 import { dbTestRouter } from './routes/db-test';
@@ -41,9 +41,12 @@ registerStripeHandlers();
 
 // Method chaining - NEVER break the chain for type inference
 const app = new Hono<Env>()
-	// DB injection for webhooks (no auth, no CORS - verified by signature)
+	// DB injection - dual adapter pattern:
+	// - db (HTTP): Fast, stateless, no transactions - for 90% of queries
+	// - dbTx (WebSocket): With transaction support - for critical multi-step operations
 	.use((c, next) => {
-		c.set('db', () => createDb(c.env.DATABASE_URL));
+		c.set('db', () => createDbHttp(c.env.DATABASE_URL));
+		c.set('dbTx', () => createDbTx(c.env.DATABASE_URL));
 		return next();
 	})
 	// R2 proxy route (public, no auth - serves QR codes and other assets)
