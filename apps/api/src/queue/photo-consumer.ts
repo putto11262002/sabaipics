@@ -31,7 +31,7 @@ import {
 } from '../lib/rekognition';
 import { RekognitionClient } from '@aws-sdk/client-rekognition';
 import { sleep } from '../utils/async';
-import { createDb, type Database } from '@sabaipics/db';
+import { createDb, createDbTx, type Database, type DatabaseTx } from '@sabaipics/db';
 import { photos, events, faces } from '@sabaipics/db';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { ResultAsync, ok, err, safeTry, type Result } from 'neverthrow';
@@ -111,32 +111,27 @@ function transformImageForRekognition(
 /**
  * Persist faces to database and update photo status to 'indexed'.
  *
- * Steps:
- * 1. Update photo status to 'indexing'
- * 2. Ensure event has Rekognition collection (create if needed)
- * 3. Insert face records (if any)
- * 4. Update photo status to 'indexed' with face_count, clear retryable/error
+ * Uses transaction to ensure atomicity:
+ * - Insert face records
+ * - Update photo status and face_count
+ * - Update event counts (photo_count, face_count)
  *
- * @param db - Database instance
+ * @param dbTx - Transactional database instance (WebSocket adapter)
+ * @param db - Non-transactional database instance (for pre-transaction checks)
  * @param job - Photo job from queue
  * @param data - IndexFaces result from Rekognition
  * @param client - Rekognition client for collection creation
  * @returns ResultAsync<void, PhotoProcessingError>
  */
 function persistFacesAndUpdatePhoto(
+  dbTx: DatabaseTx,
   db: Database,
   job: PhotoJob,
   data: IndexFacesResult,
   client: RekognitionClient,
 ): ResultAsync<void, PhotoProcessingError> {
   return safeTry(async function* () {
-    // STEP 1: Mark as 'indexing' (in progress)
-    yield* ResultAsync.fromPromise(
-      db.update(photos).set({ status: 'indexing' }).where(eq(photos.id, job.photo_id)),
-      (cause): PhotoProcessingError => ({ type: 'database', operation: 'update_photo_indexing', cause }),
-    );
-
-    // STEP 2: Ensure collection exists
+    // PRE-STEP: Ensure collection exists (outside transaction - uses Rekognition API)
     const event = yield* ResultAsync.fromPromise(
       db
         .select({ collectionId: events.rekognitionCollectionId })
@@ -169,37 +164,40 @@ function persistFacesAndUpdatePhoto(
       );
     }
 
-    // STEP 3: Insert faces (if any) - NO TRANSACTION
-    if (data.faceRecords.length > 0) {
-      const faceRows = data.faceRecords.map((faceRecord) => ({
-        photoId: job.photo_id,
-        rekognitionFaceId: faceRecord.Face?.FaceId ?? null,
-        rekognitionResponse: faceRecord,
-        boundingBox: faceRecord.Face?.BoundingBox ?? null,
-      }));
-
-      yield* ResultAsync.fromPromise(
-        db.insert(faces).values(faceRows),
-        (cause): PhotoProcessingError => ({ type: 'database', operation: 'insert_faces', cause }),
-      );
-    }
-
-    // STEP 4: Update photo to 'indexed' (success)
+    // TRANSACTION: Insert faces, update photo status
     yield* ResultAsync.fromPromise(
-      db
-        .update(photos)
-        .set({
-          status: 'indexed',
-          faceCount: data.faceRecords.length,
-          retryable: null, // Clear retryable flag
-          errorName: null, // Clear error name
-          indexedAt: new Date().toISOString(), // Record indexing completion timestamp
-        })
-        .where(eq(photos.id, job.photo_id)),
-      (cause): PhotoProcessingError => ({ type: 'database', operation: 'update_photo_indexed', cause }),
+      dbTx.transaction(async (tx) => {
+        // STEP 1: Insert face records (if any)
+        if (data.faceRecords.length > 0) {
+          const faceRows = data.faceRecords.map((faceRecord) => ({
+            photoId: job.photo_id,
+            rekognitionFaceId: faceRecord.Face?.FaceId ?? null,
+            rekognitionResponse: faceRecord,
+            boundingBox: faceRecord.Face?.BoundingBox ?? null,
+          }));
+
+          await tx.insert(faces).values(faceRows);
+        }
+
+        // STEP 2: Update photo status to 'indexed'
+        await tx
+          .update(photos)
+          .set({
+            status: 'indexed',
+            faceCount: data.faceRecords.length,
+            retryable: null, // Clear retryable flag
+            errorName: null, // Clear error name
+            indexedAt: new Date().toISOString(), // Record indexing completion timestamp
+          })
+          .where(eq(photos.id, job.photo_id));
+
+        // Note: event counts (photo_count, face_count) are not stored in the events table schema
+        // If needed in the future, add columns to events table and update them here
+      }),
+      (cause): PhotoProcessingError => ({ type: 'database', operation: 'transaction_persist', cause }),
     );
 
-    // STEP 5: Log unindexed faces (informational)
+    // POST-STEP: Log unindexed faces (informational)
     if (data.unindexedFaces.length > 0) {
       console.warn(
         `[Queue] ${data.unindexedFaces.length} faces not indexed`,
@@ -368,8 +366,9 @@ export async function queue(
     await sleep(delay);
   }
 
-  // Create database connection once for entire batch
+  // Create database connections once for entire batch
   const db = createDb(env.DATABASE_URL);
+  const dbTx = createDbTx(env.DATABASE_URL);  // WebSocket for transactions
 
   // Create Rekognition client once for entire batch
   const client = createRekognitionClient({
@@ -427,7 +426,7 @@ export async function queue(
       .match(
         // Success path - persist faces and update photo
         async (indexResult) => {
-          await persistFacesAndUpdatePhoto(db, job, indexResult, client)
+          await persistFacesAndUpdatePhoto(dbTx, db, job, indexResult, client)
             .orTee((persistErr) => {
               console.error(`[Queue] Persist error`, {
                 photoId: job.photo_id,

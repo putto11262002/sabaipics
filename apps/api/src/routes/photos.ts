@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, and, desc, lt, inArray, sql, asc, gt, isNull } from 'drizzle-orm';
-import { photos, events, photoStatuses, creditLedger, photographers, Photo } from '@sabaipics/db';
+import { photos, events, photoStatuses, creditLedger, photographers, Photo, type DatabaseTx } from '@sabaipics/db';
 import { requirePhotographer, requireConsent, type PhotographerVariables } from '../middleware';
 import type { Bindings } from '../types';
 import type { PhotoJob } from '../types/photo-job';
@@ -21,7 +21,9 @@ import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 
 type Env = {
   Bindings: Bindings;
-  Variables: PhotographerVariables;
+  Variables: PhotographerVariables & {
+    dbTx: () => DatabaseTx;
+  };
 };
 
 // =============================================================================
@@ -367,73 +369,78 @@ export const photosUploadRouter = new Hono<Env>().post(
       // 6. Deduct credit + create photo record (atomic, only after R2 success)
       const photo = yield* ResultAsync.fromPromise(
         (async () => {
-          // Lock photographer row to prevent race conditions
-          await db
-            .select({ id: photographers.id })
-            .from(photographers)
-            .where(eq(photographers.id, photographer.id))
-            .for('update');
+          const dbTx = c.var.dbTx();
 
-          // Re-check balance under lock
-          const [balanceResult] = await db
-            .select({ balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int` })
-            .from(creditLedger)
-            .where(
-              and(
-                eq(creditLedger.photographerId, photographer.id),
-                gt(creditLedger.expiresAt, sql`NOW()`),
-              ),
-            );
+          // Transaction: check balance, deduct credit, create photo record
+          return await dbTx.transaction(async (tx) => {
+            // Lock photographer row to prevent race conditions
+            await tx
+              .select({ id: photographers.id })
+              .from(photographers)
+              .where(eq(photographers.id, photographer.id))
+              .for('update');
 
-          if ((balanceResult?.balance ?? 0) < 1) {
-            throw new Error('INSUFFICIENT_CREDITS');
-          }
+            // Re-check balance under lock
+            const [balanceResult] = await tx
+              .select({ balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int` })
+              .from(creditLedger)
+              .where(
+                and(
+                  eq(creditLedger.photographerId, photographer.id),
+                  gt(creditLedger.expiresAt, sql`NOW()`),
+                ),
+              );
 
-          // Find oldest unexpired purchase for FIFO expiry
-          const [oldestCredit] = await db
-            .select({ expiresAt: creditLedger.expiresAt })
-            .from(creditLedger)
-            .where(
-              and(
-                eq(creditLedger.photographerId, photographer.id),
-                gt(creditLedger.amount, 0),
-                gt(creditLedger.expiresAt, sql`NOW()`),
-              ),
-            )
-            .orderBy(asc(creditLedger.expiresAt))
-            .limit(1);
+            if ((balanceResult?.balance ?? 0) < 1) {
+              throw new Error('INSUFFICIENT_CREDITS');
+            }
 
-          if (!oldestCredit) {
-            throw new Error('INSUFFICIENT_CREDITS');
-          }
+            // Find oldest unexpired purchase for FIFO expiry
+            const [oldestCredit] = await tx
+              .select({ expiresAt: creditLedger.expiresAt })
+              .from(creditLedger)
+              .where(
+                and(
+                  eq(creditLedger.photographerId, photographer.id),
+                  gt(creditLedger.amount, 0),
+                  gt(creditLedger.expiresAt, sql`NOW()`),
+                ),
+              )
+              .orderBy(asc(creditLedger.expiresAt))
+              .limit(1);
 
-          // Deduct 1 credit with FIFO expiry
-          await db.insert(creditLedger).values({
-            photographerId: photographer.id,
-            amount: -1,
-            type: 'upload',
-            expiresAt: oldestCredit.expiresAt,
-            stripeSessionId: null,
+            if (!oldestCredit) {
+              throw new Error('INSUFFICIENT_CREDITS');
+            }
+
+            // Deduct 1 credit with FIFO expiry
+            await tx.insert(creditLedger).values({
+              photographerId: photographer.id,
+              amount: -1,
+              type: 'upload',
+              expiresAt: oldestCredit.expiresAt,
+              stripeSessionId: null,
+            });
+
+            // Create photo record
+            const [newPhoto] = await tx
+              .insert(photos)
+              .values({
+                id: photoId,
+                eventId,
+                r2Key,
+                status: 'uploading',
+                faceCount: 0,
+                originalMimeType,
+                originalFileSize,
+                width,
+                height,
+                fileSize,
+              })
+              .returning();
+
+            return newPhoto;
           });
-
-          // Create photo record
-          const [newPhoto] = await db
-            .insert(photos)
-            .values({
-              id: photoId,
-              eventId,
-              r2Key,
-              status: 'uploading',
-              faceCount: 0,
-              originalMimeType,
-              originalFileSize,
-              width,
-              height,
-              fileSize,
-            })
-            .returning();
-
-          return newPhoto;
         })(),
         (e): HandlerError => {
           const msg = e instanceof Error ? e.message : '';

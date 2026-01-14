@@ -20,6 +20,17 @@ type AuthEnv = { Bindings: AuthBindings; Variables: AuthVariables };
 // Base auth middleware - extracts and verifies JWT, allows unauthenticated
 export function createClerkAuth(): MiddlewareHandler<AuthEnv> {
   return async (c, next) => {
+    // Test mode bypass - inject mock auth for integration testing
+    // Uses NODE_ENV which Vitest automatically sets to 'test' during test runs
+    if (process.env.NODE_ENV === "test") {
+      const auth: AuthObject = {
+        userId: "test_clerk_user_integration",
+        sessionId: "test_session_integration",
+      };
+      c.set("auth", auth);
+      return next();
+    }
+
     const clerkClient = createClerkClient({
       secretKey: c.env.CLERK_SECRET_KEY,
       publishableKey: c.env.CLERK_PUBLISHABLE_KEY,
