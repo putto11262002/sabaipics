@@ -23,7 +23,11 @@ tests/fixtures/images/*.json
 
 # Eval test images (download from R2)
 tests/fixtures/eval/**/*.jpg
-# But keep labels.json and README.md (metadata)
+tests/fixtures/eval/**/*.json
+# But keep README.md and label files (metadata)
+!tests/fixtures/eval/**/README.md
+!tests/fixtures/eval/**/labels*.json
+!tests/fixtures/eval/**/ground-truth*.json
 
 # Environment
 .env
