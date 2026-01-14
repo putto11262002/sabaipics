@@ -10,7 +10,7 @@ import { consentRouter } from './routes/consent';
 import { dashboardRouter } from './routes/dashboard/route';
 import { creditsRouter } from './routes/credits';
 import { eventsRouter } from './routes/events';
-import { photosRouter, photosUploadRouter, photoStatusRouter, bulkDownloadRouter, bulkDeleteRouter } from './routes/photos';
+import { photosRouter } from './routes/photos';
 import { r2Router } from './routes/r2';
 import type { Env, Bindings } from './types';
 
@@ -70,11 +70,7 @@ const app = new Hono<Env>()
 	.route('/consent', consentRouter)
 	.route('/dashboard', dashboardRouter)
 	.route('/events', eventsRouter)
-	.route('/events', photosRouter)
-	.route('/events', bulkDownloadRouter)
-	.route('/events', bulkDeleteRouter)
-	.route('/photos', photosUploadRouter)
-	.route('/photos', photoStatusRouter);
+	.route('/', photosRouter);
 
 // =============================================================================
 // Worker Export
