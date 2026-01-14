@@ -1,5 +1,5 @@
 /**
- * Setup for integration tests (real AWS calls)
+ * Setup for integration tests (real AWS calls, Neon DB)
  */
 
 import { beforeAll } from "vitest";
@@ -10,6 +10,7 @@ const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().min(1, "AWS_SECRET_ACCESS_KEY is required"),
   AWS_REGION: z.string().min(1, "AWS_REGION is required"),
   STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
+  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 });
 
 beforeAll(() => {

@@ -1,5 +1,5 @@
 /**
- * Setup for Node.js tests (functional tests with mocks)
+ * Setup for Workers tests
  */
 
-// No special setup needed for mocked tests
+// Workers tests use env from cloudflare:test module, no setup needed
