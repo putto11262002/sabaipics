@@ -17,6 +17,10 @@ data/
 models/*.bin
 models/*.json
 
+# Test images (download from R2)
+tests/fixtures/images/*.jpg
+tests/fixtures/images/*.json
+
 # Environment
 .env
 .env.local
