@@ -21,6 +21,10 @@ models/*.json
 tests/fixtures/images/*.jpg
 tests/fixtures/images/*.json
 
+# Eval test images (download from R2)
+tests/fixtures/eval/**/*.jpg
+# But keep labels.json and README.md (metadata)
+
 # Environment
 .env
 .env.local
