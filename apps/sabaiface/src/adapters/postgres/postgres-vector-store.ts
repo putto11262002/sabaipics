@@ -150,10 +150,12 @@ export class PostgresVectorStore implements VectorStore {
   ): Promise<FaceMatch[]> {
     // Convert Float32Array to array for SQL
     const queryVector = Array.from(queryDescriptor);
+    const vectorStr = `[${queryVector.join(',')}]`;
 
     // Search using cosine distance (<=> operator)
     // Note: Cosine distance range is 0-2 (0 = identical, 2 = opposite)
     // We filter by threshold to limit results to similar faces
+    // IMPORTANT: Use sql.raw() for pgvector to properly interpolate the vector literal
     const result = await this.db.execute<{
       id: string;
       photo_id: string;
@@ -161,25 +163,28 @@ export class PostgresVectorStore implements VectorStore {
       bounding_box: string;
       indexed_at: string;
       distance: number;
-    }>(sql`
+    }>(sql.raw(`
       SELECT
         id,
         photo_id,
         confidence,
         bounding_box,
         indexed_at,
-        (descriptor <=> ${sql`${queryVector}::vector`}) as distance
-      FROM ${faces}
-      WHERE event_id = ${collectionId}
+        (descriptor <=> '${vectorStr}'::vector) as distance
+      FROM faces
+      WHERE event_id = '${collectionId}'
         AND provider = 'sabaiface'
         AND descriptor IS NOT NULL
-        AND (descriptor <=> ${sql`${queryVector}::vector`}) < ${threshold}
-      ORDER BY descriptor <=> ${sql`${queryVector}::vector`}
+        AND (descriptor <=> '${vectorStr}'::vector) < ${threshold}
+      ORDER BY descriptor <=> '${vectorStr}'::vector
       LIMIT ${maxResults}
-    `);
+    `));
+
+    // Handle neon-http response format (returns { rows: [...] })
+    const rows = 'rows' in result ? result.rows : result;
 
     // Convert to FaceMatch objects
-    return result.map((row) => {
+    return rows.map((row) => {
       const boundingBox = JSON.parse(row.bounding_box) as {
         Width: number;
         Height: number;

@@ -27,7 +27,9 @@ tests/fixtures/eval/**/*.json
 # But keep README.md and label files (metadata)
 !tests/fixtures/eval/**/README.md
 !tests/fixtures/eval/**/labels*.json
-!tests/fixtures/eval/**/ground-truth*.json
+# Keep sample ground-truth (structure reference), ignore local generated files
+!tests/fixtures/eval/**/ground-truth.sample.json
+tests/fixtures/eval/**/ground-truth.local.json
 
 # Environment
 .env

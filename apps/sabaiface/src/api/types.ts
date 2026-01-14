@@ -114,7 +114,7 @@ export type IndexFacesResponse = z.infer<typeof IndexFacesResponseSchema>;
 // =============================================================================
 
 export const SearchFacesByImageRequestSchema = z.object({
-  CollectionId: z.string(),
+  CollectionId: z.string().optional(), // Optional since it's in the URL path
   Image: z.object({
     Bytes: z.string(), // Base64 encoded
   }),
