@@ -37,6 +37,12 @@ enum AppState {
     case error(String)
 }
 
+/// Connection mode for camera
+enum ConnectionMode {
+    case usb
+    case wifi
+}
+
 /// ViewModel managing camera discovery and connection state
 class CameraViewModel: NSObject, ObservableObject {
     // MARK: - Published Properties
@@ -45,25 +51,34 @@ class CameraViewModel: NSObject, ObservableObject {
     @Published var capturedPhotos: [CapturedPhoto] = []
     @Published var photoCount: Int = 0
     @Published var downloadingCount: Int = 0
+    @Published var connectionMode: ConnectionMode = .wifi // Default to WiFi
 
     // MARK: - Private Properties
-    private let cameraService: CameraService
+    private let cameraService: CameraService // USB (legacy)
+    private let wifiService: WiFiCameraService // WiFi (new)
     private var cancellables = Set<AnyCancellable>()
+    private var wifiCancellables = Set<AnyCancellable>()
     private var connectedCamera: ICCameraDevice?
     private var sessionStartTime: Date?
     private var initialCatalogReceived = false
 
     // MARK: - Initialization
     override init() {
-        self.cameraService = CameraService()
+        self.cameraService = CameraService() // USB (legacy, disabled)
+        self.wifiService = WiFiCameraService() // WiFi (new)
         super.init()
-        setupBindings()
-        startSearching()
+
+        // USB DISABLED - uncomment to re-enable
+        // setupBindings()
+        // startSearching()
+
+        // WiFi ACTIVE
+        setupWiFiBindings()
     }
 
     // MARK: - Setup
     private func setupBindings() {
-        // Listen to camera discoveries
+        // USB (legacy) - Listen to camera discoveries
         cameraService.$discoveredCameras
             .sink { [weak self] cameras in
                 guard let self = self else { return }
@@ -83,7 +98,35 @@ class CameraViewModel: NSObject, ObservableObject {
             .assign(to: &$isSearching)
     }
 
+    /// Setup WiFi bindings for reactive state management
+    private func setupWiFiBindings() {
+        print("📱 [CameraViewModel] Setting up WiFi bindings")
+
+        // Listen to WiFi connection state
+        wifiService.$isConnected
+            .sink { [weak self] connected in
+                guard let self = self else { return }
+
+                if connected {
+                    print("✅ [CameraViewModel] WiFi camera connected - transitioning to capture")
+                    self.appState = .capturing
+                }
+            }
+            .store(in: &wifiCancellables)
+
+        // Listen to WiFi connection errors
+        wifiService.$connectionError
+            .compactMap { $0 }
+            .sink { [weak self] error in
+                print("❌ [CameraViewModel] WiFi connection error: \(error)")
+                self?.appState = .error(error)
+            }
+            .store(in: &wifiCancellables)
+    }
+
     // MARK: - Public Methods
+
+    // MARK: USB Methods (Legacy)
     func startSearching() {
         print("📱 Starting camera search from ViewModel")
         appState = .searching
@@ -93,6 +136,31 @@ class CameraViewModel: NSObject, ObservableObject {
     func stopSearching() {
         print("📱 Stopping camera search from ViewModel")
         cameraService.stopSearching()
+    }
+
+    // MARK: WiFi Methods (Active)
+
+    /// Connect to WiFi camera with specified IP
+    /// - Parameter ip: Camera IP address (e.g. "192.168.1.1")
+    func connectToWiFiCamera(ip: String) {
+        print("📱 [CameraViewModel] Connecting to WiFi camera at \(ip)")
+        appState = .connecting
+        connectionMode = .wifi
+
+        let config = WiFiCameraService.CameraConfig(
+            ip: ip,
+            model: "Canon EOS (WLAN)",
+            proto: "ptpip"
+        )
+
+        wifiService.connect(config: config)
+    }
+
+    /// Disconnect from WiFi camera
+    func disconnectWiFi() {
+        print("📱 [CameraViewModel] Disconnecting WiFi camera")
+        wifiService.disconnect()
+        appState = .searching
     }
 
     func takePicture() {

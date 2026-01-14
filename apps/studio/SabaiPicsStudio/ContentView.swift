@@ -20,25 +20,30 @@ struct ContentView: View {
                 // Content based on app state
                 switch viewModel.appState {
                 case .searching:
-                    SearchingView(isSearching: $viewModel.isSearching)
+                    // NEW: WiFi setup instead of USB search
+                    WiFiSetupView(viewModel: viewModel)
 
                 case .cameraFound(let camera):
+                    // USB legacy (disabled)
                     CameraFoundView(camera: camera) {
                         viewModel.connectToCamera(camera)
                     }
 
                 case .connecting:
+                    // NEW: Connecting view
                     ConnectingView()
 
                 case .ready:
                     ReadyView()
 
                 case .capturing:
+                    // Live capture view (existing)
                     LiveCaptureView(viewModel: viewModel)
 
                 case .error(let message):
+                    // Error view (existing)
                     ErrorView(message: message) {
-                        viewModel.startSearching()
+                        viewModel.appState = .searching
                     }
                 }
             }
@@ -52,10 +57,12 @@ struct ContentView: View {
 /// View shown while connecting to camera
 struct ConnectingView: View {
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             ProgressView()
                 .scaleEffect(1.5)
-            Text("Connecting...")
+                .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+
+            Text("Connecting to camera...")
                 .font(.headline)
                 .foregroundColor(.secondary)
         }

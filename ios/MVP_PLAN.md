@@ -29,35 +29,35 @@ Each phase is independently testable and can be demonstrated/shipped.
 
 ---
 
-### ☐ Phase 1: Framework Setup & Bridge Foundation (2 hours)
+### ✅ Phase 1: Framework Setup & Bridge Foundation (2 hours) - COMPLETE
 
 **Goal:** GPhoto2Framework integrated, compiles successfully, Objective-C bridge skeleton ready
 
 **Tasks:**
 
-- [ ] **1.1** Add GPhoto2Framework to Xcode project
+- [x] **1.1** Add GPhoto2Framework to Xcode project
   - Drag `GPhoto2Framework/GPhoto2.xcframework` into project
   - Set "Embed & Sign" in Frameworks
   - Verify framework appears in project navigator
 
-- [ ] **1.2** Create bridging header
+- [x] **1.2** Create bridging header
   - Create `SabaiPicsStudio-Bridging-Header.h`
   - Add `#import <GPhoto2/gphoto2.h>`
   - Set bridging header path in Build Settings
 
-- [ ] **1.3** Create Objective-C bridge files
+- [x] **1.3** Create Objective-C bridge files
   - Create `WiFiCameraManager.h` (interface)
   - Create `WiFiCameraManager.m` (implementation)
   - Add both files to Xcode project
   - Add to Build Phases → Compile Sources
 
-- [ ] **1.4** Implement basic connection skeleton
+- [x] **1.4** Implement basic connection skeleton
   - `connectWithIP:model:protocol:error:` method
   - `disconnect` method
   - Connection state enum
   - Delegate protocol definition
 
-- [ ] **1.5** Build and verify
+- [x] **1.5** Build and verify
   - Run `xcodebuild` or build in Xcode
   - Fix any linker errors
   - Ensure bridging header works
@@ -76,40 +76,40 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 
 ---
 
-### ☐ Phase 2: WiFi Connection (Canon Only) (2 hours)
+### ✅ Phase 2: WiFi Connection (Canon Only) (2 hours) - COMPLETE
 
 **Goal:** Can connect to Canon camera via WiFi, see connection status
 
 **Tasks:**
 
-- [ ] **2.1** Complete WiFiCameraManager connection logic
+- [x] **2.1** Complete WiFiCameraManager connection logic
   - Implement GPhoto2 abilities lookup for "Canon EOS (WLAN)"
   - Implement port info setup with "ptpip:IP"
   - Implement camera initialization
   - Add error handling with descriptive messages
 
-- [ ] **2.2** Create Swift service wrapper
+- [x] **2.2** Create Swift service wrapper
   - Create `WiFiCameraService.swift`
   - Wrap WiFiCameraManager with Combine publishers
   - `@Published var isConnected: Bool`
   - `@Published var connectionError: String?`
   - Implement delegate conformance
 
-- [ ] **2.3** Update CameraViewModel
+- [x] **2.3** Update CameraViewModel
   - Add `wifiService: WiFiCameraService` property
   - Add WiFi bindings in `setupWiFiBindings()`
   - Add `connectToWiFiCamera(ip:)` method
   - Disable USB initialization (comment out)
   - Add connection mode: `.wifi`
 
-- [ ] **2.4** Create simple WiFi setup UI
+- [x] **2.4** Create simple WiFi setup UI
   - Create `WiFiSetupView.swift`
   - IP address text field (default: "192.168.1.1")
   - Connect button
   - Camera model preset: "Canon EOS (WLAN)"
   - Connection instructions for Canon
 
-- [ ] **2.5** Update ContentView
+- [x] **2.5** Update ContentView
   - Show WiFiSetupView on app launch (`.searching` state)
   - Show ConnectingView during connection
   - Handle connection errors
@@ -502,8 +502,8 @@ apps/studio/SabaiPicsStudio/
 Use this checklist to track overall progress:
 
 ### Implementation Progress
-- [ ] Phase 1: Framework Setup & Bridge Foundation (2h)
-- [ ] Phase 2: WiFi Connection (Canon Only) (2h)
+- [x] Phase 1: Framework Setup & Bridge Foundation (2h) ✅
+- [x] Phase 2: WiFi Connection (Canon Only) (2h) ✅
 - [ ] Phase 3: Photo Event Monitoring (2h)
 - [ ] Phase 4: Photo Download (JPEG Only) (2h)
 - [ ] Phase 5: List View UI (1.5h)
@@ -512,10 +512,11 @@ Use this checklist to track overall progress:
 - [ ] Phase 8: Final Testing & Documentation (1h)
 
 **Total Time:** 13 hours (conservative)
+**Completed:** 4 hours | **Remaining:** 9 hours
 
 ### Milestone Checkpoints
-- [ ] **Milestone 1:** Project builds with GPhoto2 (after Phase 1)
-- [ ] **Milestone 2:** Can connect to Canon camera (after Phase 2)
+- [x] **Milestone 1:** Project builds with GPhoto2 (after Phase 1) ✅
+- [x] **Milestone 2:** Can connect to Canon camera (after Phase 2) ✅
 - [ ] **Milestone 3:** Can detect new photos (after Phase 3)
 - [ ] **Milestone 4:** Photos auto-download and display (after Phase 4)
 - [ ] **Milestone 5:** Professional UI complete (after Phase 5)

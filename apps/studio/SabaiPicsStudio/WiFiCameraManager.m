@@ -12,6 +12,9 @@
 #import "WiFiCameraManager.h"
 #import <GPhoto2/gphoto2.h>
 
+// Note: PTP headers not available in public framework headers
+// Device info logging is optional and commented out for now
+
 #pragma mark - Error Domain
 
 // Error domain for WiFiCameraManager errors
@@ -138,14 +141,14 @@ static GPContext* createGPhoto2Context(void) {
 
 /**
  * Connect to WiFi camera
- * Phase 1: SKELETON IMPLEMENTATION - will be completed in Phase 2
+ * Phase 2: FULL IMPLEMENTATION with GPhoto2
  */
 - (BOOL)connectWithIP:(NSString *)ip
                 model:(NSString *)model
              protocol:(NSString *)protocol
                 error:(NSError **)error {
 
-    NSLog(@"[WiFiCameraManager] connectWithIP called (Phase 1 skeleton)");
+    NSLog(@"[WiFiCameraManager] === Starting Camera Connection ===");
     NSLog(@"  IP: %@", ip);
     NSLog(@"  Model: %@", model);
     NSLog(@"  Protocol: %@", protocol);
@@ -180,40 +183,269 @@ static GPContext* createGPhoto2Context(void) {
     // Update state
     self.connectionState = WiFiCameraConnectionStateConnecting;
 
-    // Phase 1: Return NO to indicate not yet implemented
-    // Phase 2: Will implement full GPhoto2 connection logic here
-    // - gp_abilities_list_lookup_model() to find camera
-    // - gp_port_info_list_lookup_path() to setup ptpip port
-    // - gp_camera_init() to connect
-    // - Parse device info and store camera handle
+    // PHASE 2: Full GPhoto2 connection implementation
+    int ret;
+    CameraAbilitiesList *abilities = NULL;
+    CameraAbilities a;
+    GPPortInfoList *portinfolist = NULL;
+    GPPortInfo pi;
 
-    NSLog(@"[WiFiCameraManager] Phase 1: Connection logic not yet implemented");
+    // Build connection string (e.g. "ptpip:192.168.1.1")
+    NSString *connectionStr = [NSString stringWithFormat:@"%@:%@", protocol, ip];
+    NSLog(@"[WiFiCameraManager] Connection string: %@", connectionStr);
 
-    [self setError:error
-           message:@"Connection not yet implemented in Phase 1"
-              code:WiFiCameraManagerErrorConnectionFailed];
+    // Step 1: Create new camera instance
+    ret = gp_camera_new(&_camera);
+    if (ret != GP_OK) {
+        NSLog(@"[WiFiCameraManager] ERROR: Failed to create camera instance (code: %d)", ret);
+        [self setError:error
+               message:@"Failed to create camera instance"
+                  code:WiFiCameraManagerErrorCameraInitFailed];
+        self.connectionState = WiFiCameraConnectionStateError;
+        return NO;
+    }
 
-    self.connectionState = WiFiCameraConnectionStateDisconnected;
+    // Step 2: Load camera abilities list
+    NSLog(@"[WiFiCameraManager] Looking up camera abilities for: %@", model);
+    ret = gp_abilities_list_new(&abilities);
+    if (ret != GP_OK) {
+        NSLog(@"[WiFiCameraManager] ERROR: Failed to create abilities list (code: %d)", ret);
+        [self setError:error
+               message:@"Failed to initialize camera abilities"
+                  code:WiFiCameraManagerErrorCameraInitFailed];
+        gp_camera_free(_camera);
+        _camera = NULL;
+        self.connectionState = WiFiCameraConnectionStateError;
+        return NO;
+    }
 
-    return NO;
+    ret = gp_abilities_list_load(abilities, _context);
+    if (ret != GP_OK) {
+        NSLog(@"[WiFiCameraManager] ERROR: Failed to load abilities list (code: %d)", ret);
+        [self setError:error
+               message:@"Failed to load camera abilities"
+                  code:WiFiCameraManagerErrorCameraInitFailed];
+        gp_abilities_list_free(abilities);
+        gp_camera_free(_camera);
+        _camera = NULL;
+        self.connectionState = WiFiCameraConnectionStateError;
+        return NO;
+    }
+
+    // Step 3: Look up camera model in abilities list
+    int modelIndex = gp_abilities_list_lookup_model(abilities, [model UTF8String]);
+    if (modelIndex < 0) {
+        NSLog(@"[WiFiCameraManager] ERROR: Camera model not found in abilities list");
+        NSString *errorMsg = [NSString stringWithFormat:@"Camera not found at %@", ip];
+        [self setError:error
+               message:errorMsg
+                  code:WiFiCameraManagerErrorConnectionFailed];
+        gp_abilities_list_free(abilities);
+        gp_camera_free(_camera);
+        _camera = NULL;
+        self.connectionState = WiFiCameraConnectionStateError;
+        return NO;
+    }
+
+    NSLog(@"[WiFiCameraManager] Found camera model at index: %d", modelIndex);
+    ret = gp_abilities_list_get_abilities(abilities, modelIndex, &a);
+    if (ret != GP_OK) {
+        NSLog(@"[WiFiCameraManager] ERROR: Failed to get camera abilities (code: %d)", ret);
+        [self setError:error
+               message:@"Failed to get camera abilities"
+                  code:WiFiCameraManagerErrorCameraInitFailed];
+        gp_abilities_list_free(abilities);
+        gp_camera_free(_camera);
+        _camera = NULL;
+        self.connectionState = WiFiCameraConnectionStateError;
+        return NO;
+    }
+
+    ret = gp_camera_set_abilities(_camera, a);
+    if (ret != GP_OK) {
+        NSLog(@"[WiFiCameraManager] ERROR: Failed to set camera abilities (code: %d)", ret);
+        [self setError:error
+               message:@"Failed to configure camera abilities"
+                  code:WiFiCameraManagerErrorCameraInitFailed];
+        gp_abilities_list_free(abilities);
+        gp_camera_free(_camera);
+        _camera = NULL;
+        self.connectionState = WiFiCameraConnectionStateError;
+        return NO;
+    }
+
+    gp_abilities_list_free(abilities);
+
+    // Step 4: Set up port info for WiFi connection
+    NSLog(@"[WiFiCameraManager] Setting up port info for: %@", connectionStr);
+    ret = gp_port_info_list_new(&portinfolist);
+    if (ret != GP_OK) {
+        NSLog(@"[WiFiCameraManager] ERROR: Failed to create port info list (code: %d)", ret);
+        [self setError:error
+               message:@"Failed to initialize port info"
+                  code:WiFiCameraManagerErrorCameraInitFailed];
+        gp_camera_free(_camera);
+        _camera = NULL;
+        self.connectionState = WiFiCameraConnectionStateError;
+        return NO;
+    }
+
+    ret = gp_port_info_list_load(portinfolist);
+    if (ret != GP_OK) {
+        NSLog(@"[WiFiCameraManager] ERROR: Failed to load port info list (code: %d)", ret);
+        [self setError:error
+               message:@"Failed to load port info"
+                  code:WiFiCameraManagerErrorCameraInitFailed];
+        gp_port_info_list_free(portinfolist);
+        gp_camera_free(_camera);
+        _camera = NULL;
+        self.connectionState = WiFiCameraConnectionStateError;
+        return NO;
+    }
+
+    int portCount = gp_port_info_list_count(portinfolist);
+    NSLog(@"[WiFiCameraManager] Found %d ports in port info list", portCount);
+
+    // Step 5: Look up port path (e.g. "ptpip:192.168.1.1")
+    int portIndex = gp_port_info_list_lookup_path(portinfolist, [connectionStr UTF8String]);
+    if (portIndex < 0) {
+        NSLog(@"[WiFiCameraManager] ERROR: Port not found in port info list");
+        [self setError:error
+               message:@"Camera not responding - check WiFi"
+                  code:WiFiCameraManagerErrorConnectionFailed];
+        gp_port_info_list_free(portinfolist);
+        gp_camera_free(_camera);
+        _camera = NULL;
+        self.connectionState = WiFiCameraConnectionStateError;
+        return NO;
+    }
+
+    NSLog(@"[WiFiCameraManager] Found port at index: %d", portIndex);
+    ret = gp_port_info_list_get_info(portinfolist, portIndex, &pi);
+    if (ret != GP_OK) {
+        NSLog(@"[WiFiCameraManager] ERROR: Failed to get port info (code: %d)", ret);
+        [self setError:error
+               message:@"Failed to get port information"
+                  code:WiFiCameraManagerErrorCameraInitFailed];
+        gp_port_info_list_free(portinfolist);
+        gp_camera_free(_camera);
+        _camera = NULL;
+        self.connectionState = WiFiCameraConnectionStateError;
+        return NO;
+    }
+
+    ret = gp_camera_set_port_info(_camera, pi);
+    if (ret != GP_OK) {
+        NSLog(@"[WiFiCameraManager] ERROR: Failed to set port info (code: %d)", ret);
+        [self setError:error
+               message:@"Failed to configure camera port"
+                  code:WiFiCameraManagerErrorCameraInitFailed];
+        gp_port_info_list_free(portinfolist);
+        gp_camera_free(_camera);
+        _camera = NULL;
+        self.connectionState = WiFiCameraConnectionStateError;
+        return NO;
+    }
+
+    gp_port_info_list_free(portinfolist);
+
+    // Step 6: Configure ptpip settings (optional, for better compatibility)
+    NSLog(@"[WiFiCameraManager] Configuring ptpip settings...");
+    gp_setting_set("ptpip", "hostname", "sabaipics-studio");
+
+    // Step 7: Initialize camera (actually connect!)
+    NSLog(@"[WiFiCameraManager] Initializing camera connection...");
+    ret = gp_camera_init(_camera, _context);
+
+    if (ret == GP_OK) {
+        // SUCCESS!
+        NSLog(@"[WiFiCameraManager] ✅ Camera initialized successfully!");
+
+        // Device info logging (requires PTP headers - commented out for now)
+        // Phase 3: Can add back if needed with proper header path
+        /*
+        PTPParams *params = &(_camera->pl->params);
+        if (params->deviceinfo.Model) {
+            NSLog(@"[WiFiCameraManager] Connected to: %s", params->deviceinfo.Model);
+        }
+        if (params->deviceinfo.Manufacturer) {
+            NSLog(@"[WiFiCameraManager] Manufacturer: %s", params->deviceinfo.Manufacturer);
+        }
+        if (params->deviceinfo.SerialNumber) {
+            NSLog(@"[WiFiCameraManager] Serial Number: %s", params->deviceinfo.SerialNumber);
+        }
+        */
+
+        self.connectionState = WiFiCameraConnectionStateConnected;
+
+        // Notify delegate on main thread
+        if (self.delegate && [self.delegate respondsToSelector:@selector(cameraManagerDidConnect:)]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self.delegate cameraManagerDidConnect:self];
+            });
+        }
+
+        NSLog(@"[WiFiCameraManager] === Connection Successful ===");
+        return YES;
+
+    } else {
+        // FAILURE
+        NSLog(@"[WiFiCameraManager] ❌ Camera initialization failed with code: %d", ret);
+
+        NSString *errorMsg;
+        if (ret == GP_ERROR_IO || ret == GP_ERROR_TIMEOUT) {
+            errorMsg = @"Connection timeout - check WiFi";
+        } else if (ret == GP_ERROR_MODEL_NOT_FOUND) {
+            errorMsg = [NSString stringWithFormat:@"Camera not found at %@", ip];
+        } else {
+            errorMsg = [NSString stringWithFormat:@"Connection failed (error code: %d)", ret];
+        }
+
+        NSError *nsError = [NSError errorWithDomain:WiFiCameraManagerErrorDomain
+                                               code:WiFiCameraManagerErrorConnectionFailed
+                                           userInfo:@{NSLocalizedDescriptionKey: errorMsg}];
+
+        if (error != NULL) {
+            *error = nsError;
+        }
+
+        // Notify delegate on main thread
+        if (self.delegate && [self.delegate respondsToSelector:@selector(cameraManager:didFailWithError:)]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self.delegate cameraManager:self didFailWithError:nsError];
+            });
+        }
+
+        // Clean up
+        gp_camera_free(_camera);
+        _camera = NULL;
+        self.connectionState = WiFiCameraConnectionStateError;
+
+        NSLog(@"[WiFiCameraManager] === Connection Failed ===");
+        return NO;
+    }
 }
 
 /**
  * Disconnect from camera
- * Phase 1: SKELETON IMPLEMENTATION - will be completed in Phase 2
+ * Phase 2: FULL IMPLEMENTATION
  */
 - (void)disconnect {
-    NSLog(@"[WiFiCameraManager] disconnect called (Phase 1 skeleton)");
+    NSLog(@"[WiFiCameraManager] === Disconnecting from camera ===");
 
     // Stop monitoring if active
     if (self.isMonitoring) {
         [self stopEventMonitoring];
     }
 
-    // Phase 2: Will implement full disconnect logic here
-    // - gp_camera_exit()
-    // - gp_camera_free()
-    // - Clean up camera handle
+    // Disconnect and free camera
+    if (_camera != NULL) {
+        NSLog(@"[WiFiCameraManager] Closing camera connection...");
+        gp_camera_exit(_camera, _context);
+        gp_camera_free(_camera);
+        _camera = NULL;
+        NSLog(@"[WiFiCameraManager] Camera freed");
+    }
 
     // Update state
     self.connectionState = WiFiCameraConnectionStateDisconnected;
@@ -221,7 +453,7 @@ static GPContext* createGPhoto2Context(void) {
     self.cameraModel = nil;
     self.protocol = nil;
 
-    NSLog(@"[WiFiCameraManager] Disconnected");
+    NSLog(@"[WiFiCameraManager] === Disconnected ===");
 }
 
 #pragma mark - Event Monitoring Methods
