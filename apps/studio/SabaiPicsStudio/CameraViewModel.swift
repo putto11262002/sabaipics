@@ -11,13 +11,17 @@ import Combine
 import SwiftUI
 
 /// Represents a captured photo
-struct CapturedPhoto: Identifiable {
+struct CapturedPhoto: Identifiable, Equatable {
     let id = UUID()
     let name: String
     let data: Data
     let image: UIImage?
     let captureDate: Date
     var isDownloading: Bool = false
+
+    static func == (lhs: CapturedPhoto, rhs: CapturedPhoto) -> Bool {
+        lhs.id == rhs.id
+    }
 
     init(name: String, data: Data, captureDate: Date = Date()) {
         self.name = name
@@ -79,6 +83,10 @@ class CameraViewModel: NSObject, ObservableObject {
     @Published var detectedPhotoCount: Int = 0 // Phase 3: Photo detection counter
     @Published var connectionMode: ConnectionMode = .wifi // Default to WiFi
 
+    // Camera and event metadata
+    @Published var eventName: String = "Event Session"
+    @Published var cameraName: String = "Canon EOS R5"
+
     // Phase 5: Premium connection UX
     @Published var retryCount: Int = 0
     @Published var isCheckingPermission: Bool = false
@@ -93,6 +101,7 @@ class CameraViewModel: NSObject, ObservableObject {
     private var connectedCamera: ICCameraDevice?
     private var sessionStartTime: Date?
     private var initialCatalogReceived = false
+    private var connectingStartTime: Date?
 
     // MARK: - Initialization
     override init() {
@@ -134,7 +143,7 @@ class CameraViewModel: NSObject, ObservableObject {
     private func setupWiFiBindings() {
         print("📱 [CameraViewModel] Setting up WiFi bindings")
 
-        // Listen to WiFi connection state (Phase 5: Premium UX)
+        // Listen to WiFi connection state (Phase 5: Premium UX with minimum display time)
         wifiService.$isConnected
             .sink { [weak self] connected in
                 guard let self = self else { return }
@@ -142,17 +151,32 @@ class CameraViewModel: NSObject, ObservableObject {
                 if connected {
                     print("✅ [CameraViewModel] WiFi connected, showing success...")
 
-                    // Show success celebration
-                    self.appState = .connected
-                    self.shouldDismissConnected = false
+                    // Calculate elapsed time since connecting started
+                    let elapsed = self.connectingStartTime.map { Date().timeIntervalSince($0) } ?? 0
+                    let minimumDisplay: TimeInterval = 1.5
+                    let remainingDelay = max(0, minimumDisplay - elapsed)
 
-                    // Auto-transition to capturing after 1 second
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    // Wait remaining time to ensure minimum display duration
+                    Task { @MainActor in
+                        if remainingDelay > 0 {
+                            print("⏱️ [CameraViewModel] Waiting \(remainingDelay)s for minimum display time...")
+                            try? await Task.sleep(nanoseconds: UInt64(remainingDelay * 1_000_000_000))
+                        }
+
+                        // Show success celebration
+                        self.appState = .connected
+                        self.shouldDismissConnected = false
+
+                        // Auto-transition to capturing after 1.5 seconds
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
                         if case .connected = self.appState {
                             print("✅ [CameraViewModel] Transitioning to main screen...")
                             self.appState = .capturing
                         }
                     }
+                } else {
+                    // Reset timer when disconnected
+                    self.connectingStartTime = nil
                 }
             }
             .store(in: &wifiCancellables)
@@ -194,7 +218,7 @@ class CameraViewModel: NSObject, ObservableObject {
                     // Create UIImage from data
                     if let image = UIImage(data: data) {
                         let photo = CapturedPhoto(name: filename, image: image)
-                        self.capturedPhotos.append(photo)
+                        self.capturedPhotos.insert(photo, at: 0)
                         self.photoCount = self.capturedPhotos.count
                         print("✅ [CameraViewModel] Added photo to grid: \(filename)")
                     } else {
@@ -257,8 +281,9 @@ class CameraViewModel: NSObject, ObservableObject {
             proto: "ptpip"
         )
 
-        // Show connecting state
+        // Show connecting state and track start time
         appState = .connecting
+        connectingStartTime = Date()
 
         // Use retry-enabled connection
         wifiService.connectWithRetry(config: config)

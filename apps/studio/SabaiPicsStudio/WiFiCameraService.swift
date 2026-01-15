@@ -35,6 +35,9 @@ class WiFiCameraService: NSObject, ObservableObject {
     /// The underlying Objective-C manager
     private let manager: WiFiCameraManager
 
+    // Task management
+    private var connectionTask: Task<Void, Never>?
+
     // Retry state
     private var retryCount = 0
     private let maxRetries = 3
@@ -76,17 +79,25 @@ class WiFiCameraService: NSObject, ObservableObject {
         // Reset error state
         connectionError = nil
 
-        // Call Objective-C method with error handling
-        do {
-            try manager.connect(withIP: config.ip, model: config.model, protocol: config.proto)
-            // Success case is handled by delegate callback
-        } catch let error as NSError {
-            let errorMsg = error.localizedDescription
-            print("❌ [WiFiCameraService] Connection failed: \(errorMsg)")
+        // Cancel any existing connection attempt
+        connectionTask?.cancel()
 
-            DispatchQueue.main.async {
-                self.connectionError = errorMsg
-                self.isConnected = false
+        // Move blocking connection to background thread to keep UI responsive
+        connectionTask = Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+
+            do {
+                try self.manager.connect(withIP: config.ip, model: config.model, protocol: config.proto)
+                // Success case handled by delegate callback (already on main thread)
+            } catch let error as NSError {
+                let errorMsg = error.localizedDescription
+                print("❌ [WiFiCameraService] Connection failed: \(errorMsg)")
+
+                // Update UI state on main thread
+                await MainActor.run {
+                    self.connectionError = errorMsg
+                    self.isConnected = false
+                }
             }
         }
     }
@@ -94,12 +105,20 @@ class WiFiCameraService: NSObject, ObservableObject {
     /// Disconnect from the camera
     func disconnect() {
         print("📱 [WiFiCameraService] Disconnecting from WiFi camera")
+        connectionTask?.cancel()
+        connectionTask = nil
         manager.disconnect()
 
         DispatchQueue.main.async {
             self.isConnected = false
             self.connectionError = nil
         }
+    }
+
+    /// Cancel any pending connection attempt
+    func cancelConnection() {
+        connectionTask?.cancel()
+        connectionTask = nil
     }
 
     // MARK: - Retry Logic (Phase 5)

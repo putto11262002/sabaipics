@@ -3,12 +3,12 @@
 //  SabaiPicsStudio
 //
 //  Created: 2026-01-15
-//  Success celebration screen (auto-dismisses after 1 second)
+//  Success celebration screen (auto-dismisses after 1.5 seconds)
 //
 
 import SwiftUI
 
-/// Success celebration screen (auto-dismisses after 1 second)
+/// Success celebration screen (auto-dismisses after 1.5 seconds)
 struct ConnectedView: View {
     let cameraModel: String
     let ipAddress: String
@@ -48,8 +48,8 @@ struct ConnectedView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
         .onAppear {
-            // Auto-dismiss after 1 second
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            // Auto-dismiss after 1.5 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 withAnimation {
                     shouldDismiss = true
                 }
