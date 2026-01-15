@@ -24,6 +24,9 @@ class WiFiCameraService: NSObject, ObservableObject {
     /// Detected photos (Phase 3)
     @Published var detectedPhotos: [(filename: String, folder: String)] = []
 
+    /// Downloaded photos with data (Phase 4)
+    @Published var downloadedPhotos: [(filename: String, data: Data)] = []
+
     // MARK: - Private Properties
 
     /// The underlying Objective-C manager
@@ -90,6 +93,7 @@ class WiFiCameraService: NSObject, ObservableObject {
             self.connectionError = nil
         }
     }
+
 }
 
 // MARK: - WiFiCameraManagerDelegate
@@ -120,8 +124,27 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
 
     /// Called when a new photo is detected on the camera
     /// Phase 3: FULL IMPLEMENTATION
+    /// Phase 4: Added JPEG filtering to skip RAW files
     func cameraManager(_ manager: Any, didDetectNewPhoto filename: String, folder: String) {
         print("📸 [WiFiCameraService] Photo detected in Swift: \(filename)")
+
+        // Filter: Only process JPEG files, skip RAW
+        let lowercased = filename.lowercased()
+        let isRAW = lowercased.hasSuffix(".cr2") ||
+                    lowercased.hasSuffix(".cr3") ||
+                    lowercased.hasSuffix(".nef") ||
+                    lowercased.hasSuffix(".arw") ||
+                    lowercased.hasSuffix(".dng")
+
+        let isJPEG = lowercased.hasSuffix(".jpg") ||
+                     lowercased.hasSuffix(".jpeg")
+
+        guard isJPEG && !isRAW else {
+            print("⏭️ Skipping non-JPEG file: \(filename)")
+            return
+        }
+
+        // Add to detected photos array
         DispatchQueue.main.async {
             self.detectedPhotos.append((filename: filename, folder: folder))
         }
@@ -130,9 +153,13 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
     // MARK: - Photo Download (Phase 4)
 
     /// Called when photo download completes
-    /// Phase 4: Will implement photo download
+    /// Phase 4: Sequential download implementation
     func cameraManager(_ manager: Any, didDownloadPhoto photoData: Data, filename: String) {
-        print("📥 [WiFiCameraService] Photo downloaded: \(filename), size: \(photoData.count) bytes")
-        // Phase 4: Implement photo download logic
+        print("✅ [WiFiCameraService] Photo downloaded: \(filename), size: \(photoData.count) bytes")
+
+        // Add to downloaded photos array (on main thread)
+        DispatchQueue.main.async {
+            self.downloadedPhotos.append((filename: filename, data: photoData))
+        }
     }
 }

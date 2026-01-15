@@ -505,20 +505,20 @@ Use this checklist to track overall progress:
 - [x] Phase 1: Framework Setup & Bridge Foundation (2h) ✅
 - [x] Phase 2: WiFi Connection (Canon Only) (2h) ✅
 - [x] Phase 3: Photo Event Monitoring (2h) ✅
-- [ ] Phase 4: Photo Download (JPEG Only) (2h)
+- [x] Phase 4: Photo Download (JPEG Only) (2h) ✅
 - [ ] Phase 5: List View UI (1.5h)
 - [ ] Phase 6: Session Management (1.5h)
 - [ ] Phase 7: Polish & Error Handling (2h)
 - [ ] Phase 8: Final Testing & Documentation (1h)
 
 **Total Time:** 13 hours (conservative)
-**Completed:** 6 hours | **Remaining:** 7 hours
+**Completed:** 8 hours | **Remaining:** 5 hours
 
 ### Milestone Checkpoints
 - [x] **Milestone 1:** Project builds with GPhoto2 (after Phase 1) ✅
 - [x] **Milestone 2:** Can connect to Canon camera (after Phase 2) ✅
 - [x] **Milestone 3:** Can detect new photos (after Phase 3) ✅
-- [ ] **Milestone 4:** Photos auto-download and display (after Phase 4)
+- [x] **Milestone 4:** Photos auto-download and display (after Phase 4) ✅
 - [ ] **Milestone 5:** Professional UI complete (after Phase 5)
 - [ ] **Milestone 6:** Full session flow works (after Phase 6)
 - [ ] **Milestone 7:** Production-ready polish (after Phase 7)

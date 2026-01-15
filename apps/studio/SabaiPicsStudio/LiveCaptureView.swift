@@ -22,7 +22,6 @@ struct LiveCaptureView: View {
             // Stats header
             StatsHeader(
                 photoCount: viewModel.photoCount,
-                downloadingCount: viewModel.downloadingCount,
                 detectedCount: viewModel.detectedPhotoCount
             )
             .padding()
@@ -43,44 +42,6 @@ struct LiveCaptureView: View {
                     .padding()
                 }
             }
-
-            Divider()
-
-            // Action buttons
-            VStack(spacing: 12) {
-                // Take Photo button (BIG and prominent)
-                Button(action: {
-                    viewModel.takePicture()
-                }) {
-                    HStack {
-                        Image(systemName: "camera.fill")
-                            .font(.title2)
-                        Text("Take Photo")
-                            .font(.title3)
-                            .fontWeight(.bold)
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .cornerRadius(12)
-                }
-
-                // End Session button (smaller, secondary)
-                Button(action: {
-                    // TODO: End session
-                }) {
-                    Text("End Session")
-                        .font(.subheadline)
-                        .foregroundColor(.red)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(8)
-                }
-            }
-            .padding()
-            .background(Color(.systemBackground))
         }
     }
 }
@@ -88,14 +49,12 @@ struct LiveCaptureView: View {
 /// Stats header showing capture statistics
 struct StatsHeader: View {
     let photoCount: Int
-    let downloadingCount: Int
     let detectedCount: Int
 
     var body: some View {
         HStack(spacing: 24) {
             StatItem(icon: "bell.fill", label: "Detected", value: "\(detectedCount)")
             StatItem(icon: "camera.fill", label: "Captured", value: "\(photoCount)")
-            StatItem(icon: "arrow.down.circle.fill", label: "Downloading", value: "\(downloadingCount)")
 
             Spacer()
 

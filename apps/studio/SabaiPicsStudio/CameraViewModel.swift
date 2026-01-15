@@ -25,6 +25,14 @@ struct CapturedPhoto: Identifiable {
         self.image = UIImage(data: data)
         self.captureDate = captureDate
     }
+
+    init(name: String, image: UIImage, captureDate: Date = Date()) {
+        self.name = name
+        self.image = image
+        // Convert UIImage to JPEG data
+        self.data = image.jpegData(compressionQuality: 0.9) ?? Data()
+        self.captureDate = captureDate
+    }
 }
 
 /// App states matching the user journey flow
@@ -50,7 +58,6 @@ class CameraViewModel: NSObject, ObservableObject {
     @Published var isSearching: Bool = false
     @Published var capturedPhotos: [CapturedPhoto] = []
     @Published var photoCount: Int = 0
-    @Published var downloadingCount: Int = 0
     @Published var detectedPhotoCount: Int = 0 // Phase 3: Photo detection counter
     @Published var connectionMode: ConnectionMode = .wifi // Default to WiFi
 
@@ -124,20 +131,31 @@ class CameraViewModel: NSObject, ObservableObject {
             }
             .store(in: &wifiCancellables)
 
-        // Listen to detected photos (Phase 3)
+        // Listen to detected photos (Phase 3) - just for counter
         wifiService.$detectedPhotos
             .sink { [weak self] photos in
+                self?.detectedPhotoCount = photos.count
+            }
+            .store(in: &wifiCancellables)
+
+        // Listen to downloaded photos (Phase 4) - sequential downloads from monitoring thread
+        wifiService.$downloadedPhotos
+            .sink { [weak self] downloads in
                 guard let self = self else { return }
 
-                self.detectedPhotoCount = photos.count
+                for (filename, data) in downloads {
+                    // Check if already added
+                    let alreadyAdded = self.capturedPhotos.contains { $0.name == filename }
+                    guard !alreadyAdded else { continue }
 
-                if !photos.isEmpty {
-                    print("📸 ViewModel received \(photos.count) detected photo(s)")
-
-                    // For Phase 3: Just log the detection
-                    // Phase 4 will implement actual download
-                    for (filename, folder) in photos {
-                        print("📸 Detected: \(filename) in \(folder)")
+                    // Create UIImage from data
+                    if let image = UIImage(data: data) {
+                        let photo = CapturedPhoto(name: filename, image: image)
+                        self.capturedPhotos.append(photo)
+                        self.photoCount = self.capturedPhotos.count
+                        print("✅ [CameraViewModel] Added photo to grid: \(filename)")
+                    } else {
+                        print("❌ [CameraViewModel] Failed to create image from data: \(filename)")
                     }
                 }
             }
@@ -273,11 +291,6 @@ extension CameraViewModel: ICCameraDeviceDelegate {
 
             print("📸 Downloading new photo: \(file.name ?? "unknown")")
 
-            // Start downloading the photo
-            DispatchQueue.main.async { [weak self] in
-                self?.downloadingCount += 1
-            }
-
             // Create a temporary directory for downloads
             let tempDir = FileManager.default.temporaryDirectory
 
@@ -340,8 +353,6 @@ extension CameraViewModel: ICCameraDeviceDownloadDelegate {
     @objc func didDownloadFile(_ file: ICCameraFile, error: Error?, options: [String : Any] = [:], contextInfo: UnsafeMutableRawPointer?) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-
-            self.downloadingCount -= 1
 
             if let error = error {
                 print("❌ Download failed: \(error.localizedDescription)")

@@ -187,6 +187,7 @@ typedef NS_ENUM(NSInteger, WiFiCameraConnectionState) {
                    filename:(NSString *)filename
                  completion:(void (^)(NSData * _Nullable photoData, NSError * _Nullable error))completion;
 
+
 @end
 
 NS_ASSUME_NONNULL_END
