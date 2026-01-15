@@ -27,10 +27,18 @@ class WiFiCameraService: NSObject, ObservableObject {
     /// Downloaded photos with data (Phase 4)
     @Published var downloadedPhotos: [(filename: String, data: Data)] = []
 
+    /// Retry count for UI display (Phase 5)
+    @Published var currentRetryCount: Int = 0
+
     // MARK: - Private Properties
 
     /// The underlying Objective-C manager
     private let manager: WiFiCameraManager
+
+    // Retry state
+    private var retryCount = 0
+    private let maxRetries = 3
+    private var connectionTimeout: TimeInterval = 15.0  // 15s instead of 90s
 
     // MARK: - Configuration
 
@@ -92,6 +100,64 @@ class WiFiCameraService: NSObject, ObservableObject {
             self.isConnected = false
             self.connectionError = nil
         }
+    }
+
+    // MARK: - Retry Logic (Phase 5)
+
+    /// Connect with automatic retry on timeout
+    func connectWithRetry(config: CameraConfig) {
+        print("📡 [WiFiCameraService] Starting connection with retry...")
+        retryCount = 0
+        attemptConnection(config: config)
+    }
+
+    private func attemptConnection(config: CameraConfig) {
+        print("📡 [WiFiCameraService] Connection attempt \(retryCount + 1)/\(maxRetries)")
+
+        // Update retry count for UI
+        DispatchQueue.main.async {
+            self.currentRetryCount = self.retryCount
+        }
+
+        // Call existing connect method
+        connect(config: config)
+
+        // Wait for result with 15s timeout
+        DispatchQueue.global().asyncAfter(deadline: .now() + connectionTimeout) { [weak self] in
+            guard let self = self else { return }
+
+            DispatchQueue.main.async {
+                if self.isConnected {
+                    // SUCCESS
+                    print("✅ [WiFiCameraService] Connection succeeded on attempt \(self.retryCount + 1)")
+                    self.retryCount = 0
+                    LocalNetworkPermissionChecker.markPermissionGranted()
+
+                } else if self.retryCount < self.maxRetries - 1 {
+                    // RETRY
+                    self.retryCount += 1
+
+                    // Exponential backoff: 2s, 5s
+                    let backoffDelay: TimeInterval = self.retryCount == 1 ? 2.0 : 5.0
+                    print("⏳ [WiFiCameraService] Retry in \(backoffDelay)s... (Attempt \(self.retryCount + 1)/\(self.maxRetries))")
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + backoffDelay) {
+                        self.attemptConnection(config: config)
+                    }
+
+                } else {
+                    // FAILURE
+                    print("❌ [WiFiCameraService] Connection failed after \(self.maxRetries) attempts")
+                    self.retryCount = 0
+                    self.connectionError = "Connection failed after 3 attempts. Please check camera WiFi settings."
+                }
+            }
+        }
+    }
+
+    /// Cancel any pending retry
+    func cancelRetry() {
+        retryCount = 0
     }
 
 }

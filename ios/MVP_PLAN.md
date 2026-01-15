@@ -234,7 +234,73 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 
 ---
 
-### ☐ Phase 5: List View UI (1.5 hours)
+### ☐ Phase 5: Connection UX & Permission Flow (4 hours)
+
+**Goal:** Premium connection experience with pre-flight permission check and auto-retry
+
+**Related Documentation:**
+- `log/003-local-network-permission-precheck.md` - Technical implementation plan
+- `log/003-connection-flow-summary.md` - UI flow and scenarios
+
+**Tasks:**
+
+- [ ] **5.1** Create LocalNetworkPermissionChecker
+  - Implement pre-flight permission trigger (169.254.255.255:1)
+  - Add UserDefaults tracking for granted status
+  - Add 5-second timeout safety
+  - Test iOS permission prompt appears
+
+- [ ] **5.2** Implement auto-retry logic with 15s timeout
+  - Update WiFiCameraService with retry state (max 3 attempts)
+  - Change connection timeout from 75s → 15s
+  - Add exponential backoff (2s, 5s delays)
+  - Implement `connectWithRetry()` method
+  - Test timeout and retry scenarios
+
+- [ ] **5.3** Create premium UI components
+  - **ConnectingView.swift** - Animated searching screen
+  - **ConnectedView.swift** - Success celebration (1s auto-transition)
+  - **ErrorView.swift** - Connection failed with "Try Again"
+  - Update **WiFiSetupView.swift** - Permission denied help text
+
+- [ ] **5.4** Implement state machine in CameraViewModel
+  - Add new states: `.connecting`, `.connected`
+  - Implement state transitions
+  - Add 1-second auto-transition from `.connected` to `.capturing`
+  - Update ContentView to show correct view for each state
+
+- [ ] **5.5** Test premium connection flow
+  - First time user → Permission prompt → Success → 1s celebration → Main screen
+  - Permission denied → WiFiSetupView with help text
+  - Subsequent connections → Fast (skip pre-flight)
+  - Network timeout → Auto-retry → Success
+  - All retries fail (52s) → ErrorView with clear message
+
+**Shippable Increment:**
+✅ First connection succeeds without manual retry
+✅ 15s timeout = 5x faster failure detection
+✅ Multi-page flow with smooth transitions (like AirPods pairing)
+✅ Clear error messages with actionable help
+✅ Auto-retry handles transient network issues
+
+**Test on iPad:**
+1. Fresh install → Permission prompt → Connect → Success in ~8s
+2. Deny permission → See help text on WiFiSetupView → Follow instructions
+3. Subsequent connections → Fast (~3s, no pre-flight)
+4. Turn camera off → All retries fail in 52s → Clear error
+5. Weak network → First attempt fails → Auto-retry succeeds
+
+**Acceptance Criteria:**
+- Pre-flight permission check triggers before connection
+- Connection timeout is 15 seconds (not 90s)
+- Auto-retry with max 3 attempts, backoff delays
+- ConnectedView shows for 1 second before main screen
+- Premium feel: smooth animations, clear feedback
+- Total max time for all failures: 52 seconds
+
+---
+
+### ☐ Phase 6: List View UI (1.5 hours)
 
 **Goal:** Professional list view with photo metadata
 
@@ -290,7 +356,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 
 ---
 
-### ☐ Phase 6: Session Management (1.5 hours)
+### ☐ Phase 7: Session Management (1.5 hours)
 
 **Goal:** End session cleanly, handle disconnection gracefully
 
@@ -346,7 +412,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 
 ---
 
-### ☐ Phase 7: Polish & Error Handling (2 hours)
+### ☐ Phase 8: Polish & Error Handling (2 hours)
 
 **Goal:** Production-ready UX with proper error handling
 
@@ -416,7 +482,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 
 ---
 
-### ☐ Phase 8: Final Testing & Documentation (1 hour)
+### ☐ Phase 9: Final Testing & Documentation (1 hour)
 
 **Goal:** Verified working end-to-end, documented for handoff
 
@@ -506,23 +572,25 @@ Use this checklist to track overall progress:
 - [x] Phase 2: WiFi Connection (Canon Only) (2h) ✅
 - [x] Phase 3: Photo Event Monitoring (2h) ✅
 - [x] Phase 4: Photo Download (JPEG Only) (2h) ✅
-- [ ] Phase 5: List View UI (1.5h)
-- [ ] Phase 6: Session Management (1.5h)
-- [ ] Phase 7: Polish & Error Handling (2h)
-- [ ] Phase 8: Final Testing & Documentation (1h)
+- [x] Phase 5: Connection UX & Permission Flow (4h) ✅
+- [ ] Phase 6: List View UI (1.5h)
+- [ ] Phase 7: Session Management (1.5h)
+- [ ] Phase 8: Polish & Error Handling (2h)
+- [ ] Phase 9: Final Testing & Documentation (1h)
 
-**Total Time:** 13 hours (conservative)
-**Completed:** 8 hours | **Remaining:** 5 hours
+**Total Time:** 17 hours (updated with Phase 5)
+**Completed:** 12 hours | **Remaining:** 5 hours
 
 ### Milestone Checkpoints
 - [x] **Milestone 1:** Project builds with GPhoto2 (after Phase 1) ✅
 - [x] **Milestone 2:** Can connect to Canon camera (after Phase 2) ✅
 - [x] **Milestone 3:** Can detect new photos (after Phase 3) ✅
 - [x] **Milestone 4:** Photos auto-download and display (after Phase 4) ✅
-- [ ] **Milestone 5:** Professional UI complete (after Phase 5)
-- [ ] **Milestone 6:** Full session flow works (after Phase 6)
-- [ ] **Milestone 7:** Production-ready polish (after Phase 7)
-- [ ] **Milestone 8:** MVP shipped! (after Phase 8)
+- [ ] **Milestone 5:** Premium connection UX (after Phase 5)
+- [ ] **Milestone 6:** Professional list UI complete (after Phase 6)
+- [ ] **Milestone 7:** Full session flow works (after Phase 7)
+- [ ] **Milestone 8:** Production-ready polish (after Phase 8)
+- [ ] **Milestone 9:** MVP shipped! (after Phase 9)
 
 ---
 

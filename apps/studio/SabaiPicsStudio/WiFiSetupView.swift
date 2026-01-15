@@ -13,6 +13,7 @@ struct WiFiSetupView: View {
     @ObservedObject var viewModel: CameraViewModel
     @State private var cameraIP: String = "192.168.1.1"
     @State private var showInstructions = false
+    @State private var showPermissionError = false
     @FocusState private var isIPFieldFocused: Bool
 
     var body: some View {
@@ -80,6 +81,31 @@ struct WiFiSetupView: View {
 
             Spacer()
                 .frame(height: 32)
+
+            // Permission error message (if shown)
+            if showPermissionError {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text("Local network access required")
+                            .font(.headline)
+                    }
+
+                    Text("SabaiPics Studio needs permission to discover cameras on your network.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    Text("Enable in: Settings > Privacy > Local Network")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+                .padding()
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+                .padding(.horizontal, 32)
+                .padding(.bottom, 16)
+            }
 
             // Connect button
             Button(action: {

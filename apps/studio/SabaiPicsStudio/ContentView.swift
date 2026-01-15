@@ -17,11 +17,12 @@ struct ContentView: View {
                 Color(.systemBackground)
                     .ignoresSafeArea()
 
-                // Content based on app state
+                // Content based on app state (Phase 5: Premium routing)
                 switch viewModel.appState {
                 case .searching:
-                    // NEW: WiFi setup instead of USB search
+                    // WiFi setup page
                     WiFiSetupView(viewModel: viewModel)
+                        .transition(.opacity)
 
                 case .cameraFound(let camera):
                     // USB legacy (disabled)
@@ -30,42 +31,50 @@ struct ContentView: View {
                     }
 
                 case .connecting:
-                    // NEW: Connecting view
-                    ConnectingView()
+                    // Phase 5: Premium connecting view with retry status
+                    ConnectingView(
+                        ipAddress: viewModel.currentIP ?? "...",
+                        retryCount: viewModel.retryCount,
+                        maxRetries: 3
+                    )
+                    .transition(.opacity)
+
+                case .connected:
+                    // Phase 5: Success celebration (1s auto-transition)
+                    ConnectedView(
+                        cameraModel: "Canon EOS",
+                        ipAddress: viewModel.currentIP ?? "",
+                        shouldDismiss: $viewModel.shouldDismissConnected
+                    )
+                    .transition(.scale.combined(with: .opacity))
 
                 case .ready:
                     ReadyView()
 
                 case .capturing:
-                    // Live capture view (existing)
+                    // Live capture view
                     LiveCaptureView(viewModel: viewModel)
+                        .transition(.opacity)
 
                 case .error(let message):
-                    // Error view (existing)
-                    ErrorView(message: message) {
-                        viewModel.appState = .searching
-                    }
+                    // Phase 5: Premium error view
+                    ConnectionErrorView(
+                        errorMessage: message,
+                        onTryAgain: {
+                            withAnimation {
+                                viewModel.appState = .searching
+                                viewModel.wifiService.cancelRetry()
+                            }
+                        }
+                    )
+                    .transition(.opacity)
                 }
             }
+            .animation(.easeInOut, value: viewModel.appState)
             .navigationTitle("SabaiPics Studio")
             .navigationBarTitleDisplayMode(.inline)
         }
         .navigationViewStyle(.stack) // Forces single-column layout on iPad (no sidebar)
-    }
-}
-
-/// View shown while connecting to camera
-struct ConnectingView: View {
-    var body: some View {
-        VStack(spacing: 24) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .progressViewStyle(CircularProgressViewStyle(tint: .blue))
-
-            Text("Connecting to camera...")
-                .font(.headline)
-                .foregroundColor(.secondary)
-        }
     }
 }
 

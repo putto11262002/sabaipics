@@ -36,13 +36,31 @@ struct CapturedPhoto: Identifiable {
 }
 
 /// App states matching the user journey flow
-enum AppState {
-    case searching
-    case cameraFound(ICCameraDevice)
-    case connecting
-    case ready
-    case capturing
-    case error(String)
+enum AppState: Equatable {
+    case searching           // WiFiSetupView
+    case cameraFound(ICCameraDevice)  // USB legacy
+    case connecting          // ConnectingView (Phase 5)
+    case connected           // ConnectedView (Phase 5, 1s pause)
+    case ready               // USB legacy
+    case capturing           // LiveCaptureView
+    case error(String)       // ConnectionErrorView
+
+    static func == (lhs: AppState, rhs: AppState) -> Bool {
+        switch (lhs, rhs) {
+        case (.searching, .searching),
+             (.connecting, .connecting),
+             (.connected, .connected),
+             (.ready, .ready),
+             (.capturing, .capturing):
+            return true
+        case let (.error(lhsMsg), .error(rhsMsg)):
+            return lhsMsg == rhsMsg
+        case let (.cameraFound(lhsCam), .cameraFound(rhsCam)):
+            return lhsCam.name == rhsCam.name
+        default:
+            return false
+        }
+    }
 }
 
 /// Connection mode for camera
@@ -61,9 +79,15 @@ class CameraViewModel: NSObject, ObservableObject {
     @Published var detectedPhotoCount: Int = 0 // Phase 3: Photo detection counter
     @Published var connectionMode: ConnectionMode = .wifi // Default to WiFi
 
+    // Phase 5: Premium connection UX
+    @Published var retryCount: Int = 0
+    @Published var isCheckingPermission: Bool = false
+    @Published var shouldDismissConnected: Bool = false
+    @Published var currentIP: String? = nil
+
     // MARK: - Private Properties
     private let cameraService: CameraService // USB (legacy)
-    private let wifiService: WiFiCameraService // WiFi (new)
+    let wifiService: WiFiCameraService // WiFi (new) - accessible for cancelRetry
     private var cancellables = Set<AnyCancellable>()
     private var wifiCancellables = Set<AnyCancellable>()
     private var connectedCamera: ICCameraDevice?
@@ -110,24 +134,36 @@ class CameraViewModel: NSObject, ObservableObject {
     private func setupWiFiBindings() {
         print("📱 [CameraViewModel] Setting up WiFi bindings")
 
-        // Listen to WiFi connection state
+        // Listen to WiFi connection state (Phase 5: Premium UX)
         wifiService.$isConnected
             .sink { [weak self] connected in
                 guard let self = self else { return }
 
                 if connected {
-                    print("✅ [CameraViewModel] WiFi camera connected - transitioning to capture")
-                    self.appState = .capturing
+                    print("✅ [CameraViewModel] WiFi connected, showing success...")
+
+                    // Show success celebration
+                    self.appState = .connected
+                    self.shouldDismissConnected = false
+
+                    // Auto-transition to capturing after 1 second
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        if case .connected = self.appState {
+                            print("✅ [CameraViewModel] Transitioning to main screen...")
+                            self.appState = .capturing
+                        }
+                    }
                 }
             }
             .store(in: &wifiCancellables)
 
         // Listen to WiFi connection errors
         wifiService.$connectionError
-            .compactMap { $0 }
             .sink { [weak self] error in
+                guard let self = self, let error = error else { return }
+
                 print("❌ [CameraViewModel] WiFi connection error: \(error)")
-                self?.appState = .error(error)
+                self.appState = .error(error)
             }
             .store(in: &wifiCancellables)
 
@@ -135,6 +171,13 @@ class CameraViewModel: NSObject, ObservableObject {
         wifiService.$detectedPhotos
             .sink { [weak self] photos in
                 self?.detectedPhotoCount = photos.count
+            }
+            .store(in: &wifiCancellables)
+
+        // Listen to retry count (Phase 5)
+        wifiService.$currentRetryCount
+            .sink { [weak self] count in
+                self?.retryCount = count
             }
             .store(in: &wifiCancellables)
 
@@ -178,20 +221,47 @@ class CameraViewModel: NSObject, ObservableObject {
 
     // MARK: WiFi Methods (Active)
 
-    /// Connect to WiFi camera with specified IP
+    /// Connect to WiFi camera with specified IP (Phase 5: with pre-flight check)
     /// - Parameter ip: Camera IP address (e.g. "192.168.1.1")
     func connectToWiFiCamera(ip: String) {
-        print("📱 [CameraViewModel] Connecting to WiFi camera at \(ip)")
-        appState = .connecting
+        print("🔐 [CameraViewModel] Starting WiFi connection flow...")
+        currentIP = ip
         connectionMode = .wifi
 
+        // Check if we likely have permission already
+        if LocalNetworkPermissionChecker.likelyHasPermission() {
+            // Skip pre-flight, connect directly
+            print("✅ [CameraViewModel] Permission already granted, connecting...")
+            initiateWiFiConnection(ip: ip)
+            return
+        }
+
+        // First time or permission unclear - do pre-flight check
+        print("🔐 [CameraViewModel] Triggering local network permission check...")
+        isCheckingPermission = true
+        appState = .connecting  // Show ConnectingView
+
+        LocalNetworkPermissionChecker.triggerPermissionPrompt { [weak self] in
+            DispatchQueue.main.async {
+                self?.isCheckingPermission = false
+                print("✅ [CameraViewModel] Permission check complete, connecting...")
+                self?.initiateWiFiConnection(ip: ip)
+            }
+        }
+    }
+
+    private func initiateWiFiConnection(ip: String) {
         let config = WiFiCameraService.CameraConfig(
             ip: ip,
             model: "Canon EOS (WLAN)",
             proto: "ptpip"
         )
 
-        wifiService.connect(config: config)
+        // Show connecting state
+        appState = .connecting
+
+        // Use retry-enabled connection
+        wifiService.connectWithRetry(config: config)
     }
 
     /// Disconnect from WiFi camera
