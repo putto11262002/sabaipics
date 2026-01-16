@@ -41,7 +41,7 @@ struct CapturedPhoto: Identifiable, Equatable {
 
 /// App states matching the user journey flow
 enum AppState: Equatable {
-    case searching           // WiFiSetupView
+    case idle                // WiFiSetupView - waiting for user input
     case cameraFound(ICCameraDevice)  // USB legacy
     case connecting          // ConnectingView (Phase 5)
     case connected           // ConnectedView (Phase 5, 1s pause)
@@ -51,7 +51,7 @@ enum AppState: Equatable {
 
     static func == (lhs: AppState, rhs: AppState) -> Bool {
         switch (lhs, rhs) {
-        case (.searching, .searching),
+        case (.idle, .idle),
              (.connecting, .connecting),
              (.connected, .connected),
              (.ready, .ready),
@@ -76,7 +76,7 @@ enum ConnectionMode {
 /// ViewModel managing camera discovery and connection state
 class CameraViewModel: NSObject, ObservableObject {
     // MARK: - Published Properties
-    @Published var appState: AppState = .searching
+    @Published var appState: AppState = .idle
     @Published var isSearching: Bool = false
     @Published var capturedPhotos: [CapturedPhoto] = []
     @Published var photoCount: Int = 0
@@ -102,6 +102,7 @@ class CameraViewModel: NSObject, ObservableObject {
     private var sessionStartTime: Date?
     private var initialCatalogReceived = false
     private var connectingStartTime: Date?
+    private let lastIPKey = "LastCameraIP"
 
     // MARK: - Initialization
     override init() {
@@ -128,8 +129,8 @@ class CameraViewModel: NSObject, ObservableObject {
                     // Camera found!
                     self.appState = .cameraFound(firstCamera)
                 } else if self.isSearching {
-                    // Still searching
-                    self.appState = .searching
+                    // Still idle, waiting for camera
+                    self.appState = .idle
                 }
             }
             .store(in: &cancellables)
@@ -175,7 +176,10 @@ class CameraViewModel: NSObject, ObservableObject {
                         }
                     }
                 } else {
-                    // Reset timer when disconnected
+                    // Unexpected disconnect during active session
+                    if case .capturing = self.appState {
+                        self.appState = .error("Camera disconnected. Check WiFi connection and reconnect.")
+                    }
                     self.connectingStartTime = nil
                 }
             }
@@ -234,7 +238,7 @@ class CameraViewModel: NSObject, ObservableObject {
     // MARK: USB Methods (Legacy)
     func startSearching() {
         print("📱 Starting camera search from ViewModel")
-        appState = .searching
+        appState = .idle
         cameraService.startSearching()
     }
 
@@ -251,6 +255,9 @@ class CameraViewModel: NSObject, ObservableObject {
         print("🔐 [CameraViewModel] Starting WiFi connection flow...")
         currentIP = ip
         connectionMode = .wifi
+
+        // Save last IP for quick reconnect
+        UserDefaults.standard.set(ip, forKey: lastIPKey)
 
         // Check if we likely have permission already
         if LocalNetworkPermissionChecker.likelyHasPermission() {
@@ -291,9 +298,45 @@ class CameraViewModel: NSObject, ObservableObject {
 
     /// Disconnect from WiFi camera
     func disconnectWiFi() {
-        print("📱 [CameraViewModel] Disconnecting WiFi camera")
-        wifiService.disconnect()
-        appState = .searching
+        print("📱 [CameraViewModel] Disconnecting from camera")
+
+        // Cancel any pending connection attempts
+        wifiService.cancelRetry()
+
+        // Disconnect from camera on background thread to avoid blocking
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+
+            self.wifiService.disconnect()
+
+            await MainActor.run {
+                // Reset ALL UI state to clean slate
+                self.isCheckingPermission = false
+                self.shouldDismissConnected = false
+                self.retryCount = 0
+                self.connectingStartTime = nil
+                self.currentIP = nil
+
+                // Clear captured photos
+                self.capturedPhotos.removeAll()
+                self.photoCount = 0
+                self.detectedPhotoCount = 0
+
+                // Clear connection mode
+                self.connectionMode = .wifi
+
+                // Return to idle state (waiting for connection)
+                self.appState = .idle
+
+                print("✅ [CameraViewModel] Returned to idle state, photos cleared")
+            }
+        }
+    }
+
+    /// Get the last connected camera IP address
+    /// - Returns: IP address string or nil if none saved
+    func getLastConnectedIP() -> String? {
+        return UserDefaults.standard.string(forKey: lastIPKey)
     }
 
     func takePicture() {

@@ -12,6 +12,7 @@ import SwiftUI
 /// Pattern: Hybrid - navigation bar with title/subtitle + photo count in trailing
 struct LiveCaptureView: View {
     @ObservedObject var viewModel: CameraViewModel
+    @State private var showDisconnectAlert = false
 
     var body: some View {
         VStack(spacing: 0.0) {
@@ -49,9 +50,33 @@ struct LiveCaptureView: View {
                     }
                 }
             }
+
+            // Trailing: Disconnect button
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showDisconnectAlert = true
+                }) {
+                    Text("Disconnect")
+                        .foregroundColor(.red)
+                }
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(UIColor.systemBackground), for: .navigationBar)
+        .alert("Disconnect from camera?", isPresented: $showDisconnectAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Disconnect", role: .destructive) {
+                // Dismiss alert first to let NavigationView clean up
+                showDisconnectAlert = false
+
+                // Then disconnect after brief delay to avoid state corruption
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    viewModel.disconnectWiFi()
+                }
+            }
+        } message: {
+            Text("Photos will be cleared. Make sure you've saved what you need.")
+        }
     }
 }
 

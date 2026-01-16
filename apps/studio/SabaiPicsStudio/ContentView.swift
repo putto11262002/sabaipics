@@ -19,8 +19,8 @@ struct ContentView: View {
 
                 // Content based on app state (Phase 5: Premium routing)
                 switch viewModel.appState {
-                case .searching:
-                    // WiFi setup page
+                case .idle:
+                    // WiFi setup page - waiting for user input
                     WiFiSetupView(viewModel: viewModel)
                         .transition(.opacity)
 
@@ -62,7 +62,7 @@ struct ContentView: View {
                         errorMessage: message,
                         onTryAgain: {
                             withAnimation {
-                                viewModel.appState = .searching
+                                viewModel.appState = .idle
                                 viewModel.wifiService.cancelRetry()
                             }
                         }
