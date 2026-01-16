@@ -84,7 +84,7 @@ export function createFacesRouter(faceService: FaceService) {
 
     try {
       // Index photo with ResultAsync
-      const resultAsync = await faceService.indexPhoto({
+      const result = await faceService.indexPhoto({
         eventId: collectionId,
         photoId: body.ExternalImageId || `photo-${Date.now()}`,
         imageData,
@@ -95,34 +95,31 @@ export function createFacesRouter(faceService: FaceService) {
         },
       });
 
-      // Use .match() to handle ResultAsync at HTTP boundary
-      return resultAsync.match(
-        (photoIndexed) => {
-          // Convert to AWS format
-          const response: IndexFacesResponse = toAWSIndexFacesResponse(photoIndexed, body.ExternalImageId);
-          return c.json(response);
-        },
-        (err) => {
-          // Log error for debugging
-          console.error(`[Faces] Error indexing faces for collection ${collectionId}:`, {
-            type: err.type,
-            retryable: err.retryable,
-            throttle: err.throttle,
-            cause: err.cause,
-          });
+      // Use .isOk() / .isErr() pattern for Hono type compatibility
+      if (result.isOk()) {
+        const response: IndexFacesResponse = toAWSIndexFacesResponse(result.value, body.ExternalImageId);
+        return c.json(response);
+      }
 
-          const statusCode = errorToHttpStatus(err);
-          return c.json(
-            {
-              StatusCode: statusCode,
-              error: errorMessage(err),
-              type: err.type,
-              retryable: err.retryable,
-              throttle: err.throttle,
-            },
-            statusCode as StatusCode
-          );
-        }
+      // Handle error case
+      const err = result.error;
+      console.error(`[Faces] Error indexing faces for collection ${collectionId}:`, {
+        type: err.type,
+        retryable: err.retryable,
+        throttle: err.throttle,
+        cause: 'cause' in err ? err.cause : undefined,
+      });
+
+      const statusCode = errorToHttpStatus(err);
+      return c.json(
+        {
+          StatusCode: statusCode,
+          error: errorMessage(err),
+          type: err.type,
+          retryable: err.retryable,
+          throttle: err.throttle,
+        },
+        statusCode as StatusCode
       );
     } catch (error) {
       console.error('[Faces] Unexpected error:', error);
@@ -149,44 +146,42 @@ export function createFacesRouter(faceService: FaceService) {
 
     try {
       // Search for similar faces with ResultAsync
-      const resultAsync = await faceService.findSimilarFaces({
+      const result = await faceService.findSimilarFaces({
         eventId: collectionId,
         imageData,
         maxResults: body.MaxFaces || 10,
         minSimilarity: (body.FaceMatchThreshold || 80) / 100, // AWS: 0-100 → Domain: 0-1
       });
 
-      // Use .match() to handle ResultAsync at HTTP boundary
-      return resultAsync.match(
-        (matches) => {
-          // Get search face info (detect face in query image first)
-          // For now, use first match's bounding box
-          const searchedFace = matches.length > 0 ? matches[0] : null;
+      // Use .isOk() / .isErr() pattern for Hono type compatibility
+      if (result.isOk()) {
+        const matches = result.value;
+        const searchedFace = matches.length > 0 ? matches[0] : null;
 
-          const response: SearchFacesByImageResponse = {
-            SearchedFaceBoundingBox: searchedFace?.boundingBox
-              ? toAWSBoundingBox(searchedFace.boundingBox)
-              : undefined,
-            SearchedFaceConfidence: searchedFace ? (searchedFace.confidence ?? 1.0) * 100 : undefined,
-            FaceMatches: matches.map(toAWSFaceMatch),
-            FaceModelVersion: 'face-api.js-1.7.15',
-          };
+        const response: SearchFacesByImageResponse = {
+          SearchedFaceBoundingBox: searchedFace?.boundingBox
+            ? toAWSBoundingBox(searchedFace.boundingBox)
+            : undefined,
+          SearchedFaceConfidence: searchedFace ? (searchedFace.confidence ?? 1.0) * 100 : undefined,
+          FaceMatches: matches.map(toAWSFaceMatch),
+          FaceModelVersion: 'face-api.js-1.7.15',
+        };
 
-          return c.json(response);
+        return c.json(response);
+      }
+
+      // Handle error case
+      const err = result.error;
+      const statusCode = errorToHttpStatus(err);
+      return c.json(
+        {
+          StatusCode: statusCode,
+          error: errorMessage(err),
+          type: err.type,
+          retryable: err.retryable,
+          throttle: err.throttle,
         },
-        (err) => {
-          const statusCode = errorToHttpStatus(err);
-          return c.json(
-            {
-              StatusCode: statusCode,
-              error: errorMessage(err),
-              type: err.type,
-              retryable: err.retryable,
-              throttle: err.throttle,
-            },
-            statusCode as StatusCode
-          );
-        }
+        statusCode as StatusCode
       );
     } catch (error) {
       return c.json({ StatusCode: 500, error: 'Internal server error' }, 500);

@@ -11,8 +11,6 @@
  * - cause: Original error (if any)
  */
 
-import type { AWSRekognitionError } from '../lib/rekognition';
-
 // =============================================================================
 // Face Service Error Types
 // =============================================================================
@@ -32,7 +30,7 @@ export type FaceServiceError =
   | { type: 'invalid_input'; field: string; reason: string; retryable: false; throttle: false }
 
   // AWS provider failures - bubbles retryable/throttle from AWS
-  | { type: 'provider_failed'; provider: 'aws'; retryable: boolean; throttle: boolean; cause: AWSRekognitionError }
+  | { type: 'provider_failed'; provider: 'aws'; retryable: boolean; throttle: boolean; cause: unknown }
 
   // SabaiFace provider failures - never retryable (local op)
   | { type: 'provider_failed'; provider: 'sabaiface'; retryable: false; throttle: false; cause: unknown }
@@ -73,20 +71,6 @@ export function invalidInput(
     reason,
     retryable: false,
     throttle: false,
-  };
-}
-
-/**
- * Create a provider_failed error for AWS.
- * Bubbles up retryable/throttle flags from AWS error.
- */
-export function awsProviderFailed(awsError: AWSRekognitionError): FaceServiceError {
-  return {
-    type: 'provider_failed',
-    provider: 'aws',
-    retryable: awsError.retryable,
-    throttle: awsError.throttle,
-    cause: awsError,
   };
 }
 

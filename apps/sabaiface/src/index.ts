@@ -40,13 +40,10 @@ export type {
 
 export {
   createFaceService,
-  createAWSFaceService,
   createSabaiFaceService,
 } from './factory/face-service-factory';
 
 export type {
-  ProviderConfig,
-  AWSProviderConfig,
   SabaiFaceProviderConfig,
 } from './factory/face-service-factory';
 
@@ -81,7 +78,6 @@ export {
 // Adapters (for direct instantiation if needed)
 // =============================================================================
 
-export { AWSFaceAdapter } from './adapters/aws/aws-adapter';
 export { SabaiFaceAdapter } from './adapters/sabaiface/sabaiface-adapter';
 
 // =============================================================================

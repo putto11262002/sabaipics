@@ -79,7 +79,9 @@ export class PostgresVectorStore implements VectorStore {
       AND descriptor IS NOT NULL
     `);
 
-    return result.map((row) => row.event_id);
+    // Handle neon-http response format (returns { rows: [...] })
+    const rows = 'rows' in result ? result.rows : result;
+    return rows.map((row) => row.event_id);
   }
 
   /**
@@ -272,11 +274,14 @@ export class PostgresVectorStore implements VectorStore {
       LIMIT 1
     `);
 
-    if (result.length === 0) {
+    // Handle neon-http response format (returns { rows: [...] })
+    const rows = 'rows' in result ? result.rows : result;
+
+    if (rows.length === 0) {
       return null;
     }
 
-    const row = result[0];
+    const row = rows[0];
     const boundingBox = JSON.parse(row.bounding_box) as {
       Width: number;
       Height: number;

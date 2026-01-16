@@ -217,7 +217,7 @@ export type ProviderRawResponse = AWSRawResponse | SabaiFaceRawResponse;
 // Face Service Interface
 // =============================================================================
 
-import { ResultAsync } from 'neverthrow';
+import { Result, ResultAsync } from 'neverthrow';
 import type { FaceServiceError } from './errors';
 
 /**
@@ -228,50 +228,47 @@ import type { FaceServiceError } from './errors';
  * - Store raw provider responses for training
  * - Use provider field to track origin
  * - Preserve bounding boxes in 0-1 scale
- * - Return Promise<ResultAsync> for typed error handling
- *
- * NOTE: The return type is Promise<ResultAsync<T, E>> to allow adapters
- * to use async/await internally while maintaining neverthrow compatibility.
+ * - Return Promise<Result> for typed error handling
  */
 export interface FaceService {
   /**
    * Index faces from a photo into an event collection.
    *
    * @param params - Photo indexing parameters
-   * @returns Promise resolving to ResultAsync with PhotoIndexed or FaceServiceError
+   * @returns Promise resolving to Result with PhotoIndexed or FaceServiceError
    */
-  indexPhoto(params: IndexPhotoParams): Promise<ResultAsync<PhotoIndexed, FaceServiceError>>;
+  indexPhoto(params: IndexPhotoParams): Promise<Result<PhotoIndexed, FaceServiceError>>;
 
   /**
    * Find similar faces in an event collection.
    *
    * @param params - Search parameters
-   * @returns Promise resolving to ResultAsync with array of similar faces (sorted by similarity) or FaceServiceError
+   * @returns Promise resolving to Result with array of similar faces (sorted by similarity) or FaceServiceError
    */
-  findSimilarFaces(params: FindSimilarParams): Promise<ResultAsync<SimilarFace[], FaceServiceError>>;
+  findSimilarFaces(params: FindSimilarParams): Promise<Result<SimilarFace[], FaceServiceError>>;
 
   /**
    * Delete faces from a photo.
    *
    * @param eventId - Event/collection identifier
    * @param faceIds - Array of face IDs to delete
-   * @returns Promise resolving to ResultAsync with void or FaceServiceError
+   * @returns Promise resolving to Result with void or FaceServiceError
    */
-  deleteFaces(eventId: string, faceIds: string[]): Promise<ResultAsync<void, FaceServiceError>>;
+  deleteFaces(eventId: string, faceIds: string[]): Promise<Result<void, FaceServiceError>>;
 
   /**
    * Delete an entire event collection.
    *
    * @param eventId - Event/collection identifier
-   * @returns Promise resolving to ResultAsync with void or FaceServiceError
+   * @returns Promise resolving to Result with void or FaceServiceError
    */
-  deleteCollection(eventId: string): Promise<ResultAsync<void, FaceServiceError>>;
+  deleteCollection(eventId: string): Promise<Result<void, FaceServiceError>>;
 
   /**
    * Create a new event collection.
    *
    * @param eventId - Event/collection identifier
-   * @returns Promise resolving to ResultAsync with collection ARN/identifier or FaceServiceError
+   * @returns Promise resolving to Result with collection ARN/identifier or FaceServiceError
    */
-  createCollection(eventId: string): Promise<ResultAsync<string, FaceServiceError>>;
+  createCollection(eventId: string): Promise<Result<string, FaceServiceError>>;
 }

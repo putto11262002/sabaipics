@@ -1,14 +1,12 @@
 /**
  * Face Service Factory
  *
- * Creates the appropriate FaceService implementation based on provider.
- * Handles dependency injection for each adapter.
+ * Creates SabaiFace service implementations.
+ * Handles dependency injection for the SabaiFace adapter.
  */
 
-import type { RekognitionClient } from '@aws-sdk/client-rekognition';
 import type { InternalDatabase } from '../db';
 import type { FaceService } from '../domain/face-service';
-import { AWSFaceAdapter } from '../adapters/aws/aws-adapter';
 import { SabaiFaceAdapter } from '../adapters/sabaiface/sabaiface-adapter';
 import { PostgresVectorStore } from '../adapters/postgres/postgres-vector-store';
 import type { FaceDetector } from '../core/face-detector';
@@ -17,15 +15,6 @@ import type { VectorStore } from '../core/vector-store';
 // =============================================================================
 // Factory Configuration
 // =============================================================================
-
-/**
- * Configuration for AWS provider
- */
-export interface AWSProviderConfig {
-  provider: 'aws';
-  client: RekognitionClient;
-  db: InternalDatabase;
-}
 
 /**
  * Configuration for SabaiFace provider
@@ -37,80 +26,39 @@ export interface SabaiFaceProviderConfig {
   db: InternalDatabase;
 }
 
-/**
- * Union type for provider configurations
- */
-export type ProviderConfig = AWSProviderConfig | SabaiFaceProviderConfig;
-
 // =============================================================================
 // Factory Function
 // =============================================================================
 
 /**
- * Create a FaceService instance based on provider configuration.
+ * Create a SabaiFace FaceService instance.
  *
- * @param config - Provider-specific configuration
- * @returns FaceService implementation
- *
- * @example
- * // AWS provider
- * const awsService = createFaceService({
- *   provider: 'aws',
- *   client: rekognitionClient,
- *   db: database,
- * });
+ * @param config - SabaiFace provider configuration
+ * @returns SabaiFace FaceService implementation
  *
  * @example
- * // SabaiFace provider
+ * ```typescript
  * const sabaiFaceService = createFaceService({
  *   provider: 'sabaiface',
  *   faceDetector: detector,
  *   vectorStore: store,
  *   db: database,
  * });
+ * ```
  */
-export function createFaceService(config: ProviderConfig): FaceService {
-  switch (config.provider) {
-    case 'aws':
-      return new AWSFaceAdapter(config.client, config.db);
-
-    case 'sabaiface':
-      // Use PostgresVectorStore by default if not provided
-      const vectorStore = config.vectorStore ?? new PostgresVectorStore(config.db);
-      return new SabaiFaceAdapter(
-        config.faceDetector,
-        vectorStore,
-        config.db
-      );
-
-    default:
-      // TypeScript exhaustiveness check
-      const _exhaustive: never = config;
-      throw new Error(`Unknown provider: ${(_exhaustive as any).provider}`);
-  }
+export function createFaceService(config: SabaiFaceProviderConfig): FaceService {
+  // Use PostgresVectorStore by default if not provided
+  const vectorStore = config.vectorStore ?? new PostgresVectorStore(config.db);
+  return new SabaiFaceAdapter(
+    config.faceDetector,
+    vectorStore,
+    config.db
+  );
 }
 
 // =============================================================================
 // Convenience Factory Functions
 // =============================================================================
-
-/**
- * Create AWS face service.
- *
- * @param client - AWS Rekognition client
- * @param db - Database instance
- * @returns AWS FaceService implementation
- */
-export function createAWSFaceService(
-  client: RekognitionClient,
-  db: InternalDatabase
-): FaceService {
-  return createFaceService({
-    provider: 'aws',
-    client,
-    db,
-  });
-}
 
 /**
  * Create SabaiFace service with PostgresVectorStore.

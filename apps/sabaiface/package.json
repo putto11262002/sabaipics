@@ -31,14 +31,14 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "eval:extract-kaggle-labels": "python3 scripts/extract-labels-python.py",
-    "eval:generate-ground-truth": "python3 scripts/extract-recognition-dataset.py --dataset ${SABAIFACE_DATASET_PATH:-../../../dataset}",
+    "eval:generate-ground-truth": "python3 scripts/extract-recognition-dataset.py --dataset ${SABAIFACE_DATASET_PATH:-../../../dataset}"
   },
   "dependencies": {
-    "@aws-sdk/client-rekognition": "^3.0.0",
     "@hono/node-server": "^1.8.0",
     "@hono/zod-validator": "^0.2.0",
     "@neondatabase/serverless": "^0.10.0",
     "@sabaipics/db": "workspace:*",
+    "aws4fetch": "^1.0.20",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.0",
     "hono": "^4.0.0",

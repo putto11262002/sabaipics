@@ -21,7 +21,6 @@ import type { FaceService } from './domain/face-service';
 
 const PORT = parseInt(process.env.PORT || '8086');
 const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/sabaiface';
-const FACE_PROVIDER = (process.env.FACE_PROVIDER || 'sabaiface') as 'aws' | 'sabaiface';
 const MODELS_PATH = process.env.MODELS_PATH || './models';
 
 // =============================================================================
@@ -29,49 +28,28 @@ const MODELS_PATH = process.env.MODELS_PATH || './models';
 // =============================================================================
 
 /**
- * Initialize face service based on provider.
+ * Initialize SabaiFace service.
  */
 async function initializeFaceService(): Promise<FaceService> {
+  console.log('[Server] Initializing SabaiFace provider...');
+
   const db = createInternalDb(DATABASE_URL);
 
-  if (FACE_PROVIDER === 'sabaiface') {
-    console.log('[Server] Initializing SabaiFace provider...');
+  // Create and load face detector
+  const detector = new FaceDetector({
+    modelsPath: MODELS_PATH,
+    minConfidence: parseFloat(process.env.FACE_CONFIDENCE_THRESHOLD || '0.5'),
+    detectAttributes: process.env.DETECT_ATTRIBUTES !== 'false',
+  });
 
-    // Create and load face detector
-    const detector = new FaceDetector({
-      modelsPath: MODELS_PATH,
-      minConfidence: parseFloat(process.env.FACE_CONFIDENCE_THRESHOLD || '0.5'),
-      detectAttributes: process.env.DETECT_ATTRIBUTES !== 'false',
-    });
+  await detector.loadModels();
 
-    await detector.loadModels();
-
-    // Create face service
-    return createFaceService({
-      provider: 'sabaiface',
-      faceDetector: detector,
-      db,
-    });
-  } else {
-    console.log('[Server] Initializing AWS provider...');
-
-    // Import AWS SDK dynamically (only if needed)
-    const { RekognitionClient } = await import('@aws-sdk/client-rekognition');
-
-    const client = new RekognitionClient({
-      region: process.env.AWS_REGION || 'us-west-2',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-      },
-    });
-
-    return createFaceService({
-      provider: 'aws',
-      client,
-      db,
-    });
-  }
+  // Create face service
+  return createFaceService({
+    provider: 'sabaiface',
+    faceDetector: detector,
+    db,
+  });
 }
 
 // =============================================================================
@@ -83,7 +61,6 @@ async function initializeFaceService(): Promise<FaceService> {
  */
 async function startServer() {
   console.log('🚀 SabaiFace API starting...');
-  console.log(`   Provider: ${FACE_PROVIDER}`);
   console.log(`   Database: ${DATABASE_URL.replace(/:[^:@]+@/, ':****@')}`);
 
   // Initialize face service
@@ -102,7 +79,7 @@ async function startServer() {
     return c.json({
       status: 'ok',
       service: 'sabaiface',
-      provider: FACE_PROVIDER,
+      provider: 'sabaiface',
       version: '1.0.0',
       timestamp: new Date().toISOString(),
     });

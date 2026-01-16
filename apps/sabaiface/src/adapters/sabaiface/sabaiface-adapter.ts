@@ -24,7 +24,7 @@ import type { FaceDetector, DetectedFace } from '../../core/face-detector';
 import type { VectorStore, FaceData } from '../../core/vector-store';
 import { pixelBoxToRatio } from '../../core/face-detector';
 import { distanceToSimilarity, similarityToDistance } from '../../core/vector-store';
-import { ResultAsync, ok, err } from 'neverthrow';
+import { ResultAsync, Result, ok, err } from 'neverthrow';
 import type { FaceServiceError } from '../../domain/errors';
 import {
   sabaifaceProviderFailed,
@@ -84,7 +84,7 @@ export class SabaiFaceAdapter implements FaceService {
    *
    * All operations wrapped in ResultAsync for error handling.
    */
-  async indexPhoto(params: IndexPhotoParams): Promise<ResultAsync<PhotoIndexed, FaceServiceError>> {
+  async indexPhoto(params: IndexPhotoParams): Promise<Result<PhotoIndexed, FaceServiceError>> {
     const startTime = Date.now();
 
     // Wrap face detection in ResultAsync
@@ -192,7 +192,7 @@ export class SabaiFaceAdapter implements FaceService {
    *
    * All operations wrapped in ResultAsync for error handling.
    */
-  async findSimilarFaces(params: FindSimilarParams): Promise<ResultAsync<SimilarFace[], FaceServiceError>> {
+  async findSimilarFaces(params: FindSimilarParams): Promise<Result<SimilarFace[], FaceServiceError>> {
     // Wrap face detection in ResultAsync
     const detectResult = await ResultAsync.fromPromise(
       this.faceDetector.detectFaces(params.imageData),
@@ -290,7 +290,7 @@ export class SabaiFaceAdapter implements FaceService {
    *
    * All operations wrapped in ResultAsync for error handling.
    */
-  async deleteFaces(eventId: string, faceIds: string[]): Promise<ResultAsync<void, FaceServiceError>> {
+  async deleteFaces(eventId: string, faceIds: string[]): Promise<Result<void, FaceServiceError>> {
     // Wrap vector store delete in ResultAsync
     const vectorDeleteResult = await ResultAsync.fromPromise(
       this.vectorStore.deleteFaces(eventId, faceIds),
@@ -327,7 +327,7 @@ export class SabaiFaceAdapter implements FaceService {
    *
    * All operations wrapped in ResultAsync for error handling.
    */
-  async deleteCollection(eventId: string): Promise<ResultAsync<void, FaceServiceError>> {
+  async deleteCollection(eventId: string): Promise<Result<void, FaceServiceError>> {
     const result = await ResultAsync.fromPromise(
       this.vectorStore.deleteCollection(eventId),
       (cause) => sabaifaceProviderFailed(cause)
@@ -346,7 +346,7 @@ export class SabaiFaceAdapter implements FaceService {
    *
    * All operations wrapped in ResultAsync for error handling.
    */
-  async createCollection(eventId: string): Promise<ResultAsync<string, FaceServiceError>> {
+  async createCollection(eventId: string): Promise<Result<string, FaceServiceError>> {
     const result = await ResultAsync.fromPromise(
       this.vectorStore.createCollection(eventId),
       (cause) => sabaifaceProviderFailed(cause)
