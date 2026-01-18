@@ -15,7 +15,8 @@ import ImageCaptureCore
 /// App-level state that determines which view to show
 ///
 /// States:
-/// - idle: WiFiSetupView - waiting for user input
+/// - manufacturerSelection: ManufacturerSelectionView - choose camera brand (SAB-22)
+/// - idle: CameraDiscoveryView - discovering cameras (SAB-22 will show this after manufacturer selected)
 /// - cameraFound: USB legacy (disabled, kept for compatibility)
 /// - connecting: ConnectingView - connection in progress
 /// - connected: ConnectedView - success celebration
@@ -23,7 +24,8 @@ import ImageCaptureCore
 /// - capturing: LiveCaptureView - active photo capture
 /// - error: ConnectionErrorView - error state
 enum AppState: Equatable {
-    case idle                        // WiFiSetupView - waiting for user input
+    case manufacturerSelection       // ManufacturerSelectionView - choose camera brand (SAB-22)
+    case idle                        // CameraDiscoveryView - discovering cameras (updated in SAB-22)
     case cameraFound(ICCameraDevice)  // USB legacy
     case connecting                   // ConnectingView (Phase 5)
     case connected                    // ConnectedView (Phase 5, 1s pause)
@@ -33,7 +35,8 @@ enum AppState: Equatable {
 
     static func == (lhs: AppState, rhs: AppState) -> Bool {
         switch (lhs, rhs) {
-        case (.idle, .idle),
+        case (.manufacturerSelection, .manufacturerSelection),
+             (.idle, .idle),
              (.connecting, .connecting),
              (.connected, .connected),
              (.ready, .ready),

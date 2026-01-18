@@ -19,6 +19,12 @@ struct ContentView: View {
 
                 // Content based on app state
                 switch coordinator.appState {
+                case .manufacturerSelection:
+                    // SAB-22: Manufacturer selection - entry point
+                    ManufacturerSelectionView()
+                        .transition(.opacity)
+                        .id("manufacturer-selection")
+
                 case .idle:
                     // WiFi setup page - waiting for user input
                     WiFiSetupView()
