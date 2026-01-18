@@ -189,7 +189,8 @@ export const photosRouter = new Hono<Env>()
         // Determine hasMore and trim extra row
         const hasMore = photoRows.length > parsedLimit;
         const items = hasMore ? photoRows.slice(0, parsedLimit) : photoRows;
-        const nextCursor = hasMore ? items[parsedLimit - 1].uploadedAt : null;
+        // Convert timestamp to ISO 8601 format for cursor
+        const nextCursor = hasMore ? new Date(items[parsedLimit - 1].uploadedAt).toISOString() : null;
 
         // Generate URLs for each photo
         const data = items.map((photo) => ({
@@ -199,7 +200,7 @@ export const photosRouter = new Hono<Env>()
           faceCount: photo.faceCount,
           fileSize: photo.fileSize,
           status: photo.status,
-          uploadedAt: photo.uploadedAt,
+          uploadedAt: new Date(photo.uploadedAt).toISOString(),
         }));
 
         return ok({
