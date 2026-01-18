@@ -40,10 +40,14 @@ class AppCoordinator: ObservableObject {
 
     /// Current app state (determines which view to show in ContentView)
     /// AppState enum is defined in Models/AppState.swift
-    @Published var appState: AppState = .idle
+    /// SAB-22: Start at manufacturer selection instead of .idle
+    @Published var appState: AppState = .manufacturerSelection
 
     /// Disconnect confirmation alert state (app-level to prevent orphaned overlays)
     @Published var showDisconnectAlert: Bool = false
+
+    /// Selected camera manufacturer (SAB-22)
+    @Published var selectedManufacturer: CameraManufacturer? = nil
 
     // MARK: - Stores (injected into environment)
 
@@ -107,6 +111,12 @@ class AppCoordinator: ObservableObject {
     /// Handles state transitions and timing logic
     /// - Parameter connectionState: Current connection state from ConnectionStore
     private func updateAppState(for connectionState: ConnectionState) {
+        // SAB-22: Don't override manufacturer selection state
+        // Only map ConnectionState after user has selected a manufacturer
+        if case .manufacturerSelection = appState {
+            return
+        }
+
         switch connectionState {
         case .idle:
             // User hasn't connected yet (WiFiSetupView)
@@ -144,6 +154,18 @@ class AppCoordinator: ObservableObject {
 
     // MARK: - Public Actions
 
+    /// Select camera manufacturer (SAB-22)
+    /// Called by ManufacturerSelectionView when user taps a manufacturer
+    /// - Parameter manufacturer: Selected camera manufacturer
+    func selectManufacturer(_ manufacturer: CameraManufacturer) {
+        print("[AppCoordinator] Manufacturer selected: \(manufacturer.rawValue)")
+        selectedManufacturer = manufacturer
+
+        // SAB-22: For now, transition to .idle (will show WiFiSetupView)
+        // SAB-23: Will transition to .discovering with CameraDiscoveryView
+        appState = .idle
+    }
+
     /// Request disconnect (shows confirmation alert)
     /// Called by LiveCaptureView when user taps "Disconnect" button
     func requestDisconnect() {
@@ -153,10 +175,13 @@ class AppCoordinator: ObservableObject {
 
     /// Confirm disconnect (called when user confirms in alert)
     /// Performs the actual disconnect and clears photos
+    /// SAB-22: Returns to manufacturer selection after disconnect
     func confirmDisconnect() {
         print("[AppCoordinator] Disconnect confirmed, disconnecting...")
         connectionStore.disconnect()
         photoStore.clearPhotos()
+        selectedManufacturer = nil
+        appState = .manufacturerSelection
     }
 }
 
