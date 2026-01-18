@@ -12,6 +12,7 @@ import { parseISO, differenceInDays } from 'date-fns';
 import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
 import { useParams } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { PhotoUploadZone } from './_components/PhotoUploadZone';
 import { UploadLog } from './_components/UploadLog';
 import { useUploadQueue } from './_components/useUploadQueue';
@@ -20,6 +21,7 @@ import { useEvent } from '../../../../hooks/events/useEvent';
 export default function EventUploadTab() {
   const { id } = useParams<{ id: string }>();
   const { data } = useEvent(id);
+  const queryClient = useQueryClient();
 
   if (!data?.data) {
     return null;
@@ -34,6 +36,14 @@ export default function EventUploadTab() {
     addFiles,
     uploadingItems,
   } = useUploadQueue(event.id);
+
+  // Expose queryClient for useUploadQueue to use
+  useEffect(() => {
+    (window as any).__queryClient = queryClient;
+    return () => {
+      delete (window as any).__queryClient;
+    };
+  }, [queryClient]);
 
   // Block navigation if uploads are in progress
   const hasActiveUploads = uploadingItems.length > 0;

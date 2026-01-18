@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { CheckCircle, Loader2, AlertCircle, Upload, Users, HardDrive } from 'lucide-react';
+import { CheckCircle, Loader2, AlertCircle, Upload, Users, HardDrive, Clock } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Table,
@@ -10,9 +10,9 @@ import {
   TableRow,
 } from '@sabaipics/ui/components/table';
 import { Skeleton } from '@sabaipics/ui/components/skeleton';
-import { Button } from '@sabaipics/ui/components/button';
 import { usePhotosStatus, type PhotoStatus } from '../../../../../hooks/photos/usePhotoStatus';
 import { usePhotos, type Photo } from '../../../../../hooks/photos/usePhotos';
+import { useUploadLogState, type UploadLogEntry } from './useUploadLogState';
 
 // Format file size utility
 function formatFileSize(bytes: number): string {
@@ -30,43 +30,61 @@ interface UploadLogProps {
 export function UploadLog({ eventId }: UploadLogProps) {
   const queryClient = useQueryClient();
 
-  // Fetch photos that are NOT indexed (uploading, indexing, failed)
+  // Fetch existing photos from API (only on mount)
   const photosQuery = usePhotos({
     eventId,
     status: ['uploading', 'indexing', 'failed'],
   });
 
-  // Get all API photos from all pages
-  const photos = useMemo(
+  // Get initial photos from API
+  const initialPhotos = useMemo(
     () => photosQuery.data?.pages.flatMap((page: { data: Photo[] }) => page.data) ?? [],
     [photosQuery.data],
   );
 
-  // Extract photo IDs that need status polling (uploaded but not yet indexed)
-  // Skip optimistic updates (temp IDs like "1234567890-abc")
-  const photoIdsToTrack = useMemo(
-    () =>
-      photos
-        .filter((p) => {
-          // Optimistic IDs are timestamps like "1737184532123-abc4", not real UUIDs
-          const isOptimistic = /^\d+-/.test(p.id);
-          return !isOptimistic && p.status && p.status !== 'indexed' && p.status !== 'failed';
-        })
-        .map((p) => p.id),
-    [photos],
-  );
+  // Local upload log state
+  const { entries, pollableIds, addEntry, updateEntry, updateFromPolling, removeEntry } = useUploadLogState({
+    eventId,
+    initialPhotos,
+  });
+
+  // Expose actions to window so useUploadQueue can call them
+  useEffect(() => {
+    (window as any).__uploadLogActions = {
+      addEntry,
+      updateEntry,
+    };
+    return () => {
+      delete (window as any).__uploadLogActions;
+    };
+  }, [addEntry, updateEntry]);
 
   // Track whether we should poll
   const [shouldPoll, setShouldPoll] = useState(true);
 
   // Batch fetch photo statuses
-  const { data: statuses, isLoading } = usePhotosStatus(photoIdsToTrack, {
+  const { data: statuses, isLoading } = usePhotosStatus(pollableIds, {
     refetchInterval: shouldPoll ? 2000 : false,
   });
 
+  // Update entries from polling
+  useEffect(() => {
+    if (!statuses) return;
+
+    updateFromPolling(
+      statuses.map((s) => ({
+        id: s.id,
+        status: s.status,
+        thumbnailUrl: s.thumbnailUrl,
+        fileSize: s.fileSize,
+        faceCount: s.faceCount,
+      }))
+    );
+  }, [statuses, updateFromPolling]);
+
   // Stop polling when all photos reach terminal state
   useEffect(() => {
-    if (!statuses || statuses.length < photoIdsToTrack.length) {
+    if (!statuses || statuses.length < pollableIds.length) {
       setShouldPoll(true);
       return;
     }
@@ -75,20 +93,23 @@ export function UploadLog({ eventId }: UploadLogProps) {
       (s) => s.status !== 'indexed' && s.status !== 'failed',
     );
     setShouldPoll(hasProcessing);
-  }, [statuses, photoIdsToTrack.length]);
+  }, [statuses, pollableIds.length]);
 
-  // Invalidate photos cache when any photo becomes indexed
+  // Remove indexed entries and invalidate cache
   useEffect(() => {
     if (!statuses) return;
 
     const indexedPhotos = statuses.filter((s) => s.status === 'indexed');
 
     if (indexedPhotos.length > 0) {
+      indexedPhotos.forEach((p) => removeEntry(p.id));
+
+      // Invalidate photos query to refresh gallery
       queryClient.invalidateQueries({
         queryKey: ['event', eventId, 'photos'],
       });
     }
-  }, [statuses, eventId, queryClient]);
+  }, [statuses, eventId, queryClient, removeEntry]);
 
   // Create a map for quick status lookup
   const statusMap = useMemo(() => {
@@ -97,7 +118,7 @@ export function UploadLog({ eventId }: UploadLogProps) {
     return map;
   }, [statuses]);
 
-  if (photos.length === 0) {
+  if (entries.length === 0) {
     return null;
   }
 
@@ -114,47 +135,43 @@ export function UploadLog({ eventId }: UploadLogProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {photos.map((photo) => {
-            const polledStatus = statusMap.get(photo.id);
+          {entries.map((entry) => {
+            const polledStatus = statusMap.get(entry.id);
             return (
               <UploadLogRow
-                key={photo.id}
-                photo={photo}
+                key={entry.id}
+                entry={entry}
                 polledStatus={polledStatus}
-                isLoadingStatus={isLoading && photoIdsToTrack.includes(photo.id)}
+                isLoadingStatus={isLoading && pollableIds.includes(entry.id)}
               />
             );
           })}
         </TableBody>
       </Table>
-
-      {/* Load More Button for API photos */}
-      {photosQuery.hasNextPage && (
-        <div className="flex justify-center pt-2">
-          <Button
-            onClick={() => photosQuery.fetchNextPage()}
-            disabled={photosQuery.isFetchingNextPage}
-            variant="outline"
-            size="sm"
-          >
-            {photosQuery.isFetchingNextPage ? 'Loading...' : 'Load More'}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
 
 interface UploadLogRowProps {
-  photo: Photo;
+  entry: UploadLogEntry;
   polledStatus: PhotoStatus | undefined;
   isLoadingStatus: boolean;
 }
 
-function UploadLogRow({ photo, polledStatus, isLoadingStatus }: UploadLogRowProps) {
+function UploadLogRow({ entry, polledStatus, isLoadingStatus }: UploadLogRowProps) {
+  const isOptimistic = /^\d+-/.test(entry.id);
+
   const getStatusDisplay = () => {
-    // Use polled status if available, otherwise use photo.status
-    const currentStatus = polledStatus?.status ?? photo.status;
+    // Optimistic - not yet on server
+    if (isOptimistic) {
+      return {
+        icon: <Clock className="size-4 text-muted-foreground" />,
+        text: 'Queued',
+      };
+    }
+
+    // Use polled status if available, otherwise use entry.status
+    const currentStatus = polledStatus?.status ?? entry.status;
 
     if (isLoadingStatus && !currentStatus) {
       return {
@@ -182,7 +199,7 @@ function UploadLogRow({ photo, polledStatus, isLoadingStatus }: UploadLogRowProp
       case 'failed':
         return {
           icon: <AlertCircle className="size-4 text-destructive" />,
-          text: polledStatus?.errorName || 'Failed',
+          text: entry.error || (polledStatus?.errorName || 'Failed'),
         };
       default:
         return {
@@ -194,11 +211,11 @@ function UploadLogRow({ photo, polledStatus, isLoadingStatus }: UploadLogRowProp
 
   const status = getStatusDisplay();
 
-  // Use polled data if available, otherwise use photo data
-  const thumbnailUrl = polledStatus?.thumbnailUrl ?? photo.thumbnailUrl;
-  const fileSize = polledStatus?.fileSize ?? photo.fileSize;
-  const faceCount = polledStatus?.faceCount ?? photo.faceCount;
-  const currentStatus = polledStatus?.status ?? photo.status;
+  // Use polled data if available, otherwise use entry data
+  const thumbnailUrl = polledStatus?.thumbnailUrl ?? entry.thumbnailUrl;
+  const fileSize = polledStatus?.fileSize ?? entry.fileSize;
+  const faceCount = polledStatus?.faceCount ?? entry.faceCount;
+  const currentStatus = polledStatus?.status ?? entry.status;
 
   return (
     <TableRow>
@@ -207,12 +224,16 @@ function UploadLogRow({ photo, polledStatus, isLoadingStatus }: UploadLogRowProp
         {thumbnailUrl ? (
           <img
             src={thumbnailUrl}
-            alt={`Photo ${photo.id.slice(0, 8)}`}
+            alt={entry.fileName || `Photo ${entry.id.slice(0, 8)}`}
             className="size-12 rounded object-cover"
           />
         ) : (
           <div className="size-12 rounded bg-muted flex items-center justify-center">
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            {isOptimistic ? (
+              <Clock className="size-4 text-muted-foreground" />
+            ) : (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            )}
           </div>
         )}
       </TableCell>
