@@ -9,12 +9,20 @@ import {
 } from "@sabaipics/ui/components/input-group";
 import { Download, Copy, Presentation, ExternalLink, Calendar, Clock } from "lucide-react";
 import { parseISO, differenceInDays } from "date-fns";
-import { useEventContext } from "../layout";
+import { useParams } from "react-router";
+import { useEvent } from "../../../../hooks/events/useEvent";
 import { useCopyToClipboard } from "../../../../hooks/use-copy-to-clipboard";
 
 export default function EventDetailsTab() {
-  const { event } = useEventContext();
+  const { id } = useParams<{ id: string }>();
+  const { data } = useEvent(id);
   const { copyToClipboard } = useCopyToClipboard();
+
+  if (!data?.data) {
+    return null;
+  }
+
+  const event = data.data;
 
   const daysUntilExpiry = differenceInDays(parseISO(event.expiresAt), new Date());
   const isExpired = daysUntilExpiry <= 0;

@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Outlet, NavLink, useOutletContext } from "react-router";
+import { useParams, useNavigate, Outlet, NavLink } from "react-router";
 import { Button } from "@sabaipics/ui/components/button";
 import { Alert } from "@sabaipics/ui/components/alert";
 import { Skeleton } from "@sabaipics/ui/components/skeleton";
@@ -172,14 +172,9 @@ export default function EventDetailLayout() {
 
       {/* Tab Content via Outlet */}
       <ScrollArea className="mt-6 flex-1 rounded-lg bg-card">
-        <Outlet context={{ event }} />
+        <Outlet />
       </ScrollArea>
     </div>
   );
-}
-
-// Hook to access the event from child routes
-export function useEventContext() {
-  return useOutletContext<{ event: NonNullable<ReturnType<typeof useEvent>["data"]>["data"] }>();
 }
 
