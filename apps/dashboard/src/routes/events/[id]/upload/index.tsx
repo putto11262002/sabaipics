@@ -32,7 +32,6 @@ export default function EventUploadTab() {
 
   const {
     addFiles,
-    optimisticPhotos,
     uploadingItems,
   } = useUploadQueue(event.id);
 
@@ -93,8 +92,8 @@ export default function EventUploadTab() {
         />
       </div>
 
-      {/* Upload log - shows both local upload session and API photos */}
-      <UploadLog optimisticPhotos={optimisticPhotos} eventId={event.id} />
+      {/* Upload log - shows photos currently uploading, indexing, or failed */}
+      <UploadLog eventId={event.id} />
     </div>
   );
 }

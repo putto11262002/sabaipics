@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { CheckCircle, Loader2, AlertCircle, Upload, Users, HardDrive, Clock } from 'lucide-react';
+import { CheckCircle, Loader2, AlertCircle, Upload, Users, HardDrive } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Table,
@@ -11,7 +11,6 @@ import {
 } from '@sabaipics/ui/components/table';
 import { Skeleton } from '@sabaipics/ui/components/skeleton';
 import { Button } from '@sabaipics/ui/components/button';
-import type { OptimisticPhoto } from './upload';
 import { usePhotosStatus, type PhotoStatus } from '../../../../../hooks/photos/usePhotoStatus';
 import { usePhotos, type Photo } from '../../../../../hooks/photos/usePhotos';
 
@@ -25,11 +24,10 @@ function formatFileSize(bytes: number): string {
 }
 
 interface UploadLogProps {
-  optimisticPhotos: OptimisticPhoto[];
   eventId: string;
 }
 
-export function UploadLog({ optimisticPhotos, eventId }: UploadLogProps) {
+export function UploadLog({ eventId }: UploadLogProps) {
   const queryClient = useQueryClient();
 
   // Fetch photos that are NOT indexed (uploading, indexing, failed)
@@ -39,39 +37,18 @@ export function UploadLog({ optimisticPhotos, eventId }: UploadLogProps) {
   });
 
   // Get all API photos from all pages
-  const apiPhotos = useMemo(
+  const photos = useMemo(
     () => photosQuery.data?.pages.flatMap((page: { data: Photo[] }) => page.data) ?? [],
     [photosQuery.data],
   );
 
-  // Merge optimistic photos with API photos
-  const mergedPhotos = useMemo((): OptimisticPhoto[] => {
-    // Get IDs of photos that have been uploaded (have server ID)
-    const uploadedPhotoIds = new Set(
-      optimisticPhotos.filter((p) => !p.localStatus && p.status).map((p) => p.id),
-    );
-
-    // Convert API photos to OptimisticPhoto format (exclude ones already in optimistic list)
-    const apiOptimisticPhotos: OptimisticPhoto[] = apiPhotos
-      .filter((photo: Photo) => !uploadedPhotoIds.has(photo.id))
-      .map(
-        (photo: Photo): OptimisticPhoto => ({
-          ...photo,
-          queuedAt: new Date(photo.uploadedAt).getTime(),
-        }),
-      );
-
-    // Combine and sort by queuedAt (latest first)
-    return [...optimisticPhotos, ...apiOptimisticPhotos].sort((a, b) => b.queuedAt - a.queuedAt);
-  }, [optimisticPhotos, apiPhotos]);
-
   // Extract photo IDs that need status polling (uploaded but not yet indexed)
   const photoIdsToTrack = useMemo(
     () =>
-      mergedPhotos
-        .filter((p) => !p.localStatus && p.status && p.status !== 'indexed' && p.status !== 'failed')
+      photos
+        .filter((p) => p.status && p.status !== 'indexed' && p.status !== 'failed')
         .map((p) => p.id),
-    [mergedPhotos],
+    [photos],
   );
 
   // Track whether we should poll
@@ -84,12 +61,6 @@ export function UploadLog({ optimisticPhotos, eventId }: UploadLogProps) {
 
   // Stop polling when all photos reach terminal state
   useEffect(() => {
-    const hasLocalUploading = optimisticPhotos.some((p) => p.localStatus);
-    if (hasLocalUploading) {
-      setShouldPoll(true);
-      return;
-    }
-
     if (!statuses || statuses.length < photoIdsToTrack.length) {
       setShouldPoll(true);
       return;
@@ -99,7 +70,7 @@ export function UploadLog({ optimisticPhotos, eventId }: UploadLogProps) {
       (s) => s.status !== 'indexed' && s.status !== 'failed',
     );
     setShouldPoll(hasProcessing);
-  }, [optimisticPhotos, statuses, photoIdsToTrack.length]);
+  }, [statuses, photoIdsToTrack.length]);
 
   // Invalidate photos cache when any photo becomes indexed
   useEffect(() => {
@@ -121,7 +92,7 @@ export function UploadLog({ optimisticPhotos, eventId }: UploadLogProps) {
     return map;
   }, [statuses]);
 
-  if (mergedPhotos.length === 0) {
+  if (photos.length === 0) {
     return null;
   }
 
@@ -138,7 +109,7 @@ export function UploadLog({ optimisticPhotos, eventId }: UploadLogProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {mergedPhotos.map((photo) => {
+          {photos.map((photo) => {
             const polledStatus = statusMap.get(photo.id);
             return (
               <UploadLogRow
@@ -170,36 +141,13 @@ export function UploadLog({ optimisticPhotos, eventId }: UploadLogProps) {
 }
 
 interface UploadLogRowProps {
-  photo: OptimisticPhoto;
+  photo: Photo;
   polledStatus: PhotoStatus | undefined;
   isLoadingStatus: boolean;
 }
 
 function UploadLogRow({ photo, polledStatus, isLoadingStatus }: UploadLogRowProps) {
   const getStatusDisplay = () => {
-    // Local upload states (before reaching server)
-    if (photo.localStatus === 'queued') {
-      return {
-        icon: <Clock className="size-4 text-muted-foreground" />,
-        text: 'Queued',
-      };
-    }
-
-    if (photo.localStatus === 'uploading') {
-      return {
-        icon: <Upload className="size-4 animate-pulse text-blue-500" />,
-        text: 'Uploading...',
-      };
-    }
-
-    // Local upload failed
-    if (photo.localError) {
-      return {
-        icon: <AlertCircle className="size-4 text-destructive" />,
-        text: photo.localError,
-      };
-    }
-
     // Use polled status if available, otherwise use photo.status
     const currentStatus = polledStatus?.status ?? photo.status;
 
@@ -213,8 +161,8 @@ function UploadLogRow({ photo, polledStatus, isLoadingStatus }: UploadLogRowProp
     switch (currentStatus) {
       case 'uploading':
         return {
-          icon: <Loader2 className="size-4 animate-spin text-blue-500" />,
-          text: 'Processing...',
+          icon: <Upload className="size-4 animate-pulse text-blue-500" />,
+          text: 'Uploading...',
         };
       case 'indexing':
         return {
@@ -254,20 +202,12 @@ function UploadLogRow({ photo, polledStatus, isLoadingStatus }: UploadLogRowProp
         {thumbnailUrl ? (
           <img
             src={thumbnailUrl}
-            alt={photo.fileName ?? `Photo ${photo.id.slice(0, 8)}`}
+            alt={`Photo ${photo.id.slice(0, 8)}`}
             className="size-12 rounded object-cover"
           />
         ) : (
           <div className="size-12 rounded bg-muted flex items-center justify-center">
-            {photo.localStatus === 'queued' ? (
-              <Clock className="size-4 text-muted-foreground" />
-            ) : photo.localStatus === 'uploading' ? (
-              <Upload className="size-4 animate-pulse text-muted-foreground" />
-            ) : photo.localError ? (
-              <AlertCircle className="size-4 text-destructive" />
-            ) : (
-              <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            )}
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
           </div>
         )}
       </TableCell>

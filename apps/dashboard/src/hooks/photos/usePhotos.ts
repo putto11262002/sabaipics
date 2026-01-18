@@ -52,5 +52,6 @@ export function usePhotos({
     refetchOnWindowFocus: !import.meta.env.DEV, // Disable refetch on window focus in dev
     refetchOnMount: false, // Don't refetch on mount if data exists
     refetchInterval: 1000 * 60, // 1 min
+    staleTime: 30 * 1000, // 30 seconds - show stale data while refetching
   });
 }

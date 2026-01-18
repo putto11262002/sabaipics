@@ -1,9 +1,10 @@
 import { useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUploadPhoto } from '../../../../../hooks/photos/useUploadPhoto';
-import type { UploadQueueItem, OptimisticPhoto } from './upload';
+import type { UploadQueueItem } from './upload';
+import type { Photo } from '../../../../../hooks/photos/usePhotos';
 
-export type { UploadQueueItem, OptimisticPhoto };
+export type { UploadQueueItem };
 
 const MAX_TOKENS = 5;
 
@@ -19,7 +20,94 @@ export function useUploadQueue(eventId: string | undefined) {
 
   // Minimal reactive state for UI
   const [displayItems, setDisplayItems] = useState<UploadQueueItem[]>([]);
-  const [optimisticPhotos, setOptimisticPhotos] = useState<OptimisticPhoto[]>([]);
+
+  // Helper to add optimistic photo to cache
+  const addOptimisticPhotoToCache = useCallback((tempId: string) => {
+    if (!eventId) return;
+
+    const optimisticPhoto = {
+      id: tempId,
+      thumbnailUrl: '',
+      previewUrl: '',
+      faceCount: 0,
+      fileSize: null as number | null,
+      status: 'uploading' as const,
+      uploadedAt: new Date().toISOString(),
+    };
+
+    // Add to all relevant query caches (with and without status filter)
+    const queryKeys = [
+      ['event', eventId, 'photos'],
+      ['event', eventId, 'photos', ['uploading', 'indexing', 'failed']],
+      ['event', eventId, 'photos', ['uploading']],
+      ['event', eventId, 'photos', ['indexing']],
+      ['event', eventId, 'photos', ['failed']],
+    ];
+
+    queryKeys.forEach((key) => {
+      queryClient.setQueryData(
+        key,
+        (old: any) => {
+          if (!old) return old;
+
+          // Handle infinite query structure
+          if (old.pages) {
+            return {
+              ...old,
+              pages: old.pages.map((page: any, index: number) =>
+                index === 0
+                  ? {
+                      ...page,
+                      data: [optimisticPhoto, ...page.data],
+                    }
+                  : page
+              ),
+            };
+          }
+
+          return old;
+        },
+        { updatedAt: Date.now() }
+      );
+    });
+  }, [eventId, queryClient]);
+
+  // Helper to update optimistic photo in cache
+  const updateOptimisticPhotoInCache = useCallback((tempId: string, updates: Partial<Photo>) => {
+    if (!eventId) return;
+
+    const queryKeys = [
+      ['event', eventId, 'photos'],
+      ['event', eventId, 'photos', ['uploading', 'indexing', 'failed']],
+      ['event', eventId, 'photos', ['uploading']],
+      ['event', eventId, 'photos', ['indexing']],
+      ['event', eventId, 'photos', ['failed']],
+    ];
+
+    queryKeys.forEach((key) => {
+      queryClient.setQueryData(
+        key,
+        (old: any) => {
+          if (!old) return old;
+
+          // Handle infinite query structure
+          if (old.pages) {
+            return {
+              ...old,
+              pages: old.pages.map((page: any) => ({
+                ...page,
+                data: page.data.map((photo: Photo) =>
+                  photo.id === tempId ? { ...photo, ...updates } : photo
+                ),
+              })),
+            };
+          }
+
+          return old;
+        }
+      );
+    });
+  }, [eventId, queryClient]);
 
   // Sync refs to display state
   const syncDisplayState = useCallback(() => {
@@ -36,38 +124,23 @@ export function useUploadQueue(eventId: string | undefined) {
     async (item: UploadQueueItem, processNext: () => void) => {
       if (!eventId) return;
 
-      // Update optimistic photo from 'queued' to 'uploading'
-      setOptimisticPhotos((prev) =>
-        prev.map((photo) =>
-          photo.id === item.id ? { ...photo, localStatus: 'uploading' as const } : photo,
-        ),
-      );
-
       try {
         const result = await uploadPhotoMutation.mutateAsync({
           eventId,
           file: item.file,
         });
 
-        // Success - remove from active, update with real photo data
+        // Success - remove from active, update cache with real photo data
         activeUploadsRef.current.delete(item.id);
 
-        // Update optimistic photo with server data (remove localStatus since it's now on server)
-        setOptimisticPhotos((prev) =>
-          prev.map((photo) =>
-            photo.id === item.id
-              ? {
-                  ...photo,
-                  id: result.id,
-                  status: result.status,
-                  uploadedAt: result.uploadedAt,
-                  localStatus: undefined, // Clear local status - now tracked by server
-                }
-              : photo,
-          ),
-        );
+        // Update cache: replace temp ID with real photo data from server
+        updateOptimisticPhotoInCache(item.id, {
+          id: result.id,
+          status: result.status,
+          faceCount: result.faceCount,
+        });
 
-        // Invalidate photos query to refresh gallery
+        // Remove the temp ID entry and invalidate to fetch fresh data
         queryClient.invalidateQueries({
           queryKey: ['event', eventId, 'photos'],
         });
@@ -82,13 +155,9 @@ export function useUploadQueue(eventId: string | undefined) {
         }
 
         // Update optimistic photo with error (set status to 'failed')
-        setOptimisticPhotos((prev) =>
-          prev.map((photo) =>
-            photo.id === item.id
-              ? { ...photo, localStatus: undefined, status: 'failed', localError: errorMessage }
-              : photo,
-          ),
-        );
+        updateOptimisticPhotoInCache(item.id, {
+          status: 'failed',
+        });
 
         // Move to failed (keep for retry functionality)
         activeUploadsRef.current.delete(item.id);
@@ -102,7 +171,7 @@ export function useUploadQueue(eventId: string | undefined) {
         processNext();
       }
     },
-    [eventId, uploadPhotoMutation, queryClient],
+    [eventId, uploadPhotoMutation, queryClient, updateOptimisticPhotoInCache],
   );
 
   // Process queue - takes tokens and starts uploads
@@ -134,20 +203,15 @@ export function useUploadQueue(eventId: string | undefined) {
         status: 'queued' as const,
       }));
 
-      // Create optimistic photos immediately for queued files (prepend - newest first)
-      const newOptimisticPhotos: OptimisticPhoto[] = newItems.map((item) => ({
-        id: item.id,
-        fileName: item.file.name,
-        localStatus: 'queued' as const,
-        queuedAt: now,
-      }));
-
-      setOptimisticPhotos((prev) => [...newOptimisticPhotos, ...prev]);
+      // Add optimistic photos to React Query cache
+      newItems.forEach((item) => {
+        addOptimisticPhotoToCache(item.id);
+      });
 
       pendingQueueRef.current.push(...newItems);
       processQueue();
     },
-    [processQueue],
+    [processQueue, addOptimisticPhotoToCache],
   );
 
   // Retry a failed upload
@@ -200,7 +264,6 @@ export function useUploadQueue(eventId: string | undefined) {
     failedItems,
     uploadingCount,
     failedCount,
-    optimisticPhotos,
     isUploading: uploadingCount > 0,
   };
 }
