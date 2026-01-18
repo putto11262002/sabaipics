@@ -4,7 +4,13 @@ import { Card, CardHeader, CardTitle, CardContent } from "@sabaipics/ui/componen
 import { Button } from "@sabaipics/ui/components/button";
 import { Input } from "@sabaipics/ui/components/input";
 import { Alert } from "@sabaipics/ui/components/alert";
-import { Copy, Check } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@sabaipics/ui/components/dropdown-menu";
+import { Copy, Check, Download, ChevronDown } from "lucide-react";
 import { useCopyToClipboard } from "../../hooks/use-copy-to-clipboard";
 import type { Event } from "../../hooks/events/useEvents";
 
@@ -66,27 +72,36 @@ export function EventQRDisplay({ event }: EventQRDisplayProps) {
             />
           </div>
 
-          {/* Download with size selection */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex gap-2">
-              {(["small", "medium", "large"] as QRSize[]).map((size) => (
-                <Button
-                  key={size}
-                  onClick={() => handleDownload(size)}
-                  disabled={isDownloading}
-                  variant={size === "medium" ? "default" : "outline"}
-                  size="sm"
-                >
-                  {size === "small" && "Small (256px)"}
-                  {size === "medium" && "Medium (512px)"}
-                  {size === "large" && "Large (1200px)"}
-                </Button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Small for sharing, Medium for general use, Large for print
-            </p>
-          </div>
+          {/* Download with size selection dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button disabled={isDownloading} variant="outline" className="w-full sm:w-auto">
+                <Download className="mr-2 size-4" />
+                Download QR Code
+                <ChevronDown className="ml-2 size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-48">
+              <DropdownMenuItem onClick={() => handleDownload("small")}>
+                <div className="flex flex-col">
+                  <span className="font-medium">Small</span>
+                  <span className="text-xs text-muted-foreground">256px - Mobile sharing</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownload("medium")}>
+                <div className="flex flex-col">
+                  <span className="font-medium">Medium</span>
+                  <span className="text-xs text-muted-foreground">512px - General use</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownload("large")}>
+                <div className="flex flex-col">
+                  <span className="font-medium">Large</span>
+                  <span className="text-xs text-muted-foreground">1200px - Print quality</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {downloadError && (
             <Alert variant="destructive">

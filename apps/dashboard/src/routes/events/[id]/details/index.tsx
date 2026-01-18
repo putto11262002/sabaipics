@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@sabaipics/ui/components/button";
 import { Badge } from "@sabaipics/ui/components/badge";
 import { Input } from "@sabaipics/ui/components/input";
@@ -7,9 +8,16 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@sabaipics/ui/components/input-group";
-import { Download, Copy, Presentation, ExternalLink, Calendar, Clock } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@sabaipics/ui/components/dropdown-menu";
+import { Copy, Presentation, ExternalLink, Calendar, Clock, Download, ChevronDown } from "lucide-react";
 import { parseISO, differenceInDays } from "date-fns";
 import { useParams } from "react-router";
+import QRCodeSVG from "react-qr-code";
 import { useEvent } from "../../../../hooks/events/useEvent";
 import { useCopyToClipboard } from "../../../../hooks/use-copy-to-clipboard";
 
@@ -17,6 +25,7 @@ export default function EventDetailsTab() {
   const { id } = useParams<{ id: string }>();
   const { data } = useEvent(id);
   const { copyToClipboard } = useCopyToClipboard();
+  const [isDownloading, setIsDownloading] = useState(false);
 
   if (!data?.data) {
     return null;
@@ -30,20 +39,25 @@ export default function EventDetailsTab() {
   const searchUrl = `${window.location.origin}/search/${event.accessCode}`;
   const slideshowUrl = `${window.location.origin}/slideshow/${event.accessCode}`;
 
-  const handleDownloadQR = async (qrCodeUrl: string, accessCode: string) => {
+  const handleDownloadQR = async (size: "small" | "medium" | "large") => {
+    setIsDownloading(true);
     try {
-      const response = await fetch(qrCodeUrl);
+      const response = await fetch(`/api/events/${event.id}/qr-download?size=${size}`);
+      if (!response.ok) throw new Error("Failed to download QR code");
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `event-qr-${accessCode}.png`;
+      a.download = `${event.name.replace(/[^a-z0-9]/gi, "-")}-${size}-qr.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to download QR code:", error);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -79,32 +93,43 @@ export default function EventDetailsTab() {
 
         <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">QR code</h3>
-              {event.qrCodeUrl && (
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}
-                  title="Download QR"
-                >
-                  <Download className="size-4" />
-                </Button>
-              )}
+            <h3 className="text-lg font-semibold">QR code</h3>
+            <div className="flex h-72 items-center justify-center rounded-3xl border bg-white p-6 shadow-sm">
+              <QRCodeSVG
+                value={searchUrl}
+                level="M"
+                style={{ height: '100%', width: 'auto' }}
+              />
             </div>
-            {event.qrCodeUrl ? (
-              <div className="flex h-72 items-center justify-center rounded-3xl border bg-white p-6 shadow-sm">
-                <img
-                  src={event.qrCodeUrl}
-                  alt="Event QR Code"
-                  className="h-full w-full object-contain"
-                />
-              </div>
-            ) : (
-              <div className="flex h-72 items-center justify-center rounded-3xl border bg-muted">
-                <p className="text-sm text-muted-foreground">QR Unavailable</p>
-              </div>
-            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={isDownloading} variant="outline" className="w-full sm:w-auto">
+                  <Download className="mr-2 size-4" />
+                  Download QR Code
+                  <ChevronDown className="ml-2 size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-48">
+                <DropdownMenuItem onClick={() => handleDownloadQR("small")}>
+                  <div className="flex flex-col">
+                    <span className="font-medium">Small</span>
+                    <span className="text-xs text-muted-foreground">256px - Mobile sharing</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDownloadQR("medium")}>
+                  <div className="flex flex-col">
+                    <span className="font-medium">Medium</span>
+                    <span className="text-xs text-muted-foreground">512px - General use</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDownloadQR("large")}>
+                  <div className="flex flex-col">
+                    <span className="font-medium">Large</span>
+                    <span className="text-xs text-muted-foreground">1200px - Print quality</span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="space-y-4">
