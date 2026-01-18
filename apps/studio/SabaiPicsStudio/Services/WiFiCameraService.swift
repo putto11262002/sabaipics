@@ -11,7 +11,8 @@ import Combine
 
 /// Swift service that wraps the Objective-C WiFiCameraManager
 /// Provides Combine publishers for reactive state management in SwiftUI
-class WiFiCameraService: NSObject, ObservableObject {
+/// Conforms to CameraServiceProtocol for dependency injection and testing
+class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 
     // MARK: - Published Properties
 
@@ -177,6 +178,30 @@ class WiFiCameraService: NSObject, ObservableObject {
     /// Cancel any pending retry
     func cancelRetry() {
         retryCount = 0
+    }
+
+    // MARK: - CameraServiceProtocol Compatibility Methods
+
+    /// Protocol-compatible connect method (uses IP address string)
+    /// - Parameter ip: Camera IP address (e.g., "192.168.1.1")
+    func connect(ip: String) {
+        let config = CameraConfig(
+            ip: ip,
+            model: "Canon EOS (WLAN)",
+            proto: "ptpip"
+        )
+        connect(config: config)
+    }
+
+    /// Protocol-compatible connect with retry method
+    /// - Parameter ip: Camera IP address (e.g., "192.168.1.1")
+    func connectWithRetry(ip: String) {
+        let config = CameraConfig(
+            ip: ip,
+            model: "Canon EOS (WLAN)",
+            proto: "ptpip"
+        )
+        connectWithRetry(config: config)
     }
 
 }
