@@ -1,11 +1,14 @@
 import { useState } from "react";
+import QRCodeSVG from "react-qr-code";
 import { Card, CardHeader, CardTitle, CardContent } from "@sabaipics/ui/components/card";
 import { Button } from "@sabaipics/ui/components/button";
 import { Input } from "@sabaipics/ui/components/input";
 import { Alert } from "@sabaipics/ui/components/alert";
-import { Download, Copy, Check } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { useCopyToClipboard } from "../../hooks/use-copy-to-clipboard";
 import type { Event } from "../../hooks/events/useEvents";
+
+type QRSize = "small" | "medium" | "large";
 
 interface EventQRDisplayProps {
   event: Event;
@@ -20,17 +23,12 @@ export function EventQRDisplay({ event }: EventQRDisplayProps) {
   const searchUrl = `https://sabaipics.com/search/${event.accessCode}`;
   const slideshowUrl = `https://sabaipics.com/event/${event.accessCode}/slideshow`;
 
-  const handleDownload = async () => {
-    if (!event.qrCodeUrl) {
-      setDownloadError("QR code is not available");
-      return;
-    }
-
+  const handleDownload = async (size: QRSize) => {
     setIsDownloading(true);
     setDownloadError(null);
 
     try {
-      const response = await fetch(event.qrCodeUrl);
+      const response = await fetch(`/api/events/${event.id}/qr-download?size=${size}`);
       if (!response.ok) {
         throw new Error("Failed to fetch QR code");
       }
@@ -39,7 +37,7 @@ export function EventQRDisplay({ event }: EventQRDisplayProps) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${event.name.replace(/[^a-z0-9]/gi, "-")}-QR.png`;
+      a.download = `${event.name.replace(/[^a-z0-9]/gi, "-")}-${size}-qr.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -58,36 +56,37 @@ export function EventQRDisplay({ event }: EventQRDisplayProps) {
         <CardTitle>QR Code & Links</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* QR Code Display */}
+        {/* QR Code Display - Client-side generation */}
         <div className="flex flex-col items-center gap-4">
-          {event.qrCodeUrl ? (
-            <>
-              <img
-                src={event.qrCodeUrl}
-                alt={`QR code for ${event.name}`}
-                className="size-80 max-w-full object-contain md:size-96"
-              />
-              <Button
-                onClick={handleDownload}
-                disabled={isDownloading}
-                variant="outline"
-                size="sm"
-              >
-                {isDownloading ? (
-                  <>Downloading...</>
-                ) : (
-                  <>
-                    <Download className="mr-2 size-4" />
-                    Download QR Code
-                  </>
-                )}
-              </Button>
-            </>
-          ) : (
-            <Alert variant="destructive">
-              <p>QR code unavailable. Please contact support.</p>
-            </Alert>
-          )}
+          <div className="w-full max-w-[400px]">
+            <QRCodeSVG
+              value={searchUrl}
+              level="M"
+              style={{ width: '100%', maxWidth: '400px', height: 'auto' }}
+            />
+          </div>
+
+          {/* Download with size selection */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex gap-2">
+              {(["small", "medium", "large"] as QRSize[]).map((size) => (
+                <Button
+                  key={size}
+                  onClick={() => handleDownload(size)}
+                  disabled={isDownloading}
+                  variant={size === "medium" ? "default" : "outline"}
+                  size="sm"
+                >
+                  {size === "small" && "Small (256px)"}
+                  {size === "medium" && "Medium (512px)"}
+                  {size === "large" && "Large (1200px)"}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Small for sharing, Medium for general use, Large for print
+            </p>
+          </div>
 
           {downloadError && (
             <Alert variant="destructive">

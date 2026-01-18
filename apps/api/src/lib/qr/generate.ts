@@ -1,5 +1,25 @@
 import { generatePngQrCode } from "@juit/qrcode";
 
+export type QRSize = "small" | "medium" | "large";
+
+/**
+ * QR size presets with dimensions in pixels
+ */
+export const QR_SIZE_PRESETS: Record<QRSize, number> = {
+  small: 256,
+  medium: 512,
+  large: 1200,
+} as const;
+
+/**
+ * Calculates the scale (pixels per module) for a given QR size.
+ * QR codes have ~25 modules, so scale = targetSize / 25.
+ */
+function getScaleForSize(size: QRSize): number {
+  const targetSize = QR_SIZE_PRESETS[size];
+  return Math.ceil(targetSize / 25);
+}
+
 /**
  * Generates a QR code PNG for an event access code.
  *
@@ -8,18 +28,23 @@ import { generatePngQrCode } from "@juit/qrcode";
  *
  * @param accessCode - 6-character uppercase alphanumeric code (e.g., "ABC123")
  * @param baseUrl - Base URL for the app (from APP_BASE_URL env var)
- * @returns PNG image as Uint8Array (ready for R2 upload)
+ * @param size - Size preset: "small" (256px), "medium" (512px), "large" (1200px). Defaults to "medium".
+ * @returns PNG image as Uint8Array
  * @throws Error if accessCode format is invalid
  *
  * @example
  * ```typescript
+ * // Default medium size
  * const qrPng = await generateEventQR("ABC123", env.APP_BASE_URL);
- * await env.PHOTOS_BUCKET.put(`qr/${eventId}.png`, qrPng);
+ *
+ * // Specific size
+ * const largeQr = await generateEventQR("ABC123", env.APP_BASE_URL, "large");
  * ```
  */
 export async function generateEventQR(
   accessCode: string,
-  baseUrl: string
+  baseUrl: string,
+  size: QRSize = "medium"
 ): Promise<Uint8Array> {
   // Validate access code format (security: prevent injection)
   if (!/^[A-Z0-9]{6}$/.test(accessCode)) {
@@ -35,7 +60,7 @@ export async function generateEventQR(
   const pngBytes = await generatePngQrCode(searchUrl, {
     ecLevel: "M", // Decision: Medium (15%) error correction
     margin: 4, // Standard quiet zone (4 modules)
-    scale: 10, // 10 pixels per module = ~250-400px total (sharp on all displays)
+    scale: getScaleForSize(size), // Calculate scale based on size preset
   });
 
   return pngBytes;
