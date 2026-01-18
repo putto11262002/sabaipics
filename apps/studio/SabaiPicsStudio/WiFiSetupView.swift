@@ -10,16 +10,17 @@ import SwiftUI
 
 /// Main WiFi setup view for connecting to Canon cameras
 struct WiFiSetupView: View {
-    @ObservedObject var viewModel: CameraViewModel
+    @EnvironmentObject var connectionStore: ConnectionStore
     @State private var cameraIP: String = "192.168.1.1"
     @State private var showInstructions = false
     @State private var showPermissionError = false
     @FocusState private var isIPFieldFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Top section with icon and title
-            VStack(spacing: 20) {
+        ScrollView {
+            VStack(spacing: 0) {
+                // Top section with icon and title
+                VStack(spacing: 20) {
                 Spacer()
                     .frame(height: 60)
 
@@ -109,8 +110,13 @@ struct WiFiSetupView: View {
 
             // Connect button
             Button(action: {
+                // Properly clean up input session before transitioning away
                 isIPFieldFocused = false
-                viewModel.connectToWiFiCamera(ip: cameraIP)
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                               to: nil, from: nil, for: nil)
+
+                // Then connect
+                connectionStore.connect(ip: cameraIP)
             }) {
                 HStack(spacing: 12) {
                     Image(systemName: "wifi")
@@ -145,7 +151,8 @@ struct WiFiSetupView: View {
                 .padding(.vertical, 12)
             }
 
-            Spacer()
+                Spacer()
+            }
         }
         .background(Color(.systemBackground))
         .sheet(isPresented: $showInstructions) {
@@ -273,5 +280,9 @@ struct InstructionStep: View {
 // MARK: - Preview
 
 #Preview {
-    WiFiSetupView(viewModel: CameraViewModel())
+    let mockService = MockCameraService()
+    let coordinator = AppCoordinator(cameraService: mockService)
+
+    return WiFiSetupView()
+        .environmentObject(coordinator.connectionStore)
 }

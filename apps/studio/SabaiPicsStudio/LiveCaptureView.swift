@@ -11,9 +11,9 @@ import SwiftUI
 /// View shown during active photo capture session
 /// Pattern: Hybrid - navigation bar with title/subtitle + photo count in trailing
 struct LiveCaptureView: View {
-    @ObservedObject var viewModel: CameraViewModel
-    @State private var showDisconnectAlert = false
-    @State private var userConfirmedDisconnect = false
+    @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var connectionStore: ConnectionStore
+    @EnvironmentObject var photoStore: PhotoStore
 
     var body: some View {
         VStack(spacing: 0.0) {
@@ -21,7 +21,7 @@ struct LiveCaptureView: View {
                 .background(Color(UIColor.separator))
 
             List {
-                ForEach(viewModel.capturedPhotos) { photo in
+                ForEach(photoStore.photos) { photo in
                     PhotoListRow(photo: photo)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         .transition(.asymmetric(
@@ -31,21 +31,21 @@ struct LiveCaptureView: View {
                 }
             }
             .listStyle(.plain)
-            .animation(.easeOut(duration: 0.4), value: viewModel.capturedPhotos)
+            .animation(.easeOut(duration: 0.4), value: photoStore.photos)
         }
         .toolbar {
             // Principal: Event name + camera name with status
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text(viewModel.eventName)
+                    Text(connectionStore.eventName)
                         .font(.headline)
                         .lineLimit(1)
 
                     HStack(spacing: 4) {
                         Circle()
-                            .fill(viewModel.wifiService.isConnected ? Color.green : Color.gray)
+                            .fill(connectionStore.connectionState == .connected ? Color.green : Color.gray)
                             .frame(width: 8, height: 8)
-                        Text(viewModel.cameraName)
+                        Text(connectionStore.cameraName)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -55,7 +55,7 @@ struct LiveCaptureView: View {
             // Trailing: Disconnect button
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
-                    showDisconnectAlert = true
+                    coordinator.requestDisconnect()
                 }) {
                     Text("Disconnect")
                         .foregroundColor(.red)
@@ -64,22 +64,11 @@ struct LiveCaptureView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(UIColor.systemBackground), for: .navigationBar)
-        .alert("Disconnect from camera?", isPresented: $showDisconnectAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Disconnect", role: .destructive) {
-                userConfirmedDisconnect = true
-                // Alert auto-dismisses, then .onChange fires
-            }
-        } message: {
-            Text("Photos will be cleared. Make sure you've saved what you need.")
-        }
-        .onChange(of: showDisconnectAlert) { isShowing in
-            // Called AFTER alert finishes dismissing (iOS 16 compatible)
-            if !isShowing && userConfirmedDisconnect {
-                // Alert dismissed AND user confirmed disconnect
-                viewModel.disconnectWiFi()
-                userConfirmedDisconnect = false  // Reset for next time
-            }
+        .onDisappear {
+            // Critical: Clean up to prevent orphaned overlays
+            // Reset coordinator alert state in case view disappears during alert
+            coordinator.showDisconnectAlert = false
+            print("[LiveCaptureView] Cleaned up alert state on disappear")
         }
     }
 }
@@ -168,41 +157,45 @@ struct PhotoListRow: View {
 
 #Preview {
     // Preview with mock data
-    NavigationView {
-        LiveCaptureView(viewModel: {
-            let viewModel = CameraViewModel()
+    let mockService = MockCameraService()
+    let coordinator = AppCoordinator(cameraService: mockService)
 
-            // Add mock photos with different states
-            let mockPhotos = [
-                CapturedPhoto(
-                    name: "IMG_9876.JPG",
-                    image: UIImage(systemName: "photo")!,
-                    captureDate: Date().addingTimeInterval(-5)
-                ),
-                CapturedPhoto(
-                    name: "IMG_9875.JPG",
-                    image: UIImage(systemName: "photo.fill")!,
-                    captureDate: Date().addingTimeInterval(-120)
-                ),
-                CapturedPhoto(
-                    name: "IMG_9874.JPG",
-                    image: UIImage(systemName: "photo")!,
-                    captureDate: Date().addingTimeInterval(-3600)
-                ),
-                CapturedPhoto(
-                    name: "IMG_9873.JPG",
-                    image: UIImage(systemName: "photo.fill")!,
-                    captureDate: Date().addingTimeInterval(-7200)
-                )
-            ]
+    // Set up mock connection state
+    coordinator.connectionStore.connectionState = .connected
+    coordinator.connectionStore.connectedIP = "172.20.10.2"
+    coordinator.connectionStore.cameraName = "Canon EOS R5"
+    coordinator.connectionStore.eventName = "Beach Wedding 2026"
 
-            viewModel.capturedPhotos = mockPhotos
-            viewModel.photoCount = mockPhotos.count
-            viewModel.detectedPhotoCount = 5
-            viewModel.eventName = "Beach Wedding 2026"
-            viewModel.cameraName = "Canon EOS R5"
+    // Add mock photos
+    let mockPhotos = [
+        CapturedPhoto(
+            name: "IMG_9876.JPG",
+            image: UIImage(systemName: "photo")!,
+            captureDate: Date().addingTimeInterval(-5)
+        ),
+        CapturedPhoto(
+            name: "IMG_9875.JPG",
+            image: UIImage(systemName: "photo.fill")!,
+            captureDate: Date().addingTimeInterval(-120)
+        ),
+        CapturedPhoto(
+            name: "IMG_9874.JPG",
+            image: UIImage(systemName: "photo")!,
+            captureDate: Date().addingTimeInterval(-3600)
+        ),
+        CapturedPhoto(
+            name: "IMG_9873.JPG",
+            image: UIImage(systemName: "photo.fill")!,
+            captureDate: Date().addingTimeInterval(-7200)
+        )
+    ]
+    coordinator.photoStore.photos = mockPhotos
+    coordinator.photoStore.photoCount = mockPhotos.count
 
-            return viewModel
-        }())
+    return NavigationView {
+        LiveCaptureView()
+            .environmentObject(coordinator)
+            .environmentObject(coordinator.connectionStore)
+            .environmentObject(coordinator.photoStore)
     }
 }

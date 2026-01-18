@@ -67,7 +67,7 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
         super.init()
         self.manager.delegate = self
 
-        print("📱 [WiFiCameraService] Initialized")
+        print("[WiFiCameraService] Initialized")
     }
 
     // MARK: - Public Methods
@@ -75,7 +75,7 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
     /// Connect to a WiFi camera
     /// - Parameter config: Camera configuration (defaults to Canon WiFi)
     func connect(config: CameraConfig = .canonWiFi) {
-        print("📱 [WiFiCameraService] Connecting to WiFi camera: \(config.ip)")
+        print("[WiFiCameraService] Connecting to WiFi camera: \(config.ip)")
 
         // Reset error state
         connectionError = nil
@@ -92,7 +92,7 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
                 // Success case handled by delegate callback (already on main thread)
             } catch let error as NSError {
                 let errorMsg = error.localizedDescription
-                print("❌ [WiFiCameraService] Connection failed: \(errorMsg)")
+                print("[WiFiCameraService] Connection failed: \(errorMsg)")
 
                 // Update UI state on main thread
                 await MainActor.run {
@@ -105,7 +105,7 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 
     /// Disconnect from the camera
     func disconnect() {
-        print("📱 [WiFiCameraService] Disconnecting from WiFi camera")
+        print("[WiFiCameraService] Disconnecting from WiFi camera")
         connectionTask?.cancel()
         connectionTask = nil
         manager.disconnect()
@@ -126,13 +126,13 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 
     /// Connect with automatic retry on timeout
     func connectWithRetry(config: CameraConfig) {
-        print("📡 [WiFiCameraService] Starting connection with retry...")
+        print("[WiFiCameraService] Starting connection with retry...")
         retryCount = 0
         attemptConnection(config: config)
     }
 
     private func attemptConnection(config: CameraConfig) {
-        print("📡 [WiFiCameraService] Connection attempt \(retryCount + 1)/\(maxRetries)")
+        print("[WiFiCameraService] Connection attempt \(retryCount + 1)/\(maxRetries)")
 
         // Update retry count for UI
         DispatchQueue.main.async {
@@ -149,7 +149,7 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
             DispatchQueue.main.async {
                 if self.isConnected {
                     // SUCCESS
-                    print("✅ [WiFiCameraService] Connection succeeded on attempt \(self.retryCount + 1)")
+                    print("[WiFiCameraService] Connection succeeded on attempt \(self.retryCount + 1)")
                     self.retryCount = 0
                     LocalNetworkPermissionChecker.markPermissionGranted()
 
@@ -159,7 +159,7 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 
                     // Exponential backoff: 2s, 5s
                     let backoffDelay: TimeInterval = self.retryCount == 1 ? 2.0 : 5.0
-                    print("⏳ [WiFiCameraService] Retry in \(backoffDelay)s... (Attempt \(self.retryCount + 1)/\(self.maxRetries))")
+                    print("[WiFiCameraService] Retry in \(backoffDelay)s... (Attempt \(self.retryCount + 1)/\(self.maxRetries))")
 
                     DispatchQueue.main.asyncAfter(deadline: .now() + backoffDelay) {
                         self.attemptConnection(config: config)
@@ -167,7 +167,7 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 
                 } else {
                     // FAILURE
-                    print("❌ [WiFiCameraService] Connection failed after \(self.maxRetries) attempts")
+                    print("[WiFiCameraService] Connection failed after \(self.maxRetries) attempts")
                     self.retryCount = 0
                     self.connectionError = "Connection failed after 3 attempts. Please check camera WiFi settings."
                 }
@@ -212,7 +212,7 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
 
     /// Called when camera successfully connects
     func cameraManagerDidConnect(_ manager: Any) {
-        print("✅ [WiFiCameraService] Connected to camera via WiFi")
+        print("[WiFiCameraService] Connected to camera via WiFi")
 
         DispatchQueue.main.async {
             self.isConnected = true
@@ -222,7 +222,7 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
 
     /// Called when camera connection or operation fails
     func cameraManager(_ manager: Any, didFailWithError error: Error) {
-        print("❌ [WiFiCameraService] Camera connection failed: \(error.localizedDescription)")
+        print("[WiFiCameraService] Camera connection failed: \(error.localizedDescription)")
 
         DispatchQueue.main.async {
             self.isConnected = false
@@ -236,7 +236,7 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
     /// Phase 3: FULL IMPLEMENTATION
     /// Phase 4: Added JPEG filtering to skip RAW files
     func cameraManager(_ manager: Any, didDetectNewPhoto filename: String, folder: String) {
-        print("📸 [WiFiCameraService] Photo detected in Swift: \(filename)")
+        print("[WiFiCameraService] Photo detected in Swift: \(filename)")
 
         // Filter: Only process JPEG files, skip RAW
         let lowercased = filename.lowercased()
@@ -250,7 +250,7 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
                      lowercased.hasSuffix(".jpeg")
 
         guard isJPEG && !isRAW else {
-            print("⏭️ Skipping non-JPEG file: \(filename)")
+            print("Skipping non-JPEG file: \(filename)")
             return
         }
 
@@ -265,7 +265,7 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
     /// Called when photo download completes
     /// Phase 4: Sequential download implementation
     func cameraManager(_ manager: Any, didDownloadPhoto photoData: Data, filename: String) {
-        print("✅ [WiFiCameraService] Photo downloaded: \(filename), size: \(photoData.count) bytes")
+        print("[WiFiCameraService] Photo downloaded: \(filename), size: \(photoData.count) bytes")
 
         // Add to downloaded photos array (on main thread)
         DispatchQueue.main.async {

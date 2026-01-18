@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var viewModel = CameraViewModel()
+    @EnvironmentObject var coordinator: AppCoordinator
 
     var body: some View {
         NavigationView {
@@ -17,40 +17,32 @@ struct ContentView: View {
                 Color(.systemBackground)
                     .ignoresSafeArea()
 
-                // Content based on app state (Phase 5: Premium routing)
-                switch viewModel.appState {
+                // Content based on app state
+                switch coordinator.appState {
                 case .idle:
                     // WiFi setup page - waiting for user input
-                    WiFiSetupView(viewModel: viewModel)
+                    WiFiSetupView()
                         .transition(.opacity)
                         .id("wifi-setup")  // Force NavigationView to recognize as distinct view
 
                 case .cameraFound(let camera):
                     // USB legacy (disabled)
                     CameraFoundView(camera: camera) {
-                        viewModel.connectToCamera(camera)
+                        // Note: This is legacy USB code, not refactored yet
                     }
                     .id("camera-found")
 
                 case .connecting:
-                    // Phase 5: Premium connecting view with retry status
-                    ConnectingView(
-                        ipAddress: viewModel.currentIP ?? "...",
-                        retryCount: viewModel.retryCount,
-                        maxRetries: 3
-                    )
-                    .transition(.opacity)
-                    .id("connecting")
+                    // Premium connecting view with retry status
+                    ConnectingView()
+                        .transition(.opacity)
+                        .id("connecting")
 
                 case .connected:
-                    // Phase 5: Success celebration (1s auto-transition)
-                    ConnectedView(
-                        cameraModel: "Canon EOS",
-                        ipAddress: viewModel.currentIP ?? "",
-                        shouldDismiss: $viewModel.shouldDismissConnected
-                    )
-                    .transition(.scale.combined(with: .opacity))
-                    .id("connected")
+                    // Success celebration (auto-transitions via AppCoordinator)
+                    ConnectedView()
+                        .transition(.scale.combined(with: .opacity))
+                        .id("connected")
 
                 case .ready:
                     ReadyView()
@@ -58,30 +50,30 @@ struct ContentView: View {
 
                 case .capturing:
                     // Live capture view
-                    LiveCaptureView(viewModel: viewModel)
+                    LiveCaptureView()
                         .transition(.opacity)
                         .id("capturing")  // Distinct identity for toolbar cleanup
 
                 case .error(let message):
-                    // Phase 5: Premium error view
-                    ConnectionErrorView(
-                        errorMessage: message,
-                        onTryAgain: {
-                            withAnimation {
-                                viewModel.appState = .idle
-                                viewModel.wifiService.cancelRetry()
-                            }
-                        }
-                    )
-                    .transition(.opacity)
-                    .id("error")
+                    // Premium error view
+                    ConnectionErrorView(errorMessage: message)
+                        .transition(.opacity)
+                        .id("error")
                 }
             }
-            .animation(.easeInOut, value: viewModel.appState)
             .navigationTitle("SabaiPics Studio")
             .navigationBarTitleDisplayMode(.inline)
         }
         .navigationViewStyle(.stack) // Forces single-column layout on iPad (no sidebar)
+        .customConfirmationDialog(
+            isPresented: $coordinator.showDisconnectAlert,
+            title: "Disconnect from camera?",
+            message: "Photos will be cleared. Make sure you've saved what you need.",
+            confirmLabel: "Disconnect",
+            isDestructive: true
+        ) {
+            coordinator.confirmDisconnect()
+        }
     }
 }
 
@@ -145,5 +137,9 @@ struct ErrorView: View {
 }
 
 #Preview {
-    ContentView()
+    let coordinator = AppCoordinator()
+    return ContentView()
+        .environmentObject(coordinator)
+        .environmentObject(coordinator.connectionStore)
+        .environmentObject(coordinator.photoStore)
 }

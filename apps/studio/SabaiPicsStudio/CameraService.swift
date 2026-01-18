@@ -33,13 +33,13 @@ class CameraService: NSObject, ObservableObject {
 
     // MARK: - Public Methods
     func startSearching() {
-        print("🔍 Starting camera search...")
+        print("Starting camera search...")
         isSearching = true
         deviceBrowser?.start()
     }
 
     func stopSearching() {
-        print("🛑 Stopping camera search...")
+        print("Stopping camera search...")
         isSearching = false
         deviceBrowser?.stop()
     }
@@ -51,7 +51,7 @@ extension CameraService: ICDeviceBrowserDelegate {
     func deviceBrowser(_ browser: ICDeviceBrowser, didAdd device: ICDevice, moreComing: Bool) {
         guard let camera = device as? ICCameraDevice else { return }
 
-        print("📷 Camera found: \(camera.name ?? "Unknown")")
+        print("Camera found: \(camera.name ?? "Unknown")")
 
         DispatchQueue.main.async {
             self.discoveredCameras.append(camera)
@@ -61,7 +61,7 @@ extension CameraService: ICDeviceBrowserDelegate {
     func deviceBrowser(_ browser: ICDeviceBrowser, didRemove device: ICDevice, moreGoing: Bool) {
         guard let camera = device as? ICCameraDevice else { return }
 
-        print("📷 Camera removed: \(camera.name ?? "Unknown")")
+        print("Camera removed: \(camera.name ?? "Unknown")")
 
         DispatchQueue.main.async {
             self.discoveredCameras.removeAll { $0 == camera }
@@ -69,6 +69,6 @@ extension CameraService: ICDeviceBrowserDelegate {
     }
 
     func deviceBrowser(_ browser: ICDeviceBrowser, didEncounterError error: Error) {
-        print("❌ Camera browser error: \(error.localizedDescription)")
+        print("Camera browser error: \(error.localizedDescription)")
     }
 }

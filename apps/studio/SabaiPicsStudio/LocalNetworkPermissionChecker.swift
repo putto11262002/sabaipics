@@ -15,7 +15,7 @@ class LocalNetworkPermissionChecker {
     /// Triggers iOS local network permission prompt
     /// - Parameter completion: Called when check completes (5s max timeout)
     static func triggerPermissionPrompt(completion: @escaping () -> Void) {
-        print("🔐 [LocalNetworkPermissionChecker] Triggering permission prompt...")
+        print("[LocalNetworkPermissionChecker] Triggering permission prompt...")
 
         // Connect to link-local broadcast to trigger iOS permission
         let connection = NWConnection(
@@ -34,7 +34,7 @@ class LocalNetworkPermissionChecker {
                 hasCompleted = true
                 connection.cancel()
 
-                print("✅ [LocalNetworkPermissionChecker] Permission check completed: \(state)")
+                print("[LocalNetworkPermissionChecker] Permission check completed: \(state)")
 
                 // Give iOS time to process permission grant
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -57,7 +57,7 @@ class LocalNetworkPermissionChecker {
             hasCompleted = true
             connection.cancel()
 
-            print("⏱️ [LocalNetworkPermissionChecker] Permission check timeout (5s)")
+            print("[LocalNetworkPermissionChecker] Permission check timeout (5s)")
             DispatchQueue.main.async {
                 completion()
             }
@@ -71,7 +71,7 @@ class LocalNetworkPermissionChecker {
 
     /// Mark permission as granted (call after successful connection)
     static func markPermissionGranted() {
-        print("✅ [LocalNetworkPermissionChecker] Marking permission as granted")
+        print("[LocalNetworkPermissionChecker] Marking permission as granted")
         UserDefaults.standard.set(true, forKey: "LocalNetworkPermissionGranted")
     }
 }

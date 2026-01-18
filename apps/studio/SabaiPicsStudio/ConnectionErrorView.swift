@@ -10,8 +10,8 @@ import SwiftUI
 
 /// Connection failed screen with "Try Again" button
 struct ConnectionErrorView: View {
+    @EnvironmentObject var coordinator: AppCoordinator
     let errorMessage: String
-    let onTryAgain: () -> Void
 
     var body: some View {
         VStack(spacing: 32) {
@@ -37,7 +37,12 @@ struct ConnectionErrorView: View {
             Spacer()
 
             // Try Again button
-            Button(action: onTryAgain) {
+            Button(action: {
+                withAnimation {
+                    coordinator.appState = .idle
+                    coordinator.connectionStore.cancelConnection()
+                }
+            }) {
                 Text("Try Again")
                     .font(.headline)
                     .foregroundColor(.white)
@@ -55,8 +60,11 @@ struct ConnectionErrorView: View {
 }
 
 #Preview {
-    ConnectionErrorView(
-        errorMessage: "Connection failed after 3 attempts. Please check camera WiFi settings.",
-        onTryAgain: {}
+    let coordinator = AppCoordinator()
+    coordinator.appState = .error("Connection failed after 3 attempts. Please check camera WiFi settings.")
+
+    return ConnectionErrorView(
+        errorMessage: "Connection failed after 3 attempts. Please check camera WiFi settings."
     )
+    .environmentObject(coordinator)
 }

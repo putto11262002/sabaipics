@@ -10,9 +10,7 @@ import SwiftUI
 
 /// Searching/connecting screen with animated spinner
 struct ConnectingView: View {
-    let ipAddress: String
-    let retryCount: Int
-    let maxRetries: Int
+    @EnvironmentObject var connectionStore: ConnectionStore
 
     var body: some View {
         VStack(spacing: 32) {
@@ -28,12 +26,12 @@ struct ConnectingView: View {
                     .font(.title3)
                     .fontWeight(.medium)
 
-                Text(ipAddress)
+                Text(connectionStore.connectedIP ?? "...")
                     .font(.body)
                     .foregroundColor(.secondary)
 
-                if retryCount > 0 {
-                    Text("Attempt \(retryCount + 1) of \(maxRetries)")
+                if connectionStore.retryCount > 0 {
+                    Text("Attempt \(connectionStore.retryCount + 1) of 3")
                         .font(.caption)
                         .foregroundColor(.orange)
                         .padding(.top, 8)
@@ -48,9 +46,20 @@ struct ConnectingView: View {
 }
 
 #Preview {
-    ConnectingView(ipAddress: "172.20.10.2", retryCount: 0, maxRetries: 3)
+    let mockService = MockCameraService()
+    let coordinator = AppCoordinator(cameraService: mockService)
+    coordinator.connectionStore.connectedIP = "172.20.10.2"
+
+    return ConnectingView()
+        .environmentObject(coordinator.connectionStore)
 }
 
 #Preview("Retrying") {
-    ConnectingView(ipAddress: "172.20.10.2", retryCount: 1, maxRetries: 3)
+    let mockService = MockCameraService()
+    let coordinator = AppCoordinator(cameraService: mockService)
+    coordinator.connectionStore.connectedIP = "172.20.10.2"
+    coordinator.connectionStore.retryCount = 1
+
+    return ConnectingView()
+        .environmentObject(coordinator.connectionStore)
 }

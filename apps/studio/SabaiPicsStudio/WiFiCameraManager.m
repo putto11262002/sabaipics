@@ -365,7 +365,7 @@ static GPContext* createGPhoto2Context(void) {
 
     if (ret == GP_OK) {
         // SUCCESS!
-        NSLog(@"[WiFiCameraManager] ✅ Camera initialized successfully!");
+        NSLog(@"[WiFiCameraManager] Camera initialized successfully!");
 
         // Device info logging (requires PTP headers - commented out for now)
         // Phase 3: Can add back if needed with proper header path
@@ -400,7 +400,7 @@ static GPContext* createGPhoto2Context(void) {
     } else {
         // FAILURE
         const char *gpErrorString = gp_result_as_string(ret);
-        NSLog(@"[WiFiCameraManager] ❌ Camera initialization failed with code: %d (%s)", ret, gpErrorString);
+        NSLog(@"[WiFiCameraManager] Camera initialization failed with code: %d (%s)", ret, gpErrorString);
 
         NSString *errorMsg;
         if (ret == GP_ERROR_IO || ret == GP_ERROR_TIMEOUT) {
@@ -473,11 +473,11 @@ static GPContext* createGPhoto2Context(void) {
  */
 - (BOOL)startEventMonitoring {
     if (_isMonitoring || _connectionState != WiFiCameraConnectionStateConnected) {
-        NSLog(@"⚠️ Cannot start monitoring: not connected or already monitoring");
+        NSLog(@"[WiFiCameraManager] Cannot start monitoring: not connected or already monitoring");
         return NO;
     }
 
-    NSLog(@"📡 Starting event monitoring");
+    NSLog(@"[WiFiCameraManager] Starting event monitoring");
     _isMonitoring = YES;
 
     // Create background thread for monitoring
@@ -495,7 +495,7 @@ static GPContext* createGPhoto2Context(void) {
  * Runs on background thread, polls camera for events and processes downloads sequentially
  */
 - (void)monitoringLoop {
-    NSLog(@"📡 Event monitoring loop started");
+    NSLog(@"[WiFiCameraManager] Event monitoring loop started");
 
     while (_isMonitoring && [[NSThread currentThread] isCancelled] == NO) {
         @autoreleasepool {
@@ -506,7 +506,7 @@ static GPContext* createGPhoto2Context(void) {
             int ret = gp_camera_wait_for_event(_camera, 1000, &evttype, &evtdata, _context);
 
             if (ret != GP_OK) {
-                NSLog(@"⚠️ Event polling error: %d", ret);
+                NSLog(@"[WiFiCameraManager] Event polling error: %d", ret);
                 continue;
             }
 
@@ -517,7 +517,7 @@ static GPContext* createGPhoto2Context(void) {
                     NSString *filename = [NSString stringWithUTF8String:path->name];
                     NSString *folder = [NSString stringWithUTF8String:path->folder];
 
-                    NSLog(@"📸 NEW PHOTO DETECTED: %@ in %@", filename, folder);
+                    NSLog(@"[WiFiCameraManager] NEW PHOTO DETECTED: %@ in %@", filename, folder);
 
                     // ADD TO DOWNLOAD QUEUE (don't download yet)
                     [_downloadQueue addObject:@{
@@ -540,7 +540,7 @@ static GPContext* createGPhoto2Context(void) {
                     break;
 
                 case GP_EVENT_CAPTURE_COMPLETE:
-                    NSLog(@"📷 Capture complete");
+                    NSLog(@"[WiFiCameraManager] Capture complete");
                     break;
 
                 default:
@@ -560,7 +560,7 @@ static GPContext* createGPhoto2Context(void) {
                 NSString *filename = item[@"filename"];
                 NSString *folder = item[@"folder"];
 
-                NSLog(@"📥 Processing download queue: %@ (queue size: %lu)", filename, (unsigned long)_downloadQueue.count);
+                NSLog(@"[WiFiCameraManager] Processing download queue: %@ (queue size: %lu)", filename, (unsigned long)_downloadQueue.count);
 
                 // Download NOW (on THIS thread - no lock conflict!)
                 NSString *localPath = [self synchronousDownloadFile:filename fromFolder:folder];
@@ -569,7 +569,7 @@ static GPContext* createGPhoto2Context(void) {
                     // Success - load image data and notify delegate
                     NSData *imageData = [NSData dataWithContentsOfFile:localPath];
                     if (imageData) {
-                        NSLog(@"✅ Downloaded %@ (%lu bytes)", filename, (unsigned long)imageData.length);
+                        NSLog(@"[WiFiCameraManager] Downloaded %@ (%lu bytes)", filename, (unsigned long)imageData.length);
 
                         dispatch_async(dispatch_get_main_queue(), ^{
                             if ([self.delegate respondsToSelector:@selector(cameraManager:didDownloadPhoto:filename:)]) {
@@ -577,16 +577,16 @@ static GPContext* createGPhoto2Context(void) {
                             }
                         });
                     } else {
-                        NSLog(@"❌ Failed to read image data from: %@", localPath);
+                        NSLog(@"[WiFiCameraManager] Failed to read image data from: %@", localPath);
                     }
                 } else {
-                    NSLog(@"❌ Failed to download: %@", filename);
+                    NSLog(@"[WiFiCameraManager] Failed to download: %@", filename);
                 }
             }
         }
     }
 
-    NSLog(@"📡 Event monitoring loop stopped");
+    NSLog(@"[WiFiCameraManager] Event monitoring loop stopped");
 }
 
 /**
@@ -598,11 +598,20 @@ static GPContext* createGPhoto2Context(void) {
         return;
     }
 
-    NSLog(@"📡 Stopping event monitoring");
+    NSLog(@"[WiFiCameraManager] Stopping event monitoring");
     _isMonitoring = NO;
 
     if (_monitoringThread) {
         [_monitoringThread cancel];
+
+        // CRITICAL FIX: Wait for thread to actually finish before freeing camera resources
+        // This prevents EXC_BAD_ACCESS when thread tries to use freed camera pointers
+        NSLog(@"[WiFiCameraManager] Waiting for monitoring thread to finish...");
+        while (!_monitoringThread.isFinished) {
+            [NSThread sleepForTimeInterval:0.01]; // 10ms poll interval
+        }
+        NSLog(@"[WiFiCameraManager] Event monitoring thread stopped");
+
         _monitoringThread = nil;
     }
 }
@@ -659,7 +668,7 @@ static GPContext* createGPhoto2Context(void) {
 - (NSString *)synchronousDownloadFile:(NSString *)filename
                            fromFolder:(NSString *)folder {
 
-    NSLog(@"[WiFiCameraManager] 📥 Downloading file: %@ from %@", filename, folder);
+    NSLog(@"[WiFiCameraManager] Downloading file: %@ from %@", filename, folder);
 
     // Create local path in Documents directory
     NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
@@ -715,7 +724,7 @@ static GPContext* createGPhoto2Context(void) {
         return nil;
     }
 
-    NSLog(@"[WiFiCameraManager] ✅ File saved to: %@", localPath);
+    NSLog(@"[WiFiCameraManager] File saved to: %@", localPath);
     return localPath;
 }
 

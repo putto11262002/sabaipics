@@ -8,11 +8,9 @@
 
 import SwiftUI
 
-/// Success celebration screen (auto-dismisses after 1.5 seconds)
+/// Success celebration screen (auto-transitions via AppCoordinator)
 struct ConnectedView: View {
-    let cameraModel: String
-    let ipAddress: String
-    @Binding var shouldDismiss: Bool
+    @EnvironmentObject var connectionStore: ConnectionStore
 
     var body: some View {
         VStack(spacing: 32) {
@@ -35,10 +33,10 @@ struct ConnectedView: View {
                     .font(.title)
                     .fontWeight(.bold)
 
-                Text(cameraModel)
+                Text(connectionStore.cameraName)
                     .font(.headline)
 
-                Text(ipAddress)
+                Text(connectionStore.connectedIP ?? "")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -47,21 +45,15 @@ struct ConnectedView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
-        .onAppear {
-            // Auto-dismiss after 1.5 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                withAnimation {
-                    shouldDismiss = true
-                }
-            }
-        }
     }
 }
 
 #Preview {
-    ConnectedView(
-        cameraModel: "Canon EOS R5",
-        ipAddress: "172.20.10.2",
-        shouldDismiss: .constant(false)
-    )
+    let mockService = MockCameraService()
+    let coordinator = AppCoordinator(cameraService: mockService)
+    coordinator.connectionStore.connectedIP = "172.20.10.2"
+    coordinator.connectionStore.cameraName = "Canon EOS R5"
+
+    return ConnectedView()
+        .environmentObject(coordinator.connectionStore)
 }
