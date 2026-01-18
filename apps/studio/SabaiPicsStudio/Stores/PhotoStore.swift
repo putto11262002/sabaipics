@@ -84,8 +84,8 @@ class PhotoStore: ObservableObject {
 
         // Subscribe to downloaded photos
         service.$downloadedPhotos
-            .sink { [weak self] _ in
-                self?.processDownloadedPhotos()
+            .sink { [weak self] newDownloads in
+                self?.processDownloadedPhotos(newDownloads)
             }
             .store(in: &cancellables)
     }
@@ -99,27 +99,29 @@ class PhotoStore: ObservableObject {
 
         // Subscribe to downloaded photos
         service.$downloadedPhotos
-            .sink { [weak self] _ in
-                self?.processDownloadedPhotos()
+            .sink { [weak self] newDownloads in
+                self?.processDownloadedPhotos(newDownloads)
             }
             .store(in: &cancellables)
     }
 
     /// Process downloaded photos from service
     /// Handles deduplication and prepending to collection
-    private func processDownloadedPhotos() {
-        let downloads = cameraService.downloadedPhotos
+    /// - Parameter downloads: Array of downloaded photos (filename, data)
+    private func processDownloadedPhotos(_ downloads: [(filename: String, data: Data)]) {
+        print("[PhotoStore] Processing \(downloads.count) downloaded photos")
 
         for (filename, data) in downloads {
             // Check if already added (deduplication)
             let alreadyAdded = photos.contains { $0.name == filename }
             guard !alreadyAdded else {
+                print("[PhotoStore] Photo already exists, skipping: \(filename)")
                 continue
             }
 
             // Create UIImage from data
             if let image = UIImage(data: data) {
-                addPhoto(filename: filename, image: image)
+                addPhoto(filename: filename, image: image, data: data)
             } else {
                 print("[PhotoStore] Failed to create image from data: \(filename)")
             }
@@ -130,15 +132,16 @@ class PhotoStore: ObservableObject {
     /// - Parameters:
     ///   - filename: Photo filename
     ///   - image: UIImage data
-    private func addPhoto(filename: String, image: UIImage) {
+    ///   - data: Raw photo data
+    private func addPhoto(filename: String, image: UIImage, data: Data) {
         // Deduplication check
         guard !photos.contains(where: { $0.name == filename }) else {
             print("[PhotoStore] Photo already exists, skipping: \(filename)")
             return
         }
 
-        // Create photo object
-        let photo = CapturedPhoto(name: filename, image: image)
+        // Create photo object with data
+        let photo = CapturedPhoto(name: filename, data: data)
 
         // Prepend to top (newest first)
         photos.insert(photo, at: 0)
