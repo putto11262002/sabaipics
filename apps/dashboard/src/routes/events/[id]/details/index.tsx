@@ -14,7 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@sabaipics/ui/components/dropdown-menu";
-import { Copy, Presentation, ExternalLink, Calendar, Clock, Download, ChevronDown } from "lucide-react";
+import { Copy, Presentation, ExternalLink, Calendar, Clock, Download } from "lucide-react";
 import { parseISO, differenceInDays } from "date-fns";
 import { useParams } from "react-router";
 import QRCodeSVG from "react-qr-code";
@@ -103,13 +103,11 @@ export default function EventDetailsTab() {
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button disabled={isDownloading} variant="outline" className="w-full sm:w-auto">
-                  <Download className="mr-2 size-4" />
-                  Download QR Code
-                  <ChevronDown className="ml-2 size-4" />
+                <Button disabled={isDownloading} variant="outline" size="icon">
+                  <Download className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="w-48">
+              <DropdownMenuContent align="start" className="w-48">
                 <DropdownMenuItem onClick={() => handleDownloadQR("small")}>
                   <div className="flex flex-col">
                     <span className="font-medium">Small</span>

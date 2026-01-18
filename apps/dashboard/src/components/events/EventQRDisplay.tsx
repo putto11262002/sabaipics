@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@sabaipics/ui/components/dropdown-menu";
-import { Copy, Check, Download, ChevronDown } from "lucide-react";
+import { Copy, Check, Download } from "lucide-react";
 import { useCopyToClipboard } from "../../hooks/use-copy-to-clipboard";
 import type { Event } from "../../hooks/events/useEvents";
 
@@ -75,13 +75,11 @@ export function EventQRDisplay({ event }: EventQRDisplayProps) {
           {/* Download with size selection dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button disabled={isDownloading} variant="outline" className="w-full sm:w-auto">
-                <Download className="mr-2 size-4" />
-                Download QR Code
-                <ChevronDown className="ml-2 size-4" />
+              <Button disabled={isDownloading} variant="outline" size="icon">
+                <Download className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-48">
+            <DropdownMenuContent align="start" className="w-48">
               <DropdownMenuItem onClick={() => handleDownload("small")}>
                 <div className="flex flex-col">
                   <span className="font-medium">Small</span>
