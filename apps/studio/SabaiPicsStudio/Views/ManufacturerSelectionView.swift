@@ -99,11 +99,7 @@ struct ManufacturerButton: View {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isEnabled ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isEnabled ? Color.blue : Color.gray.opacity(0.3), lineWidth: 2)
+                    .stroke(isEnabled ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: 2)
             )
             .foregroundColor(isEnabled ? .primary : .secondary)
         }
