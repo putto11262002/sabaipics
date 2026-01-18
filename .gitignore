@@ -50,3 +50,33 @@ yarn-error.log*
 .claude/drafts/
 
 .vscode/*
+
+# Xcode
+## User settings
+apps/studio/**/*.xcodeproj/xcuserdata/
+apps/studio/**/*.xcodeproj/project.xcworkspace/xcuserdata/
+
+## Build generated
+apps/studio/build/
+apps/studio/DerivedData/
+
+## Various settings
+apps/studio/**/*.pbxuser
+apps/studio/**/*.mode1v3
+apps/studio/**/*.mode2v3
+apps/studio/**/*.perspectivev3
+!apps/studio/**/*.xcodeproj/project.pbxproj
+!apps/studio/**/*.xcodeproj/xcshareddata/
+!apps/studio/**/*.xcworkspace/contents.xcworkspacedata
+
+## Other
+apps/studio/**/*.moved-aside
+apps/studio/**/*.xccheckout
+apps/studio/**/*.xcscmblueprint
+
+## Swift Package Manager
+apps/studio/.swiftpm/
+apps/studio/.build/
+
+# Syncthing temp files
+**/.syncthing.*.tmp
