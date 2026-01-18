@@ -24,16 +24,10 @@ struct ManufacturerSelectionView: View {
                 Spacer()
 
                 // Title
-                VStack(spacing: 8) {
-                    Text("Select Camera Brand")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-
-                    Text("Choose your camera manufacturer to begin")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.bottom, 32)
+                Text("Select your camera")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+                    .padding(.bottom, 32)
 
                 // Manufacturer buttons
                 VStack(spacing: 16) {

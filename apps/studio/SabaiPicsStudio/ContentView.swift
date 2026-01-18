@@ -67,7 +67,7 @@ struct ContentView: View {
                         .id("error")
                 }
             }
-            .navigationTitle("SabaiPics Studio")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
         }
         .navigationViewStyle(.stack) // Forces single-column layout on iPad (no sidebar)
