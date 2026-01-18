@@ -1,15 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { useApiClient } from '../../lib/api';
+import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono';
 
-export interface PhotoStatus {
-  id: string;
-  status: 'uploading' | 'indexing' | 'indexed' | 'failed';
-  errorName: string | null;
-  faceCount: number;
-  fileSize: number | null;
-  thumbnailUrl: string;
-  uploadedAt: string;
-}
+const getStatus = api.photos.status.$get;
+
+export type PhotoStatus = InferResponseType<typeof getStatus, 200>['data'][0];
 
 /**
  * Batch fetch photo statuses by multiple IDs
@@ -21,15 +16,12 @@ export function usePhotosStatus(
     refetchInterval?: number | false;
   },
 ) {
-  const { createAuthClient } = useApiClient();
-
   return useQuery({
     queryKey: ['photos', 'status', photoIds],
     queryFn: async (): Promise<PhotoStatus[]> => {
       if (photoIds.length === 0) return [];
 
-      const client = await createAuthClient();
-      const response = await client.photos.status.$get({
+      const response = await getStatus({
         query: { ids: photoIds.join(',') },
       });
 
@@ -38,7 +30,7 @@ export function usePhotosStatus(
       }
 
       const json = await response.json();
-      return json.data as PhotoStatus[];
+      return json.data;
     },
     enabled: options?.enabled !== false && photoIds.length > 0,
     refetchInterval: options?.refetchInterval,

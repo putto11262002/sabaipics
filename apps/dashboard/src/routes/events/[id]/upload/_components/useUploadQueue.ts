@@ -1,14 +1,9 @@
 import { useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUploadPhoto } from './useUploadPhoto';
-import type { UploadQueueItem, UploadLogEntry } from '../../types/upload';
+import { useUploadPhoto } from '../../../../../hooks/photos/useUploadPhoto';
+import type { UploadQueueItem, OptimisticPhoto } from './upload';
 
-export type { UploadQueueItem, UploadLogEntry };
-
-export interface FileValidationError {
-  file: File;
-  error: string;
-}
+export type { UploadQueueItem, OptimisticPhoto };
 
 const MAX_TOKENS = 5;
 
@@ -24,8 +19,7 @@ export function useUploadQueue(eventId: string | undefined) {
 
   // Minimal reactive state for UI
   const [displayItems, setDisplayItems] = useState<UploadQueueItem[]>([]);
-  const [validationErrors, setValidationErrors] = useState<FileValidationError[]>([]);
-  const [uploadLog, setUploadLog] = useState<UploadLogEntry[]>([]);
+  const [optimisticPhotos, setOptimisticPhotos] = useState<OptimisticPhoto[]>([]);
 
   // Sync refs to display state
   const syncDisplayState = useCallback(() => {
@@ -42,12 +36,10 @@ export function useUploadQueue(eventId: string | undefined) {
     async (item: UploadQueueItem, processNext: () => void) => {
       if (!eventId) return;
 
-      // Update existing log entry from 'queued' to 'uploading'
-      setUploadLog((prev) =>
-        prev.map((entry) =>
-          entry.id === item.id
-            ? { ...entry, uploadStatus: 'uploading' as const, startedAt: Date.now() }
-            : entry,
+      // Update optimistic photo from 'queued' to 'uploading'
+      setOptimisticPhotos((prev) =>
+        prev.map((photo) =>
+          photo.id === item.id ? { ...photo, localStatus: 'uploading' as const } : photo,
         ),
       );
 
@@ -57,15 +49,21 @@ export function useUploadQueue(eventId: string | undefined) {
           file: item.file,
         });
 
-        // Success - remove from active and update log entry
+        // Success - remove from active, update with real photo data
         activeUploadsRef.current.delete(item.id);
 
-        // Update log entry with photoId
-        setUploadLog((prev) =>
-          prev.map((entry) =>
-            entry.id === item.id
-              ? { ...entry, uploadStatus: 'uploaded' as const, photoId: result.id }
-              : entry,
+        // Update optimistic photo with server data (remove localStatus since it's now on server)
+        setOptimisticPhotos((prev) =>
+          prev.map((photo) =>
+            photo.id === item.id
+              ? {
+                  ...photo,
+                  id: result.id,
+                  status: result.status,
+                  uploadedAt: result.uploadedAt,
+                  localStatus: undefined, // Clear local status - now tracked by server
+                }
+              : photo,
           ),
         );
 
@@ -83,12 +81,12 @@ export function useUploadQueue(eventId: string | undefined) {
           errorMessage = 'Event expired';
         }
 
-        // Update log entry with error
-        setUploadLog((prev) =>
-          prev.map((entry) =>
-            entry.id === item.id
-              ? { ...entry, uploadStatus: 'failed' as const, uploadError: errorMessage }
-              : entry,
+        // Update optimistic photo with error (set status to 'failed')
+        setOptimisticPhotos((prev) =>
+          prev.map((photo) =>
+            photo.id === item.id
+              ? { ...photo, localStatus: undefined, status: 'failed', localError: errorMessage }
+              : photo,
           ),
         );
 
@@ -136,15 +134,15 @@ export function useUploadQueue(eventId: string | undefined) {
         status: 'queued' as const,
       }));
 
-      // Create log entries immediately for queued files (prepend - newest first)
-      const newLogEntries: UploadLogEntry[] = newItems.map((item) => ({
+      // Create optimistic photos immediately for queued files (prepend - newest first)
+      const newOptimisticPhotos: OptimisticPhoto[] = newItems.map((item) => ({
         id: item.id,
         fileName: item.file.name,
-        uploadStatus: 'queued' as const,
+        localStatus: 'queued' as const,
         queuedAt: now,
       }));
 
-      setUploadLog((prev) => [...newLogEntries, ...prev]);
+      setOptimisticPhotos((prev) => [...newOptimisticPhotos, ...prev]);
 
       pendingQueueRef.current.push(...newItems);
       processQueue();
@@ -178,11 +176,6 @@ export function useUploadQueue(eventId: string | undefined) {
     [syncDisplayState],
   );
 
-  // Clear validation errors
-  const clearValidationErrors = useCallback(() => {
-    setValidationErrors([]);
-  }, []);
-
   // Computed values for UI
   const uploadingCount = displayItems.filter(
     (i) => i.status === 'queued' || i.status === 'uploading',
@@ -201,16 +194,13 @@ export function useUploadQueue(eventId: string | undefined) {
     addFiles,
     retryUpload,
     removeFromQueue,
-    setValidationErrors,
-    clearValidationErrors,
 
     // State for UI
     uploadingItems,
     failedItems,
     uploadingCount,
     failedCount,
-    validationErrors,
-    uploadLog,
+    optimisticPhotos,
     isUploading: uploadingCount > 0,
   };
 }

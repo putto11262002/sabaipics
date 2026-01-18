@@ -1,9 +1,13 @@
-import { hc } from "hono/client";
-import type { AppType } from "@sabaipics/api";
-import { useAuth } from "@sabaipics/auth/react";
+import { hc } from 'hono/client';
+import type { AppType } from '@sabaipics/api';
+import { useAuth } from '@sabaipics/auth/react';
 
 // Base client for unauthenticated requests
-export const api = hc<AppType>(import.meta.env.VITE_API_URL);
+export const api = hc<AppType>(import.meta.env.VITE_API_URL, {
+  init: {
+    credentials: 'include',
+  },
+});
 
 // Hook for authenticated API calls
 export function useApiClient() {

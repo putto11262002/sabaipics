@@ -128,7 +128,7 @@ function createTestApp(options: {
       }
       return next();
     })
-    .route("/events", photosRouter);
+    .route("/", photosRouter);
 
   return { app };
 }
@@ -243,7 +243,7 @@ describe("POST /events/:id/photos", () => {
           c.env.CLOUDFLARE_ACCOUNT_ID = "test-account-id";
           return next();
         })
-        .route("/events", photosRouter);
+        .route("/", photosRouter);
 
       const client = testClient(app);
 

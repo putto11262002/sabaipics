@@ -21,7 +21,8 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@sabaipics/ui/components/toggle-group";
-import { useEventContext } from "../layout";
+import { useParams } from "react-router";
+import { useEvent } from "../../../../hooks/events/useEvent";
 
 // Mock data for photo uploads chart
 const generateMockChartData = (days: number) => {
@@ -46,8 +47,15 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export default function EventStatisticsTab() {
-  const { event } = useEventContext();
+  const { id } = useParams<{ id: string }>();
+  const { data } = useEvent(id);
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "all">("30d");
+
+  if (!data?.data) {
+    return null;
+  }
+
+  const event = data.data;
 
   const daysUntilExpiry = differenceInDays(parseISO(event.expiresAt), new Date());
   const isExpired = daysUntilExpiry <= 0;
