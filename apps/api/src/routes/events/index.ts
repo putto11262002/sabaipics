@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { events } from '@sabaipics/db';
 import { requirePhotographer, requireConsent, type PhotographerVariables } from '../../middleware';
 import type { Bindings } from '../../types';
-import { generateEventQR, type QRSize } from '../../lib/qr';
+import { generatePngQrCode } from '@juit/qrcode';
 import { generateAccessCode } from './access-code';
 import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './schema';
 
@@ -20,6 +20,42 @@ type Env = {
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+
+// =============================================================================
+// QR Code Generation
+// =============================================================================
+
+type QRSize = "small" | "medium" | "large";
+
+const QR_SIZE_PRESETS: Record<QRSize, number> = {
+  small: 256,
+  medium: 512,
+  large: 1200,
+} as const;
+
+function getScaleForSize(size: QRSize): number {
+  return Math.ceil(QR_SIZE_PRESETS[size] / 25);
+}
+
+async function generateEventQR(
+  accessCode: string,
+  baseUrl: string,
+  size: QRSize = "medium"
+): Promise<Uint8Array> {
+  if (!/^[A-Z0-9]{6}$/.test(accessCode)) {
+    throw new Error(
+      `Invalid access code format: "${accessCode}". Must be 6 uppercase alphanumeric characters (A-Z0-9).`
+    );
+  }
+
+  const searchUrl = `${baseUrl}/search/${accessCode}`;
+
+  return await generatePngQrCode(searchUrl, {
+    ecLevel: "M",
+    margin: 4,
+    scale: getScaleForSize(size),
+  });
+}
 
 // =============================================================================
 // Error Helpers
