@@ -36,12 +36,15 @@ export function createCollectionsRouter(faceService: FaceService) {
   app.post('/', zValidator('json', CreateCollectionRequestSchema), async (c) => {
     const { CollectionId } = c.req.valid('json');
 
+    console.log('[Collections] Creating collection:', { collectionId: CollectionId });
+
     try {
       // Create collection with ResultAsync
       const result = await faceService.createCollection(CollectionId);
 
       // Use .isOk() / .isErr() pattern for Hono type compatibility
       if (result.isOk()) {
+        console.log('[Collections] Collection created:', { collectionId: CollectionId, arn: result.value });
         const response: CreateCollectionResponse = {
           StatusCode: 200,
           CollectionArn: result.value,
@@ -52,6 +55,7 @@ export function createCollectionsRouter(faceService: FaceService) {
 
       // Handle error case
       const err = result.error;
+      console.error('[Collections] Failed to create collection:', { collectionId: CollectionId, error: err.type });
       const statusCode = errorToHttpStatus(err);
       return c.json(
         {
@@ -64,6 +68,7 @@ export function createCollectionsRouter(faceService: FaceService) {
         statusCode as StatusCode
       );
     } catch (error) {
+      console.error('[Collections] Unexpected error creating collection:', error);
       return c.json({ StatusCode: 500, error: 'Internal server error' }, 500);
     }
   });
@@ -75,12 +80,15 @@ export function createCollectionsRouter(faceService: FaceService) {
   app.delete('/:id', async (c) => {
     const collectionId = c.req.param('id');
 
+    console.log('[Collections] Deleting collection:', { collectionId });
+
     try {
       // Delete collection with ResultAsync
       const result = await faceService.deleteCollection(collectionId);
 
       // Use .isOk() / .isErr() pattern for Hono type compatibility
       if (result.isOk()) {
+        console.log('[Collections] Collection deleted:', { collectionId });
         const response: DeleteCollectionResponse = {
           StatusCode: 200,
         };
@@ -89,6 +97,7 @@ export function createCollectionsRouter(faceService: FaceService) {
 
       // Handle error case
       const err = result.error;
+      console.error('[Collections] Failed to delete collection:', { collectionId, error: err.type });
       const statusCode = errorToHttpStatus(err);
       return c.json(
         {
@@ -101,6 +110,7 @@ export function createCollectionsRouter(faceService: FaceService) {
         statusCode as StatusCode
       );
     } catch (error) {
+      console.error('[Collections] Unexpected error deleting collection:', error);
       return c.json({ StatusCode: 500, error: 'Internal server error' }, 500);
     }
   });

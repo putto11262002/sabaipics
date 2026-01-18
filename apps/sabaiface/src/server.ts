@@ -60,8 +60,12 @@ async function initializeFaceService(): Promise<FaceService> {
  * Start the HTTP server.
  */
 async function startServer() {
-  console.log('🚀 SabaiFace API starting...');
-  console.log(`   Database: ${DATABASE_URL.replace(/:[^:@]+@/, ':****@')}`);
+  console.log('[SabaiFace] Starting server...');
+  console.log('[SabaiFace] Config:', {
+    port: PORT,
+    database: DATABASE_URL.replace(/:[^:@]+@/, ':****@'),
+    modelsPath: MODELS_PATH,
+  });
 
   // Initialize face service
   const faceService = await initializeFaceService();
@@ -103,11 +107,11 @@ async function startServer() {
     port: PORT,
   });
 
-  console.log(`✅ SabaiFace API ready on http://localhost:${PORT}`);
+  console.log(`[SabaiFace] Server ready on http://localhost:${PORT}`);
 }
 
 // Start server
 startServer().catch((error) => {
-  console.error('❌ Failed to start server:', error);
+  console.error('[SabaiFace] Failed to start server:', error);
   process.exit(1);
 });

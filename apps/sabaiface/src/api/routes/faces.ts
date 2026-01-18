@@ -42,20 +42,23 @@ export function createFacesRouter(faceService: FaceService) {
   app.post('/:id/index-faces', zValidator('json', IndexFacesRequestSchema), async (c) => {
     const collectionId = c.req.param('id');
     const body = c.req.valid('json');
+    const externalImageId = body.ExternalImageId || `photo-${Date.now()}`;
 
-    console.log(`[Faces] Received index-faces request for collection: ${collectionId}`);
-    console.log(`[Faces] Request body keys:`, Object.keys(body));
-    console.log(`[Faces] Has Image.Bytes:`, 'Bytes' in body.Image);
-    console.log(`[Faces] Has ExternalImageId:`, 'ExternalImageId' in body);
+    console.log('[Faces] IndexFaces request:', {
+      collectionId,
+      externalImageId,
+      maxFaces: body.MaxFaces || 100,
+      qualityFilter: body.QualityFilter || 'AUTO',
+    });
 
     // Decode base64 image
     let imageBytes: Buffer;
     if ('Bytes' in body.Image) {
       try {
         imageBytes = Buffer.from(body.Image.Bytes, 'base64');
-        console.log(`[Faces] Decoded image buffer, size: ${imageBytes.length} bytes`);
+        console.log('[Faces] Image decoded:', { size: imageBytes.length, externalImageId });
       } catch (e) {
-        console.error('[Faces] Failed to decode base64 image:', e);
+        console.error('[Faces] Failed to decode base64 image:', { externalImageId, error: e });
         return c.json(
           {
             StatusCode: 400,
@@ -66,7 +69,7 @@ export function createFacesRouter(faceService: FaceService) {
       }
     } else {
       // S3Object not supported yet
-      console.error('[Faces] S3Object not supported');
+      console.error('[Faces] S3Object not supported:', { externalImageId });
       return c.json(
         {
           StatusCode: 400,
@@ -86,7 +89,7 @@ export function createFacesRouter(faceService: FaceService) {
       // Index photo with ResultAsync
       const result = await faceService.indexPhoto({
         eventId: collectionId,
-        photoId: body.ExternalImageId || `photo-${Date.now()}`,
+        photoId: externalImageId,
         imageData,
         options: {
           maxFaces: body.MaxFaces || 100,
@@ -97,17 +100,24 @@ export function createFacesRouter(faceService: FaceService) {
 
       // Use .isOk() / .isErr() pattern for Hono type compatibility
       if (result.isOk()) {
-        const response: IndexFacesResponse = toAWSIndexFacesResponse(result.value, body.ExternalImageId);
+        const indexed = result.value;
+        console.log('[Faces] IndexFaces success:', {
+          collectionId,
+          externalImageId,
+          facesIndexed: indexed.faces.length,
+          unindexedFaces: indexed.unindexedFaces.length,
+        });
+        const response: IndexFacesResponse = toAWSIndexFacesResponse(indexed, body.ExternalImageId);
         return c.json(response);
       }
 
       // Handle error case
       const err = result.error;
-      console.error(`[Faces] Error indexing faces for collection ${collectionId}:`, {
-        type: err.type,
+      console.error('[Faces] IndexFaces failed:', {
+        collectionId,
+        externalImageId,
+        error: err.type,
         retryable: err.retryable,
-        throttle: err.throttle,
-        cause: 'cause' in err ? err.cause : undefined,
       });
 
       const statusCode = errorToHttpStatus(err);
@@ -122,7 +132,7 @@ export function createFacesRouter(faceService: FaceService) {
         statusCode as StatusCode
       );
     } catch (error) {
-      console.error('[Faces] Unexpected error:', error);
+      console.error('[Faces] IndexFaces unexpected error:', { collectionId, externalImageId, error });
       return c.json({ StatusCode: 500, error: 'Internal server error', message: error instanceof Error ? error.message : 'Unknown error' }, 500);
     }
   });
@@ -134,9 +144,18 @@ export function createFacesRouter(faceService: FaceService) {
   app.post('/:id/search-faces-by-image', zValidator('json', SearchFacesByImageRequestSchema), async (c) => {
     const collectionId = c.req.param('id');
     const body = c.req.valid('json');
+    const maxFaces = body.MaxFaces || 10;
+    const threshold = body.FaceMatchThreshold || 80;
+
+    console.log('[Faces] SearchFacesByImage request:', {
+      collectionId,
+      maxFaces,
+      threshold,
+    });
 
     // Decode base64 image
     const imageBytes = Buffer.from(body.Image.Bytes, 'base64');
+    console.log('[Faces] Search image decoded:', { size: imageBytes.length });
 
     // Convert Buffer to ArrayBuffer
     const imageData = imageBytes.buffer.slice(
@@ -149,13 +168,18 @@ export function createFacesRouter(faceService: FaceService) {
       const result = await faceService.findSimilarFaces({
         eventId: collectionId,
         imageData,
-        maxResults: body.MaxFaces || 10,
-        minSimilarity: (body.FaceMatchThreshold || 80) / 100, // AWS: 0-100 → Domain: 0-1
+        maxResults: maxFaces,
+        minSimilarity: threshold / 100, // AWS: 0-100 -> Domain: 0-1
       });
 
       // Use .isOk() / .isErr() pattern for Hono type compatibility
       if (result.isOk()) {
         const matches = result.value;
+        console.log('[Faces] SearchFacesByImage success:', {
+          collectionId,
+          matchesFound: matches.length,
+        });
+
         const searchedFace = matches.length > 0 ? matches[0] : null;
 
         const response: SearchFacesByImageResponse = {
@@ -172,6 +196,12 @@ export function createFacesRouter(faceService: FaceService) {
 
       // Handle error case
       const err = result.error;
+      console.error('[Faces] SearchFacesByImage failed:', {
+        collectionId,
+        error: err.type,
+        retryable: err.retryable,
+      });
+
       const statusCode = errorToHttpStatus(err);
       return c.json(
         {
@@ -184,6 +214,7 @@ export function createFacesRouter(faceService: FaceService) {
         statusCode as StatusCode
       );
     } catch (error) {
+      console.error('[Faces] SearchFacesByImage unexpected error:', { collectionId, error });
       return c.json({ StatusCode: 500, error: 'Internal server error' }, 500);
     }
   });

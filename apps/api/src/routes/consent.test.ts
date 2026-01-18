@@ -125,7 +125,7 @@ describe("POST /consent - Framework-Level (Hono Router)", () => {
       // Verify response
       expect(res.status).toBe(201);
 
-      const body = await res.json();
+      const body = await res.json() as { data: { consentType: string } };
       expect(body.data.consentType).toBe("pdpa");
 
       // Verify DB state - both tables should be updated atomically

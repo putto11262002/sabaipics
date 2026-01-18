@@ -22,7 +22,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
-import { SabaiFaceHTTPClient, AWSRekognitionClient } from '../../client/src';
+import { SabaiFaceHTTPClient, createAWSRekognitionClient, type AWSRekognitionClient } from '../../client/src';
 import type { IndexPhotoRequest, FindSimilarRequest } from '../../client/src/types';
 
 // Load environment variables
@@ -118,7 +118,7 @@ function createSabaiFaceClient(): SabaiFaceHTTPClient {
 }
 
 function createAWSClient(): AWSRekognitionClient {
-  return new AWSRekognitionClient({
+  return createAWSRekognitionClient({
     region: process.env.AWS_REGION || 'us-west-2',
     credentials: {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',

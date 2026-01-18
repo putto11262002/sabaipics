@@ -6,10 +6,6 @@
   "description": "SabaiFace: Self-hosted face recognition service compatible with AWS Rekognition API",
   "exports": {
     ".": {
-      "types": "./client/src/index.ts",
-      "import": "./client/src/index.ts"
-    },
-    "./server": {
       "types": "./src/server.ts",
       "import": "./src/server.ts"
     }
@@ -42,7 +38,7 @@
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.0",
     "hono": "^4.0.0",
-    "neverthrow": "^6.0.0",
+    "neverthrow": "^8.2.0",
     "zod": "^3.22.0"
   },
   "optionalDependencies": {

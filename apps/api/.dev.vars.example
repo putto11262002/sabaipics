@@ -26,7 +26,13 @@ NGROK_DOMAIN=your-domain.ngrok-free.app
 # Format: postgres://user:password@host/database?sslmode=require
 DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 
-# AWS Credentials for Rekognition
+# Face Recognition Provider Configuration
+# FACE_PROVIDER: 'aws' (default) or 'sabaiface' (for local development)
+# When using sabaiface, set SABAIFACE_ENDPOINT to the local server URL
+FACE_PROVIDER=aws
+SABAIFACE_ENDPOINT=http://localhost:3001
+
+# AWS Credentials for Rekognition (required when FACE_PROVIDER=aws)
 # Get from: AWS IAM Console → Users → Security Credentials
 AWS_ACCESS_KEY_ID=AKIAXXXXXXXXXX
 AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
