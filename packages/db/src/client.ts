@@ -24,9 +24,12 @@ export function createDbHttp(connectionString: string) {
  *
  * Characteristics:
  * - Supports transactions via Neon's serverless driver
- * - Uses HTTP connection with transaction semantics
- * - Uses singleton pattern for connection reuse in CF Workers
+ * - Uses WebSocket connection with transaction semantics
  * - Ideal for: multi-step atomic operations
+ *
+ * IMPORTANT: In Cloudflare Workers queue consumers, create a fresh connection
+ * per message to avoid cross-request I/O errors. WebSocket connections cannot
+ * be shared across request contexts.
  *
  * Note: This uses drizzle-orm/neon-serverless which accepts a connection
  * string directly and wraps the Neon serverless driver with transaction support.
@@ -34,14 +37,10 @@ export function createDbHttp(connectionString: string) {
  * @param connectionString - Neon database connection string from env bindings
  * @returns Drizzle database instance with schema (supports .transaction())
  */
-let serverlessDbCache: ReturnType<typeof drizzleServerless> | null = null;
-
 export function createDbTx(connectionString: string) {
-  if (serverlessDbCache) return serverlessDbCache;
-
-  // neon-serverless adapter expects connection string directly, not neon() result
-  serverlessDbCache = drizzleServerless(connectionString, { schema });
-  return serverlessDbCache;
+  // No caching - each call creates a fresh connection
+  // This is required for CF Workers queue consumers to avoid cross-request I/O errors
+  return drizzleServerless(connectionString, { schema });
 }
 
 /**

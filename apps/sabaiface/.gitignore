@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Wrangler local state
+.wrangler/
+
+# Database migrations
+drizzle/
+
+# Local data (LanceDB storage)
+data/
+
+# Model files (large binary files - download separately)
+models/*.bin
+models/*.json
+
+# Test images (download from R2)
+tests/fixtures/images/*.jpg
+tests/fixtures/images/*.json
+
+# Eval test images (download from R2)
+tests/fixtures/eval/**/*.jpg
+tests/fixtures/eval/**/*.json
+# But keep README.md and label files (metadata)
+!tests/fixtures/eval/**/README.md
+!tests/fixtures/eval/**/labels*.json
+# Keep sample ground-truth (structure reference), ignore local generated files
+!tests/fixtures/eval/**/ground-truth.sample.json
+tests/fixtures/eval/**/ground-truth.local.json
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Testing
+coverage/

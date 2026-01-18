@@ -8,8 +8,8 @@
  *
  * Infrastructure layer:
  * - Fetches image from R2
- * - Calls Rekognition IndexFaces
- * - Returns SDK types (FaceRecord[], UnindexedFace[])
+ * - Calls face recognition provider (AWS or SabaiFace)
+ * - Returns normalized domain types
  *
  * Application layer (NOT here) handles:
  * - Saving faces to DB
@@ -20,16 +20,17 @@
 import type { PhotoJob } from '../types/photo-job';
 import type { Bindings } from '../types';
 import {
-  createRekognitionClient,
-  createCollectionSafe,
-  indexFacesSafe,
+  createFaceProvider,
   getCollectionId,
-  type AWSRekognitionError,
-  type IndexFacesResult,
+  isResourceAlreadyExistsError,
   getBackoffDelay,
   getThrottleBackoffDelay,
+  type FaceRecognitionProvider,
+  type FaceServiceError,
+  type PhotoIndexed,
+  type Face,
+  type AWSRawFaceRecord,
 } from '../lib/rekognition';
-import { RekognitionClient } from '@aws-sdk/client-rekognition';
 import { sleep } from '../utils/async';
 import { createDb, createDbTx, type Database, type DatabaseTx } from '@sabaipics/db';
 import { photos, events, faces } from '@sabaipics/db';
@@ -47,7 +48,7 @@ import { ResultAsync, ok, err, safeTry, type Result } from 'neverthrow';
 export type PhotoProcessingError =
   | { type: 'not_found'; resource: 'r2_image'; key: string }
   | { type: 'database'; operation: string; cause: unknown }
-  | { type: 'rekognition'; cause: AWSRekognitionError }
+  | { type: 'face_service'; cause: FaceServiceError }
   | { type: 'transform'; message: string; cause: unknown };
 
 /**
@@ -56,7 +57,7 @@ export type PhotoProcessingError =
  */
 interface ProcessedPhoto {
   message: Message<PhotoJob>;
-  result: Result<IndexFacesResult, PhotoProcessingError>;
+  result: Result<PhotoIndexed, PhotoProcessingError>;
 }
 
 // =============================================================================
@@ -109,6 +110,28 @@ function transformImageForRekognition(
 // =============================================================================
 
 /**
+ * Convert normalized Face to DB format (AWS-style for backwards compatibility).
+ * The DB stores bounding boxes with capital letter keys (Width, Height, etc.)
+ * and raw responses for model training.
+ */
+function faceToDbRecord(face: Face, photoId: string) {
+  // Convert normalized bounding box back to AWS format for DB
+  const awsBoundingBox = {
+    Width: face.boundingBox.width,
+    Height: face.boundingBox.height,
+    Left: face.boundingBox.left,
+    Top: face.boundingBox.top,
+  };
+
+  return {
+    photoId,
+    rekognitionFaceId: face.faceId || null,
+    boundingBox: awsBoundingBox,
+    rekognitionResponse: face.rawResponse as AWSRawFaceRecord | null,
+  };
+}
+
+/**
  * Persist faces to database and update photo status to 'indexed'.
  *
  * Uses transaction to ensure atomicity:
@@ -116,22 +139,29 @@ function transformImageForRekognition(
  * - Update photo status and face_count
  * - Update event counts (photo_count, face_count)
  *
- * @param dbTx - Transactional database instance (WebSocket adapter)
+ * Note: Creates its own WebSocket transaction connection per-call to avoid
+ * Cloudflare Workers cross-request I/O errors. Each message needs its own
+ * connection context.
+ *
  * @param db - Non-transactional database instance (for pre-transaction checks)
+ * @param databaseUrl - Database URL for creating transaction connection
  * @param job - Photo job from queue
- * @param data - IndexFaces result from Rekognition
- * @param client - Rekognition client for collection creation
+ * @param data - PhotoIndexed result from provider
+ * @param provider - Face recognition provider for collection creation
  * @returns ResultAsync<void, PhotoProcessingError>
  */
 function persistFacesAndUpdatePhoto(
-  dbTx: DatabaseTx,
   db: Database,
+  databaseUrl: string,
   job: PhotoJob,
-  data: IndexFacesResult,
-  client: RekognitionClient,
+  data: PhotoIndexed,
+  provider: FaceRecognitionProvider,
 ): ResultAsync<void, PhotoProcessingError> {
+  // Create fresh WebSocket connection for this transaction
+  // Avoids cross-request I/O errors in Cloudflare Workers
+  const dbTx = createDbTx(databaseUrl);
   return safeTry(async function* () {
-    // PRE-STEP: Ensure collection exists (outside transaction - uses Rekognition API)
+    // PRE-STEP: Ensure collection exists (outside transaction - uses provider API)
     const event = yield* ResultAsync.fromPromise(
       db
         .select({ collectionId: events.rekognitionCollectionId })
@@ -143,15 +173,18 @@ function persistFacesAndUpdatePhoto(
     );
 
     if (!event.collectionId) {
-      // Create collection using safe wrapper, handle ResourceAlreadyExistsException
-      const createResult = yield* createCollectionSafe(client, job.event_id)
-        .orElse((rekErr) => {
+      // Create collection, handle ResourceAlreadyExistsException (race condition)
+      yield* provider.createCollection(job.event_id)
+        .orElse((faceErr) => {
           // Handle AlreadyExistsException (race condition) - treat as success
-          if (rekErr.name === 'ResourceAlreadyExistsException') {
-            return ok(getCollectionId(job.event_id));
+          if (faceErr.type === 'provider_failed' && faceErr.provider === 'aws') {
+            const awsErr = faceErr as Extract<FaceServiceError, { provider: 'aws' }>;
+            if (isResourceAlreadyExistsError(awsErr.errorName)) {
+              return ok(getCollectionId(job.event_id));
+            }
           }
-          // Other rekognition errors propagate
-          return err<string, PhotoProcessingError>({ type: 'rekognition', cause: rekErr });
+          // Other errors propagate
+          return err<string, PhotoProcessingError>({ type: 'face_service', cause: faceErr });
         });
 
       // Update event with collection ID (idempotent)
@@ -168,14 +201,8 @@ function persistFacesAndUpdatePhoto(
     yield* ResultAsync.fromPromise(
       dbTx.transaction(async (tx) => {
         // STEP 1: Insert face records (if any)
-        if (data.faceRecords.length > 0) {
-          const faceRows = data.faceRecords.map((faceRecord) => ({
-            photoId: job.photo_id,
-            rekognitionFaceId: faceRecord.Face?.FaceId ?? null,
-            rekognitionResponse: faceRecord,
-            boundingBox: faceRecord.Face?.BoundingBox ?? null,
-          }));
-
+        if (data.faces.length > 0) {
+          const faceRows = data.faces.map((face) => faceToDbRecord(face, job.photo_id));
           await tx.insert(faces).values(faceRows);
         }
 
@@ -184,7 +211,7 @@ function persistFacesAndUpdatePhoto(
           .update(photos)
           .set({
             status: 'indexed',
-            faceCount: data.faceRecords.length,
+            faceCount: data.faces.length,
             retryable: null, // Clear retryable flag
             errorName: null, // Clear error name
             indexedAt: new Date().toISOString(), // Record indexing completion timestamp
@@ -203,7 +230,7 @@ function persistFacesAndUpdatePhoto(
         `[Queue] ${data.unindexedFaces.length} faces not indexed`,
         {
           photoId: job.photo_id,
-          reasons: data.unindexedFaces.map((f) => f.Reasons).flat(),
+          reasons: data.unindexedFaces.map((f) => f.reasons).flat(),
         },
       );
     }
@@ -237,7 +264,7 @@ function fetchImageFromR2(
  * Ensure collection exists, create if needed.
  */
 function ensureCollection(
-  client: RekognitionClient,
+  provider: FaceRecognitionProvider,
   db: Database,
   eventId: string,
 ): ResultAsync<void, PhotoProcessingError> {
@@ -256,8 +283,8 @@ function ensureCollection(
     }
 
     // Create collection
-    yield* createCollectionSafe(client, eventId)
-      .mapErr((e): PhotoProcessingError => ({ type: 'rekognition', cause: e }));
+    yield* provider.createCollection(eventId)
+      .mapErr((e): PhotoProcessingError => ({ type: 'face_service', cause: e }));
 
     // Update event table
     yield* ResultAsync.fromPromise(
@@ -273,14 +300,14 @@ function ensureCollection(
 
 /**
  * Process a single photo using safeTry for flat async flow.
- * Returns ResultAsync<IndexFacesResult, PhotoProcessingError>.
+ * Returns ResultAsync<PhotoIndexed, PhotoProcessingError>.
  */
 function processPhoto(
   env: Bindings,
-  client: RekognitionClient,
+  provider: FaceRecognitionProvider,
   db: Database,
   message: Message<PhotoJob>,
-): ResultAsync<IndexFacesResult, PhotoProcessingError> {
+): ResultAsync<PhotoIndexed, PhotoProcessingError> {
   const job = message.body;
 
   return safeTry(async function* () {
@@ -306,11 +333,14 @@ function processPhoto(
     }
 
     // Step 4: Ensure collection exists
-    yield* ensureCollection(client, db, job.event_id);
+    yield* ensureCollection(provider, db, job.event_id);
 
-    // Step 5: Index faces
-    const indexResult = yield* indexFacesSafe(client, job.event_id, imageBytes, job.photo_id)
-      .mapErr((e): PhotoProcessingError => ({ type: 'rekognition', cause: e }));
+    // Step 5: Index faces using unified provider interface
+    const indexResult = yield* provider.indexPhoto({
+      eventId: job.event_id,
+      photoId: job.photo_id,
+      imageData: imageBytes,
+    }).mapErr((e): PhotoProcessingError => ({ type: 'face_service', cause: e }));
 
     return ok(indexResult);
   }).mapErr((error) => {
@@ -321,15 +351,68 @@ function processPhoto(
       errorType: error.type,
     };
 
-    if (error.type === 'rekognition') {
-      logData.awsErrorName = error.cause.name;
-      logData.retryable = error.cause.retryable;
-      logData.throttle = error.cause.throttle;
+    if (error.type === 'face_service') {
+      const faceErr = error.cause;
+      if (faceErr.type === 'provider_failed') {
+        logData.provider = faceErr.provider;
+        logData.retryable = faceErr.retryable;
+        logData.throttle = faceErr.throttle;
+        if (faceErr.provider === 'aws') {
+          logData.errorName = (faceErr as Extract<FaceServiceError, { provider: 'aws' }>).errorName;
+        }
+      }
     }
 
     console.error(`[Queue] Photo processing failed`, logData);
     return error;
   });
+}
+
+// =============================================================================
+// Error Helpers
+// =============================================================================
+
+/**
+ * Extract error name from FaceServiceError for DB storage
+ */
+function getErrorName(error: PhotoProcessingError): string {
+  if (error.type === 'face_service') {
+    const faceErr = error.cause;
+    if (faceErr.type === 'provider_failed' && faceErr.provider === 'aws') {
+      return (faceErr as Extract<FaceServiceError, { provider: 'aws' }>).errorName || 'AWSError';
+    }
+    if (faceErr.type === 'provider_failed' && faceErr.provider === 'sabaiface') {
+      return 'SabaiFaceError';
+    }
+    return faceErr.type;
+  }
+  if (error.type === 'database') return 'DatabaseError';
+  if (error.type === 'not_found') return 'NotFoundError';
+  if (error.type === 'transform') return 'TransformError';
+  return 'UnknownError';
+}
+
+/**
+ * Check if error is retryable
+ */
+function isRetryableProcessingError(error: PhotoProcessingError): boolean {
+  if (error.type === 'face_service') {
+    return error.cause.retryable;
+  }
+  if (error.type === 'database') return true;
+  if (error.type === 'transform') return true;
+  if (error.type === 'not_found') return false;
+  return false;
+}
+
+/**
+ * Check if error is throttle
+ */
+function isThrottleProcessingError(error: PhotoProcessingError): boolean {
+  if (error.type === 'face_service') {
+    return error.cause.throttle;
+  }
+  return false;
 }
 
 // =============================================================================
@@ -340,7 +423,7 @@ function processPhoto(
  * Queue consumer handler for photo processing.
  *
  * Strategy:
- * - Fire Rekognition requests at 20ms intervals (50 TPS pacing)
+ * - Fire face recognition requests at 20ms intervals (50 TPS pacing)
  * - Don't await each response - let them complete in parallel
  * - Collect all results, then handle ack/retry at the end using .match()
  */
@@ -366,16 +449,13 @@ export async function queue(
     await sleep(delay);
   }
 
-  // Create database connections once for entire batch
+  // Create HTTP database connection for batch (stateless, safe to share)
   const db = createDb(env.DATABASE_URL);
-  const dbTx = createDbTx(env.DATABASE_URL);  // WebSocket for transactions
+  // Note: dbTx (WebSocket) is created per-message in persistFacesAndUpdatePhoto
+  // to avoid cross-request I/O errors in Cloudflare Workers
 
-  // Create Rekognition client once for entire batch
-  const client = createRekognitionClient({
-    AWS_ACCESS_KEY_ID: env.AWS_ACCESS_KEY_ID,
-    AWS_SECRET_ACCESS_KEY: env.AWS_SECRET_ACCESS_KEY,
-    AWS_REGION: env.AWS_REGION,
-  });
+  // Create face recognition provider once for entire batch
+  const provider = createFaceProvider(env);
 
   // Fire all requests with paced initiation (20ms intervals)
   // Collect ProcessedPhoto with message + result
@@ -386,7 +466,7 @@ export async function queue(
         await sleep(index * intervalMs);
       }
 
-      const result = await processPhoto(env, client, db, message);
+      const result = await processPhoto(env, provider, db, message);
       return { message, result };
     }),
   );
@@ -405,11 +485,16 @@ export async function queue(
         const logData: Record<string, unknown> = { photoId: job.photo_id, errorType: error.type };
 
         switch (error.type) {
-          case 'rekognition':
-            logData.awsErrorName = error.cause.name;
-            logData.retryable = error.cause.retryable;
-            logData.throttle = error.cause.throttle;
+          case 'face_service': {
+            const faceErr = error.cause;
+            logData.faceErrorType = faceErr.type;
+            if (faceErr.type === 'provider_failed') {
+              logData.provider = faceErr.provider;
+              logData.retryable = faceErr.retryable;
+              logData.throttle = faceErr.throttle;
+            }
             break;
+          }
           case 'not_found':
             logData.key = error.key;
             break;
@@ -426,13 +511,13 @@ export async function queue(
       .match(
         // Success path - persist faces and update photo
         async (indexResult) => {
-          await persistFacesAndUpdatePhoto(dbTx, db, job, indexResult, client)
+          await persistFacesAndUpdatePhoto(db, env.DATABASE_URL, job, indexResult, provider)
             .orTee((persistErr) => {
               console.error(`[Queue] Persist error`, {
                 photoId: job.photo_id,
                 type: persistErr.type,
                 ...(persistErr.type === 'database' ? { operation: persistErr.operation } : {}),
-                ...(persistErr.type === 'rekognition' ? { name: persistErr.cause.name } : {}),
+                ...(persistErr.type === 'face_service' ? { faceErrorType: persistErr.cause.type } : {}),
               });
             })
             .match(
@@ -443,7 +528,7 @@ export async function queue(
               async (persistErr) => {
                 failCount++;
                 // Best-effort: mark photo with retryable error
-                const errorName = persistErr.type === 'rekognition' ? persistErr.cause.name : 'DatabaseError';
+                const errorName = getErrorName(persistErr);
                 await ResultAsync.fromPromise(
                   db.update(photos).set({ retryable: true, errorName }).where(eq(photos.id, job.photo_id)),
                   (e) => e,
@@ -459,92 +544,53 @@ export async function queue(
         // Error path - control flow only (logging done in orTee above)
         async (error) => {
           failCount++;
-          switch (error.type) {
-            case 'rekognition': {
-              const awsErr = error.cause;
+          const isThrottle = isThrottleProcessingError(error);
+          const isRetryable = isRetryableProcessingError(error);
+          const errorName = getErrorName(error);
 
-              // Throttle: retry with longer backoff, report to rate limiter
-              if (awsErr.throttle) {
-                hasThrottleError = true;
-
-                await ResultAsync.fromPromise(
-                  db.update(photos).set({ retryable: true, errorName: awsErr.name }).where(eq(photos.id, job.photo_id)),
-                  (e) => e,
-                ).match(
-                  () => {},
-                  (e) => console.error(`[Queue] Failed to mark throttle error:`, e),
-                );
-
-                message.retry({ delaySeconds: getThrottleBackoffDelay(message.attempts) });
-                return;
-              }
-
-              // Non-retryable AWS error: mark as failed
-              if (!awsErr.retryable) {
-                await ResultAsync.fromPromise(
-                  db.update(photos).set({ status: 'failed', retryable: false, errorName: awsErr.name }).where(eq(photos.id, job.photo_id)),
-                  (e) => e,
-                ).match(
-                  () => {},
-                  (e) => console.error(`[Queue] Failed to mark photo as failed:`, e),
-                );
-
-                message.ack();
-                return;
-              }
-
-              // Retryable AWS error: retry with backoff
-              await ResultAsync.fromPromise(
-                db.update(photos).set({ retryable: true, errorName: awsErr.name }).where(eq(photos.id, job.photo_id)),
-                (e) => e,
-              ).match(
-                () => {},
-                (e) => console.error(`[Queue] Failed to mark retryable error:`, e),
-              );
-
-              message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
-              break;
-            }
-
-            case 'not_found': {
-              await ResultAsync.fromPromise(
-                db.update(photos).set({ status: 'failed', retryable: false, errorName: 'NotFoundError' }).where(eq(photos.id, job.photo_id)),
-                (e) => e,
-              ).match(
-                () => {},
-                (e) => console.error(`[Queue] Failed to mark photo as failed:`, e),
-              );
-
-              message.ack();
-              break;
-            }
-
-            case 'database': {
-              await ResultAsync.fromPromise(
-                db.update(photos).set({ retryable: true, errorName: 'DatabaseError' }).where(eq(photos.id, job.photo_id)),
-                (e) => e,
-              ).match(
-                () => {},
-                (e) => console.error(`[Queue] Failed to mark database error:`, e),
-              );
-
-              message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
-              break;
-            }
-
-            case 'transform': {
-              await ResultAsync.fromPromise(
-                db.update(photos).set({ retryable: true, errorName: 'TransformError' }).where(eq(photos.id, job.photo_id)),
-                (e) => e,
-              ).match(
-                () => {},
-                (e) => console.error(`[Queue] Failed to mark transform error:`, e),
-              );
-
-              message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
-              break;
-            }
+          // Track throttle for rate limiter feedback
+          if (isThrottle) {
+            hasThrottleError = true;
           }
+
+          // Throttle: retry with longer backoff
+          if (isThrottle) {
+            await ResultAsync.fromPromise(
+              db.update(photos).set({ retryable: true, errorName }).where(eq(photos.id, job.photo_id)),
+              (e) => e,
+            ).match(
+              () => {},
+              (e) => console.error(`[Queue] Failed to mark throttle error:`, e),
+            );
+
+            message.retry({ delaySeconds: getThrottleBackoffDelay(message.attempts) });
+            return;
+          }
+
+          // Non-retryable: mark as failed
+          if (!isRetryable) {
+            await ResultAsync.fromPromise(
+              db.update(photos).set({ status: 'failed', retryable: false, errorName }).where(eq(photos.id, job.photo_id)),
+              (e) => e,
+            ).match(
+              () => {},
+              (e) => console.error(`[Queue] Failed to mark photo as failed:`, e),
+            );
+
+            message.ack();
+            return;
+          }
+
+          // Retryable: retry with backoff
+          await ResultAsync.fromPromise(
+            db.update(photos).set({ retryable: true, errorName }).where(eq(photos.id, job.photo_id)),
+            (e) => e,
+          ).match(
+            () => {},
+            (e) => console.error(`[Queue] Failed to mark retryable error:`, e),
+          );
+
+          message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
         },
       );
   }
