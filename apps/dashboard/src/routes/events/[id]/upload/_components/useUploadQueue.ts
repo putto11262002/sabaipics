@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback } from 'react';
 import { useUploadPhoto } from '../../../../../hooks/photos/useUploadPhoto';
+import { generateThumbnailUrl, generatePreviewUrl } from '../../../../../lib/photos';
 import type { UploadQueueItem } from './upload';
 
 export type { UploadQueueItem };
@@ -56,12 +57,34 @@ export function useUploadQueue(eventId: string | undefined) {
           });
         }
 
-        // Invalidate photos query to refresh gallery
+        // Optimistically add to gallery cache (indexed photos)
         const queryClient = (window as any).__queryClient;
         if (queryClient) {
-          queryClient.invalidateQueries({
-            queryKey: ['event', eventId, 'photos'],
-          });
+          queryClient.setQueryData(
+            ['event', eventId, 'photos', ['indexed']],
+            (old: any) => {
+              if (!old || !old.pages) return old;
+
+              const optimisticPhoto = {
+                id: result.id,
+                thumbnailUrl: generateThumbnailUrl(result.r2Key),
+                previewUrl: generatePreviewUrl(result.r2Key),
+                status: 'indexed',
+                faceCount: result.faceCount,
+                fileSize: result.fileSize ?? null,
+                uploadedAt: result.uploadedAt,
+              };
+
+              return {
+                ...old,
+                pages: old.pages.map((page: any, index: number) =>
+                  index === 0
+                    ? { ...page, data: [optimisticPhoto, ...page.data] }
+                    : page
+                ),
+              };
+            }
+          );
         }
       } catch (error) {
         const err = error as Error & { status?: number };

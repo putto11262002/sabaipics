@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import type { InferRequestType } from 'hono';
 
@@ -12,12 +12,11 @@ export interface UploadPhotoResult {
   r2Key: string;
   status: 'uploading' | 'indexing' | 'indexed' | 'failed';
   faceCount: number;
+  fileSize?: number | null;
   uploadedAt: string;
 }
 
 export function useUploadPhoto() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async ({ eventId, file }: { eventId: string; file: File }): Promise<UploadPhotoResult> => {
       const response = await uploadPhoto(
@@ -43,12 +42,7 @@ export function useUploadPhoto() {
       const json = await response.json();
       return json.data as UploadPhotoResult;
     },
-    onSuccess: (_, variables) => {
-      // Invalidate photos query to refresh gallery
-      queryClient.invalidateQueries({
-        queryKey: ['event', variables.eventId, 'photos'],
-      });
-    },
+    // No onSuccess invalidation - optimistic updates handled in useUploadQueue
     retry: false,
   });
 }
