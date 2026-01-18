@@ -43,10 +43,15 @@ export function UploadLog({ eventId }: UploadLogProps) {
   );
 
   // Extract photo IDs that need status polling (uploaded but not yet indexed)
+  // Skip optimistic updates (temp IDs like "1234567890-abc")
   const photoIdsToTrack = useMemo(
     () =>
       photos
-        .filter((p) => p.status && p.status !== 'indexed' && p.status !== 'failed')
+        .filter((p) => {
+          // Optimistic IDs are timestamps like "1737184532123-abc4", not real UUIDs
+          const isOptimistic = /^\d+-/.test(p.id);
+          return !isOptimistic && p.status && p.status !== 'indexed' && p.status !== 'failed';
+        })
         .map((p) => p.id),
     [photos],
   );
