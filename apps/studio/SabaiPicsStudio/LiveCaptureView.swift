@@ -13,6 +13,7 @@ import SwiftUI
 struct LiveCaptureView: View {
     @ObservedObject var viewModel: CameraViewModel
     @State private var showDisconnectAlert = false
+    @State private var userConfirmedDisconnect = false
 
     var body: some View {
         VStack(spacing: 0.0) {
@@ -66,16 +67,19 @@ struct LiveCaptureView: View {
         .alert("Disconnect from camera?", isPresented: $showDisconnectAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Disconnect", role: .destructive) {
-                // Dismiss alert first to let NavigationView clean up
-                showDisconnectAlert = false
-
-                // Then disconnect after brief delay to avoid state corruption
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    viewModel.disconnectWiFi()
-                }
+                userConfirmedDisconnect = true
+                // Alert auto-dismisses, then .onChange fires
             }
         } message: {
             Text("Photos will be cleared. Make sure you've saved what you need.")
+        }
+        .onChange(of: showDisconnectAlert) { isShowing in
+            // Called AFTER alert finishes dismissing (iOS 16 compatible)
+            if !isShowing && userConfirmedDisconnect {
+                // Alert dismissed AND user confirmed disconnect
+                viewModel.disconnectWiFi()
+                userConfirmedDisconnect = false  // Reset for next time
+            }
         }
     }
 }

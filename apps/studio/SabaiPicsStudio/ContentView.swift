@@ -23,12 +23,14 @@ struct ContentView: View {
                     // WiFi setup page - waiting for user input
                     WiFiSetupView(viewModel: viewModel)
                         .transition(.opacity)
+                        .id("wifi-setup")  // Force NavigationView to recognize as distinct view
 
                 case .cameraFound(let camera):
                     // USB legacy (disabled)
                     CameraFoundView(camera: camera) {
                         viewModel.connectToCamera(camera)
                     }
+                    .id("camera-found")
 
                 case .connecting:
                     // Phase 5: Premium connecting view with retry status
@@ -38,6 +40,7 @@ struct ContentView: View {
                         maxRetries: 3
                     )
                     .transition(.opacity)
+                    .id("connecting")
 
                 case .connected:
                     // Phase 5: Success celebration (1s auto-transition)
@@ -47,14 +50,17 @@ struct ContentView: View {
                         shouldDismiss: $viewModel.shouldDismissConnected
                     )
                     .transition(.scale.combined(with: .opacity))
+                    .id("connected")
 
                 case .ready:
                     ReadyView()
+                        .id("ready")
 
                 case .capturing:
                     // Live capture view
                     LiveCaptureView(viewModel: viewModel)
                         .transition(.opacity)
+                        .id("capturing")  // Distinct identity for toolbar cleanup
 
                 case .error(let message):
                     // Phase 5: Premium error view
@@ -68,6 +74,7 @@ struct ContentView: View {
                         }
                     )
                     .transition(.opacity)
+                    .id("error")
                 }
             }
             .animation(.easeInOut, value: viewModel.appState)
