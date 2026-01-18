@@ -90,36 +90,8 @@ export function isInvalidRequestError(
 // Backoff Calculation
 // =============================================================================
 
-/**
- * Calculates exponential backoff delay with jitter
- *
- * Formula: min(base * 2^attempt, maxDelay) + random jitter
- *
- * @param attempt - The retry attempt number (1-based)
- * @param baseDelayMs - Base delay in milliseconds (default: 1000ms)
- * @param maxDelayMs - Maximum delay cap in milliseconds (default: 30000ms)
- * @returns Delay in milliseconds
- *
- * @example
- * ```typescript
- * // Attempt 1: ~1-2s, Attempt 2: ~2-3s, Attempt 3: ~4-5s
- * const delay = getBackoffDelay(attempt);
- * await sleep(delay);
- * ```
- */
-export function getBackoffDelay(
-  attempt: number,
-  baseDelayMs: number = 1000,
-  maxDelayMs: number = 30000
-): number {
-  const exponentialDelay = Math.min(
-    baseDelayMs * Math.pow(2, attempt - 1),
-    maxDelayMs
-  );
-  // Add jitter (0-1000ms) to prevent thundering herd
-  const jitter = Math.random() * 1000;
-  return exponentialDelay + jitter;
-}
+// Re-export from shared location for backwards compatibility
+export { getBackoffDelayMs as getBackoffDelay } from '../../utils/backoff';
 
 // =============================================================================
 // Error Formatting

@@ -1,5 +1,5 @@
 import type { AuthVariables } from "@sabaipics/auth/types";
-import type { Database } from "@sabaipics/db";
+import type { Database, DatabaseTx } from "@sabaipics/db";
 
 // Bindings are auto-generated from wrangler.jsonc via: pnpm cf-typegen
 // Additional secrets are typed from .dev.vars (local) and .dev.vars.example (documentation)
@@ -7,7 +7,8 @@ import type { Database } from "@sabaipics/db";
 export type Bindings = Cloudflare.Env;
 
 export type Variables = AuthVariables & {
-  db: () => Database;
+  db: () => Database;      // HTTP adapter - fast, no transactions
+  dbTx: () => DatabaseTx;  // WebSocket adapter - with transaction support
 };
 
 export type Env = { Bindings: Bindings; Variables: Variables };

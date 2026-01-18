@@ -4,7 +4,8 @@ export default defineWorkersConfig({
   test: {
     globals: true,
     setupFiles: ["./tests/setup.ts"],
-    // Only include tests that need workerd runtime (DO, R2, Queue)
+    // Only include Workers tests (tests/**/*.workers.test.ts)
+    // Co-located tests (src/**/*.test.ts) run with regular Node vitest
     include: ["tests/**/*.workers.test.ts"],
     poolOptions: {
       workers: {
@@ -12,6 +13,7 @@ export default defineWorkersConfig({
           configPath: "./wrangler.jsonc",
         },
         // Use DO class directly instead of main entry (avoids AWS SDK load)
+        // Note: SELF.fetch() requires main entry, but app.request() works fine
         main: "./src/durable-objects/rate-limiter.ts",
         isolatedStorage: true,
       },

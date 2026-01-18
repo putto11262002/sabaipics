@@ -3,7 +3,7 @@
  *
  * Handles rekognition-cleanup queue messages:
  * - Soft-delete photos (set deletedAt)
- * - Delete Rekognition collection from AWS
+ * - Delete face recognition collection
  * - Clear rekognitionCollectionId from event
  *
  * Idempotent: ResourceNotFoundException treated as success.
@@ -14,11 +14,11 @@ import type { Bindings } from '../types';
 import { createDb, events, photos } from '@sabaipics/db';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import {
-  createRekognitionClient,
-  deleteCollectionSafe,
-  type AWSRekognitionError,
+  createFaceProvider,
+  isResourceNotFoundError,
   getBackoffDelay,
   getThrottleBackoffDelay,
+  type FaceServiceError,
 } from '../lib/rekognition';
 import { ResultAsync, ok, err, safeTry } from 'neverthrow';
 
@@ -29,7 +29,7 @@ import { ResultAsync, ok, err, safeTry } from 'neverthrow';
 type CleanupError =
   | { type: 'event_not_found'; eventId: string }
   | { type: 'database'; operation: string; cause: unknown }
-  | { type: 'rekognition'; retryable: boolean; throttle: boolean; cause: AWSRekognitionError };
+  | { type: 'face_service'; retryable: boolean; throttle: boolean; cause: FaceServiceError };
 
 // =============================================================================
 // Queue Handler
@@ -41,11 +41,7 @@ export async function queue(batch: MessageBatch<CleanupJob>, env: Bindings): Pro
   console.log('[Cleanup] Batch start', { size: batch.messages.length });
 
   const db = createDb(env.DATABASE_URL);
-  const rekognition = createRekognitionClient({
-    AWS_ACCESS_KEY_ID: env.AWS_ACCESS_KEY_ID,
-    AWS_SECRET_ACCESS_KEY: env.AWS_SECRET_ACCESS_KEY,
-    AWS_REGION: env.AWS_REGION,
-  });
+  const provider = createFaceProvider(env);
 
   for (const message of batch.messages) {
     const { event_id } = message.body;
@@ -83,20 +79,25 @@ export async function queue(batch: MessageBatch<CleanupJob>, env: Bindings): Pro
         );
       }
 
-      // 3. Delete AWS collection + clear DB reference
+      // 3. Delete collection + clear DB reference
       if (state.collectionId) {
-        collectionDeleted = yield* deleteCollectionSafe(rekognition, event_id)
+        collectionDeleted = yield* provider.deleteCollection(event_id)
           .map(() => true)
-          .orElse((e) =>
-            e.name === 'ResourceNotFoundException'
-              ? ok(false)
-              : err<boolean, CleanupError>({
-                  type: 'rekognition',
-                  retryable: e.retryable,
-                  throttle: e.throttle,
-                  cause: e,
-                }),
-          )
+          .orElse((faceErr) => {
+            // Handle ResourceNotFoundException (already deleted) - treat as success
+            if (faceErr.type === 'provider_failed' && faceErr.provider === 'aws') {
+              const awsErr = faceErr as Extract<FaceServiceError, { provider: 'aws' }>;
+              if (isResourceNotFoundError(awsErr.errorName)) {
+                return ok(false);
+              }
+            }
+            return err<boolean, CleanupError>({
+              type: 'face_service',
+              retryable: faceErr.retryable,
+              throttle: faceErr.throttle,
+              cause: faceErr,
+            });
+          })
           .andThen((deleted) =>
             ResultAsync.fromPromise(
               db
@@ -119,7 +120,7 @@ export async function queue(batch: MessageBatch<CleanupJob>, env: Bindings): Pro
         },
         (error) => {
           const { retryable, throttle } =
-            error.type === 'rekognition'
+            error.type === 'face_service'
               ? error
               : { retryable: error.type === 'database', throttle: false };
 

@@ -1,12 +1,14 @@
 /**
- * AWS Rekognition Error Handling
+ * Face Recognition Error Utilities
  *
- * Classifies errors for retry logic:
- * - Retryable: Transient failures (throttling, server errors)
- * - Non-retryable: Bad input (invalid image, wrong format)
+ * Error classification and formatting helpers.
+ * Backoff logic is in src/utils/backoff.ts (shared with other services).
  */
 
-import { isError } from "../../utils/error";
+import { isError } from '../../utils/error';
+
+// Re-export backoff utilities from shared location
+export { getBackoffDelay, getThrottleBackoffDelay } from '../../utils/backoff';
 
 // =============================================================================
 // Error Classification
@@ -17,18 +19,18 @@ import { isError } from "../../utils/error";
  */
 const NON_RETRYABLE_ERROR_NAMES = new Set([
   // Invalid image data
-  "InvalidImageFormatException",
-  "ImageTooLargeException",
-  "InvalidParameterException",
-  "InvalidS3ObjectException",
+  'InvalidImageFormatException',
+  'ImageTooLargeException',
+  'InvalidParameterException',
+  'InvalidS3ObjectException',
 
   // Resource issues (need manual fix)
-  "ResourceNotFoundException", // Collection doesn't exist
-  "ResourceAlreadyExistsException",
+  'ResourceNotFoundException', // Collection doesn't exist
+  'ResourceAlreadyExistsException',
 
   // Access issues
-  "AccessDeniedException",
-  "InvalidPolicyRevisionIdException",
+  'AccessDeniedException',
+  'InvalidPolicyRevisionIdException',
 ]);
 
 /**
@@ -36,18 +38,18 @@ const NON_RETRYABLE_ERROR_NAMES = new Set([
  */
 const RETRYABLE_ERROR_NAMES = new Set([
   // Rate limiting
-  "ProvisionedThroughputExceededException",
-  "ThrottlingException",
-  "LimitExceededException",
+  'ProvisionedThroughputExceededException',
+  'ThrottlingException',
+  'LimitExceededException',
 
   // Service issues
-  "InternalServerError",
-  "ServiceUnavailableException",
-  "ServiceException",
+  'InternalServerError',
+  'ServiceUnavailableException',
+  'ServiceException',
 
   // Network issues (from SDK)
-  "TimeoutError",
-  "NetworkingError",
+  'TimeoutError',
+  'NetworkingError',
 ]);
 
 // =============================================================================
@@ -106,48 +108,24 @@ export function isThrottlingError(error: unknown): boolean {
   if (!isError(error)) return false;
 
   return (
-    error.name === "ProvisionedThroughputExceededException" ||
-    error.name === "ThrottlingException" ||
-    error.name === "LimitExceededException"
+    error.name === 'ProvisionedThroughputExceededException' ||
+    error.name === 'ThrottlingException' ||
+    error.name === 'LimitExceededException'
   );
 }
 
-// =============================================================================
-// Backoff Calculation
-// =============================================================================
-
 /**
- * Calculate exponential backoff delay with jitter
- *
- * @param attempts - Number of retry attempts (1-based)
- * @param baseDelaySeconds - Base delay in seconds (default: 2)
- * @param maxDelaySeconds - Maximum delay in seconds (default: 300 = 5 min)
- * @returns Delay in seconds
+ * Check if error is ResourceAlreadyExistsException (for collection creation)
  */
-export function getBackoffDelay(
-  attempts: number,
-  baseDelaySeconds = 2,
-  maxDelaySeconds = 300
-): number {
-  // Exponential: 2, 4, 8, 16, 32, 64, 128, 256, 300 (capped)
-  const exponentialDelay = baseDelaySeconds * Math.pow(2, attempts - 1);
-
-  // Cap at max
-  const cappedDelay = Math.min(exponentialDelay, maxDelaySeconds);
-
-  // Add jitter (±20%) to prevent thundering herd
-  const jitter = cappedDelay * 0.2 * (Math.random() - 0.5);
-
-  return Math.round(cappedDelay + jitter);
+export function isResourceAlreadyExistsError(errorName?: string): boolean {
+  return errorName === 'ResourceAlreadyExistsException';
 }
 
 /**
- * Get backoff delay specifically for throttling errors
- * Uses longer delays since rate limits need time to reset
+ * Check if error is ResourceNotFoundException (for collection deletion)
  */
-export function getThrottleBackoffDelay(attempts: number): number {
-  // Start at 5 seconds, longer backoff for throttling
-  return getBackoffDelay(attempts, 5, 300);
+export function isResourceNotFoundError(errorName?: string): boolean {
+  return errorName === 'ResourceNotFoundException';
 }
 
 // =============================================================================
@@ -179,8 +157,7 @@ export function formatErrorMessage(error: unknown): string {
     parts.push(`[${awsError.$metadata.httpStatusCode}]`);
   }
 
-  parts.push(":", awsError.message);
+  parts.push(':', awsError.message);
 
-  return parts.join(" ");
+  return parts.join(' ');
 }
-

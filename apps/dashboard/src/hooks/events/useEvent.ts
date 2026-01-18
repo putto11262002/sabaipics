@@ -1,41 +1,42 @@
-import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../lib/api";
-import type { Event } from "./useEvents";
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../../lib/api';
+import { type InferResponseType } from 'hono/client';
 
-interface EventResponse {
-  data: Event;
-}
+const getEvent = api.events[':id'].$get;
+
+export type Event = InferResponseType<typeof getEvent, 200>['data'];
 
 export function useEvent(id: string | undefined) {
-  const { getToken } = useApiClient();
-
   return useQuery({
-    queryKey: ["event", id],
+    queryKey: ['event', id],
     queryFn: async () => {
       if (!id) {
-        throw new Error("Event ID is required");
+        throw new Error('Event ID is required');
       }
 
-      const token = await getToken();
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/events/${id}`,
+      const res = await getEvent(
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
+          param: { id },
+        },
+        {
+          init: {
+            credentials: 'include',
           },
-        }
+        },
       );
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error("Event not found");
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error('Event not found');
         }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(`Failed to fetch event: ${res.status}`);
       }
 
-      return response.json() as Promise<EventResponse>;
+      return (await res.json()) as InferResponseType<typeof getEvent, 200>;
     },
-    enabled: !!id, // Only run query if ID is provided
+    enabled: !!id,
+    refetchOnWindowFocus: !import.meta.env.DEV,
+    refetchOnMount: false,
     staleTime: 1000 * 60, // 1 minute
   });
 }

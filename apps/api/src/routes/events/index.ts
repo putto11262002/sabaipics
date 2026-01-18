@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, desc, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { events } from '@sabaipics/db';
 import { requirePhotographer, requireConsent, type PhotographerVariables } from '../../middleware';
 import type { Bindings } from '../../types';
-import { generateEventQR } from '../../lib/qr';
+import { generatePngQrCode } from '@juit/qrcode';
 import { generateAccessCode } from './access-code';
 import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './schema';
 
@@ -21,15 +22,39 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
 // =============================================================================
-// Helpers
+// QR Code Generation
 // =============================================================================
 
-/**
- * Generate QR code URL using direct R2 URL
- * Note: Uses PHOTO_R2_BASE_URL which points to the public R2 bucket
- */
-function getQrCodeUrl(r2Key: string, photoBaseUrl: string): string {
-  return `${photoBaseUrl}/${r2Key}`;
+type QRSize = "small" | "medium" | "large";
+
+const QR_SIZE_PRESETS: Record<QRSize, number> = {
+  small: 256,
+  medium: 512,
+  large: 1200,
+} as const;
+
+function getScaleForSize(size: QRSize): number {
+  return Math.ceil(QR_SIZE_PRESETS[size] / 25);
+}
+
+async function generateEventQR(
+  accessCode: string,
+  baseUrl: string,
+  size: QRSize = "medium"
+): Promise<Uint8Array> {
+  if (!/^[A-Z0-9]{6}$/.test(accessCode)) {
+    throw new Error(
+      `Invalid access code format: "${accessCode}". Must be 6 uppercase alphanumeric characters (A-Z0-9).`
+    );
+  }
+
+  const searchUrl = `${baseUrl}/search/${accessCode}`;
+
+  return await generatePngQrCode(searchUrl, {
+    ecLevel: "M",
+    margin: 4,
+    scale: getScaleForSize(size),
+  });
 }
 
 // =============================================================================
@@ -81,15 +106,6 @@ function qrGenerationFailedError(reason: string) {
   };
 }
 
-function qrUploadFailedError(reason: string) {
-  return {
-    error: {
-      code: 'QR_UPLOAD_FAILED' as const,
-      message: `Failed to upload QR code: ${reason}`,
-    },
-  };
-}
-
 
 // =============================================================================
 // Routes
@@ -97,7 +113,7 @@ function qrUploadFailedError(reason: string) {
 
 export const eventsRouter = new Hono<Env>()
 
-  // POST /events - Create event with QR code
+  // POST /events - Create event (QR code generated client-side)
   .post(
     '/',
     requirePhotographer(),
@@ -137,53 +153,11 @@ export const eventsRouter = new Hono<Env>()
         return c.json(accessCodeGenerationFailedError(), 500);
       }
 
-      console.log(`[QR] Starting QR generation for access code: ${accessCode}`);
-      console.log(`[QR] APP_BASE_URL: ${c.env.APP_BASE_URL}`);
-
-      // Generate QR code PNG
-      let qrPng: Uint8Array;
-      try {
-        qrPng = await generateEventQR(accessCode, c.env.APP_BASE_URL);
-        console.log(`[QR] QR code generated successfully`);
-        console.log(`[QR] - Type: ${qrPng.constructor.name}`);
-        console.log(`[QR] - Length: ${qrPng.length} bytes`);
-        console.log(
-          `[QR] - First 8 bytes (PNG magic): ${Array.from(qrPng.slice(0, 8))
-            .map((b) => b.toString(16).padStart(2, '0'))
-            .join(' ')}`,
-        );
-      } catch (e) {
-        console.error(`[QR] QR generation failed:`, e);
-        const reason = e instanceof Error ? e.message : 'unknown error';
-        return c.json(qrGenerationFailedError(reason), 500);
-      }
-
-      // Upload QR to R2
-      const r2Key = `qr/${accessCode}.png`;
-      console.log(`[QR] Uploading to R2 with key: ${r2Key}`);
-      console.log(`[QR] Bucket binding: PHOTOS_BUCKET`);
-
-      try {
-        await c.env.PHOTOS_BUCKET.put(r2Key, qrPng, {
-          httpMetadata: { contentType: 'image/png' },
-        });
-        console.log(`[QR] Successfully uploaded to R2`);
-      } catch (e) {
-        console.error(`[QR] R2 upload failed:`, e);
-        const reason = e instanceof Error ? e.message : 'unknown error';
-        return c.json(qrUploadFailedError(reason), 500);
-      }
-
-      // Use direct R2 URL
-      const qrCodeUrl = getQrCodeUrl(r2Key, c.env.PHOTO_R2_BASE_URL);
-      console.log(`[QR] Final QR code URL: ${qrCodeUrl}`);
-      console.log(`[QR] PHOTO_R2_BASE_URL: ${c.env.PHOTO_R2_BASE_URL}`);
-
       // Calculate expiry date (30 days from now)
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30);
 
-      // Insert event record
+      // Insert event record (QR code generated client-side, not stored)
       const [created] = await db
         .insert(events)
         .values({
@@ -192,7 +166,7 @@ export const eventsRouter = new Hono<Env>()
           startDate: body.startDate,
           endDate: body.endDate,
           accessCode,
-          qrCodeR2Key: r2Key,
+          qrCodeR2Key: null, // No longer storing QR codes
           rekognitionCollectionId: null,
           expiresAt: expiresAt.toISOString(),
         })
@@ -207,7 +181,7 @@ export const eventsRouter = new Hono<Env>()
             startDate: created.startDate,
             endDate: created.endDate,
             accessCode: created.accessCode,
-            qrCodeUrl,
+            qrCodeUrl: null, // Client-side generation
             rekognitionCollectionId: created.rekognitionCollectionId,
             expiresAt: created.expiresAt,
             createdAt: created.createdAt,
@@ -238,7 +212,6 @@ export const eventsRouter = new Hono<Env>()
           startDate: events.startDate,
           endDate: events.endDate,
           accessCode: events.accessCode,
-          qrCodeR2Key: events.qrCodeR2Key,
           createdAt: events.createdAt,
           expiresAt: events.expiresAt,
         })
@@ -259,15 +232,8 @@ export const eventsRouter = new Hono<Env>()
       const hasNextPage = page + 1 < totalPages;
       const hasPrevPage = page > 0;
 
-      // Construct QR URLs using direct R2 URL
-      const photoBaseUrl = c.env.PHOTO_R2_BASE_URL;
-      const data = eventsList.map((event) => ({
-        ...event,
-        qrCodeUrl: event.qrCodeR2Key ? getQrCodeUrl(event.qrCodeR2Key, photoBaseUrl) : null,
-      }));
-
       return c.json({
-        data,
+        data: eventsList,
         pagination: {
           page,
           limit,
@@ -303,9 +269,6 @@ export const eventsRouter = new Hono<Env>()
         return c.json(notFoundError(), 404);
       }
 
-      const photoBaseUrl = c.env.PHOTO_R2_BASE_URL;
-      const qrCodeUrl = event.qrCodeR2Key ? getQrCodeUrl(event.qrCodeR2Key, photoBaseUrl) : null;
-
       return c.json({
         data: {
           id: event.id,
@@ -314,10 +277,64 @@ export const eventsRouter = new Hono<Env>()
           startDate: event.startDate,
           endDate: event.endDate,
           accessCode: event.accessCode,
-          qrCodeUrl,
+          qrCodeUrl: null, // Client-side generation
           rekognitionCollectionId: event.rekognitionCollectionId,
           expiresAt: event.expiresAt,
           createdAt: event.createdAt,
+        },
+      });
+    },
+  )
+
+  // GET /events/:id/qr-download - Download QR code as PNG
+  .get(
+    '/:id/qr-download',
+    requirePhotographer(),
+    requireConsent(),
+    zValidator('param', eventParamsSchema),
+    zValidator('query', z.object({
+      size: z.enum(['small', 'medium', 'large']).optional().default('medium'),
+    })),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id } = c.req.valid('param');
+      const { size } = c.req.valid('query');
+
+      const [event] = await db.select().from(events).where(eq(events.id, id)).limit(1);
+
+      if (!event) {
+        return c.json(notFoundError(), 404);
+      }
+
+      // Authorization: ensure photographer owns this event
+      if (event.photographerId !== photographer.id) {
+        // Return NOT_FOUND instead of FORBIDDEN to prevent enumeration
+        return c.json(notFoundError(), 404);
+      }
+
+      // Generate QR code on-demand
+      let qrPng: Uint8Array;
+      try {
+        qrPng = await generateEventQR(event.accessCode, c.env.APP_BASE_URL, size as QRSize);
+      } catch (e) {
+        console.error('[QR] Download generation failed:', e);
+        const reason = e instanceof Error ? e.message : 'unknown error';
+        return c.json(qrGenerationFailedError(reason), 500);
+      }
+
+      // Return PNG with download headers
+      const sanitizedName = event.name.replace(/[^a-z0-9]/gi, '-');
+      const filename = `${sanitizedName}-${size}-qr.png`;
+      // Convert Uint8Array to regular ArrayBuffer for Response
+      const arrayBuffer = new ArrayBuffer(qrPng.length);
+      const view = new Uint8Array(arrayBuffer);
+      view.set(qrPng);
+      return new Response(arrayBuffer, {
+        headers: {
+          'Content-Type': 'image/png',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
         },
       });
     },

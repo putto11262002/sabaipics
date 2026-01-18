@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { createClerkAuth } from '@sabaipics/auth/middleware';
-import { createDb } from '@sabaipics/db';
+import { createDbHttp, createDbTx } from '@sabaipics/db';
 import { authRouter } from './routes/auth';
 import { webhookRouter } from './routes/webhooks';
 import { dbTestRouter } from './routes/db-test';
@@ -10,7 +10,7 @@ import { consentRouter } from './routes/consent';
 import { dashboardRouter } from './routes/dashboard/route';
 import { creditsRouter } from './routes/credits';
 import { eventsRouter } from './routes/events';
-import { photosRouter, photosUploadRouter, photoStatusRouter, bulkDownloadRouter, bulkDeleteRouter } from './routes/photos';
+import { photosRouter } from './routes/photos';
 import { r2Router } from './routes/r2';
 import type { Env, Bindings } from './types';
 
@@ -41,9 +41,12 @@ registerStripeHandlers();
 
 // Method chaining - NEVER break the chain for type inference
 const app = new Hono<Env>()
-	// DB injection for webhooks (no auth, no CORS - verified by signature)
+	// DB injection - dual adapter pattern:
+	// - db (HTTP): Fast, stateless, no transactions - for 90% of queries
+	// - dbTx (WebSocket): With transaction support - for critical multi-step operations
 	.use((c, next) => {
-		c.set('db', () => createDb(c.env.DATABASE_URL));
+		c.set('db', () => createDbHttp(c.env.DATABASE_URL));
+		c.set('dbTx', () => createDbTx(c.env.DATABASE_URL));
 		return next();
 	})
 	// R2 proxy route (public, no auth - serves QR codes and other assets)
@@ -67,11 +70,7 @@ const app = new Hono<Env>()
 	.route('/consent', consentRouter)
 	.route('/dashboard', dashboardRouter)
 	.route('/events', eventsRouter)
-	.route('/events', photosRouter)
-	.route('/events', bulkDownloadRouter)
-	.route('/events', bulkDeleteRouter)
-	.route('/photos', photosUploadRouter)
-	.route('/photos', photoStatusRouter);
+	.route('/', photosRouter);
 
 // =============================================================================
 // Worker Export

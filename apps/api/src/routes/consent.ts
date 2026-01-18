@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import { consentRecords, photographers } from "@sabaipics/db";
+import { consentRecords, photographers, type DatabaseTx } from "@sabaipics/db";
 import { requirePhotographer, type PhotographerVariables } from "../middleware";
 import type { Bindings } from "../types";
 
@@ -10,7 +10,9 @@ import type { Bindings } from "../types";
 
 type Env = {
   Bindings: Bindings;
-  Variables: PhotographerVariables;
+  Variables: PhotographerVariables & {
+    dbTx: () => DatabaseTx;
+  };
 };
 
 // =============================================================================
@@ -50,31 +52,37 @@ export const consentRouter = new Hono<Env>()
       return c.json(alreadyConsentedError(), 409);
     }
 
-    const db = c.var.db();
+    const dbTx = c.var.dbTx();
 
     // Get client IP from Cloudflare header
     const ipAddress = c.req.header("CF-Connecting-IP") ?? null;
 
-    // Insert consent record and update photographer
+    // Transaction: Insert consent record + update photographer
     const now = new Date().toISOString();
 
-    const [consentRecord] = await db
-      .insert(consentRecords)
-      .values({
-        photographerId: photographer.id,
-        consentType: "pdpa",
-        ipAddress,
-      })
-      .returning({
-        id: consentRecords.id,
-        consentType: consentRecords.consentType,
-        createdAt: consentRecords.createdAt,
-      });
+    const consentRecord = await dbTx.transaction(async (tx) => {
+      // Insert consent record
+      const [record] = await tx
+        .insert(consentRecords)
+        .values({
+          photographerId: photographer.id,
+          consentType: "pdpa",
+          ipAddress,
+        })
+        .returning({
+          id: consentRecords.id,
+          consentType: consentRecords.consentType,
+          createdAt: consentRecords.createdAt,
+        });
 
-    await db
-      .update(photographers)
-      .set({ pdpaConsentAt: now })
-      .where(eq(photographers.id, photographer.id));
+      // Update photographer with consent timestamp
+      await tx
+        .update(photographers)
+        .set({ pdpaConsentAt: now })
+        .where(eq(photographers.id, photographer.id));
+
+      return record;
+    });
 
     return c.json({ data: consentRecord }, 201);
   });

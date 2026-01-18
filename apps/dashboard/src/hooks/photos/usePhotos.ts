@@ -5,9 +5,15 @@ import { type InferResponseType } from 'hono/client';
 const listPhotos = api.events[':eventId'].photos.$post;
 
 export type Photo = InferResponseType<typeof listPhotos, 200>['data'][0];
-export type PhotoStatus = 'uploading' | 'indexing' | 'indexed' | 'failed';
+export type PhotoStatus = Photo['status'];
 
-export function usePhotos({ eventId, status }: { eventId: string | undefined; status?: PhotoStatus[] }) {
+export function usePhotos({
+  eventId,
+  status,
+}: {
+  eventId: string | undefined;
+  status?: PhotoStatus[];
+}) {
   return useInfiniteQuery({
     queryKey: ['event', eventId, 'photos', status],
     queryFn: async ({ pageParam }: { pageParam?: string }) => {

@@ -1,4 +1,3 @@
-import { Alert } from '@sabaipics/ui/components/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,31 +11,30 @@ import {
 import { parseISO, differenceInDays } from 'date-fns';
 import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
-import { PhotoUploadZone } from '../../../../components/photos/PhotoUploadZone';
-import { UploadLog } from '../../../../components/photos/UploadLog';
-import { useUploadQueue } from '../../../../hooks/photos/useUploadQueue';
-import { usePhotos } from '../../../../hooks/photos/usePhotos';
-import { useEventContext } from '../layout';
+import { useParams } from 'react-router';
+import { PhotoUploadZone } from './_components/PhotoUploadZone';
+import { UploadLog } from './_components/UploadLog';
+import { useUploadQueue } from './_components/useUploadQueue';
+import { useEvent } from '../../../../hooks/events/useEvent';
 
 export default function EventUploadTab() {
-  const { event } = useEventContext();
+  const { id } = useParams<{ id: string }>();
+  const { data } = useEvent(id);
+
+  if (!data?.data) {
+    return null;
+  }
+
+  const event = data.data;
 
   const daysUntilExpiry = differenceInDays(parseISO(event.expiresAt), new Date());
   const isExpired = daysUntilExpiry <= 0;
 
   const {
     addFiles,
-    setValidationErrors,
-    validationErrors,
-    uploadLog,
+    optimisticPhotos,
     uploadingItems,
   } = useUploadQueue(event.id);
-
-  // Fetch photos that are NOT indexed (uploading, indexing, failed)
-  const photosQuery = usePhotos({
-    eventId: event.id,
-    status: ['uploading', 'indexing', 'failed']
-  });
 
   // Block navigation if uploads are in progress
   const hasActiveUploads = uploadingItems.length > 0;
@@ -88,39 +86,15 @@ export default function EventUploadTab() {
       <div>
         <h3 className="text-lg font-semibold mb-4">Upload Photos</h3>
 
-        {/* Validation errors */}
-        {validationErrors.length > 0 && (
-          <Alert variant="destructive" className="mb-4">
-            <div>
-              <p className="mb-2 font-medium">
-                {validationErrors.length} {validationErrors.length === 1 ? 'file was' : 'files were'}{' '}
-                rejected:
-              </p>
-              <div className="space-y-1 text-sm">
-                {validationErrors.map((error, index) => (
-                  <p key={index}>
-                    <span className="font-medium">{error.file.name}:</span> {error.error}
-                  </p>
-                ))}
-              </div>
-            </div>
-          </Alert>
-        )}
-
         {/* Upload dropzone */}
         <PhotoUploadZone
           onFilesSelected={addFiles}
-          onValidationErrors={setValidationErrors}
           disabled={isExpired}
         />
       </div>
 
       {/* Upload log - shows both local upload session and API photos */}
-      <UploadLog
-        entries={uploadLog}
-        photosQuery={photosQuery}
-        eventId={event.id}
-      />
+      <UploadLog optimisticPhotos={optimisticPhotos} eventId={event.id} />
     </div>
   );
 }
