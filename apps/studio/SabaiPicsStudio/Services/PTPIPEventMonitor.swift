@@ -130,25 +130,31 @@ actor PTPIPEventMonitor {
             throw PTPIPEventMonitorError.notConnected
         }
 
-        // First, read header (8 bytes)
-        let headerData = try await receiveData(connection: connection, minimumLength: 8, maximumLength: 8)
-        guard let header = PTPIPHeader.from(headerData) else {
-            throw PTPIPEventMonitorError.invalidPacket
-        }
+        do {
+            // First, read header (8 bytes)
+            let headerData = try await receiveData(connection: connection, minimumLength: 8, maximumLength: 8)
+            guard let header = PTPIPHeader.from(headerData) else {
+                throw PTPIPEventMonitorError.invalidPacket
+            }
 
-        // Read remaining payload
-        let payloadLength = Int(header.length) - 8
-        guard payloadLength >= 0 else {
-            throw PTPIPEventMonitorError.invalidPacket
-        }
+            // Read remaining payload
+            let payloadLength = Int(header.length) - 8
+            guard payloadLength >= 0 else {
+                throw PTPIPEventMonitorError.invalidPacket
+            }
 
-        if payloadLength > 0 {
-            let payloadData = try await receiveData(connection: connection, minimumLength: payloadLength, maximumLength: payloadLength)
-            var fullPacket = headerData
-            fullPacket.append(payloadData)
-            return fullPacket
-        } else {
-            return headerData
+            if payloadLength > 0 {
+                let payloadData = try await receiveData(connection: connection, minimumLength: payloadLength, maximumLength: payloadLength)
+                var fullPacket = headerData
+                fullPacket.append(payloadData)
+                return fullPacket
+            } else {
+                return headerData
+            }
+        } catch PTPIPEventMonitorError.timeout {
+            // Timeout is normal - no events received in 30s, just keep waiting
+            print("[PTPIPEventMonitor] No events received (timeout), continuing to monitor...")
+            return nil
         }
     }
 

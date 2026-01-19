@@ -31,6 +31,7 @@ enum PTPOperationCode: UInt16 {
     // Canon EOS Extensions (for Canon cameras)
     case canonEOSGetEvent = 0x9116
     case canonEOSSetRemoteMode = 0x9114
+    case canonEOSSetEventMode = 0x9115  // Enable/disable event reporting
     case canonEOSGetStorageIDs = 0x9101
     case canonEOSGetStorageInfo = 0x9102
     case canonEOSGetObject = 0x9104
@@ -191,7 +192,7 @@ struct PTPCommand {
     /// - Returns: PTPIPOperationRequest packet
     mutating func canonGetEvent() -> PTPIPOperationRequest {
         return PTPIPOperationRequest(
-            dataPhaseInfo: 1,  // 1 = receive or no data, 2 = send data (per libgphoto2)
+            dataPhaseInfo: 2,  // 2 = PTP_DP_GETDATA (receive data from camera)
             operationCode: PTPOperationCode.canonEOSGetEvent.rawValue,
             transactionID: nextTransactionID(),
             parameters: []
@@ -216,6 +217,21 @@ struct PTPCommand {
         return PTPIPOperationRequest(
             dataPhaseInfo: 1,  // 1 = receive or no data, 2 = send data (per libgphoto2)
             operationCode: PTPOperationCode.canonEOSSetRemoteMode.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: [mode]
+        )
+    }
+
+    /// Build Canon EOS SetEventMode command
+    /// - Parameter mode: 1=enable event reporting, 0=disable
+    /// - Returns: PTPIPOperationRequest packet
+    /// - Note: This MUST be called after OpenSession and SetRemoteMode to enable
+    ///         the camera to report events (ObjectAdded, etc.) in GetEvent responses.
+    ///         Without this, GetEvent always returns empty (8-byte terminator).
+    mutating func canonSetEventMode(mode: UInt32 = 1) -> PTPIPOperationRequest {
+        return PTPIPOperationRequest(
+            dataPhaseInfo: 1,  // No data phase, just command + response
+            operationCode: PTPOperationCode.canonEOSSetEventMode.rawValue,
             transactionID: nextTransactionID(),
             parameters: [mode]
         )

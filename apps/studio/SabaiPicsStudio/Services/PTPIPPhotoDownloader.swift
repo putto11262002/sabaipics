@@ -49,7 +49,6 @@ actor PTPIPPhotoDownloader {
 
     /// Initialize downloader
     init() {
-        print("[PTPIPPhotoDownloader] Initialized")
     }
 
     /// Configure downloader with command connection
@@ -59,7 +58,6 @@ actor PTPIPPhotoDownloader {
     func configure(connection: NWConnection, transactionManager: PTPTransactionManager) async {
         self.commandConnection = connection
         self.transactionManager = transactionManager
-        print("[PTPIPPhotoDownloader] Configured")
     }
 
     /// Download photo by object handle
@@ -72,8 +70,6 @@ actor PTPIPPhotoDownloader {
             throw PTPIPPhotoDownloaderError.notConnected
         }
 
-        print("[PTPIPPhotoDownloader] Downloading object 0x\(String(format: "%08X", objectHandle))")
-
         // Build GetObject command
         var command = await txManager.createCommand()
         let getObjectCommand = command.getObject(handle: objectHandle)
@@ -82,11 +78,9 @@ actor PTPIPPhotoDownloader {
         // Send command
         let commandData = getObjectCommand.toData()
         try await sendData(connection: connection, data: commandData)
-        print("[PTPIPPhotoDownloader] GetObject command sent (txID: \(expectedTransactionID))")
 
         // Receive data packets
         let photoData = try await receiveDataPackets(connection: connection)
-        print("[PTPIPPhotoDownloader] Received \(photoData.count) bytes")
 
         // Receive operation response with transaction ID validation
         let response = try await receiveResponse(connection: connection, expectedTransactionID: expectedTransactionID)
@@ -97,7 +91,6 @@ actor PTPIPPhotoDownloader {
             )
         }
 
-        print("[PTPIPPhotoDownloader] Download complete: 0x\(String(format: "%08X", objectHandle))")
         return photoData
     }
 
@@ -133,7 +126,6 @@ actor PTPIPPhotoDownloader {
 
                 expectedTotalLength = startPacket.totalDataLength
                 receivedStartPacket = true
-                print("[PTPIPPhotoDownloader] Start data packet: expecting \(expectedTotalLength) bytes")
 
             case .dataPacket:
                 // Intermediate data packets
@@ -148,13 +140,9 @@ actor PTPIPPhotoDownloader {
                 }
 
                 accumulatedData.append(dataPacket.data)
-                print("[PTPIPPhotoDownloader] Data packet: \(dataPacket.data.count) bytes (total: \(accumulatedData.count))")
 
             case .endDataPacket:
                 // Last packet: marks end of transfer and may contain final data chunk
-                print("[PTPIPPhotoDownloader] End data packet received")
-
-                // Read remaining payload from EndDataPacket
                 let payloadLength = Int(header.length) - 8
                 let payloadData = try await receiveWithTimeout(connection: connection, minimumLength: payloadLength, maximumLength: payloadLength)
 
@@ -168,7 +156,6 @@ actor PTPIPPhotoDownloader {
 
                 // Extract any remaining data from EndDataPacket (critical for small photos < 64KB)
                 if !endPacket.data.isEmpty {
-                    print("[PTPIPPhotoDownloader] End packet contains \(endPacket.data.count) bytes of data")
                     accumulatedData.append(endPacket.data)
                 }
 
@@ -183,7 +170,6 @@ actor PTPIPPhotoDownloader {
                 return accumulatedData
 
             default:
-                print("[PTPIPPhotoDownloader] Unexpected packet type: 0x\(String(format: "%08X", header.type))")
                 throw PTPIPPhotoDownloaderError.invalidDataPacket
             }
         }
@@ -211,11 +197,9 @@ actor PTPIPPhotoDownloader {
 
         // Validate transaction ID matches request
         guard response.transactionID == expectedTransactionID else {
-            print("[PTPIPPhotoDownloader] Transaction ID mismatch: expected \(expectedTransactionID), got \(response.transactionID)")
             throw PTPIPPhotoDownloaderError.transactionMismatch
         }
 
-        print("[PTPIPPhotoDownloader] Response: 0x\(String(format: "%04X", response.responseCode)) (txID: \(response.transactionID))")
         return response
     }
 

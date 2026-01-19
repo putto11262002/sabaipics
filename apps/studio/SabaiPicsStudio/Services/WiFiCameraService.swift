@@ -51,6 +51,26 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
     private let maxRetries = 3
     private var connectionTimeout: TimeInterval = 15.0  // 15s instead of 90s
 
+    // MARK: - Persistent GUID (like libgphoto2)
+
+    /// Persistent GUID for PTP/IP connections (matches libgphoto2's gp_setting_get/set behavior)
+    /// Canon cameras save connection configurations and require the same GUID for reconnection
+    private static let guidKey = "com.sabaipics.ptpip.guid"
+
+    /// Get or create persistent GUID for this device
+    private var persistentGUID: UUID {
+        // Try to load saved GUID
+        if let guidString = UserDefaults.standard.string(forKey: Self.guidKey),
+           let savedGUID = UUID(uuidString: guidString) {
+            return savedGUID
+        }
+
+        // Generate new GUID and save it
+        let newGUID = UUID()
+        UserDefaults.standard.set(newGUID.uuidString, forKey: Self.guidKey)
+        return newGUID
+    }
+
     // MARK: - Configuration
 
     /// Camera configuration parameters
@@ -73,8 +93,6 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
         self.manager = WiFiCameraManager()
         super.init()
         self.manager.delegate = self
-
-        print("[WiFiCameraService] Initialized")
     }
 
     // MARK: - Public Methods
@@ -82,7 +100,6 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
     /// Connect to a WiFi camera
     /// - Parameter config: Camera configuration (defaults to Canon WiFi)
     func connect(config: CameraConfig = .canonWiFi) {
-        print("[WiFiCameraService] Connecting to WiFi camera: \(config.ip)")
 
         // Reset error state
         connectionError = nil
@@ -98,12 +115,9 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
                 try self.manager.connect(withIP: config.ip, model: config.model, protocol: config.proto)
                 // Success case handled by delegate callback (already on main thread)
             } catch let error as NSError {
-                let errorMsg = error.localizedDescription
-                print("[WiFiCameraService] Connection failed: \(errorMsg)")
-
                 // Update UI state on main thread
                 await MainActor.run {
-                    self.connectionError = errorMsg
+                    self.connectionError = error.localizedDescription
                     self.isConnected = false
                 }
             }
@@ -112,7 +126,6 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 
     /// Disconnect from the camera
     func disconnect() {
-        print("[WiFiCameraService] Disconnecting from WiFi camera")
         connectionTask?.cancel()
         connectionTask = nil
 
@@ -141,13 +154,11 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 
     /// Connect with automatic retry on timeout
     func connectWithRetry(config: CameraConfig) {
-        print("[WiFiCameraService] Starting connection with retry...")
         retryCount = 0
         attemptConnection(config: config)
     }
 
     private func attemptConnection(config: CameraConfig) {
-        print("[WiFiCameraService] Connection attempt \(retryCount + 1)/\(maxRetries)")
 
         // Update retry count for UI
         DispatchQueue.main.async {
@@ -164,7 +175,6 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
             DispatchQueue.main.async {
                 if self.isConnected {
                     // SUCCESS
-                    print("[WiFiCameraService] Connection succeeded on attempt \(self.retryCount + 1)")
                     self.retryCount = 0
                     LocalNetworkPermissionChecker.markPermissionGranted()
 
@@ -174,7 +184,6 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 
                     // Exponential backoff: 2s, 5s
                     let backoffDelay: TimeInterval = self.retryCount == 1 ? 2.0 : 5.0
-                    print("[WiFiCameraService] Retry in \(backoffDelay)s... (Attempt \(self.retryCount + 1)/\(self.maxRetries))")
 
                     DispatchQueue.main.asyncAfter(deadline: .now() + backoffDelay) {
                         self.attemptConnection(config: config)
@@ -182,7 +191,6 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 
                 } else {
                     // FAILURE
-                    print("[WiFiCameraService] Connection failed after \(self.maxRetries) attempts")
                     self.retryCount = 0
                     self.connectionError = "Connection failed after 3 attempts. Please check camera WiFi settings."
                 }
@@ -208,13 +216,12 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
         eventConnection: NWConnection,
         sessionID: UInt32
     ) async {
-        print("[WiFiCameraService] Connecting with PTP/IP session \(sessionID)...")
-
         // Reset error state
         connectionError = nil
 
-        // Create new PTP/IP session
-        let session = PTPIPSession(sessionID: sessionID)
+        // Create new PTP/IP session with persistent GUID
+        let guid = persistentGUID  // Use persistent GUID (like libgphoto2)
+        let session = PTPIPSession(sessionID: sessionID, guid: guid)
         session.delegate = self
         self.ptpSession = session
 
@@ -223,40 +230,149 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
             try await session.connect(commandConnection: commandConnection, eventConnection: eventConnection)
 
             // Success
-            print("[WiFiCameraService] PTP/IP session connected")
             self.isConnected = true
             self.connectionError = nil
 
         } catch {
-            print("[WiFiCameraService] PTP/IP session failed: \(error)")
             self.isConnected = false
             self.connectionError = error.localizedDescription
             self.ptpSession = nil
         }
     }
 
+    // MARK: - PTP/IP Direct Connection (SAB-27)
+
+    /// Connect directly via PTP/IP protocol (pure Swift implementation)
+    /// This bypasses libgphoto2 and uses the new Swift PTP/IP client
+    /// - Parameter ip: Camera IP address (e.g., "192.168.1.1")
+    func connectViaPTPIP(ip: String) {
+        // Reset error state
+        connectionError = nil
+
+        // Cancel any existing connection
+        connectionTask?.cancel()
+
+        // Disconnect any existing session first
+        if let existingSession = ptpSession {
+            Task {
+                await existingSession.disconnect()
+            }
+            ptpSession = nil
+        }
+
+        // Create async task for connection
+        connectionTask = Task {
+            // Create NWConnection objects for command and event channels (port 15740)
+            let commandConnection = createConnection(to: ip, port: 15740)
+            let eventConnection = createConnection(to: ip, port: 15740)
+
+            do {
+                // Start command connection FIRST (per libgphoto2 sequence)
+                commandConnection.start(queue: .main)
+
+                // Wait for command connection to be ready
+                try await waitForConnection(commandConnection, timeout: 5.0)
+
+                // Note: Event connection will be started by PTPIPSession AFTER Init Command Ack
+
+                // Create PTP/IP session with random session ID and persistent GUID
+                let sessionID = UInt32.random(in: 1...UInt32.max)
+                let guid = self.persistentGUID  // Use persistent GUID (like libgphoto2)
+                let session = PTPIPSession(sessionID: sessionID, guid: guid)
+                session.delegate = self
+                self.ptpSession = session
+
+                // Connect (will perform Init handshake internally)
+                try await session.connect(
+                    commandConnection: commandConnection,
+                    eventConnection: eventConnection
+                )
+
+                // Success - delegate will be notified via sessionDidConnect
+
+            } catch {
+                // Cancel connections on failure to clean up TCP sockets
+                commandConnection.cancel()
+                eventConnection.cancel()
+
+                await MainActor.run {
+                    self.isConnected = false
+                    self.connectionError = error.localizedDescription
+                    self.ptpSession = nil
+                }
+            }
+        }
+    }
+
+    // MARK: - Helper Methods
+
+    /// Create NWConnection to camera
+    private func createConnection(to ip: String, port: UInt16) -> NWConnection {
+        let host = NWEndpoint.Host(ip)
+        let port = NWEndpoint.Port(rawValue: port)!
+        let connection = NWConnection(host: host, port: port, using: .tcp)
+        return connection
+    }
+
+    /// Wait for NWConnection to reach ready state
+    private func waitForConnection(_ connection: NWConnection, timeout: TimeInterval) async throws {
+        try await withTimeout(seconds: timeout) {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                var resumed = false
+                connection.stateUpdateHandler = { state in
+                    guard !resumed else { return }
+                    switch state {
+                    case .ready:
+                        resumed = true
+                        continuation.resume()
+                    case .failed(let error):
+                        resumed = true
+                        continuation.resume(throwing: error)
+                    default:
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    /// Execute async operation with timeout
+    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                try await operation()
+            }
+
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw NSError(
+                    domain: "WiFiCameraService",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "Connection timeout after \(seconds)s"]
+                )
+            }
+
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+
     // MARK: - CameraServiceProtocol Compatibility Methods
 
-    /// Protocol-compatible connect method (uses IP address string)
+    /// Protocol-compatible connect method (uses new PTP/IP implementation)
     /// - Parameter ip: Camera IP address (e.g., "192.168.1.1")
     func connect(ip: String) {
-        let config = CameraConfig(
-            ip: ip,
-            model: "Canon EOS (WLAN)",
-            proto: "ptpip"
-        )
-        connect(config: config)
+        // Use new Swift PTP/IP implementation (SAB-27)
+        connectViaPTPIP(ip: ip)
     }
 
     /// Protocol-compatible connect with retry method
     /// - Parameter ip: Camera IP address (e.g., "192.168.1.1")
     func connectWithRetry(ip: String) {
-        let config = CameraConfig(
-            ip: ip,
-            model: "Canon EOS (WLAN)",
-            proto: "ptpip"
-        )
-        connectWithRetry(config: config)
+        // Use new Swift PTP/IP implementation (SAB-27)
+        // Note: For now, retry logic is built into the PTP/IP timeout handling
+        connectViaPTPIP(ip: ip)
     }
 
 }
@@ -266,19 +382,15 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 extension WiFiCameraService: PTPIPSessionDelegate {
 
     func sessionDidConnect(_ session: PTPIPSession) {
-        print("[WiFiCameraService] PTP/IP session connected")
         self.isConnected = true
         self.connectionError = nil
     }
 
     func session(_ session: PTPIPSession, didDetectPhoto objectHandle: UInt32) {
-        print("[WiFiCameraService] Photo detected via PTP/IP: 0x\(String(format: "%08X", objectHandle))")
         // Photo will be auto-downloaded by PTPIPSession
     }
 
     func session(_ session: PTPIPSession, didDownloadPhoto data: Data, objectHandle: UInt32) {
-        print("[WiFiCameraService] Photo downloaded via PTP/IP: \(data.count) bytes")
-
         // Generate filename from object handle
         let filename = "PTP_\(String(format: "%08X", objectHandle)).jpg"
 
@@ -287,14 +399,16 @@ extension WiFiCameraService: PTPIPSessionDelegate {
     }
 
     func session(_ session: PTPIPSession, didFailWithError error: Error) {
-        print("[WiFiCameraService] PTP/IP session error: \(error)")
         self.connectionError = error.localizedDescription
     }
 
     func sessionDidDisconnect(_ session: PTPIPSession) {
-        print("[WiFiCameraService] PTP/IP session disconnected")
         self.isConnected = false
         self.ptpSession = nil
+
+        // Clear downloaded photos on disconnect (don't persist)
+        self.downloadedPhotos.removeAll()
+        self.detectedPhotos.removeAll()
     }
 }
 
@@ -304,8 +418,6 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
 
     /// Called when camera successfully connects
     func cameraManagerDidConnect(_ manager: Any) {
-        print("[WiFiCameraService] Connected to camera via WiFi")
-
         DispatchQueue.main.async {
             self.isConnected = true
             self.connectionError = nil
@@ -314,8 +426,6 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
 
     /// Called when camera connection or operation fails
     func cameraManager(_ manager: Any, didFailWithError error: Error) {
-        print("[WiFiCameraService] Camera connection failed: \(error.localizedDescription)")
-
         DispatchQueue.main.async {
             self.isConnected = false
             self.connectionError = error.localizedDescription
@@ -328,7 +438,6 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
     /// Phase 3: FULL IMPLEMENTATION
     /// Phase 4: Added JPEG filtering to skip RAW files
     func cameraManager(_ manager: Any, didDetectNewPhoto filename: String, folder: String) {
-        print("[WiFiCameraService] Photo detected in Swift: \(filename)")
 
         // Filter: Only process JPEG files, skip RAW
         let lowercased = filename.lowercased()
@@ -342,7 +451,6 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
                      lowercased.hasSuffix(".jpeg")
 
         guard isJPEG && !isRAW else {
-            print("Skipping non-JPEG file: \(filename)")
             return
         }
 
@@ -357,8 +465,6 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
     /// Called when photo download completes
     /// Phase 4: Sequential download implementation
     func cameraManager(_ manager: Any, didDownloadPhoto photoData: Data, filename: String) {
-        print("[WiFiCameraService] Photo downloaded: \(filename), size: \(photoData.count) bytes")
-
         // Add to downloaded photos array (on main thread)
         DispatchQueue.main.async {
             self.downloadedPhotos.append((filename: filename, data: photoData))
