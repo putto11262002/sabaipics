@@ -404,7 +404,6 @@ export const photosRouter = new Hono<Env>()
             const res = await c.env.IMAGES.input(stream)
               .transform({
                 width: 4000,
-                height: 4000,
                 fit: 'scale-down',
               })
               .output({ format: 'image/jpeg', quality: 90 })

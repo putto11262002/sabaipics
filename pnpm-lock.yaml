@@ -150,9 +150,6 @@ importers:
       react-dom:
         specifier: ^19.2.0
         version: 19.2.3(react@19.2.3)
-      react-grid-gallery:
-        specifier: ^1.0.0
-        version: 1.0.1(react@19.2.3)
       react-hook-form:
         specifier: ^7.70.0
         version: 7.70.0(react@19.2.3)
@@ -4488,11 +4485,6 @@ packages:
     resolution: {integrity: sha512-yELu4WmLPw5Mr/lmeEpox5rw3RETacE++JgHqQzd2dg+YbJuat3jH4ingc+WPZhxaoFzdv9y33G+F7Nl5O0GBg==}
     peerDependencies:
       react: ^19.2.3
-
-  react-grid-gallery@1.0.1:
-    resolution: {integrity: sha512-+fVd6fH9tm0W+UMgzRHET/gmzSs2/l2sGOuELLaHXMto6UhuZdscj9ILHOYe7hn0GBRUJiczMllsEs7OJz9uPA==}
-    peerDependencies:
-      react: '>=16.14.0'
 
   react-hook-form@7.70.0:
     resolution: {integrity: sha512-COOMajS4FI3Wuwrs3GPpi/Jeef/5W1DRR84Yl5/ShlT3dKVFUfoGiEZ/QE6Uw8P4T2/CLJdcTVYKvWBMQTEpvw==}
@@ -9542,10 +9534,6 @@ snapshots:
     dependencies:
       react: 19.2.3
       scheduler: 0.27.0
-
-  react-grid-gallery@1.0.1(react@19.2.3):
-    dependencies:
-      react: 19.2.3
 
   react-hook-form@7.70.0(react@19.2.3):
     dependencies:
