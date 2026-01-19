@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'react-router';
 import { Button } from '@sabaipics/ui/components/button';
 import { Download, Trash2, CheckSquare } from 'lucide-react';
@@ -108,6 +108,27 @@ export default function EventPhotosTab() {
   // Get all photos from all pages
   const allPhotos = photosQuery.data?.pages.flatMap((page) => page.data) ?? [];
 
+  // Infinite scroll with Intersection Observer
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // When sentinel is visible and we have more pages, fetch next
+        if (entries[0].isIntersecting && photosQuery.hasNextPage && !photosQuery.isFetchingNextPage) {
+          photosQuery.fetchNextPage();
+        }
+      },
+      { rootMargin: '200px' } // Trigger 200px before reaching bottom
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [photosQuery.hasNextPage, photosQuery.isFetchingNextPage, photosQuery.fetchNextPage]);
+
   return (
     <div className="space-y-4">
       {/* Bulk Action / Selection Mode */}
@@ -158,16 +179,16 @@ export default function EventPhotosTab() {
         isSelectionMode={isSelectionMode}
       />
 
-      {/* Load More Button */}
-      {photosQuery.hasNextPage && (
-        <div className="flex justify-center pt-4">
-          <Button
-            onClick={() => photosQuery.fetchNextPage()}
-            disabled={photosQuery.isFetchingNextPage}
-            variant="outline"
-          >
-            {photosQuery.isFetchingNextPage ? 'Loading...' : 'Load More'}
-          </Button>
+      {/* Infinite scroll sentinel */}
+      <div ref={loadMoreRef} className="h-1" />
+
+      {/* Loading indicator */}
+      {photosQuery.isFetchingNextPage && (
+        <div className="flex justify-center py-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
+            Loading more photos...
+          </div>
         </div>
       )}
 
