@@ -156,18 +156,18 @@ export default function EventPhotosTab() {
         onPhotoClick={handlePhotoClick}
         onSelectionChange={handleSelectionChange}
         isSelectionMode={isSelectionMode}
-        hasNextPage={photosQuery.hasNextPage}
-        onLoadMore={() => photosQuery.fetchNextPage()}
-        isFetchingNextPage={photosQuery.isFetchingNextPage}
       />
 
-      {/* Loading indicator at bottom */}
-      {photosQuery.isFetchingNextPage && (
+      {/* Load More Button */}
+      {photosQuery.hasNextPage && (
         <div className="flex justify-center pt-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-            Loading more photos...
-          </div>
+          <Button
+            onClick={() => photosQuery.fetchNextPage()}
+            disabled={photosQuery.isFetchingNextPage}
+            variant="outline"
+          >
+            {photosQuery.isFetchingNextPage ? 'Loading...' : 'Load More'}
+          </Button>
         </div>
       )}
 
