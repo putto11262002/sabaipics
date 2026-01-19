@@ -69,6 +69,7 @@ class AppCoordinator: ObservableObject {
 
     /// Initialize with real WiFi camera service (production)
     /// This is the default initializer used in production builds
+    @MainActor
     init() {
         let service = WiFiCameraService()
         self.cameraService = service
@@ -82,6 +83,7 @@ class AppCoordinator: ObservableObject {
     /// Initialize with custom service (for testing/mocking)
     /// Use this in tests and previews to inject a MockCameraService
     /// - Parameter cameraService: Service conforming to CameraServiceProtocol
+    @MainActor
     init(cameraService: any CameraServiceProtocol) {
         self.cameraService = cameraService
         self.connectionStore = ConnectionStore(cameraService: cameraService)
