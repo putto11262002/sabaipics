@@ -4,14 +4,18 @@
 //
 //  Created: 2026-01-14
 //  Swift wrapper for WiFiCameraManager with Combine publishers
+//  Updated: 2026-01-19 - Added PTPIPSession support for WiFi cameras
 //
 
 import Foundation
 import Combine
+import Network
 
 /// Swift service that wraps the Objective-C WiFiCameraManager
 /// Provides Combine publishers for reactive state management in SwiftUI
 /// Conforms to CameraServiceProtocol for dependency injection and testing
+/// Now supports both libgphoto2 (legacy) and PTPIPSession (WiFi-only)
+@MainActor
 class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 
     // MARK: - Published Properties
@@ -33,8 +37,11 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
 
     // MARK: - Private Properties
 
-    /// The underlying Objective-C manager
+    /// The underlying Objective-C manager (legacy libgphoto2)
     private let manager: WiFiCameraManager
+
+    /// PTP/IP session for WiFi cameras (SAB-27)
+    private var ptpSession: PTPIPSession?
 
     // Task management
     private var connectionTask: Task<Void, Never>?
@@ -108,12 +115,20 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
         print("[WiFiCameraService] Disconnecting from WiFi camera")
         connectionTask?.cancel()
         connectionTask = nil
+
+        // Disconnect PTP/IP session if active
+        if let session = ptpSession {
+            Task {
+                await session.disconnect()
+                self.ptpSession = nil
+            }
+        }
+
+        // Disconnect legacy manager
         manager.disconnect()
 
-        DispatchQueue.main.async {
-            self.isConnected = false
-            self.connectionError = nil
-        }
+        self.isConnected = false
+        self.connectionError = nil
     }
 
     /// Cancel any pending connection attempt
@@ -180,6 +195,46 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
         retryCount = 0
     }
 
+    // MARK: - PTP/IP Session Methods (SAB-27)
+
+    /// Connect using existing PTP/IP connections (from NetworkScannerService)
+    /// This is the preferred method for WiFi cameras (multi-session support)
+    /// - Parameters:
+    ///   - commandConnection: Established command channel connection
+    ///   - eventConnection: Established event channel connection
+    ///   - sessionID: Unique session ID for this camera
+    func connectWithPTPSession(
+        commandConnection: NWConnection,
+        eventConnection: NWConnection,
+        sessionID: UInt32
+    ) async {
+        print("[WiFiCameraService] Connecting with PTP/IP session \(sessionID)...")
+
+        // Reset error state
+        connectionError = nil
+
+        // Create new PTP/IP session
+        let session = PTPIPSession(sessionID: sessionID)
+        session.delegate = self
+        self.ptpSession = session
+
+        do {
+            // Connect using existing connections (no reconnect!)
+            try await session.connect(commandConnection: commandConnection, eventConnection: eventConnection)
+
+            // Success
+            print("[WiFiCameraService] PTP/IP session connected")
+            self.isConnected = true
+            self.connectionError = nil
+
+        } catch {
+            print("[WiFiCameraService] PTP/IP session failed: \(error)")
+            self.isConnected = false
+            self.connectionError = error.localizedDescription
+            self.ptpSession = nil
+        }
+    }
+
     // MARK: - CameraServiceProtocol Compatibility Methods
 
     /// Protocol-compatible connect method (uses IP address string)
@@ -204,6 +259,43 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
         connectWithRetry(config: config)
     }
 
+}
+
+// MARK: - PTPIPSessionDelegate
+
+extension WiFiCameraService: PTPIPSessionDelegate {
+
+    func sessionDidConnect(_ session: PTPIPSession) {
+        print("[WiFiCameraService] PTP/IP session connected")
+        self.isConnected = true
+        self.connectionError = nil
+    }
+
+    func session(_ session: PTPIPSession, didDetectPhoto objectHandle: UInt32) {
+        print("[WiFiCameraService] Photo detected via PTP/IP: 0x\(String(format: "%08X", objectHandle))")
+        // Photo will be auto-downloaded by PTPIPSession
+    }
+
+    func session(_ session: PTPIPSession, didDownloadPhoto data: Data, objectHandle: UInt32) {
+        print("[WiFiCameraService] Photo downloaded via PTP/IP: \(data.count) bytes")
+
+        // Generate filename from object handle
+        let filename = "PTP_\(String(format: "%08X", objectHandle)).jpg"
+
+        // Add to downloaded photos array
+        self.downloadedPhotos.append((filename: filename, data: data))
+    }
+
+    func session(_ session: PTPIPSession, didFailWithError error: Error) {
+        print("[WiFiCameraService] PTP/IP session error: \(error)")
+        self.connectionError = error.localizedDescription
+    }
+
+    func sessionDidDisconnect(_ session: PTPIPSession) {
+        print("[WiFiCameraService] PTP/IP session disconnected")
+        self.isConnected = false
+        self.ptpSession = nil
+    }
 }
 
 // MARK: - WiFiCameraManagerDelegate
