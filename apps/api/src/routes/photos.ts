@@ -2,23 +2,11 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, and, desc, lt, inArray, sql, asc, gt, isNull } from 'drizzle-orm';
-import {
-  photos,
-  events,
-  photoStatuses,
-  creditLedger,
-  photographers,
-  Photo,
-  type DatabaseTx,
-} from '@sabaipics/db';
-import { requirePhotographer, requireConsent, type PhotographerVariables } from '../middleware';
+import { photos, events, photoStatuses, creditLedger, photographers } from '@sabaipics/db';
+import { requirePhotographer, requireConsent } from '../middleware';
 import type { Bindings, Env } from '../types';
 import type { PhotoJob } from '../types/photo-job';
-import {
-  normalizeImage,
-  DEFAULT_NORMALIZE_OPTIONS,
-  type NormalizeResult,
-} from '../lib/images/normalize';
+import { extractJpegDimensions } from '../lib/images/jpeg';
 import { createZip } from 'littlezipper';
 import { apiError, type HandlerError } from '../lib/error';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
@@ -401,31 +389,42 @@ export const photosRouter = new Hono<Env>()
         // 4. Get file bytes and normalize image
         const arrayBuffer = await file.arrayBuffer();
 
-        let normalizeResult: NormalizeResult;
-        console.log(process.env.NODE_ENV);
+        const normalizeResult = yield* ResultAsync.fromThrowable(
+          async () => {
+            const stream = new ReadableStream({
+              start(controller) {
+                controller.enqueue(arrayBuffer);
+                controller.close();
+              },
+            });
+            const res = await c.env.IMAGES.input(stream)
+              .transform({
+                width: 4000,
+                height: 4000,
+                fit: 'scale-down',
+              })
+              .output({ format: 'image/jpeg', quality: 90 })
+              .then((res) => res.response())
+              .then((res) => res.arrayBuffer());
 
-        if (process.env.NODE_ENV === 'development') {
-          normalizeResult = {
-            bytes: arrayBuffer,
-            width: 4000,
-            height: 4000,
-          };
-        } else {
-          normalizeResult = yield* ResultAsync.fromPromise(
-            normalizeImage(
-              arrayBuffer,
-              originalMimeType,
-              c.env.PHOTOS_BUCKET,
-              c.env.PHOTO_R2_BASE_URL,
-              DEFAULT_NORMALIZE_OPTIONS,
-            ),
-            (e): HandlerError => ({
-              code: 'UNPROCESSABLE',
-              message: 'Image processing failed',
-              cause: e,
-            }),
-          );
-        }
+            const dimensions = extractJpegDimensions(res);
+
+            if (!dimensions) {
+              throw new Error('Failed to extract dimensions from normalized JPEG');
+            }
+
+            return {
+              bytes: res,
+              width: dimensions.width,
+              height: dimensions.height,
+            };
+          },
+          (e): HandlerError => ({
+            code: 'UNPROCESSABLE',
+            message: 'Image processing failed',
+            cause: e,
+          }),
+        )();
 
         const { bytes: normalizedImageBytes, width, height } = normalizeResult;
         const fileSize = normalizedImageBytes.byteLength;
@@ -555,7 +554,7 @@ export const photosRouter = new Hono<Env>()
           uploadedAt: photo.uploadedAt,
         });
       })
-        .orTee((e) => e.cause && console.error(`[${c.req.url}] ${e.code}:`, e.cause))
+        .orTee((e) => console.log(e))
         .match(
           (data) => c.json({ data }, 201),
           (e) => apiError(c, e),
