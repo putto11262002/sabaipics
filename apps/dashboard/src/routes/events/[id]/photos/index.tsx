@@ -105,6 +105,16 @@ export default function EventPhotosTab() {
     setIsLightboxOpen(false);
   }, []);
 
+  const handlePhotoSelected = useCallback(
+    (id: string) => {
+      if (selectedPhotoIds.includes(id)) {
+        return;
+      }
+      setSelectedPhotoIds((prev) => [...prev, id]);
+    },
+    [selectedPhotoIds],
+  );
+
   // Get all photos from all pages
   const allPhotos = photosQuery.data?.pages.flatMap((page) => page.data) ?? [];
 
@@ -118,11 +128,15 @@ export default function EventPhotosTab() {
     const observer = new IntersectionObserver(
       (entries) => {
         // When sentinel is visible and we have more pages, fetch next
-        if (entries[0].isIntersecting && photosQuery.hasNextPage && !photosQuery.isFetchingNextPage) {
+        if (
+          entries[0].isIntersecting &&
+          photosQuery.hasNextPage &&
+          !photosQuery.isFetchingNextPage
+        ) {
           photosQuery.fetchNextPage();
         }
       },
-      { rootMargin: '200px' } // Trigger 200px before reaching bottom
+      { rootMargin: '200px' }, // Trigger 200px before reaching bottom
     );
 
     observer.observe(sentinel);
@@ -143,11 +157,20 @@ export default function EventPhotosTab() {
             <Button size="sm" variant="outline" onClick={handleExitSelectionMode}>
               Cancel
             </Button>
-            <Button size="sm" onClick={handleBulkDownload} disabled={isDownloading || deleteMutation.isPending}>
+            <Button
+              size="sm"
+              onClick={handleBulkDownload}
+              disabled={isDownloading || deleteMutation.isPending}
+            >
               <Download className="size-4 mr-2" />
               {isDownloading ? 'Downloading...' : 'Download'}
             </Button>
-            <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={isDownloading || deleteMutation.isPending}>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={isDownloading || deleteMutation.isPending}
+            >
               <Trash2 className="size-4 mr-2" />
               {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
@@ -171,12 +194,10 @@ export default function EventPhotosTab() {
 
       {/* Grid View */}
       <PhotosGridView
-        key={isSelectionMode ? 'selection' : 'normal'}
         photos={allPhotos}
-        isLoading={photosQuery.isLoading}
-        onPhotoClick={handlePhotoClick}
-        onSelectionChange={handleSelectionChange}
-        isSelectionMode={isSelectionMode}
+        onPhotoSelected={handlePhotoSelected}
+        isSelelectable={isSelectionMode}
+        selectedPhotoIds={selectedPhotoIds}
       />
 
       {/* Infinite scroll sentinel */}

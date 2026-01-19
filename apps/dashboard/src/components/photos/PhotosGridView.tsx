@@ -1,82 +1,49 @@
-import { AspectRatio } from "@sabaipics/ui/components/aspect-ratio";
-import { Badge } from "@sabaipics/ui/components/badge";
-import { Skeleton } from "@sabaipics/ui/components/skeleton";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@sabaipics/ui/components/empty";
-import { Check, Image as ImageIcon } from "lucide-react";
-import type { Photo } from "../../hooks/photos/usePhotos";
-import { useState, useEffect, useRef } from "react";
-import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
-import { toast } from "sonner";
+import { AspectRatio } from '@sabaipics/ui/components/aspect-ratio';
+import { Badge } from '@sabaipics/ui/components/badge';
+import { Skeleton } from '@sabaipics/ui/components/skeleton';
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from '@sabaipics/ui/components/empty';
+import { Check, Image as ImageIcon } from 'lucide-react';
+import type { Photo } from '../../hooks/photos/usePhotos';
+import { useState, useEffect, useRef } from 'react';
+import { useReactTable, getCoreRowModel } from '@tanstack/react-table';
+import { toast } from 'sonner';
+import { ColumnsPhotoAlbum } from 'react-photo-album';
+import 'react-photo-album/columns.css';
 
 const MAX_SELECTION = 15;
 
 interface PhotosGridViewProps {
   photos: Photo[];
-  isLoading: boolean;
-  onPhotoClick: (index: number) => void;
-  onSelectionChange?: (photoIds: string[]) => void;
-  isSelectionMode?: boolean;
+  onPhotoSelected: (id: string) => void;
+  selectedPhotoIds: string[];
+  isSelelectable: boolean;
 }
 
 export function PhotosGridView({
   photos,
-  isLoading,
-  onPhotoClick,
-  onSelectionChange,
-  isSelectionMode = false
+  onPhotoSelected,
+  selectedPhotoIds,
+  isSelelectable,
 }: PhotosGridViewProps) {
   const [rowSelection, setRowSelection] = useState({});
   const previousPhotoIdsRef = useRef<string[]>([]);
 
-  const table = useReactTable({
-    data: photos,
-    columns: [],
-    state: { rowSelection },
-    enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: (_, index) => String(index),
-    enableMultiRowSelection: true,
-  });
-
-  // Notify parent of selection changes (only when actually changed)
-  useEffect(() => {
-    const selectedRows = table.getFilteredSelectedRowModel().rows;
-    const photoIds = selectedRows.map((row) => photos[parseInt(row.id)].id);
-
-    // Only notify if the actual photo IDs changed
-    const prevIds = previousPhotoIdsRef.current;
-    const hasChanged = photoIds.length !== prevIds.length ||
-      photoIds.some((id, i) => prevIds[i] !== id);
-
-    if (hasChanged) {
-      previousPhotoIdsRef.current = photoIds;
-      onSelectionChange?.(photoIds);
-    }
-  }, [rowSelection, photos, onSelectionChange]);
-
-  const handleToggleRowSelection = (rowId: string, value: boolean) => {
-    const row = table.getRow(rowId);
-    const currentSelectionCount = table.getFilteredSelectedRowModel().rows.length;
-    const isCurrentlySelected = row.getIsSelected();
-
-    if (value && !isCurrentlySelected && currentSelectionCount >= MAX_SELECTION) {
-      toast.error(`Maximum ${MAX_SELECTION} photos can be selected`);
-      return;
-    }
-    row.toggleSelected(!!value);
-  };
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-square w-full" />
-        ))}
-      </div>
-    );
-  }
+  // // Loading state
+  // if (isLoading) {
+  //   return (
+  //     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+  //       {Array.from({ length: 8 }).map((_, i) => (
+  //         <Skeleton key={i} className="aspect-square w-full" />
+  //       ))}
+  //     </div>
+  //   );
+  // }
 
   // Empty state
   if (photos.length === 0) {
@@ -94,6 +61,34 @@ export function PhotosGridView({
       </Empty>
     );
   }
+  const dPhotos = photos
+    ? photos?.map((photo, index) => ({
+        src: photo.thumbnailUrl,
+        height: photo.height,
+        width: photo.width,
+        key: photo.id,
+      }))
+    : [];
+  return (
+    <ColumnsPhotoAlbum
+      photos={dPhotos}
+      render={{
+        container: ({ ref, ...rest }) => <div className="bg-muted" ref={ref} {...rest} />,
+        extras: (_, { photo, index }) => {
+          const isSelected = selectedPhotoIds.includes(photo.key);
+          if (isSelected) {
+            return (
+              <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center">
+                <div className="bg-primary rounded-full p-2">
+                  <Check className="size-6 text-primary-foreground" />
+                </div>
+              </div>
+            );
+          }
+        },
+      }}
+    />
+  );
 
   // Grid view with photos
   return (
@@ -163,7 +158,7 @@ export function PhotosGridView({
                     {/* Face count badge (only for indexed photos on hover) */}
                     {photo.status === 'indexed' && (
                       <Badge className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {photo.faceCount} {photo.faceCount === 1 ? "face" : "faces"}
+                        {photo.faceCount} {photo.faceCount === 1 ? 'face' : 'faces'}
                       </Badge>
                     )}
                   </>

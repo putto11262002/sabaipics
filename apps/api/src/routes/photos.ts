@@ -155,6 +155,8 @@ export const photosRouter = new Hono<Env>()
               faceCount: photos.faceCount,
               fileSize: photos.fileSize,
               uploadedAt: photos.uploadedAt,
+              width: photos.width,
+              height: photos.height,
             })
             .from(photos)
             .where(
@@ -192,6 +194,8 @@ export const photosRouter = new Hono<Env>()
           fileSize: photo.fileSize,
           status: photo.status,
           uploadedAt: new Date(photo.uploadedAt).toISOString(),
+          width: photo.width,
+          height: photo.height,
         }));
 
         return ok({
