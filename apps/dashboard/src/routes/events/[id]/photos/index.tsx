@@ -149,19 +149,17 @@ export default function EventPhotosTab() {
       </div>
 
       {/* Grid View */}
-      <div className="min-h-[500px]">
-        <PhotosGridView
-          key={isSelectionMode ? 'selection' : 'normal'}
-          photos={allPhotos}
-          isLoading={photosQuery.isLoading}
-          onPhotoClick={handlePhotoClick}
-          onSelectionChange={handleSelectionChange}
-          isSelectionMode={isSelectionMode}
-          hasNextPage={photosQuery.hasNextPage}
-          onLoadMore={() => photosQuery.fetchNextPage()}
-          isFetchingNextPage={photosQuery.isFetchingNextPage}
-        />
-      </div>
+      <PhotosGridView
+        key={isSelectionMode ? 'selection' : 'normal'}
+        photos={allPhotos}
+        isLoading={photosQuery.isLoading}
+        onPhotoClick={handlePhotoClick}
+        onSelectionChange={handleSelectionChange}
+        isSelectionMode={isSelectionMode}
+        hasNextPage={photosQuery.hasNextPage}
+        onLoadMore={() => photosQuery.fetchNextPage()}
+        isFetchingNextPage={photosQuery.isFetchingNextPage}
+      />
 
       {/* Loading indicator at bottom */}
       {photosQuery.isFetchingNextPage && (

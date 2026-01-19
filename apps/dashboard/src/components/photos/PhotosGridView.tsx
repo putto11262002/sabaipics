@@ -104,20 +104,21 @@ export function PhotosGridView({
 
   // Grid view with photos using VirtuosoGrid for virtualization
   return (
-    <VirtuosoGrid
-      totalCount={photos.length}
-      endReached={() => {
-        if (hasNextPage && !isFetchingNextPage && onLoadMore) {
-          onLoadMore();
-        }
-      }}
-      overscan={200}
-      style={{ height: '100%' }}
-      className="w-full"
-      data={photos}
-      listClassName="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2"
-      itemClassName="virtuoso-grid-item"
-      itemContent={(index, photo) => {
+    <div style={{ height: 'calc(100vh - 300px)' }}>
+      <VirtuosoGrid
+        totalCount={photos.length}
+        endReached={() => {
+          if (hasNextPage && !isFetchingNextPage && onLoadMore) {
+            onLoadMore();
+          }
+        }}
+        overscan={200}
+        style={{ height: '100%' }}
+        className="w-full"
+        data={photos}
+        listClassName="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2"
+        itemClassName="virtuoso-grid-item"
+        itemContent={(index, photo) => {
         const row = table.getRow(String(index));
         const isSelected = row.getIsSelected();
 
@@ -194,5 +195,6 @@ export function PhotosGridView({
         ),
       }}
     />
+    </div>
   );
 }
