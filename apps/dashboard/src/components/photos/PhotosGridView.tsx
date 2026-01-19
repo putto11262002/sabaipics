@@ -107,8 +107,10 @@ export function PhotosGridView({
     <div style={{ height: 'calc(100vh - 300px)' }}>
       <VirtuosoGrid
         totalCount={photos.length}
-        endReached={() => {
-          if (hasNextPage && !isFetchingNextPage && onLoadMore) {
+        endReached={(offset) => {
+          // Only trigger if user has scrolled (offset > 0) or if initial load is small
+          const isInitialLoad = photos.length < 20;
+          if ((offset > 0 || isInitialLoad) && hasNextPage && !isFetchingNextPage && onLoadMore) {
             onLoadMore();
           }
         }}
