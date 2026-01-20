@@ -8,8 +8,6 @@ import {
 import { Check, Image as ImageIcon } from 'lucide-react';
 import type { Photo } from '../../hooks/photos/usePhotos';
 import { useState, useMemo } from 'react';
-import { ColumnsPhotoAlbum } from 'react-photo-album';
-import 'react-photo-album/columns.css';
 
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
@@ -20,6 +18,9 @@ import Slideshow from 'yet-another-react-lightbox/plugins/slideshow';
 // import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 import 'yet-another-react-lightbox/plugins/thumbnails.css';
+
+import { RowsPhotoAlbum } from 'react-photo-album';
+import 'react-photo-album/rows.css';
 
 interface PhotosGridViewProps {
   photos: Photo[];
@@ -75,7 +76,7 @@ export function PhotosGridView({
         // enable optional lightbox plugins
         plugins={[Fullscreen, Slideshow, Zoom]}
       />
-      <ColumnsPhotoAlbum
+      <RowsPhotoAlbum
         photos={photos}
         onClick={({ index, photo }) => {
           if (!isSelelectable) {

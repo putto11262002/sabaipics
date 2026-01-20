@@ -69,19 +69,17 @@ export default function EventPhotosTab() {
     setSelectedPhotoIds([]);
   }, []);
 
-  const handlePhotoSelected = useCallback(
-    (id: string) => {
-      if (selectedPhotoIds.includes(id)) {
-        return;
-      }
-      if (selectedPhotoIds.length === MAX_SELECTION) {
-        toast.error('Maximum selection reached');
-        return;
-      }
-      setSelectedPhotoIds((prev) => [...prev, id]);
-    },
-    [selectedPhotoIds],
-  );
+  const handlePhotoSelected = (id: string) => {
+    if (selectedPhotoIds.includes(id)) {
+      setSelectedPhotoIds((prev) => prev.filter((i) => i !== id));
+      return;
+    }
+    if (selectedPhotoIds.length === MAX_SELECTION) {
+      toast.error('Maximum selection reached');
+      return;
+    }
+    setSelectedPhotoIds((prev) => [...prev, id]);
+  };
 
   // Get all photos from all pages
   const allPhotos = photosQuery.data?.pages.flatMap((page) => page.data) ?? [];
@@ -112,9 +110,9 @@ export default function EventPhotosTab() {
   }, [photosQuery.hasNextPage, photosQuery.isFetchingNextPage, photosQuery.fetchNextPage]);
 
   return (
-    <div className="space-y-3">
+    <>
       {/* Bulk Action / Selection Mode */}
-      <div className="flex justify-between items-center gap-3">
+      <div className="flex justify-between items-center gap-3 sticky top-0 z-20 bg-background py-4">
         {isSelectionMode ? (
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground">
@@ -130,41 +128,47 @@ export default function EventPhotosTab() {
             Select
           </Button>
         )}
-        {isSelectionMode && (
-          <div className="flex items-center gap-3">
-            {selectedPhotoIds.length > 0 && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleBulkDownload}
-                  disabled={downloadMutation.isPending || deleteMutation.isPending}
-                >
-                  <Download className="size-4 mr-1" />
-                  {downloadMutation.isPending ? 'Downloading...' : 'Download'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructiveOutline"
-                  onClick={handleBulkDelete}
-                  disabled={downloadMutation.isPending || deleteMutation.isPending}
-                >
-                  <Trash2 className="size-4 mr-1" />
-                  {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-                </Button>
-              </>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBulkDownload}
+              disabled={
+                selectedPhotoIds.length === 0 ||
+                downloadMutation.isPending ||
+                deleteMutation.isPending
+              }
+            >
+              <Download className="size-4 mr-1" />
+              {downloadMutation.isPending ? 'Downloading...' : 'Download'}
+            </Button>
+            <Button
+              size="sm"
+              variant="destructiveOutline"
+              onClick={handleBulkDelete}
+              disabled={
+                selectedPhotoIds.length === 0 ||
+                downloadMutation.isPending ||
+                deleteMutation.isPending
+              }
+            >
+              <Trash2 className="size-4 mr-1" />
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </>
+        </div>
       </div>
 
       {/* Grid View */}
-      <PhotosGridView
-        photos={allPhotos}
-        onPhotoSelected={handlePhotoSelected}
-        isSelelectable={isSelectionMode}
-        selectedPhotoIds={selectedPhotoIds}
-      />
+      <div className="h-full mb-2">
+        <PhotosGridView
+          photos={allPhotos}
+          onPhotoSelected={handlePhotoSelected}
+          isSelelectable={isSelectionMode}
+          selectedPhotoIds={selectedPhotoIds}
+        />
+      </div>
 
       {/* Infinite scroll sentinel */}
       <div ref={loadMoreRef} className="h-1" />
@@ -175,6 +179,6 @@ export default function EventPhotosTab() {
           <Spinner />
         </div>
       )}
-    </div>
+    </>
   );
 }
