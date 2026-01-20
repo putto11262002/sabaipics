@@ -95,7 +95,8 @@ export function UploadLog({ eventId }: UploadLogProps) {
     setShouldPoll(hasProcessing);
   }, [statuses, pollableIds.length]);
 
-  // Remove indexed entries and invalidate cache
+  // Remove indexed entries from upload log
+  // Note: No invalidation needed since we use optimistic updates
   useEffect(() => {
     if (!statuses) return;
 
@@ -104,12 +105,13 @@ export function UploadLog({ eventId }: UploadLogProps) {
     if (indexedPhotos.length > 0) {
       indexedPhotos.forEach((p) => removeEntry(p.id));
 
-      // Invalidate photos query to refresh gallery
-      queryClient.invalidateQueries({
-        queryKey: ['event', eventId, 'photos'],
-      });
+      // NOTE: Optimistic updates already added photos to gallery cache
+      // No need to invalidate and refetch - photos are already visible
+      // queryClient.invalidateQueries({
+      //   queryKey: ['event', eventId, 'photos'],
+      // });
     }
-  }, [statuses, eventId, queryClient, removeEntry]);
+  }, [statuses, removeEntry]);
 
   // Create a map for quick status lookup
   const statusMap = useMemo(() => {

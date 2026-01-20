@@ -8,8 +8,20 @@ import { useDeletePhotos } from '../../../../hooks/photos/useDeletePhotos';
 import { useDownloadPhotos } from '../../../../hooks/photos/useDownloadPhotos';
 import { toast } from 'sonner';
 import { Spinner } from '@sabaipics/ui/components/spinner';
+import { Skeleton } from '@sabaipics/ui/components/skeleton';
 
 const MAX_SELECTION = 15;
+
+// Skeleton component for photo grid loading state
+function PhotosGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      {Array.from({ length: 20 }).map((_, i) => (
+        <Skeleton key={i} className="aspect-square rounded-lg" />
+      ))}
+    </div>
+  );
+}
 
 export default function EventPhotosTab() {
   const { id } = useParams<{ id: string }>();
@@ -83,6 +95,9 @@ export default function EventPhotosTab() {
 
   // Get all photos from all pages
   const allPhotos = photosQuery.data?.pages.flatMap((page) => page.data) ?? [];
+
+  // Show skeleton on initial load
+  const isInitialLoading = photosQuery.isLoading && !allPhotos.length;
 
   // Infinite scroll with Intersection Observer
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -162,12 +177,16 @@ export default function EventPhotosTab() {
 
       {/* Grid View */}
       <div className="h-full mb-2">
-        <PhotosGridView
-          photos={allPhotos}
-          onPhotoSelected={handlePhotoSelected}
-          isSelelectable={isSelectionMode}
-          selectedPhotoIds={selectedPhotoIds}
-        />
+        {isInitialLoading ? (
+          <PhotosGridSkeleton />
+        ) : (
+          <PhotosGridView
+            photos={allPhotos}
+            onPhotoSelected={handlePhotoSelected}
+            isSelelectable={isSelectionMode}
+            selectedPhotoIds={selectedPhotoIds}
+          />
+        )}
       </div>
 
       {/* Infinite scroll sentinel */}

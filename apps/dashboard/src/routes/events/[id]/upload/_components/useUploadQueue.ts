@@ -57,35 +57,7 @@ export function useUploadQueue(eventId: string | undefined) {
           });
         }
 
-        // Optimistically add to gallery cache (indexed photos)
-        const queryClient = (window as any).__queryClient;
-        if (queryClient) {
-          queryClient.setQueryData(
-            ['event', eventId, 'photos', ['indexed']],
-            (old: any) => {
-              if (!old || !old.pages) return old;
-
-              const optimisticPhoto = {
-                id: result.id,
-                thumbnailUrl: generateThumbnailUrl(result.r2Key),
-                previewUrl: generatePreviewUrl(result.r2Key),
-                status: 'indexed',
-                faceCount: result.faceCount,
-                fileSize: result.fileSize ?? null,
-                uploadedAt: result.uploadedAt,
-              };
-
-              return {
-                ...old,
-                pages: old.pages.map((page: any, index: number) =>
-                  index === 0
-                    ? { ...page, data: [optimisticPhoto, ...page.data] }
-                    : page
-                ),
-              };
-            }
-          );
-        }
+        // NOTE: No optimistic gallery updates - gallery refetches on mount
       } catch (error) {
         const err = error as Error & { status?: number };
         let errorMessage = err.message || 'Upload failed';
