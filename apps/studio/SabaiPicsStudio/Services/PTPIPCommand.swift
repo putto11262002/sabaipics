@@ -236,6 +236,18 @@ struct PTPCommand {
             parameters: [mode]
         )
     }
+
+    /// Build GetObjectInfo command
+    /// - Parameter objectHandle: Object handle to get info for
+    /// - Returns: PTPIPOperationRequest packet
+    mutating func getObjectInfo(handle: UInt32) -> PTPIPOperationRequest {
+        return PTPIPOperationRequest(
+            dataPhaseInfo: 1,  // 1 = receive data from camera
+            operationCode: PTPOperationCode.getObjectInfo.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: [handle]
+        )
+    }
 }
 
 // MARK: - Transaction Manager

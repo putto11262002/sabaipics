@@ -3,6 +3,7 @@
 //  SabaiPicsStudio
 //
 //  Created: 2026-01-15
+//  Updated: 2026-01-19 - Transfer Session Architecture
 //  Connection failed screen with "Try Again" button
 //
 
@@ -36,11 +37,10 @@ struct ConnectionErrorView: View {
 
             Spacer()
 
-            // Try Again button
+            // Try Again button - returns to manufacturer selection
             Button(action: {
                 withAnimation {
-                    coordinator.appState = .idle
-                    coordinator.connectionStore.cancelConnection()
+                    coordinator.backToManufacturerSelection()
                 }
             }) {
                 Text("Try Again")

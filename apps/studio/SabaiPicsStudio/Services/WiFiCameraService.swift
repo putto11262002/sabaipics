@@ -240,7 +240,89 @@ class WiFiCameraService: NSObject, ObservableObject, CameraServiceProtocol {
         }
     }
 
+    /// Connect using a discovered camera with prepared session (SAB-23)
+    /// Session already has: Init handshake + OpenSession + SetEventMode done
+    /// We just need to take ownership and start event monitoring
+    /// - Parameter camera: DiscoveredCamera from NetworkScannerService
+    func connectWithDiscoveredCamera(_ camera: DiscoveredCamera) async {
+        // Reset error state
+        connectionError = nil
+
+        print("[WiFiCameraService] connectWithDiscoveredCamera: \(camera.name) at \(camera.ipAddress)")
+
+        // Verify session is available and ready
+        guard let session = camera.session, session.connected else {
+            print("[WiFiCameraService] ❌ No prepared session, falling back to IP connect")
+            await connectViaPTPIPAsync(ip: camera.ipAddress)
+            return
+        }
+
+        print("[WiFiCameraService] ✓ Taking ownership of prepared session")
+
+        // Take ownership of the session
+        session.delegate = self
+        self.ptpSession = session
+
+        // Clear session from camera so it doesn't get disconnected when camera is cleaned up
+        camera.session = nil
+
+        // Start event monitoring (this is the only thing left to do!)
+        session.startEventMonitoring()
+
+        // Success - delegate callback (sessionDidConnect) will set isConnected
+        print("[WiFiCameraService] ✅ Session activated - monitoring started!")
+    }
+
     // MARK: - PTP/IP Direct Connection (SAB-27)
+
+    /// Async version of connectViaPTPIP for use in async contexts
+    /// - Parameter ip: Camera IP address (e.g., "192.168.1.1")
+    private func connectViaPTPIPAsync(ip: String) async {
+        // Reset error state
+        connectionError = nil
+
+        // Disconnect any existing session first
+        if let existingSession = ptpSession {
+            await existingSession.disconnect()
+            ptpSession = nil
+        }
+
+        // Create NWConnection objects for command and event channels (port 15740)
+        let commandConnection = createConnection(to: ip, port: 15740)
+        let eventConnection = createConnection(to: ip, port: 15740)
+
+        do {
+            // Start command connection FIRST (per libgphoto2 sequence)
+            commandConnection.start(queue: .main)
+
+            // Wait for command connection to be ready
+            try await waitForConnection(commandConnection, timeout: 5.0)
+
+            // Create PTP/IP session with random session ID and persistent GUID
+            let sessionID = UInt32.random(in: 1...UInt32.max)
+            let guid = self.persistentGUID
+            let session = PTPIPSession(sessionID: sessionID, guid: guid)
+            session.delegate = self
+            self.ptpSession = session
+
+            // Connect (will perform Init handshake internally)
+            try await session.connect(
+                commandConnection: commandConnection,
+                eventConnection: eventConnection
+            )
+
+            // Success - delegate will be notified via sessionDidConnect
+
+        } catch {
+            // Cancel connections on failure to clean up TCP sockets
+            commandConnection.cancel()
+            eventConnection.cancel()
+
+            self.isConnected = false
+            self.connectionError = error.localizedDescription
+            self.ptpSession = nil
+        }
+    }
 
     /// Connect directly via PTP/IP protocol (pure Swift implementation)
     /// This bypasses libgphoto2 and uses the new Swift PTP/IP client
@@ -409,6 +491,11 @@ extension WiFiCameraService: PTPIPSessionDelegate {
         // Clear downloaded photos on disconnect (don't persist)
         self.downloadedPhotos.removeAll()
         self.detectedPhotos.removeAll()
+    }
+
+    func session(_ session: PTPIPSession, didSkipRawFile filename: String) {
+        // WiFiCameraService doesn't track RAW skips - only TransferSession does
+        print("[WiFiCameraService] RAW file skipped: \(filename)")
     }
 }
 
