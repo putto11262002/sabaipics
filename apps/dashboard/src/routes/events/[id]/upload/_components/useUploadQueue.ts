@@ -1,14 +1,102 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useUploadPhoto } from '../../../../../hooks/photos/useUploadPhoto';
-import { generateThumbnailUrl, generatePreviewUrl } from '../../../../../lib/photos';
+import { usePhotos, type Photo } from '../../../../../hooks/photos/usePhotos';
+import { usePhotosStatus } from '../../../../../hooks/photos/usePhotoStatus';
 import type { UploadQueueItem } from './upload';
 
 export type { UploadQueueItem };
+
+export interface UploadLogEntry {
+  id: string;
+  fileName?: string;
+  status: 'uploading' | 'indexing' | 'indexed' | 'failed';
+  thumbnailUrl?: string;
+  fileSize?: number | null | undefined;
+  faceCount?: number | null | undefined;
+  error?: string;
+  uploadedAt: string;
+}
 
 const MAX_TOKENS = 5;
 
 export function useUploadQueue(eventId: string | undefined) {
   const uploadPhotoMutation = useUploadPhoto();
+
+  // Fetch existing photos from API (uploading/indexing/failed)
+  const photosQuery = usePhotos({
+    eventId,
+    status: ['uploading', 'indexing', 'failed'],
+  });
+
+  // Upload log state (single source of truth)
+  const uploadLogRef = useRef<Map<string, UploadLogEntry>>(new Map());
+  const [, setUploadLogVersion] = useState(0); // Force re-renders
+
+  // Initialize upload log with photos from API
+  useEffect(() => {
+    if (!photosQuery.data) return;
+
+    const initialPhotos = photosQuery.data.pages.flatMap((page) => page.data);
+    initialPhotos.forEach((photo: Photo) => {
+      uploadLogRef.current.set(photo.id, {
+        id: photo.id,
+        thumbnailUrl: photo.thumbnailUrl,
+        fileSize: photo.fileSize,
+        faceCount: photo.faceCount,
+        status: photo.status,
+        uploadedAt: photo.uploadedAt,
+      });
+    });
+
+    setUploadLogVersion((v) => v + 1);
+  }, [photosQuery.data]);
+
+  // Status polling for upload log entries
+  const pollableIds = Array.from(uploadLogRef.current.values())
+    .filter((e) => {
+      const isOptimistic = /^\d+-/.test(e.id);
+      return !isOptimistic && e.status !== 'indexed' && e.status !== 'failed';
+    })
+    .map((e) => e.id);
+
+  const { data: statuses } = usePhotosStatus(pollableIds, {
+    refetchInterval: pollableIds.length > 0 ? 2000 : false,
+  });
+
+  // Update upload log from polling
+  useEffect(() => {
+    if (!statuses) return;
+
+    statuses.forEach((status) => {
+      const existing = uploadLogRef.current.get(status.id);
+      if (!existing) return;
+
+      uploadLogRef.current.set(status.id, {
+        ...existing,
+        ...status,
+      });
+    });
+
+    setUploadLogVersion((v) => v + 1);
+  }, [statuses]);
+
+  // Remove indexed entries from upload log
+  useEffect(() => {
+    if (!statuses) return;
+
+    const indexedPhotos = statuses.filter((s) => s.status === 'indexed');
+    if (indexedPhotos.length > 0) {
+      indexedPhotos.forEach((p) => {
+        uploadLogRef.current.delete(p.id);
+      });
+      setUploadLogVersion((v) => v + 1);
+    }
+  }, [statuses]);
+
+  // Helper to sync upload log state
+  const syncUploadLog = useCallback(() => {
+    setUploadLogVersion((v) => v + 1);
+  }, []);
 
   // Refs for queue management (non-reactive)
   const pendingQueueRef = useRef<UploadQueueItem[]>([]);
@@ -35,10 +123,11 @@ export function useUploadQueue(eventId: string | undefined) {
       if (!eventId) return;
 
       // Update upload log to show uploading
-      const actions = (window as any).__uploadLogActions;
-      if (actions) {
-        actions.updateEntry(item.id, { status: 'uploading' });
-      }
+      uploadLogRef.current.set(item.id, {
+        ...uploadLogRef.current.get(item.id)!,
+        status: 'uploading',
+      });
+      syncUploadLog();
 
       try {
         const result = await uploadPhotoMutation.mutateAsync({
@@ -49,13 +138,18 @@ export function useUploadQueue(eventId: string | undefined) {
         // Success - remove from active, update upload log with real photo data
         activeUploadsRef.current.delete(item.id);
 
-        if (actions) {
-          actions.updateEntry(item.id, {
-            id: result.id,
-            status: result.status,
-            faceCount: result.faceCount,
-          });
-        }
+        // Replace temp ID with real ID in upload log
+        uploadLogRef.current.delete(item.id);
+        uploadLogRef.current.set(result.id, {
+          id: result.id,
+          fileName: item.file.name,
+          status: result.status,
+          thumbnailUrl: result.thumbnailUrl,
+          fileSize: result.fileSize,
+          faceCount: result.faceCount,
+          uploadedAt: result.uploadedAt,
+        });
+        syncUploadLog();
 
         // NOTE: No optimistic gallery updates - gallery refetches on mount
       } catch (error) {
@@ -69,12 +163,12 @@ export function useUploadQueue(eventId: string | undefined) {
         }
 
         // Update upload log with error
-        if (actions) {
-          actions.updateEntry(item.id, {
-            status: 'failed',
-            error: errorMessage,
-          });
-        }
+        uploadLogRef.current.set(item.id, {
+          ...uploadLogRef.current.get(item.id)!,
+          status: 'failed',
+          error: errorMessage,
+        });
+        syncUploadLog();
 
         // Move to failed (keep for retry functionality)
         activeUploadsRef.current.delete(item.id);
@@ -88,7 +182,7 @@ export function useUploadQueue(eventId: string | undefined) {
         processNext();
       }
     },
-    [eventId, uploadPhotoMutation],
+    [eventId, uploadPhotoMutation, syncUploadLog],
   );
 
   // Process queue - takes tokens and starts uploads
@@ -121,17 +215,20 @@ export function useUploadQueue(eventId: string | undefined) {
       }));
 
       // Add to upload log (optimistic)
-      const actions = (window as any).__uploadLogActions;
       newItems.forEach((item) => {
-        if (actions) {
-          actions.addEntry(item.id, item.file.name);
-        }
+        uploadLogRef.current.set(item.id, {
+          id: item.id,
+          fileName: item.file.name,
+          status: 'uploading',
+          uploadedAt: new Date().toISOString(),
+        });
       });
+      syncUploadLog();
 
       pendingQueueRef.current.push(...newItems);
       processQueue();
     },
-    [processQueue],
+    [processQueue, syncUploadLog],
   );
 
   // Retry a failed upload
@@ -173,17 +270,25 @@ export function useUploadQueue(eventId: string | undefined) {
 
   const failedItems = displayItems.filter((i) => i.status === 'failed');
 
+  // Get upload log entries (for UploadLog component)
+  const uploadLogEntries = Array.from(uploadLogRef.current.values()).filter(
+    (e) => e.status !== 'indexed',
+  );
+
   return {
     // Actions
     addFiles,
     retryUpload,
     removeFromQueue,
 
-    // State for UI
+    // State for UI (queue)
     uploadingItems,
     failedItems,
     uploadingCount,
     failedCount,
     isUploading: uploadingCount > 0,
+
+    // State for UI (upload log)
+    uploadLogEntries,
   };
 }

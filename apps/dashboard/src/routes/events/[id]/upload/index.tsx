@@ -12,7 +12,6 @@ import { parseISO, differenceInDays } from 'date-fns';
 import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
 import { useParams } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
 import { PhotoUploadZone } from './_components/PhotoUploadZone';
 import { UploadLog } from './_components/UploadLog';
 import { useUploadQueue } from './_components/useUploadQueue';
@@ -39,20 +38,10 @@ export default function EventUploadTab() {
 }
 
 function EventUploadTabContent({ event }: { event: { id: string; expiresAt: string } }) {
-  const queryClient = useQueryClient();
-
   const daysUntilExpiry = differenceInDays(parseISO(event.expiresAt), new Date());
   const isExpired = daysUntilExpiry <= 0;
 
-  const { addFiles, uploadingItems } = useUploadQueue(event.id);
-
-  // Expose queryClient for useUploadQueue to use
-  useEffect(() => {
-    (window as any).__queryClient = queryClient;
-    return () => {
-      delete (window as any).__queryClient;
-    };
-  }, [queryClient]);
+  const { addFiles, uploadingItems, uploadLogEntries } = useUploadQueue(event.id);
 
   // Block navigation if uploads are in progress
   const hasActiveUploads = uploadingItems.length > 0;
@@ -102,7 +91,7 @@ function EventUploadTabContent({ event }: { event: { id: string; expiresAt: stri
       <PhotoUploadZone onFilesSelected={addFiles} disabled={isExpired} />
 
       {/* Upload log - shows photos currently uploading, indexing, or failed */}
-      <UploadLog eventId={event.id} />
+      <UploadLog entries={uploadLogEntries} />
     </div>
   );
 }
