@@ -72,11 +72,13 @@ export type ApiErrorCode = keyof typeof API_ERROR_STATUS;
  * - code: maps to HTTP status
  * - message: user-friendly message (returned to client)
  * - cause: original error for logging (NOT returned to client)
+ * - headers: optional response headers (e.g., Retry-After for rate limiting)
  */
 export type HandlerError = {
   code: ApiErrorCode;
   message: string;
   cause?: unknown;
+  headers?: Record<string, string>;
 };
 
 /**
@@ -100,7 +102,13 @@ export type HandlerError = {
  */
 export function apiError(c: Context, codeOrError: ApiErrorCode | HandlerError, message?: string) {
   if (typeof codeOrError === 'object') {
-    const { code, message } = codeOrError;
+    const { code, message, headers } = codeOrError;
+    // Set custom headers if provided (e.g., Retry-After for rate limiting)
+    if (headers) {
+      for (const [key, value] of Object.entries(headers)) {
+        c.header(key, value);
+      }
+    }
     return c.json({ error: { code, message } }, API_ERROR_STATUS[code]);
   }
   return c.json({ error: { code: codeOrError, message } }, API_ERROR_STATUS[codeOrError]);
