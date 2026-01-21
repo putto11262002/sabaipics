@@ -5,6 +5,7 @@ import { events } from "./events";
 import { photos } from "./photos";
 import { faces } from "./faces";
 import { consentRecords } from "./consent-records";
+import { participantSearches } from "./participant-searches";
 
 // Photographer relations
 export const photographersRelations = relations(photographers, ({ many }) => ({
@@ -28,6 +29,7 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
     references: [photographers.id],
   }),
   photos: many(photos),
+  participantSearches: many(participantSearches),
 }));
 
 // Photo relations
@@ -52,5 +54,13 @@ export const consentRecordsRelations = relations(consentRecords, ({ one }) => ({
   photographer: one(photographers, {
     fields: [consentRecords.photographerId],
     references: [photographers.id],
+  }),
+}));
+
+// Participant searches relations
+export const participantSearchesRelations = relations(participantSearches, ({ one }) => ({
+  event: one(events, {
+    fields: [participantSearches.eventId],
+    references: [events.id],
   }),
 }));
