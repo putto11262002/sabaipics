@@ -11,12 +11,14 @@ import { dashboardRouter } from './routes/dashboard/route';
 import { creditsRouter } from './routes/credits';
 import { eventsRouter } from './routes/events';
 import { photosRouter } from './routes/photos';
+import { uploadsRouter } from './routes/uploads';
 import { r2Router } from './routes/r2';
 import type { Env, Bindings } from './types';
 
 // Queue consumers
 import { queue as photoQueue } from './queue/photo-consumer';
 import { queue as cleanupQueue } from './queue/cleanup-consumer';
+import { queue as uploadQueue } from './queue/upload-consumer';
 
 // Cron handlers
 import { scheduled } from './crons';
@@ -70,6 +72,7 @@ const app = new Hono<Env>()
 	.route('/consent', consentRouter)
 	.route('/dashboard', dashboardRouter)
 	.route('/events', eventsRouter)
+	.route('/uploads', uploadsRouter)
 	.route('/', photosRouter);
 
 // =============================================================================
@@ -89,6 +92,9 @@ export default {
 		}
 		if (batch.queue === 'rekognition-cleanup' || batch.queue === 'rekognition-cleanup-staging') {
 			return cleanupQueue(batch as MessageBatch<any>, env);
+		}
+		if (batch.queue === 'upload-processing' || batch.queue === 'upload-processing-staging') {
+			return uploadQueue(batch as MessageBatch<any>, env, ctx);
 		}
 		console.error('[Queue] Unknown queue:', batch.queue);
 	},

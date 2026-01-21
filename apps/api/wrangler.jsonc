@@ -46,6 +46,10 @@
 			{
 				"queue": "rekognition-cleanup",
 				"binding": "CLEANUP_QUEUE"
+			},
+			{
+				"queue": "upload-processing",
+				"binding": "UPLOAD_QUEUE"
 			}
 		],
 		"consumers": [
@@ -64,6 +68,14 @@
 				"max_retries": 3,
 				"max_concurrency": 1,
 				"dead_letter_queue": "rekognition-cleanup-dlq"
+			},
+			{
+				"queue": "upload-processing",
+				"max_batch_size": 10,
+				"max_batch_timeout": 5,
+				"max_retries": 3,
+				"max_concurrency": 1,
+				"dead_letter_queue": "upload-processing-dlq"
 			}
 		]
 	},
@@ -123,6 +135,10 @@
 					{
 						"queue": "rekognition-cleanup-staging",
 						"binding": "CLEANUP_QUEUE"
+					},
+					{
+						"queue": "upload-processing-staging",
+						"binding": "UPLOAD_QUEUE"
 					}
 				],
 				"consumers": [
@@ -141,6 +157,14 @@
 						"max_retries": 3,
 						"max_concurrency": 1,
 						"dead_letter_queue": "rekognition-cleanup-dlq-staging"
+					},
+					{
+						"queue": "upload-processing-staging",
+						"max_batch_size": 10,
+						"max_batch_timeout": 5,
+						"max_retries": 3,
+						"max_concurrency": 1,
+						"dead_letter_queue": "upload-processing-dlq-staging"
 					}
 				]
 			},
@@ -196,6 +220,10 @@
 					{
 						"queue": "rekognition-cleanup",
 						"binding": "CLEANUP_QUEUE"
+					},
+					{
+						"queue": "upload-processing",
+						"binding": "UPLOAD_QUEUE"
 					}
 				],
 				"consumers": [
@@ -214,6 +242,14 @@
 						"max_retries": 3,
 						"max_concurrency": 1,
 						"dead_letter_queue": "rekognition-cleanup-dlq"
+					},
+					{
+						"queue": "upload-processing",
+						"max_batch_size": 10,
+						"max_batch_timeout": 5,
+						"max_retries": 3,
+						"max_concurrency": 1,
+						"dead_letter_queue": "upload-processing-dlq"
 					}
 				]
 			},
