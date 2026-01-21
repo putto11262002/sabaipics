@@ -11,12 +11,14 @@ import { dashboardRouter } from './routes/dashboard/route';
 import { creditsRouter } from './routes/credits';
 import { eventsRouter } from './routes/events';
 import { photosRouter } from './routes/photos';
+import { uploadsRouter } from './routes/uploads';
 import { r2Router } from './routes/r2';
 import type { Env, Bindings } from './types';
 
 // Queue consumers
 import { queue as photoQueue } from './queue/photo-consumer';
 import { queue as cleanupQueue } from './queue/cleanup-consumer';
+import { queue as uploadQueue } from './queue/upload-consumer';
 
 // Cron handlers
 import { scheduled } from './crons';
@@ -70,6 +72,7 @@ const app = new Hono<Env>()
   .route('/consent', consentRouter)
   .route('/dashboard', dashboardRouter)
   .route('/events', eventsRouter)
+  .route('/uploads', uploadsRouter)
   .route('/', photosRouter);
 
 // =============================================================================
@@ -83,12 +86,15 @@ export type AppType = typeof app;
 export default {
   fetch: app.fetch,
   queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
-    // Route by queue name
-    if (batch.queue === 'photo-processing' || batch.queue === 'photo-processing-staging') {
+    // Route by queue name prefix (handles -dev, -staging, etc.)
+    if (batch.queue.startsWith('photo-processing')) {
       return photoQueue(batch as MessageBatch<any>, env, ctx);
     }
-    if (batch.queue === 'rekognition-cleanup' || batch.queue === 'rekognition-cleanup-staging') {
+    if (batch.queue.startsWith('rekognition-cleanup')) {
       return cleanupQueue(batch as MessageBatch<any>, env);
+    }
+    if (batch.queue.startsWith('upload-processing')) {
+      return uploadQueue(batch as MessageBatch<any>, env, ctx);
     }
     console.error('[Queue] Unknown queue:', batch.queue);
   },
