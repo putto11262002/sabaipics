@@ -44,6 +44,7 @@ declare namespace Cloudflare {
 		CLEANUP_QUEUE: Queue;
 		UPLOAD_QUEUE: Queue;
 		IMAGES: ImagesBinding;
+		DOWNLOAD_RATE_LIMITER: RateLimit;
 	}
 }
 interface CloudflareBindings extends Cloudflare.Env {}

@@ -9,6 +9,7 @@ import { generatePngQrCode } from '@juit/qrcode';
 import { generateAccessCode } from './access-code';
 import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './schema';
 import { searchRouter } from './search';
+import { downloadsRouter } from './downloads';
 
 // =============================================================================
 // Types
@@ -341,4 +342,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
   // Mount participant search router (public endpoint)
-  .route('/', searchRouter);
+  .route('/', searchRouter)
+  // Mount participant downloads router (public endpoint)
+  .route('/', downloadsRouter);
