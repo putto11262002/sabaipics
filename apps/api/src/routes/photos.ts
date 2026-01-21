@@ -2,15 +2,11 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, and, desc, lt, inArray, sql, asc, gt, isNull } from 'drizzle-orm';
-import { photos, events, photoStatuses, creditLedger, photographers, Photo, type DatabaseTx } from '@sabaipics/db';
-import { requirePhotographer, requireConsent, type PhotographerVariables } from '../middleware';
-import type { Bindings } from '../types';
+import { photos, events, photoStatuses, creditLedger, photographers } from '@sabaipics/db';
+import { requirePhotographer, requireConsent } from '../middleware';
+import type { Bindings, Env } from '../types';
 import type { PhotoJob } from '../types/photo-job';
-import {
-  normalizeImage,
-  DEFAULT_NORMALIZE_OPTIONS,
-  type NormalizeResult,
-} from '../lib/images/normalize';
+import { extractJpegDimensions } from '../lib/images/jpeg';
 import { createZip } from 'littlezipper';
 import { apiError, type HandlerError } from '../lib/error';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
@@ -18,13 +14,6 @@ import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 // =============================================================================
 // Types
 // =============================================================================
-
-type Env = {
-  Bindings: Bindings;
-  Variables: PhotographerVariables & {
-    dbTx: () => DatabaseTx;
-  };
-};
 
 // =============================================================================
 // Zod Schemas
@@ -75,18 +64,18 @@ const uploadPhotoSchema = z.object({
 // =============================================================================
 
 // Public transform URLs (cached at edge)
-function generateThumbnailUrl(r2Key: string, cfDomain: string, r2BaseUrl: string): string {
+function generateThumbnailUrl(env: Bindings, r2Key: string): string {
   if (process.env.NODE_ENV === 'development') {
-    return `${r2BaseUrl}/${r2Key}`;
+    return `${env.API_BASE_URL}/local/r2/${r2Key}`;
   }
-  return `${cfDomain}/cdn-cgi/image/width=400,fit=cover,format=auto,quality=75/${r2BaseUrl}/${r2Key}`;
+  return `https://${env.CF_ZONE}/cdn-cgi/image/width=400,fit=cover,format=auto,quality=75/${env.PHOTO_R2_BASE_URL}/${r2Key}`;
 }
 
-function generatePreviewUrl(r2Key: string, cfDomain: string, r2BaseUrl: string): string {
+function generatePreviewUrl(env: Bindings, r2Key: string): string {
   if (process.env.NODE_ENV === 'development') {
-    return `${r2BaseUrl}/${r2Key}`;
+    return `${env.API_BASE_URL}/local/r2/${r2Key}`;
   }
-  return `${cfDomain}/cdn-cgi/image/width=1200,fit=contain,format=auto,quality=85/${r2BaseUrl}/${r2Key}`;
+  return `https://${env.CF_ZONE}/cdn-cgi/image/width=1200,fit=contain,format=auto,quality=85/${env.PHOTO_R2_BASE_URL}/${r2Key}`;
 }
 
 // =============================================================================
@@ -166,6 +155,8 @@ export const photosRouter = new Hono<Env>()
               faceCount: photos.faceCount,
               fileSize: photos.fileSize,
               uploadedAt: photos.uploadedAt,
+              width: photos.width,
+              height: photos.height,
             })
             .from(photos)
             .where(
@@ -190,17 +181,21 @@ export const photosRouter = new Hono<Env>()
         const hasMore = photoRows.length > parsedLimit;
         const items = hasMore ? photoRows.slice(0, parsedLimit) : photoRows;
         // Convert timestamp to ISO 8601 format for cursor
-        const nextCursor = hasMore ? new Date(items[parsedLimit - 1].uploadedAt).toISOString() : null;
+        const nextCursor = hasMore
+          ? new Date(items[parsedLimit - 1].uploadedAt).toISOString()
+          : null;
 
         // Generate URLs for each photo
         const data = items.map((photo) => ({
           id: photo.id,
-          thumbnailUrl: generateThumbnailUrl(photo.r2Key, c.env.CF_ZONE, c.env.PHOTO_R2_BASE_URL),
-          previewUrl: generatePreviewUrl(photo.r2Key, c.env.CF_ZONE, c.env.PHOTO_R2_BASE_URL),
+          thumbnailUrl: generateThumbnailUrl(c.env, photo.r2Key),
+          previewUrl: generatePreviewUrl(c.env, photo.r2Key),
           faceCount: photo.faceCount,
           fileSize: photo.fileSize,
           status: photo.status,
           uploadedAt: new Date(photo.uploadedAt).toISOString(),
+          width: photo.width,
+          height: photo.height,
         }));
 
         return ok({
@@ -398,20 +393,41 @@ export const photosRouter = new Hono<Env>()
         // 4. Get file bytes and normalize image
         const arrayBuffer = await file.arrayBuffer();
 
-        const normalizeResult = yield* ResultAsync.fromPromise(
-          normalizeImage(
-            arrayBuffer,
-            originalMimeType,
-            c.env.PHOTOS_BUCKET,
-            c.env.PHOTO_R2_BASE_URL,
-            DEFAULT_NORMALIZE_OPTIONS,
-          ),
+        const normalizeResult = yield* ResultAsync.fromThrowable(
+          async () => {
+            const stream = new ReadableStream({
+              start(controller) {
+                controller.enqueue(arrayBuffer);
+                controller.close();
+              },
+            });
+            const res = await c.env.IMAGES.input(stream)
+              .transform({
+                width: 4000,
+                fit: 'scale-down',
+              })
+              .output({ format: 'image/jpeg', quality: 90 })
+              .then((res) => res.response())
+              .then((res) => res.arrayBuffer());
+
+            const dimensions = extractJpegDimensions(res);
+
+            if (!dimensions) {
+              throw new Error('Failed to extract dimensions from normalized JPEG');
+            }
+
+            return {
+              bytes: res,
+              width: dimensions.width,
+              height: dimensions.height,
+            };
+          },
           (e): HandlerError => ({
             code: 'UNPROCESSABLE',
             message: 'Image processing failed',
             cause: e,
           }),
-        );
+        )();
 
         const { bytes: normalizedImageBytes, width, height } = normalizeResult;
         const fileSize = normalizedImageBytes.byteLength;
@@ -421,7 +437,11 @@ export const photosRouter = new Hono<Env>()
           c.env.PHOTOS_BUCKET.put(r2Key, normalizedImageBytes, {
             httpMetadata: { contentType: 'image/jpeg' },
           }),
-          (e): HandlerError => ({ code: 'BAD_GATEWAY', message: 'Storage upload failed', cause: e }),
+          (e): HandlerError => ({
+            code: 'BAD_GATEWAY',
+            message: 'Storage upload failed',
+            cause: e,
+          }),
         );
 
         // 6. Deduct credit + create photo record (atomic, only after R2 success)
@@ -537,7 +557,7 @@ export const photosRouter = new Hono<Env>()
           uploadedAt: photo.uploadedAt,
         });
       })
-        .orTee((e) => e.cause && console.error(`[${c.req.url}] ${e.code}:`, e.cause))
+        .orTee((e) => console.log(e))
         .match(
           (data) => c.json({ data }, 201),
           (e) => apiError(c, e),
@@ -580,7 +600,7 @@ export const photosRouter = new Hono<Env>()
         errorName: photo.errorName,
         faceCount: photo.faceCount,
         fileSize: photo.fileSize,
-        thumbnailUrl: generateThumbnailUrl(photo.r2Key, c.env.CF_ZONE, c.env.PHOTO_R2_BASE_URL),
+        thumbnailUrl: generateThumbnailUrl(c.env, photo.r2Key),
         uploadedAt: photo.uploadedAt,
       }));
 
