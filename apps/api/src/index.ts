@@ -86,14 +86,14 @@ export type AppType = typeof app;
 export default {
 	fetch: app.fetch,
 	queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
-		// Route by queue name
-		if (batch.queue === 'photo-processing' || batch.queue === 'photo-processing-staging') {
+		// Route by queue name prefix (handles -dev, -staging, etc.)
+		if (batch.queue.startsWith('photo-processing')) {
 			return photoQueue(batch as MessageBatch<any>, env, ctx);
 		}
-		if (batch.queue === 'rekognition-cleanup' || batch.queue === 'rekognition-cleanup-staging') {
+		if (batch.queue.startsWith('rekognition-cleanup')) {
 			return cleanupQueue(batch as MessageBatch<any>, env);
 		}
-		if (batch.queue === 'upload-processing' || batch.queue === 'upload-processing-staging') {
+		if (batch.queue.startsWith('upload-processing')) {
 			return uploadQueue(batch as MessageBatch<any>, env, ctx);
 		}
 		console.error('[Queue] Unknown queue:', batch.queue);
