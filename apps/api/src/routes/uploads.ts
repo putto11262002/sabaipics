@@ -10,7 +10,6 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, and, gt, sql } from 'drizzle-orm';
-import { AwsClient } from 'aws4fetch';
 import {
   events,
   creditLedger,
@@ -20,7 +19,7 @@ import { requirePhotographer, type PhotographerVariables } from '../middleware';
 import type { Env } from '../types';
 import { apiError, type HandlerError } from '../lib/error';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
-
+import { generatePresignedPutUrl } from '../lib/r2/presign';
 
 // =============================================================================
 // Constants
@@ -37,71 +36,6 @@ const ALLOWED_MIME_TYPES = [
 ] as const;
 
 const PRESIGN_TTL_SECONDS = 300; // 5 minutes
-
-// =============================================================================
-// Presigned URL Generation (co-located)
-// =============================================================================
-
-interface PresignOptions {
-  bucket: string;
-  key: string;
-  contentType: string;
-  contentLength: number;
-  expiresIn: number; // seconds
-}
-
-interface PresignResult {
-  url: string;
-  expiresAt: Date;
-}
-
-/**
- * Generate a presigned PUT URL for R2.
- *
- * Signed headers:
- * - Content-Type: must match exactly
- * - Content-Length: must match exactly
- * - If-None-Match: * (prevent overwrite)
- */
-async function generatePresignedPutUrl(
-  accountId: string,
-  accessKeyId: string,
-  secretAccessKey: string,
-  options: PresignOptions,
-): Promise<PresignResult> {
-  const client = new AwsClient({
-    accessKeyId,
-    secretAccessKey,
-    service: 's3',
-    region: 'auto',
-  });
-
-  const r2Url = `https://${accountId}.r2.cloudflarestorage.com`;
-  const objectUrl = `${r2Url}/${options.bucket}/${options.key}`;
-
-  // URL with expiry
-  const urlWithExpiry = `${objectUrl}?X-Amz-Expires=${options.expiresIn}`;
-
-  // Sign the request with required headers
-  const signedRequest = await client.sign(
-    new Request(urlWithExpiry, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': options.contentType,
-        'Content-Length': options.contentLength.toString(),
-        'If-None-Match': '*',
-      },
-    }),
-    { aws: { signQuery: true } },
-  );
-
-  const expiresAt = new Date(Date.now() + options.expiresIn * 1000);
-
-  return {
-    url: signedRequest.url,
-    expiresAt,
-  };
-}
 
 // =============================================================================
 // Schemas

@@ -17,6 +17,7 @@ import { createDb, createDbTx } from '@sabaipics/db';
 import { uploadIntents, photos, creditLedger, photographers } from '@sabaipics/db';
 import { eq, and, gt, asc, sql } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
+import { extractJpegDimensions, validateImageMagicBytes } from '../lib/images';
 
 // =============================================================================
 // Types
@@ -32,101 +33,10 @@ type UploadProcessingError =
   | { type: 'insufficient_credits'; key: string; intentId: string };
 
 // =============================================================================
-// Magic Byte Validation (co-located)
+// Constants
 // =============================================================================
-
-// Magic bytes for image validation
-const IMAGE_SIGNATURES = {
-  jpeg: [0xff, 0xd8, 0xff],
-  png: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
-  gif: [0x47, 0x49, 0x46, 0x38],
-  webp: { riff: [0x52, 0x49, 0x46, 0x46], webp: [0x57, 0x45, 0x42, 0x50] },
-  heic: { ftyp: [0x66, 0x74, 0x79, 0x70] }, // starts at offset 4
-};
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
-
-// =============================================================================
-// JPEG Dimension Extraction (co-located from normalize.ts)
-// =============================================================================
-
-/**
- * Extracts width and height from JPEG file bytes by parsing SOF markers.
- * Supports SOF0, SOF1, and SOF2 (baseline, extended, progressive).
- */
-function extractJpegDimensions(bytes: ArrayBuffer): { width: number; height: number } | null {
-  const view = new DataView(bytes);
-  let offset = 2; // Skip SOI marker (0xFFD8)
-
-  while (offset < view.byteLength - 8) {
-    // Check for marker start
-    if (view.getUint8(offset) !== 0xff) {
-      offset++;
-      continue;
-    }
-
-    const marker = view.getUint8(offset + 1);
-
-    // SOF markers: SOF0 (0xC0), SOF1 (0xC1), SOF2 (0xC2)
-    if (marker === 0xc0 || marker === 0xc1 || marker === 0xc2) {
-      // SOF segment structure: marker (2) + length (2) + precision (1) + height (2) + width (2)
-      const height = view.getUint16(offset + 5, false); // big-endian
-      const width = view.getUint16(offset + 7, false);
-      return { width, height };
-    }
-
-    // Skip to next marker
-    if (marker === 0xd8 || marker === 0xd9) {
-      // SOI or EOI markers have no length
-      offset += 2;
-    } else if (marker >= 0xd0 && marker <= 0xd7) {
-      // RST markers have no length
-      offset += 2;
-    } else {
-      // Read segment length and skip
-      const length = view.getUint16(offset + 2, false);
-      offset += 2 + length;
-    }
-  }
-
-  return null;
-}
-
-// =============================================================================
-// Magic Byte Validation
-// =============================================================================
-
-function matchesSignature(bytes: Uint8Array, signature: number[], offset = 0): boolean {
-  return signature.every((byte, i) => bytes[offset + i] === byte);
-}
-
-function validateImageMagicBytes(bytes: Uint8Array): { valid: boolean; detectedType?: string } {
-  // JPEG
-  if (matchesSignature(bytes, IMAGE_SIGNATURES.jpeg)) {
-    return { valid: true, detectedType: 'image/jpeg' };
-  }
-  // PNG
-  if (matchesSignature(bytes, IMAGE_SIGNATURES.png)) {
-    return { valid: true, detectedType: 'image/png' };
-  }
-  // GIF
-  if (matchesSignature(bytes, IMAGE_SIGNATURES.gif)) {
-    return { valid: true, detectedType: 'image/gif' };
-  }
-  // WebP (RIFF....WEBP)
-  if (
-    matchesSignature(bytes, IMAGE_SIGNATURES.webp.riff) &&
-    matchesSignature(bytes, IMAGE_SIGNATURES.webp.webp, 8)
-  ) {
-    return { valid: true, detectedType: 'image/webp' };
-  }
-  // HEIC/HEIF (....ftyp at offset 4)
-  if (matchesSignature(bytes, IMAGE_SIGNATURES.heic.ftyp, 4)) {
-    return { valid: true, detectedType: 'image/heic' };
-  }
-
-  return { valid: false };
-}
 
 // =============================================================================
 // Processing
