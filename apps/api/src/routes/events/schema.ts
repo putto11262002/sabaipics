@@ -45,9 +45,45 @@ export const uploadPhotoSchema = z.object({
 });
 
 // =============================================================================
+// Participant Search Schemas
+// =============================================================================
+
+const ALLOWED_SEARCH_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/heic',
+  'image/heif',
+  'image/webp',
+] as const;
+
+const MAX_SELFIE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+export const participantSearchSchema = z.object({
+  selfie: z
+    .instanceof(File)
+    .refine((f) => f.size > 0, 'File cannot be empty')
+    .refine(
+      (f) => f.size <= MAX_SELFIE_SIZE,
+      `File size must be less than 5 MB`,
+    )
+    .refine(
+      (f) => ALLOWED_SEARCH_MIME_TYPES.includes(f.type as (typeof ALLOWED_SEARCH_MIME_TYPES)[number]),
+      `File type must be one of: ${ALLOWED_SEARCH_MIME_TYPES.join(', ')}`,
+    ),
+  consentAccepted: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the consent to continue.' }),
+  }),
+});
+
+export const participantSearchParamsSchema = z.object({
+  eventId: z.string().uuid(),
+});
+
+// =============================================================================
 // Types
 // =============================================================================
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;
 export type UploadPhotoInput = z.infer<typeof uploadPhotoSchema>;
+export type ParticipantSearchInput = z.infer<typeof participantSearchSchema>;
