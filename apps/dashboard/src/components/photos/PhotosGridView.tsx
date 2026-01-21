@@ -42,8 +42,8 @@ export function PhotosGridView({
       _photos
         ? _photos.map((photo) => ({
             src: photo.thumbnailUrl,
-            height: photo.height,
-            width: photo.width,
+            height: photo.height ?? 1,
+            width: photo.width ?? 1,
             key: photo.id,
           }))
         : [],
@@ -78,17 +78,29 @@ export function PhotosGridView({
       />
       <RowsPhotoAlbum
         photos={photos}
-        onClick={({ index, photo }) => {
+        onClick={(event) => {
           if (!isSelelectable) {
-            setIndex(index);
-          } else {
-            onPhotoSelected(photo.key);
+            setIndex(event.index);
+            return;
           }
+
+          if (!event.photo.key) {
+            return;
+          }
+
+          onPhotoSelected(event.photo.key);
         }}
         render={{
-          container: ({ ref, ...rest }) => <div className="bg-muted" ref={ref} {...rest} />,
-          extras: (_, { photo }) => {
-            const isSelected = selectedPhotoIds.includes(photo.key);
+          container: (props) => {
+            const { ref, ...rest } = props;
+            return <div className="bg-muted" ref={ref} {...rest} />;
+          },
+          extras: (_unused, context) => {
+            if (!context.photo.key) {
+              return null;
+            }
+
+            const isSelected = selectedPhotoIds.includes(context.photo.key);
             if (isSelected) {
               return (
                 <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center">
@@ -98,6 +110,8 @@ export function PhotosGridView({
                 </div>
               );
             }
+
+            return null;
           },
         }}
       />

@@ -158,7 +158,6 @@ export function useUploadQueue(eventId: string | undefined) {
           id: result.id,
           fileName: item.file.name,
           status: result.status,
-          thumbnailUrl: result.thumbnailUrl,
           fileSize: result.fileSize,
           faceCount: result.faceCount,
           uploadedAt: result.uploadedAt,
