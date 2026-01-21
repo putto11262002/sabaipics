@@ -11,6 +11,7 @@ export * from "./photos";
 export * from "./faces";
 export * from "./consent-records";
 export * from "./upload-intents";
+export * from "./participant-searches";
 
 // Relations
 export * from "./relations";

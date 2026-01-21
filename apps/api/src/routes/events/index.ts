@@ -8,6 +8,7 @@ import type { Bindings } from '../../types';
 import { generatePngQrCode } from '@juit/qrcode';
 import { generateAccessCode } from './access-code';
 import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './schema';
+import { searchRouter } from './search';
 
 // =============================================================================
 // Types
@@ -338,4 +339,6 @@ export const eventsRouter = new Hono<Env>()
         },
       });
     },
-  );
+  )
+  // Mount participant search router (public endpoint)
+  .route('/', searchRouter);

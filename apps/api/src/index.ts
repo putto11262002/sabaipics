@@ -43,37 +43,37 @@ registerStripeHandlers();
 
 // Method chaining - NEVER break the chain for type inference
 const app = new Hono<Env>()
-	// DB injection - dual adapter pattern:
-	// - db (HTTP): Fast, stateless, no transactions - for 90% of queries
-	// - dbTx (WebSocket): With transaction support - for critical multi-step operations
-	.use((c, next) => {
-		c.set('db', () => createDbHttp(c.env.DATABASE_URL));
-		c.set('dbTx', () => createDbTx(c.env.DATABASE_URL));
-		return next();
-	})
-	// R2 proxy route (public, no auth - serves QR codes and other assets)
-	.route('/r2', r2Router)
-	// Webhooks route (uses c.var.db from above)
-	.route('/webhooks', webhookRouter)
-	// Then CORS and auth for all other routes
-	.use('/*', (c, next) => {
-		return cors({
-			origin: c.env.CORS_ORIGIN,
-			credentials: true,
-		})(c, next);
-	})
-	// Admin routes - API key auth, no Clerk (must be before Clerk middleware)
-	.route('/admin', adminRouter)
-	.use('/*', createClerkAuth())
-	.route('/credit-packages', creditsRouter)
-	.get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))
-	.route('/db-test', dbTestRouter)
-	.route('/auth', authRouter)
-	.route('/consent', consentRouter)
-	.route('/dashboard', dashboardRouter)
-	.route('/events', eventsRouter)
-	.route('/uploads', uploadsRouter)
-	.route('/', photosRouter);
+  // DB injection - dual adapter pattern:
+  // - db (HTTP): Fast, stateless, no transactions - for 90% of queries
+  // - dbTx (WebSocket): With transaction support - for critical multi-step operations
+  .use((c, next) => {
+    c.set('db', () => createDbHttp(c.env.DATABASE_URL));
+    c.set('dbTx', () => createDbTx(c.env.DATABASE_URL));
+    return next();
+  })
+  // R2 proxy route (public, no auth - serves QR codes and other assets)
+  .route('/local/r2', r2Router)
+  // Webhooks route (uses c.var.db from above)
+  .route('/webhooks', webhookRouter)
+  // Then CORS and auth for all other routes
+  .use('/*', (c, next) => {
+    return cors({
+      origin: c.env.CORS_ORIGIN,
+      credentials: true,
+    })(c, next);
+  })
+  // Admin routes - API key auth, no Clerk (must be before Clerk middleware)
+  .route('/admin', adminRouter)
+  .use('/*', createClerkAuth())
+  .route('/credit-packages', creditsRouter)
+  .get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))
+  .route('/db-test', dbTestRouter)
+  .route('/auth', authRouter)
+  .route('/consent', consentRouter)
+  .route('/dashboard', dashboardRouter)
+  .route('/events', eventsRouter)
+  .route('/uploads', uploadsRouter)
+  .route('/', photosRouter);
 
 // =============================================================================
 // Worker Export
@@ -84,19 +84,19 @@ export type AppType = typeof app;
 
 // Export worker with fetch, queue, and scheduled handlers
 export default {
-	fetch: app.fetch,
-	queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
-		// Route by queue name prefix (handles -dev, -staging, etc.)
-		if (batch.queue.startsWith('photo-processing')) {
-			return photoQueue(batch as MessageBatch<any>, env, ctx);
-		}
-		if (batch.queue.startsWith('rekognition-cleanup')) {
-			return cleanupQueue(batch as MessageBatch<any>, env);
-		}
-		if (batch.queue.startsWith('upload-processing')) {
-			return uploadQueue(batch as MessageBatch<any>, env, ctx);
-		}
-		console.error('[Queue] Unknown queue:', batch.queue);
-	},
-	scheduled,
+  fetch: app.fetch,
+  queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
+    // Route by queue name prefix (handles -dev, -staging, etc.)
+    if (batch.queue.startsWith('photo-processing')) {
+      return photoQueue(batch as MessageBatch<any>, env, ctx);
+    }
+    if (batch.queue.startsWith('rekognition-cleanup')) {
+      return cleanupQueue(batch as MessageBatch<any>, env);
+    }
+    if (batch.queue.startsWith('upload-processing')) {
+      return uploadQueue(batch as MessageBatch<any>, env, ctx);
+    }
+    console.error('[Queue] Unknown queue:', batch.queue);
+  },
+  scheduled,
 };

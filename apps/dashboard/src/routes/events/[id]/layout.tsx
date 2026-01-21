@@ -1,7 +1,7 @@
-import { useParams, useNavigate, Outlet, NavLink } from "react-router";
-import { Button } from "@sabaipics/ui/components/button";
-import { Alert } from "@sabaipics/ui/components/alert";
-import { Skeleton } from "@sabaipics/ui/components/skeleton";
+import { useParams, useNavigate, Outlet, NavLink } from 'react-router';
+import { Button } from '@sabaipics/ui/components/button';
+import { Alert } from '@sabaipics/ui/components/alert';
+import { Skeleton } from '@sabaipics/ui/components/skeleton';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,7 +9,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@sabaipics/ui/components/breadcrumb";
+} from '@sabaipics/ui/components/breadcrumb';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,19 +17,19 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@sabaipics/ui/components/dropdown-menu";
-import { MoreVertical, Download, ExternalLink, Trash2 } from "lucide-react";
-import { useEvent } from "../../../hooks/events/useEvent";
-import { useCopyToClipboard } from "../../../hooks/use-copy-to-clipboard";
-import { cn } from "@sabaipics/ui/lib/utils";
-import { ScrollArea } from "@sabaipics/ui/components/scroll-area";
+} from '@sabaipics/ui/components/dropdown-menu';
+import { MoreVertical, Download, ExternalLink, Trash2 } from 'lucide-react';
+import { useEvent } from '../../../hooks/events/useEvent';
+import { useCopyToClipboard } from '../../../hooks/use-copy-to-clipboard';
+import { cn } from '@sabaipics/ui/lib/utils';
+import { ScrollArea } from '@sabaipics/ui/components/scroll-area';
 
 const tabs = [
-  { name: "Details", path: "details" },
-  { name: "Upload", path: "upload" },
-  { name: "Photos", path: "photos" },
-  { name: "Statistics", path: "statistics" },
-  { name: "Faces", path: "faces", disabled: true },
+  { name: 'Details', path: 'details' },
+  { name: 'Upload', path: 'upload' },
+  { name: 'Photos', path: 'photos' },
+  { name: 'Statistics', path: 'statistics' },
+  { name: 'Faces', path: 'faces', disabled: true },
 ];
 
 export default function EventDetailLayout() {
@@ -43,7 +43,7 @@ export default function EventDetailLayout() {
       const response = await fetch(qrCodeUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
       a.download = `event-qr-${accessCode}.png`;
       document.body.appendChild(a);
@@ -51,7 +51,7 @@ export default function EventDetailLayout() {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Failed to download QR code:", error);
+      console.error('Failed to download QR code:', error);
     }
   };
 
@@ -78,7 +78,7 @@ export default function EventDetailLayout() {
             <Button onClick={() => refetch()} variant="outline" size="sm">
               Try Again
             </Button>
-            <Button onClick={() => navigate("/events")} variant="outline" size="sm">
+            <Button onClick={() => navigate('/events')} variant="outline" size="sm">
               Back to Events
             </Button>
           </div>
@@ -94,9 +94,9 @@ export default function EventDetailLayout() {
   const event = data.data;
 
   return (
-    <div className="container mx-auto flex h-screen flex-col p-6">
+    <div className="flex h-screen flex-col overflow-hidden">
       {/* Header Section with Tabs */}
-      <div className="flex-shrink-0 border-b">
+      <div className="flex-shrink-0 border-b container mx-auto px-6 pt-4">
         {/* Breadcrumb and Actions */}
         <div className="mb-4 flex items-center justify-between">
           <Breadcrumb>
@@ -125,10 +125,12 @@ export default function EventDetailLayout() {
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => handleCopyLink(event.accessCode)}>
                 <ExternalLink className="mr-2 size-4" />
-                {isCopied ? "Link Copied!" : "Copy Search Link"}
+                {isCopied ? 'Link Copied!' : 'Copy Search Link'}
               </DropdownMenuItem>
               {event.qrCodeUrl && (
-                <DropdownMenuItem onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}>
+                <DropdownMenuItem
+                  onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}
+                >
                   <Download className="mr-2 size-4" />
                   Download QR Code
                 </DropdownMenuItem>
@@ -144,7 +146,7 @@ export default function EventDetailLayout() {
 
         {/* Tab Navigation */}
         <div className="flex gap-6 -mb-px">
-          {tabs.map((tab) => (
+          {tabs.map((tab) =>
             tab.disabled ? (
               <span
                 key={tab.path}
@@ -156,25 +158,26 @@ export default function EventDetailLayout() {
               <NavLink
                 key={tab.path}
                 to={`/events/${id}/${tab.path}`}
-                className={({ isActive }) => cn(
-                  "pb-3 text-sm font-medium transition-colors border-b-2",
-                  isActive
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
+                className={({ isActive }) =>
+                  cn(
+                    'pb-3 text-sm font-medium transition-colors border-b-2',
+                    isActive
+                      ? 'border-primary text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
+                  )
+                }
               >
                 {tab.name}
               </NavLink>
-            )
-          ))}
+            ),
+          )}
         </div>
       </div>
 
       {/* Tab Content via Outlet */}
-      <ScrollArea className="mt-6 flex-1 rounded-lg bg-card">
+      <ScrollArea className="flex-1 grow container mx-auto px-6 overflow-scroll">
         <Outlet />
       </ScrollArea>
     </div>
   );
 }
-
