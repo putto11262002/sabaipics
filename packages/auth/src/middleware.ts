@@ -22,7 +22,8 @@ export function createClerkAuth(): MiddlewareHandler<AuthEnv> {
   return async (c, next) => {
     // Test mode bypass - inject mock auth for integration testing
     // Uses NODE_ENV which Vitest automatically sets to 'test' during test runs
-    if (process.env.NODE_ENV === "test") {
+    const nodeEnv = process.env.NODE_ENV as string | undefined;
+    if (nodeEnv === "test") {
       const auth: AuthObject = {
         userId: "test_clerk_user_integration",
         sessionId: "test_session_integration",
@@ -79,4 +80,3 @@ export function requireAuth(): MiddlewareHandler<{ Variables: AuthVariables }> {
     return next();
   };
 }
-
