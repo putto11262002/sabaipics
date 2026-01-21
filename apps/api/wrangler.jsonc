@@ -10,11 +10,12 @@
 
 	// Development environment (default) - localhost
 	"vars": {
+		"NODE_ENV": "development",
 		"CORS_ORIGIN": "http://localhost:5173",
 		"AUTHORIZED_PARTIES": "http://localhost:5173",
 		"AWS_REGION": "us-west-2",
 		"APP_BASE_URL": "http://localhost:8081",
-		"CF_ZONE": "https://sabaipics.com",
+		"CF_ZONE": "sabaipics.com",
 		"CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
 		"PHOTO_BUCKET_NAME": "sabaipics-photos",
 		"PHOTO_R2_BASE_URL": "https://photo.sabaipics.com",
@@ -26,8 +27,7 @@
 	"r2_buckets": [
 		{
 			"binding": "PHOTOS_BUCKET",
-			"bucket_name": "sabaipics-photos",
-			"remote": true
+			"bucket_name": "sabaipics-photos"
 		}
 	],
 
@@ -46,6 +46,10 @@
 			{
 				"queue": "rekognition-cleanup",
 				"binding": "CLEANUP_QUEUE"
+			},
+			{
+				"queue": "upload-processing",
+				"binding": "UPLOAD_QUEUE"
 			}
 		],
 		"consumers": [
@@ -64,6 +68,14 @@
 				"max_retries": 3,
 				"max_concurrency": 1,
 				"dead_letter_queue": "rekognition-cleanup-dlq"
+			},
+			{
+				"queue": "upload-processing",
+				"max_batch_size": 10,
+				"max_batch_timeout": 5,
+				"max_retries": 3,
+				"max_concurrency": 1,
+				"dead_letter_queue": "upload-processing-dlq"
 			}
 		]
 	},
@@ -102,6 +114,7 @@
 		// Staging environment - auto-deploy from master
 		"staging": {
 			"vars": {
+				"NODE_ENV": "staging",
 				"CORS_ORIGIN": "https://app-staging.sabaipics.com",
 				"AUTHORIZED_PARTIES": "https://app-staging.sabaipics.com",
 				"AWS_REGION": "us-west-2",
@@ -135,6 +148,10 @@
 					{
 						"queue": "rekognition-cleanup-staging",
 						"binding": "CLEANUP_QUEUE"
+					},
+					{
+						"queue": "upload-processing-staging",
+						"binding": "UPLOAD_QUEUE"
 					}
 				],
 				"consumers": [
@@ -153,6 +170,14 @@
 						"max_retries": 3,
 						"max_concurrency": 1,
 						"dead_letter_queue": "rekognition-cleanup-dlq-staging"
+					},
+					{
+						"queue": "upload-processing-staging",
+						"max_batch_size": 10,
+						"max_batch_timeout": 5,
+						"max_retries": 3,
+						"max_concurrency": 1,
+						"dead_letter_queue": "upload-processing-dlq-staging"
 					}
 				]
 			},
@@ -185,6 +210,7 @@
 		// Production environment - manual approval
 		"production": {
 			"vars": {
+				"NODE_ENV": "production",
 				"CORS_ORIGIN": "https://app.sabaipics.com",
 				"AUTHORIZED_PARTIES": "https://app.sabaipics.com",
 				"AWS_REGION": "us-west-2",
@@ -218,6 +244,10 @@
 					{
 						"queue": "rekognition-cleanup",
 						"binding": "CLEANUP_QUEUE"
+					},
+					{
+						"queue": "upload-processing",
+						"binding": "UPLOAD_QUEUE"
 					}
 				],
 				"consumers": [
@@ -236,6 +266,14 @@
 						"max_retries": 3,
 						"max_concurrency": 1,
 						"dead_letter_queue": "rekognition-cleanup-dlq"
+					},
+					{
+						"queue": "upload-processing",
+						"max_batch_size": 10,
+						"max_batch_timeout": 5,
+						"max_retries": 3,
+						"max_concurrency": 1,
+						"dead_letter_queue": "upload-processing-dlq"
 					}
 				]
 			},
