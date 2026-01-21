@@ -194,8 +194,8 @@ export const photosRouter = new Hono<Env>()
           fileSize: photo.fileSize,
           status: photo.status,
           uploadedAt: new Date(photo.uploadedAt).toISOString(),
-          width: photo.width,
-          height: photo.height,
+          width: photo.width ?? 1,
+          height: photo.height ?? 1,
         }));
 
         return ok({
