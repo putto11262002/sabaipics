@@ -40,17 +40,11 @@ function getScaleForSize(size: QRSize): number {
 }
 
 async function generateEventQR(
-  accessCode: string,
+  eventId: string,
   baseUrl: string,
   size: QRSize = "medium"
 ): Promise<Uint8Array> {
-  if (!/^[A-Z0-9]{6}$/.test(accessCode)) {
-    throw new Error(
-      `Invalid access code format: "${accessCode}". Must be 6 uppercase alphanumeric characters (A-Z0-9).`
-    );
-  }
-
-  const searchUrl = `${baseUrl}/search/${accessCode}`;
+  const searchUrl = `${baseUrl}/events/${eventId}/search`;
 
   return await generatePngQrCode(searchUrl, {
     ecLevel: "M",
@@ -318,7 +312,7 @@ export const eventsRouter = new Hono<Env>()
       // Generate QR code on-demand
       let qrPng: Uint8Array;
       try {
-        qrPng = await generateEventQR(event.accessCode, c.env.APP_BASE_URL, size as QRSize);
+        qrPng = await generateEventQR(event.id, c.env.APP_BASE_URL, size as QRSize);
       } catch (e) {
         console.error('[QR] Download generation failed:', e);
         const reason = e instanceof Error ? e.message : 'unknown error';
