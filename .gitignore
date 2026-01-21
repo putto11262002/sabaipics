@@ -80,3 +80,10 @@ apps/studio/.build/
 
 # Syncthing temp files
 **/.syncthing.*.tmp
+
+# Local development
+docker-compose.yml
+dataset
+
+# Private planning docs
+docs/logs/sabaiface-service/
