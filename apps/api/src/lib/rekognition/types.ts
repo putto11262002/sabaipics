@@ -186,6 +186,24 @@ export interface PhotoIndexed {
   provider: 'aws' | 'sabaiface';
 }
 
+/**
+ * Photo match from findImagesByFace operation
+ */
+export interface PhotoMatch {
+  photoId: string;
+  similarity: number;
+  faceCount?: number;
+}
+
+/**
+ * Result of findImagesByFace operation
+ */
+export interface FindImagesByFaceResponse {
+  photos: PhotoMatch[];
+  totalMatchedFaces: number;
+  provider: 'aws' | 'sabaiface';
+}
+
 // =============================================================================
 // Request Types
 // =============================================================================
@@ -207,6 +225,16 @@ export interface IndexPhotoRequest {
  * Find Similar Faces Request
  */
 export interface FindSimilarRequest {
+  eventId: string;
+  imageData: ArrayBuffer;
+  maxResults?: number;
+  minSimilarity?: number;
+}
+
+/**
+ * Find Images by Face Request
+ */
+export interface FindImagesByFaceRequest {
   eventId: string;
   imageData: ArrayBuffer;
   maxResults?: number;
@@ -249,6 +277,7 @@ export type FaceServiceError =
 export interface FaceRecognitionProvider {
   indexPhoto(request: IndexPhotoRequest): ResultAsync<PhotoIndexed, FaceServiceError>;
   findSimilarFaces(request: FindSimilarRequest): ResultAsync<SimilarFace[], FaceServiceError>;
+  findImagesByFace(request: FindImagesByFaceRequest): ResultAsync<FindImagesByFaceResponse, FaceServiceError>;
   deleteFaces(eventId: string, faceIds: string[]): ResultAsync<void, FaceServiceError>;
   deleteCollection(eventId: string): ResultAsync<void, FaceServiceError>;
   createCollection(eventId: string): ResultAsync<string, FaceServiceError>;
