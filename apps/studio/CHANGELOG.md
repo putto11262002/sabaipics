@@ -6,6 +6,23 @@ iOS Studio architecture changes. See `ARCHITECTURE.md` for current design.
 
 ## 2026-01-20
 
+### Update 7: Multi-Vendor Event Source Architecture
+**Status:** Implemented
+
+Refactored Canon polling into protocol-based architecture for multi-vendor support.
+
+| Component | Purpose |
+|-----------|---------|
+| `CameraEventSource` | Protocol for vendor-specific event monitoring |
+| `CanonEventSource` | Canon polling (0x9116) - extracted from PTPIPSession |
+| `StandardEventSource` | Wraps PTPIPEventMonitor for Sony/Fuji/etc |
+| `NikonEventSource` | Stub (TODO: implement 0x90C7 polling) |
+| `PhotoOperationsProvider` | Protocol for download operations |
+
+**Files:** CameraEventSource.swift (new), CanonEventSource.swift (new), StandardEventSource.swift (new), NikonEventSource.swift (new), PTPIPSession.swift
+
+---
+
 ### Update 6: RAW File Skip Warning Banner
 **Status:** Implemented
 

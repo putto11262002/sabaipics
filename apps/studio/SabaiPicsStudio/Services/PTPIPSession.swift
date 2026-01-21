@@ -95,16 +95,9 @@ class PTPIPSession: NSObject {
     private var connectionNumber: UInt32 = 0
 
     // Components
-    private var eventMonitor: PTPIPEventMonitor?
+    private var eventSource: CameraEventSource?
     private var photoDownloader: PTPIPPhotoDownloader?
     private var transactionManager: PTPTransactionManager?
-    private var canonPollingTask: Task<Void, Never>?
-
-    // Adaptive polling intervals (libgphoto2 pattern)
-    // Canon cameras require polling - use adaptive backoff for responsiveness
-    private var canonPollInterval: TimeInterval = 0.05  // Start at 50ms
-    private let minPollInterval: TimeInterval = 0.05     // 50ms minimum
-    private let maxPollInterval: TimeInterval = 0.2      // 200ms maximum
 
     // Camera detection
     private var cameraVendor: CameraVendor = .unknown
@@ -221,8 +214,7 @@ class PTPIPSession: NSObject {
         // Phase 3: Send OpenSession command (required after Init handshake per libgphoto2)
         try await sendOpenSession()
 
-        // Initialize components
-        self.eventMonitor = PTPIPEventMonitor()
+        // Initialize photo downloader
         self.photoDownloader = PTPIPPhotoDownloader()
 
         // Configure downloader
@@ -230,23 +222,16 @@ class PTPIPSession: NSObject {
             await downloader.configure(connection: commandConnection, transactionManager: txManager)
         }
 
-        // Start appropriate event handling based on camera vendor
-        switch cameraVendor {
-        case .canon:
-            // Initialize Canon EOS before starting polling
-            // Per libgphoto2: SetEventMode(1) MUST be called after OpenSession
-            try await initializeCanonEOS()
-            startCanonPolling()
+        // Create and start appropriate event source based on camera vendor
+        eventSource = createEventSource(for: cameraVendor)
+        eventSource?.delegate = self
 
-        case .nikon:
-            startNikonPolling()
-
-        case .standard, .unknown:
-            if let monitor = eventMonitor {
-                await monitor.setDelegate(self)
-                await monitor.startMonitoring(connection: eventConnection)
-            }
+        // Canon requires initialization before polling
+        if cameraVendor == .canon, let canonSource = eventSource as? CanonEventSource {
+            try await canonSource.initializeCanonEOS()
         }
+
+        await eventSource?.startMonitoring()
 
         isConnected = true
         print("[PTPIPSession] Session ready")
@@ -292,8 +277,7 @@ class PTPIPSession: NSObject {
         try await sendOpenSession()
         print("[PTPIPSession] OpenSession successful")
 
-        // Initialize components (but don't start monitoring yet)
-        self.eventMonitor = PTPIPEventMonitor()
+        // Initialize photo downloader (but don't start event monitoring yet)
         self.photoDownloader = PTPIPPhotoDownloader()
 
         // Configure downloader
@@ -301,11 +285,15 @@ class PTPIPSession: NSObject {
             await downloader.configure(connection: commandConnection, transactionManager: txManager)
         }
 
+        // Create event source (but don't start monitoring yet)
+        eventSource = createEventSource(for: cameraVendor)
+        eventSource?.delegate = self
+
         // For Canon: SetEventMode(1) to enable event reporting
         // This does NOT lock the camera - just subscribes to events
-        if cameraVendor == .canon {
+        if cameraVendor == .canon, let canonSource = eventSource as? CanonEventSource {
             print("[PTPIPSession] Initializing Canon EOS (SetEventMode)...")
-            try await initializeCanonEOS()
+            try await canonSource.initializeCanonEOS()
             print("[PTPIPSession] Canon EOS initialized")
         }
 
@@ -326,24 +314,10 @@ class PTPIPSession: NSObject {
 
         print("[PTPIPSession] Starting event monitoring...")
 
-        // Start appropriate event handling based on camera vendor
-        switch cameraVendor {
-        case .canon:
-            startCanonPolling()
-            print("[PTPIPSession] Canon polling started")
-
-        case .nikon:
-            startNikonPolling()
-            print("[PTPIPSession] Nikon polling started")
-
-        case .standard, .unknown:
-            if let monitor = eventMonitor, let connection = eventConnection {
-                Task {
-                    await monitor.setDelegate(self)
-                    await monitor.startMonitoring(connection: connection)
-                }
-                print("[PTPIPSession] Standard event monitoring started")
-            }
+        // Start event source monitoring
+        Task {
+            await eventSource?.startMonitoring()
+            print("[PTPIPSession] Event monitoring started for vendor: \(cameraVendor)")
         }
 
         // NOW notify delegate that session is fully ready
@@ -392,14 +366,10 @@ class PTPIPSession: NSObject {
         }
 
         // Stop event monitoring AFTER CloseSession
-        if let monitor = eventMonitor {
-            await monitor.stopMonitoring()
-            await monitor.cleanup()
+        if let source = eventSource {
+            await source.stopMonitoring()
+            await source.cleanup()
         }
-
-        // Stop Canon polling
-        canonPollingTask?.cancel()
-        canonPollingTask = nil
 
         // Clean up downloader
         if let downloader = photoDownloader {
@@ -413,7 +383,7 @@ class PTPIPSession: NSObject {
         // Clean up connections
         commandConnection = nil
         eventConnection = nil
-        eventMonitor = nil
+        eventSource = nil
         photoDownloader = nil
         transactionManager = nil
 
@@ -468,42 +438,6 @@ class PTPIPSession: NSObject {
 
         // Read response (may fail if camera already disconnected)
         _ = try? await receiveResponse(connection: connection, expectedTransactionID: closeCommand.transactionID)
-    }
-
-    /// Initialize Canon EOS for event reporting
-    /// From libgphoto2 config.c: SetEventMode(1) enables event reporting
-    /// Without SetEventMode(1), GetEvent always returns empty (8-byte terminator)
-    /// NOTE: We intentionally skip SetRemoteMode to avoid taking over camera control
-    private func initializeCanonEOS() async throws {
-        guard let connection = commandConnection,
-              let txManager = transactionManager else {
-            throw PTPIPSessionError.notConnected
-        }
-
-        // SetEventMode(1) - Enable event reporting (CRITICAL!)
-        // NOTE: We skip SetRemoteMode because we only want to monitor events
-        var command = await txManager.createCommand()
-        let setEventModeCmd = command.canonSetEventMode(mode: 1)
-        let eventModeData = setEventModeCmd.toData()
-
-        try await sendData(connection: connection, data: eventModeData)
-        let eventModeResponse = try await receiveResponse(connection: connection, expectedTransactionID: setEventModeCmd.transactionID)
-
-        if let responseCode = PTPResponseCode(rawValue: eventModeResponse.responseCode), !responseCode.isSuccess {
-            print("[PTPIPSession] WARNING: SetEventMode failed - events may not work")
-        }
-
-        // Flush initial event queue (per libgphoto2 ptp_check_eos_events)
-        do {
-            var command2 = await txManager.createCommand()
-            let getEventCmd = command2.canonGetEvent()
-            let getEventData = getEventCmd.toData()
-
-            try await sendData(connection: connection, data: getEventData)
-            _ = try await receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCmd.transactionID)
-        } catch {
-            // Non-fatal - initial flush can fail
-        }
     }
 
     /// Download photo by object handle
@@ -776,263 +710,30 @@ class PTPIPSession: NSObject {
         return .standard
     }
 
-    // MARK: - Nikon Polling
-    // Nikon cameras also require polling (future implementation)
+    // MARK: - Event Source Factory
 
-    /// Start Nikon event polling
-    /// TODO: Implement Nikon_GetEvent polling
-    private func startNikonPolling() {
-        // For now, try event channel
-        if let monitor = eventMonitor, let connection = eventConnection {
-            Task {
-                await monitor.setDelegate(self)
-                await monitor.startMonitoring(connection: connection)
-            }
+    /// Create appropriate event source for camera vendor
+    private func createEventSource(for vendor: CameraVendor) -> CameraEventSource {
+        switch vendor {
+        case .canon:
+            return CanonEventSource(
+                commandConnection: commandConnection,
+                transactionManager: transactionManager,
+                photoOps: self
+            )
+
+        case .nikon:
+            return NikonEventSource(
+                eventConnection: eventConnection,
+                photoOps: self
+            )
+
+        case .standard, .unknown:
+            return StandardEventSource(
+                eventConnection: eventConnection,
+                photoOps: self
+            )
         }
-    }
-
-    // MARK: - Canon EOS Polling
-    // Canon EOS cameras don't send events on event channel - they require polling
-
-    /// Start Canon EOS event polling
-    /// Canon cameras require active polling with Canon_EOS_GetEvent command
-    private func startCanonPolling() {
-        canonPollingTask = Task { [weak self] in
-            await self?.canonPollingLoop()
-        }
-    }
-
-    /// Canon EOS polling loop with adaptive backoff (libgphoto2 pattern)
-    /// - Polls Canon_EOS_GetEvent with 50-200ms adaptive interval
-    /// - When events found: poll immediately (reset to 50ms)
-    /// - When no events: sleep and increase interval (up to 200ms max)
-    private func canonPollingLoop() async {
-        print("[PTPIPSession] Canon adaptive polling started (50-200ms)")
-
-        // Reset poll interval at start
-        canonPollInterval = minPollInterval
-
-        while isConnected {
-            do {
-                // Poll Canon GetEvent
-                let foundEvents = try await pollCanonEvent()
-
-                if foundEvents {
-                    // Events found - reset backoff and poll again immediately
-                    canonPollInterval = minPollInterval
-                    print("[PTPIPSession] Events found, polling immediately")
-                    continue  // No sleep - immediate next poll
-                } else {
-                    // No events - adaptive backoff
-                    print("[PTPIPSession] No events, sleeping \(Int(canonPollInterval * 1000))ms")
-                    try await Task.sleep(nanoseconds: UInt64(canonPollInterval * 1_000_000_000))
-
-                    // Increase interval for next poll (up to max)
-                    let newInterval = min(canonPollInterval + 0.05, maxPollInterval)
-                    if newInterval > canonPollInterval {
-                        canonPollInterval = newInterval
-                        print("[PTPIPSession] Poll interval increased to \(Int(canonPollInterval * 1000))ms")
-                    }
-                }
-
-            } catch is CancellationError {
-                break
-            } catch {
-                // Error - back off with max interval and retry
-                print("[PTPIPSession] Poll error: \(error), backing off \(Int(maxPollInterval * 1000))ms")
-                try? await Task.sleep(nanoseconds: UInt64(maxPollInterval * 1_000_000_000))
-            }
-        }
-
-        print("[PTPIPSession] Canon polling stopped")
-    }
-
-    /// Poll Canon EOS GetEvent
-    /// Sends Canon_EOS_GetEvent command and processes response
-    /// Filters out RAW files and only downloads JPEGs
-    /// - Returns: true if events were found (photos detected), false if empty
-    private func pollCanonEvent() async throws -> Bool {
-        guard let connection = commandConnection,
-              let txManager = transactionManager else {
-            return false
-        }
-
-        // Create Canon GetEvent command
-        var command = await txManager.createCommand()
-        let getEventCommand = command.canonGetEvent()
-        let commandData = getEventCommand.toData()
-
-        // Send command
-        try await sendData(connection: connection, data: commandData)
-
-        // Read response (may contain data packets with events)
-        let response = try await receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCommand.transactionID)
-
-        // Parse events from response data
-        guard let eventData = response.data, !eventData.isEmpty else {
-            return false  // No event data
-        }
-
-        let photosToDownload = parseCanonEvents(eventData)
-
-        if photosToDownload.isEmpty {
-            return false  // No photos in events
-        }
-
-        // Download photos SEQUENTIALLY (PTP/IP commands must be serialized)
-        // Filter out RAW files - only download JPEGs
-        for handle in photosToDownload {
-            // Get object info to check file type
-            do {
-                let objectInfo = try await getObjectInfo(objectHandle: handle)
-
-                // Skip RAW files
-                if objectInfo.isRawFile {
-                    print("[PTPIPSession] Skipping RAW file: \(objectInfo.filename) (format: 0x\(String(format: "%04X", objectInfo.objectFormat)))")
-                    delegate?.session(self, didSkipRawFile: objectInfo.filename)
-                    continue
-                }
-
-                // Only download JPEG files
-                if objectInfo.isJpegFile {
-                    print("[PTPIPSession] 📷 Downloading JPEG: \(objectInfo.filename)")
-                    delegate?.session(self, didDetectPhoto: handle)
-                    let photoData = try await downloadPhoto(objectHandle: handle)
-                    print("[PTPIPSession] Photo 0x\(String(format: "%08X", handle)) downloaded (\(photoData.count) bytes)")
-                } else {
-                    // Unknown format - log and skip
-                    print("[PTPIPSession] ⏭️ Skipping unknown format: \(objectInfo.filename) (format: 0x\(String(format: "%04X", objectInfo.objectFormat)))")
-                }
-            } catch {
-                print("[PTPIPSession] Failed to get object info for 0x\(String(format: "%08X", handle)): \(error)")
-                // Fall back to downloading anyway if we can't determine the type
-                delegate?.session(self, didDetectPhoto: handle)
-                do {
-                    let photoData = try await downloadPhoto(objectHandle: handle)
-                    print("[PTPIPSession] Photo 0x\(String(format: "%08X", handle)) downloaded (\(photoData.count) bytes)")
-                } catch {
-                    print("[PTPIPSession] Photo download failed: \(error)")
-                    delegate?.session(self, didFailWithError: error)
-                }
-            }
-        }
-
-        return true  // Events were found and processed
-    }
-
-    /// Receive Canon GetEvent response (handles data packets + response)
-    private func receiveCanonEventResponse(connection: NWConnection, expectedTransactionID: UInt32) async throws -> (data: Data?, response: PTPIPOperationResponse) {
-        var accumulatedData = Data()
-
-        // Read packets until we get OperationResponse
-        while true {
-            // Read header
-            let headerData = try await receiveData(connection: connection, length: 8)
-            guard let header = PTPIPHeader.from(headerData) else {
-                throw PTPIPSessionError.invalidResponse
-            }
-
-            // Read payload
-            let payloadLength = Int(header.length) - 8
-            let payloadData: Data
-            if payloadLength > 0 {
-                payloadData = try await receiveData(connection: connection, length: payloadLength)
-            } else {
-                payloadData = Data()
-            }
-
-            var fullPacket = headerData
-            fullPacket.append(payloadData)
-
-            // Handle packet type
-            guard let packetType = PTPIPPacketType(rawValue: header.type) else {
-                throw PTPIPSessionError.invalidResponse
-            }
-
-            switch packetType {
-            case .startDataPacket:
-                // START_DATA_PACKET: TransID(4) + TotalLength(8), NO actual data
-                continue
-
-            case .dataPacket:
-                // DATA_PACKET: Skip 4 bytes (transID), data at offset 4
-                if payloadData.count > 4 {
-                    accumulatedData.append(payloadData.dropFirst(4))
-                }
-                continue
-
-            case .endDataPacket:
-                // END_DATA_PACKET: Same as DATA_PACKET
-                if payloadData.count > 4 {
-                    accumulatedData.append(payloadData.dropFirst(4))
-                }
-                continue
-
-            case .operationResponse:
-                // Got response - parse and return
-                guard let response = PTPIPOperationResponse.from(fullPacket) else {
-                    throw PTPIPSessionError.invalidResponse
-                }
-
-                // Validate transaction ID
-                guard response.transactionID == expectedTransactionID else {
-                    throw PTPIPSessionError.transactionMismatch
-                }
-
-                return (accumulatedData.isEmpty ? nil : accumulatedData, response)
-
-            default:
-                throw PTPIPSessionError.invalidResponse
-            }
-        }
-    }
-
-    /// Parse Canon event data for ObjectAdded events
-    /// Canon returns a packed structure with multiple events
-    /// Based on libgphoto2 ptp-pack.c ptp_unpack_CANON_changes()
-    /// Returns list of object handles to download
-    private func parseCanonEvents(_ data: Data) -> [UInt32] {
-        var offset = 0
-        var photosToDownload: [UInt32] = []
-
-        // From libgphoto2: while (curdata - data + 8 < datasize)
-        while offset + 8 < data.count {
-            // Canon event format: size (4 bytes) + type (4 bytes) + data...
-            let size = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self) }
-            let eventSize = Int(UInt32(littleEndian: size))
-
-            let eventType = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset + 4, as: UInt32.self) }
-            let type = UInt32(littleEndian: eventType)
-
-            // Terminator check: size=8, type=0 means end of events
-            if eventSize == 8 && type == 0 {
-                break
-            }
-
-            if eventSize < 8 || offset + eventSize >= data.count {
-                break
-            }
-
-            // Check for photo-related events (from libgphoto2 ptp-pack.c)
-            // 0xC181 = ObjectAddedEx, 0xC1A7 = ObjectAddedEx64
-            // 0xC186 = RequestObjectTransfer, 0xC1A9 = RequestObjectTransfer64
-            switch type {
-            case 0xC181, 0xC1A7, 0xC186, 0xC1A9:
-                if eventSize >= 12 {
-                    let objectHandle = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset + 8, as: UInt32.self) }
-                    let handle = UInt32(littleEndian: objectHandle)
-                    print("[PTPIPSession] Photo detected: 0x\(String(format: "%08X", handle))")
-                    photosToDownload.append(handle)
-                }
-
-            default:
-                break
-            }
-
-            offset += eventSize
-        }
-
-        return photosToDownload
     }
 
     // MARK: - Public Properties
@@ -1048,33 +749,34 @@ class PTPIPSession: NSObject {
     }
 }
 
-// MARK: - Event Monitor Delegate
+// MARK: - Photo Operations Provider
 
-extension PTPIPSession: PTPIPEventMonitorDelegate {
-    nonisolated func eventMonitor(_ monitor: PTPIPEventMonitor, didReceiveObjectAdded objectHandle: UInt32) {
-        Task { @MainActor in
-            print("[PTPIPSession] Photo detected: 0x\(String(format: "%08X", objectHandle))")
-            delegate?.session(self, didDetectPhoto: objectHandle)
+extension PTPIPSession: PhotoOperationsProvider {
+    // getObjectInfo and downloadPhoto are already implemented above
+    // This conformance allows event sources to access these operations
+}
 
-            // Auto-download photo when detected
-            do {
-                let photoData = try await downloadPhoto(objectHandle: objectHandle)
-                print("[PTPIPSession] Photo 0x\(String(format: "%08X", objectHandle)) downloaded (\(photoData.count) bytes)")
-            } catch {
-                print("[PTPIPSession] Photo download failed: \(error)")
-                delegate?.session(self, didFailWithError: error)
-            }
-        }
+// MARK: - Camera Event Source Delegate
+
+extension PTPIPSession: CameraEventSourceDelegate {
+    func eventSource(_ source: CameraEventSource, didDetectPhoto objectHandle: UInt32) {
+        print("[PTPIPSession] Event source detected photo: 0x\(String(format: "%08X", objectHandle))")
+        delegate?.session(self, didDetectPhoto: objectHandle)
     }
 
-    nonisolated func eventMonitor(_ monitor: PTPIPEventMonitor, didFailWithError error: Error) {
-        Task { @MainActor in
-            delegate?.session(self, didFailWithError: error)
-        }
+    func eventSource(_ source: CameraEventSource, didSkipRawFile filename: String) {
+        print("[PTPIPSession] Event source skipped RAW: \(filename)")
+        delegate?.session(self, didSkipRawFile: filename)
     }
 
-    nonisolated func eventMonitorDidDisconnect(_ monitor: PTPIPEventMonitor) {
-        Task { @MainActor in
+    func eventSource(_ source: CameraEventSource, didFailWithError error: Error) {
+        print("[PTPIPSession] Event source error: \(error)")
+        delegate?.session(self, didFailWithError: error)
+    }
+
+    func eventSourceDidDisconnect(_ source: CameraEventSource) {
+        print("[PTPIPSession] Event source disconnected")
+        Task {
             await disconnect()
         }
     }
