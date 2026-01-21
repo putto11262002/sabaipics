@@ -30,6 +30,7 @@ export function useUploadQueue(eventId: string | undefined) {
 
   // Upload log state (single source of truth)
   const uploadLogRef = useRef<Map<string, UploadLogEntry>>(new Map());
+  const indexedForRemovalRef = useRef<Set<string>>(new Set()); // Track entries scheduled for removal
   const [, setUploadLogVersion] = useState(0); // Force re-renders
 
   // Initialize upload log with photos from API
@@ -71,6 +72,9 @@ export function useUploadQueue(eventId: string | undefined) {
       const existing = uploadLogRef.current.get(status.id);
       if (!existing) return;
 
+      // Skip updating entries already scheduled for removal
+      if (indexedForRemovalRef.current.has(status.id)) return;
+
       uploadLogRef.current.set(status.id, {
         ...existing,
         ...status,
@@ -80,17 +84,27 @@ export function useUploadQueue(eventId: string | undefined) {
     setUploadLogVersion((v) => v + 1);
   }, [statuses]);
 
-  // Remove indexed entries from upload log
+  // Remove indexed entries from upload log after 3 second delay
   useEffect(() => {
     if (!statuses) return;
 
     const indexedPhotos = statuses.filter((s) => s.status === 'indexed');
-    if (indexedPhotos.length > 0) {
-      indexedPhotos.forEach((p) => {
-        uploadLogRef.current.delete(p.id);
+    if (indexedPhotos.length === 0) return;
+
+    // Set timeouts for each indexed photo that isn't already scheduled
+    indexedPhotos
+      .filter((p) => !indexedForRemovalRef.current.has(p.id))
+      .forEach((p) => {
+        // Mark as scheduled for removal
+        indexedForRemovalRef.current.add(p.id);
+
+        setTimeout(() => {
+          uploadLogRef.current.delete(p.id);
+          indexedForRemovalRef.current.delete(p.id); // Clean up tracking
+          setUploadLogVersion((v) => v + 1);
+        }, 3000); // 3 second delay to show "Indexed" status
       });
-      setUploadLogVersion((v) => v + 1);
-    }
+    // Note: No cleanup function - let timeouts fire naturally
   }, [statuses]);
 
   // Helper to sync upload log state
@@ -271,9 +285,8 @@ export function useUploadQueue(eventId: string | undefined) {
   const failedItems = displayItems.filter((i) => i.status === 'failed');
 
   // Get upload log entries (for UploadLog component)
-  const uploadLogEntries = Array.from(uploadLogRef.current.values()).filter(
-    (e) => e.status !== 'indexed',
-  );
+  // Note: Don't filter out 'indexed' - they'll be removed after 3 second delay
+  const uploadLogEntries = Array.from(uploadLogRef.current.values());
 
   return {
     // Actions
