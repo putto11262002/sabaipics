@@ -179,7 +179,8 @@ export const stripeWebhookRouter = new Hono<{
     // Test mode bypass - skip signature verification during testing
     // Vitest sets NODE_ENV to "test" automatically during test runs
     let event: Stripe.Event;
-    if (process.env.NODE_ENV === "test" || signature === "test_signature") {
+    const nodeEnv = process.env.NODE_ENV as string | undefined;
+    if (nodeEnv === "test" || signature === "test_signature") {
       event = JSON.parse(rawBody) as Stripe.Event;
     } else {
       // Verify signature and construct event (production)
