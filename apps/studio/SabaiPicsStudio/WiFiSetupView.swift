@@ -3,15 +3,17 @@
 //  SabaiPicsStudio
 //
 //  Created: 2026-01-14
+//  Updated: 2026-01-19 - Transfer Session Architecture
 //  Professional WiFi camera setup UI for iPad
 //
 
 import SwiftUI
 
 /// Main WiFi setup view for connecting to Canon cameras
+/// Used for manual IP entry (fallback from auto-discovery)
 struct WiFiSetupView: View {
-    @EnvironmentObject var connectionStore: ConnectionStore
-    @State private var cameraIP: String = "192.168.1.1"
+    @EnvironmentObject var coordinator: AppCoordinator
+    @State private var cameraIP: String = "172.20.10.2"  // Default to hotspot IP range
     @State private var showInstructions = false
     @State private var showPermissionError = false
     @FocusState private var isIPFieldFocused: Bool
@@ -115,8 +117,8 @@ struct WiFiSetupView: View {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
                                                to: nil, from: nil, for: nil)
 
-                // Then connect
-                connectionStore.connect(ip: cameraIP)
+                // Then connect via coordinator (Path 2: Manual IP)
+                coordinator.connectManualIP(cameraIP)
             }) {
                 HStack(spacing: 12) {
                     Image(systemName: "wifi")
@@ -280,9 +282,8 @@ struct InstructionStep: View {
 // MARK: - Preview
 
 #Preview {
-    let mockService = MockCameraService()
-    let coordinator = AppCoordinator(cameraService: mockService)
+    let coordinator = AppCoordinator()
 
     return WiFiSetupView()
-        .environmentObject(coordinator.connectionStore)
+        .environmentObject(coordinator)
 }

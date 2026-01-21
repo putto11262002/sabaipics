@@ -3,51 +3,127 @@
 //  SabaiPicsStudio
 //
 //  Created: 2026-01-18
-//  Phase 5: Architecture Refactoring - AppState Extraction
+//  Updated: 2026-01-19 - Transfer Session Architecture
 //
 //  App-level state that determines which view to show in ContentView.
-//  Extracted from CameraViewModel.swift during Phase 5 cleanup.
+//  Simplified state machine with clear transitions.
 //
 
 import Foundation
-import ImageCaptureCore
 
 /// App-level state that determines which view to show
 ///
+/// State Machine:
+/// ```
+/// manufacturerSelection → hotspotSetup → discovering ─┬→ transferring
+///                                      ↘ manualIPEntry → connecting ─┘
+///                                                                    ↓
+///                                                            [disconnect]
+///                                                                    ↓
+///                                                      manufacturerSelection
+/// ```
+///
 /// States:
-/// - manufacturerSelection: ManufacturerSelectionView - choose camera brand (SAB-22)
-/// - idle: CameraDiscoveryView - discovering cameras (SAB-22 will show this after manufacturer selected)
-/// - cameraFound: USB legacy (disabled, kept for compatibility)
-/// - connecting: ConnectingView - connection in progress
-/// - connected: ConnectedView - success celebration
-/// - ready: USB legacy (might not be used)
-/// - capturing: LiveCaptureView - active photo capture
-/// - error: ConnectionErrorView - error state
+/// - manufacturerSelection: Choose camera brand (Canon/Nikon/Sony)
+/// - hotspotSetup: Instructions to enable Personal Hotspot
+/// - discovering: Network scan for cameras (CameraDiscoveryView)
+/// - manualIPEntry: Manual IP address entry (WiFiSetupView)
+/// - connecting: Connection in progress (ConnectingView)
+/// - transferring: Active photo transfer session (LiveCaptureView)
+/// - error: Error state with message
 enum AppState: Equatable {
-    case manufacturerSelection       // ManufacturerSelectionView - choose camera brand (SAB-22)
-    case idle                        // CameraDiscoveryView - discovering cameras (updated in SAB-22)
-    case cameraFound(ICCameraDevice)  // USB legacy
-    case connecting                   // ConnectingView (Phase 5)
-    case connected                    // ConnectedView (Phase 5, 1s pause)
-    case ready                        // USB legacy
-    case capturing                    // LiveCaptureView
-    case error(String)                // ConnectionErrorView
+    /// Choose camera manufacturer (Canon/Nikon/Sony)
+    case manufacturerSelection
+
+    /// Setup instructions for Personal Hotspot
+    case hotspotSetup
+
+    /// Scanning network for cameras
+    case discovering
+
+    /// Manual IP address entry (fallback)
+    case manualIPEntry
+
+    /// Connecting to camera (shows progress)
+    case connecting(ip: String)
+
+    /// Active transfer session (main capture view)
+    /// Associated TransferSession is managed by AppCoordinator
+    case transferring
+
+    /// Error state with message
+    case error(String)
+
+    // MARK: - Equatable
 
     static func == (lhs: AppState, rhs: AppState) -> Bool {
         switch (lhs, rhs) {
         case (.manufacturerSelection, .manufacturerSelection),
-             (.idle, .idle),
-             (.connecting, .connecting),
-             (.connected, .connected),
-             (.ready, .ready),
-             (.capturing, .capturing):
+             (.hotspotSetup, .hotspotSetup),
+             (.discovering, .discovering),
+             (.manualIPEntry, .manualIPEntry),
+             (.transferring, .transferring):
             return true
+        case let (.connecting(lhsIP), .connecting(rhsIP)):
+            return lhsIP == rhsIP
         case let (.error(lhsMsg), .error(rhsMsg)):
             return lhsMsg == rhsMsg
-        case let (.cameraFound(lhsCam), .cameraFound(rhsCam)):
-            return lhsCam.name == rhsCam.name
         default:
             return false
+        }
+    }
+}
+
+// MARK: - State Helpers
+
+extension AppState {
+    /// Whether this state should show the back button
+    var showsBackButton: Bool {
+        switch self {
+        case .hotspotSetup, .discovering, .manualIPEntry, .connecting:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether this state is a "connecting" type state
+    var isConnecting: Bool {
+        switch self {
+        case .connecting:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether this state is the active transfer state
+    var isTransferring: Bool {
+        switch self {
+        case .transferring:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Human-readable description for debugging
+    var debugDescription: String {
+        switch self {
+        case .manufacturerSelection:
+            return "manufacturerSelection"
+        case .hotspotSetup:
+            return "hotspotSetup"
+        case .discovering:
+            return "discovering"
+        case .manualIPEntry:
+            return "manualIPEntry"
+        case .connecting(let ip):
+            return "connecting(\(ip))"
+        case .transferring:
+            return "transferring"
+        case .error(let msg):
+            return "error(\(msg))"
         }
     }
 }

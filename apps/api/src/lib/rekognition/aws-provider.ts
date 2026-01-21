@@ -18,6 +18,8 @@ import { Buffer } from 'node:buffer';
 import type {
   IndexPhotoRequest,
   FindSimilarRequest,
+  FindImagesByFaceRequest,
+  FindImagesByFaceResponse,
   PhotoIndexed,
   SimilarFace,
   Face,
@@ -217,6 +219,49 @@ function transformSearchResponse(data: any): SimilarFace[] {
   );
 }
 
+function transformImageSearchResponse(data: any): FindImagesByFaceResponse {
+  // Aggregate face matches by ExternalImageId (our photoId)
+  const photoMap = new Map<string, { similarity: number; faceCount: number }>();
+
+  data.FaceMatches?.forEach((m: any) => {
+    const photoId = m.Face?.ExternalImageId;
+    if (!photoId) return;
+
+    const similarity = normalizeConfidence(m.Similarity);
+
+    if (photoMap.has(photoId)) {
+      const existing = photoMap.get(photoId)!;
+      // Keep the highest similarity score
+      if (similarity > existing.similarity) {
+        existing.similarity = similarity;
+      }
+      // Increment face count
+      existing.faceCount += 1;
+    } else {
+      photoMap.set(photoId, {
+        similarity,
+        faceCount: 1,
+      });
+    }
+  });
+
+  // Convert map to array of PhotoMatch objects
+  const photos = Array.from(photoMap.entries()).map(([photoId, data]) => ({
+    photoId,
+    similarity: data.similarity,
+    faceCount: data.faceCount,
+  }));
+
+  // Sort by similarity (descending)
+  photos.sort((a, b) => b.similarity - a.similarity);
+
+  return {
+    photos,
+    totalMatchedFaces: data.FaceMatches?.length || 0,
+    provider: 'aws',
+  };
+}
+
 // =============================================================================
 // Client Factory
 // =============================================================================
@@ -299,6 +344,37 @@ export function createAWSProvider(config: AWSProviderConfig): FaceRecognitionPro
       }
 
       return ok(transformSearchResponse(data));
+    });
+
+  const findImagesByFace = (request: FindImagesByFaceRequest): ResultAsync<FindImagesByFaceResponse, FaceServiceError> =>
+    safeTry(async function* () {
+      const response = yield* ResultAsync.fromPromise(
+        aws.fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-amz-json-1.1',
+            'X-Amz-Target': 'RekognitionService.SearchFacesByImage',
+          },
+          body: JSON.stringify({
+            CollectionId: request.eventId,
+            Image: { Bytes: Buffer.from(request.imageData).toString('base64') },
+            MaxFaces: (request.maxResults ?? 10) * 2, // Fetch more to account for aggregation
+            FaceMatchThreshold: (request.minSimilarity ?? 0.8) * 100,
+          }),
+        }),
+        networkErrorToFaceServiceError,
+      ).safeUnwrap();
+
+      const data = yield* ResultAsync.fromPromise(
+        response.json() as Promise<any>,
+        jsonParseErrorToFaceServiceError,
+      ).safeUnwrap();
+
+      if (data.__type) {
+        return err(awsErrorToFaceServiceError(data.__type, data));
+      }
+
+      return ok(transformImageSearchResponse(data));
     });
 
   const deleteFaces = (eventId: string, faceIds: string[]): ResultAsync<void, FaceServiceError> =>
@@ -389,6 +465,7 @@ export function createAWSProvider(config: AWSProviderConfig): FaceRecognitionPro
   return {
     indexPhoto,
     findSimilarFaces,
+    findImagesByFace,
     deleteFaces,
     deleteCollection,
     createCollection,

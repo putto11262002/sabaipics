@@ -41,6 +41,7 @@ class PhotoStore: ObservableObject {
 
     /// Initialize photo store with camera service
     /// - Parameter cameraService: Service conforming to CameraServiceProtocol
+    @MainActor
     init(cameraService: any CameraServiceProtocol) {
         self.cameraService = cameraService
         setupSubscriptions()
@@ -61,6 +62,7 @@ class PhotoStore: ObservableObject {
     /// Setup Combine subscriptions to service publishers
     /// Note: We subscribe by directly accessing the concrete service type
     /// This is necessary because protocols can't expose @Published property wrappers
+    @MainActor
     private func setupSubscriptions() {
         print("[PhotoStore] Setting up service subscriptions")
 
@@ -76,6 +78,7 @@ class PhotoStore: ObservableObject {
     }
 
     /// Subscribe to WiFiCameraService publishers
+    @MainActor
     private func subscribeToWiFiService(_ service: WiFiCameraService) {
         // Subscribe to detected photos (for counter only)
         service.$detectedPhotos
