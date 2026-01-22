@@ -17,11 +17,7 @@ import {
   type IndexFacesResponse,
   type SearchFacesByImageResponse,
 } from '../types';
-import {
-  toAWSIndexFacesResponse,
-  toAWSFaceMatch,
-  toAWSBoundingBox,
-} from '../mappers';
+import { toAWSIndexFacesResponse, toAWSFaceMatch, toAWSBoundingBox } from '../mappers';
 import { errorToHttpStatus, errorMessage } from '../../domain/errors';
 
 type StatusCode = 200 | 400 | 404 | 500 | 503;
@@ -64,7 +60,7 @@ export function createFacesRouter(faceService: FaceService) {
             StatusCode: 400,
             error: 'Failed to decode base64 image data',
           },
-          400
+          400,
         );
       }
     } else {
@@ -75,14 +71,14 @@ export function createFacesRouter(faceService: FaceService) {
           StatusCode: 400,
           error: 'S3Object image source not supported yet. Use Bytes instead.',
         },
-        400
+        400,
       );
     }
 
     // Convert Buffer to ArrayBuffer
     const imageData = imageBytes.buffer.slice(
       imageBytes.byteOffset,
-      imageBytes.byteOffset + imageBytes.byteLength
+      imageBytes.byteOffset + imageBytes.byteLength,
     ) as ArrayBuffer;
 
     try {
@@ -118,6 +114,7 @@ export function createFacesRouter(faceService: FaceService) {
         externalImageId,
         error: err.type,
         retryable: err.retryable,
+        cause: 'cause' in err ? err.cause : undefined,
       });
 
       const statusCode = errorToHttpStatus(err);
@@ -129,11 +126,22 @@ export function createFacesRouter(faceService: FaceService) {
           retryable: err.retryable,
           throttle: err.throttle,
         },
-        statusCode as StatusCode
+        statusCode as StatusCode,
       );
     } catch (error) {
-      console.error('[Faces] IndexFaces unexpected error:', { collectionId, externalImageId, error });
-      return c.json({ StatusCode: 500, error: 'Internal server error', message: error instanceof Error ? error.message : 'Unknown error' }, 500);
+      console.error('[Faces] IndexFaces unexpected error:', {
+        collectionId,
+        externalImageId,
+        error,
+      });
+      return c.json(
+        {
+          StatusCode: 500,
+          error: 'Internal server error',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+        500,
+      );
     }
   });
 
@@ -141,83 +149,89 @@ export function createFacesRouter(faceService: FaceService) {
    * POST /collections/:id/search-faces-by-image
    * Search for faces similar to the query image.
    */
-  app.post('/:id/search-faces-by-image', zValidator('json', SearchFacesByImageRequestSchema), async (c) => {
-    const collectionId = c.req.param('id');
-    const body = c.req.valid('json');
-    const maxFaces = body.MaxFaces || 10;
-    const threshold = body.FaceMatchThreshold || 80;
+  app.post(
+    '/:id/search-faces-by-image',
+    zValidator('json', SearchFacesByImageRequestSchema),
+    async (c) => {
+      const collectionId = c.req.param('id');
+      const body = c.req.valid('json');
+      const maxFaces = body.MaxFaces || 10;
+      const threshold = body.FaceMatchThreshold || 80;
 
-    console.log('[Faces] SearchFacesByImage request:', {
-      collectionId,
-      maxFaces,
-      threshold,
-    });
-
-    // Decode base64 image
-    const imageBytes = Buffer.from(body.Image.Bytes, 'base64');
-    console.log('[Faces] Search image decoded:', { size: imageBytes.length });
-
-    // Convert Buffer to ArrayBuffer
-    const imageData = imageBytes.buffer.slice(
-      imageBytes.byteOffset,
-      imageBytes.byteOffset + imageBytes.byteLength
-    ) as ArrayBuffer;
-
-    try {
-      // Search for similar faces with ResultAsync
-      const result = await faceService.findSimilarFaces({
-        eventId: collectionId,
-        imageData,
-        maxResults: maxFaces,
-        minSimilarity: threshold / 100, // AWS: 0-100 -> Domain: 0-1
+      console.log('[Faces] SearchFacesByImage request:', {
+        collectionId,
+        maxFaces,
+        threshold,
       });
 
-      // Use .isOk() / .isErr() pattern for Hono type compatibility
-      if (result.isOk()) {
-        const matches = result.value;
-        console.log('[Faces] SearchFacesByImage success:', {
-          collectionId,
-          matchesFound: matches.length,
+      // Decode base64 image
+      const imageBytes = Buffer.from(body.Image.Bytes, 'base64');
+      console.log('[Faces] Search image decoded:', { size: imageBytes.length });
+
+      // Convert Buffer to ArrayBuffer
+      const imageData = imageBytes.buffer.slice(
+        imageBytes.byteOffset,
+        imageBytes.byteOffset + imageBytes.byteLength,
+      ) as ArrayBuffer;
+
+      try {
+        // Search for similar faces with ResultAsync
+        const result = await faceService.findSimilarFaces({
+          eventId: collectionId,
+          imageData,
+          maxResults: maxFaces,
+          minSimilarity: threshold / 100, // AWS: 0-100 -> Domain: 0-1
         });
 
-        const searchedFace = matches.length > 0 ? matches[0] : null;
+        // Use .isOk() / .isErr() pattern for Hono type compatibility
+        if (result.isOk()) {
+          const matches = result.value;
+          console.log('[Faces] SearchFacesByImage success:', {
+            collectionId,
+            matchesFound: matches.length,
+          });
 
-        const response: SearchFacesByImageResponse = {
-          SearchedFaceBoundingBox: searchedFace?.boundingBox
-            ? toAWSBoundingBox(searchedFace.boundingBox)
-            : undefined,
-          SearchedFaceConfidence: searchedFace ? (searchedFace.confidence ?? 1.0) * 100 : undefined,
-          FaceMatches: matches.map(toAWSFaceMatch),
-          FaceModelVersion: 'face-api.js-1.7.15',
-        };
+          const searchedFace = matches.length > 0 ? matches[0] : null;
 
-        return c.json(response);
-      }
+          const response: SearchFacesByImageResponse = {
+            SearchedFaceBoundingBox: searchedFace?.boundingBox
+              ? toAWSBoundingBox(searchedFace.boundingBox)
+              : undefined,
+            SearchedFaceConfidence: searchedFace
+              ? (searchedFace.confidence ?? 1.0) * 100
+              : undefined,
+            FaceMatches: matches.map(toAWSFaceMatch),
+            FaceModelVersion: 'face-api.js-1.7.15',
+          };
 
-      // Handle error case
-      const err = result.error;
-      console.error('[Faces] SearchFacesByImage failed:', {
-        collectionId,
-        error: err.type,
-        retryable: err.retryable,
-      });
+          return c.json(response);
+        }
 
-      const statusCode = errorToHttpStatus(err);
-      return c.json(
-        {
-          StatusCode: statusCode,
-          error: errorMessage(err),
-          type: err.type,
+        // Handle error case
+        const err = result.error;
+        console.error('[Faces] SearchFacesByImage failed:', {
+          collectionId,
+          error: err.type,
           retryable: err.retryable,
-          throttle: err.throttle,
-        },
-        statusCode as StatusCode
-      );
-    } catch (error) {
-      console.error('[Faces] SearchFacesByImage unexpected error:', { collectionId, error });
-      return c.json({ StatusCode: 500, error: 'Internal server error' }, 500);
-    }
-  });
+        });
+
+        const statusCode = errorToHttpStatus(err);
+        return c.json(
+          {
+            StatusCode: statusCode,
+            error: errorMessage(err),
+            type: err.type,
+            retryable: err.retryable,
+            throttle: err.throttle,
+          },
+          statusCode as StatusCode,
+        );
+      } catch (error) {
+        console.error('[Faces] SearchFacesByImage unexpected error:', { collectionId, error });
+        return c.json({ StatusCode: 500, error: 'Internal server error' }, 500);
+      }
+    },
+  );
 
   return app;
 }

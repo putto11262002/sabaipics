@@ -1,0 +1,49 @@
+{
+  "name": "@sabaipics/event",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:staging": "tsc -b && vite build --mode staging",
+    "build:prod": "tsc -b && vite build --mode production",
+    "lint": "eslint . --max-warnings 0",
+    "preview": "vite preview",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "pages:deploy": "pnpm build:prod && wrangler pages deploy dist --project-name=event",
+    "pages:deploy:staging": "pnpm build:staging && wrangler pages deploy dist --project-name=event-staging"
+  },
+  "dependencies": {
+    "@sabaipics/ui": "workspace:*",
+    "@tanstack/react-query": "^5.80.7",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "hono": "^4.7.10",
+    "lucide-react": "^0.469.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-photo-album": "^3.0.2",
+    "react-router": "^7.1.1",
+    "sonner": "^1.7.2",
+    "tailwind-merge": "^2.6.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^15.14.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.19.0",
+    "vite": "^6.0.7",
+    "wrangler": "^3.99.0"
+  }
+}

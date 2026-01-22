@@ -26,7 +26,7 @@ const MAX_PAGE_SIZE = 100;
 // QR Code Generation
 // =============================================================================
 
-type QRSize = "small" | "medium" | "large";
+type QRSize = 'small' | 'medium' | 'large';
 
 const QR_SIZE_PRESETS: Record<QRSize, number> = {
   small: 256,
@@ -41,12 +41,12 @@ function getScaleForSize(size: QRSize): number {
 async function generateEventQR(
   eventId: string,
   baseUrl: string,
-  size: QRSize = "medium"
+  size: QRSize = 'medium',
 ): Promise<Uint8Array> {
   const searchUrl = `${baseUrl}/events/${eventId}/search`;
 
   return await generatePngQrCode(searchUrl, {
-    ecLevel: "M",
+    ecLevel: 'M',
     margin: 4,
     scale: getScaleForSize(size),
   });
@@ -91,7 +91,6 @@ function qrGenerationFailedError(reason: string) {
     },
   };
 }
-
 
 // =============================================================================
 // Routes
@@ -250,9 +249,12 @@ export const eventsRouter = new Hono<Env>()
     requirePhotographer(),
     requireConsent(),
     zValidator('param', eventParamsSchema),
-    zValidator('query', z.object({
-      size: z.enum(['small', 'medium', 'large']).optional().default('medium'),
-    })),
+    zValidator(
+      'query',
+      z.object({
+        size: z.enum(['small', 'medium', 'large']).optional().default('medium'),
+      }),
+    ),
     async (c) => {
       const photographer = c.var.photographer;
       const db = c.var.db();
@@ -297,6 +299,28 @@ export const eventsRouter = new Hono<Env>()
       });
     },
   )
+  // GET /events/:id/public - Public event info (no auth required)
+  .get('/:id/public', zValidator('param', eventParamsSchema), async (c) => {
+    const db = c.var.db();
+    const { id } = c.req.valid('param');
+
+    const [event] = await db
+      .select({ name: events.name })
+      .from(events)
+      .where(eq(events.id, id))
+      .limit(1);
+
+    if (!event) {
+      return c.json(notFoundError(), 404);
+    }
+
+    return c.json({
+      data: {
+        name: event.name,
+      },
+    });
+  })
+
   // Mount participant search router (public endpoint)
   .route('/', searchRouter)
   // Mount participant downloads router (public endpoint)

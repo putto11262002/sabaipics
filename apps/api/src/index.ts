@@ -57,8 +57,10 @@ const app = new Hono<Env>()
   .route('/webhooks', webhookRouter)
   // Then CORS and auth for all other routes
   .use('/*', (c, next) => {
+    // Support comma-separated origins for dev (e.g., "http://localhost:5173,http://localhost:5174")
+    const allowedOrigins = c.env.CORS_ORIGIN.split(',').map((o) => o.trim());
     return cors({
-      origin: c.env.CORS_ORIGIN,
+      origin: (origin) => (allowedOrigins.includes(origin) ? origin : allowedOrigins[0]),
       credentials: true,
     })(c, next);
   })

@@ -43,7 +43,7 @@ const searchRequestSchema = z.object({
       (f) => ALLOWED_MIME_TYPES.includes(f.type as (typeof ALLOWED_MIME_TYPES)[number]),
       `File type must be one of: ${ALLOWED_MIME_TYPES.join(', ')}`,
     ),
-  consentAccepted: z.boolean(),
+  consentAccepted: z.preprocess((val) => val === 'true' || val === true, z.boolean()),
 });
 
 const eventParamsSchema = z.object({
@@ -54,18 +54,30 @@ const eventParamsSchema = z.object({
 // URL Generators
 // =============================================================================
 
-function generateThumbnailUrl(r2Key: string, cfZone: string, r2BaseUrl: string): string {
-  if (process.env.NODE_ENV === 'development') {
+function generateThumbnailUrl(
+  r2Key: string,
+  cfZone: string,
+  r2BaseUrl: string,
+  isDev: boolean,
+): string {
+  // In development, skip CF Image Resizing - use raw R2 URL
+  if (isDev) {
     return `${r2BaseUrl}/${r2Key}`;
   }
-  return `${cfZone}/cdn-cgi/image/width=400,fit=cover,format=auto,quality=75/${r2BaseUrl}/${r2Key}`;
+  return `https://${cfZone}/cdn-cgi/image/width=400,fit=cover,format=auto,quality=75/${r2BaseUrl}/${r2Key}`;
 }
 
-function generatePreviewUrl(r2Key: string, cfZone: string, r2BaseUrl: string): string {
-  if (process.env.NODE_ENV === 'development') {
+function generatePreviewUrl(
+  r2Key: string,
+  cfZone: string,
+  r2BaseUrl: string,
+  isDev: boolean,
+): string {
+  // In development, skip CF Image Resizing - use raw R2 URL
+  if (isDev) {
     return `${r2BaseUrl}/${r2Key}`;
   }
-  return `${cfZone}/cdn-cgi/image/width=1200,fit=contain,format=auto,quality=85/${r2BaseUrl}/${r2Key}`;
+  return `https://${cfZone}/cdn-cgi/image/width=1200,fit=contain,format=auto,quality=85/${r2BaseUrl}/${r2Key}`;
 }
 
 // =============================================================================
@@ -337,10 +349,16 @@ export const searchRouter = new Hono<Env>().post(
       );
 
       // Step 12: Generate photo URLs
+      const isDev = c.env.NODE_ENV === 'development';
       const responsePhotos = photoRecords.map((photo) => ({
         photoId: photo.id,
-        thumbnailUrl: generateThumbnailUrl(photo.r2Key, c.env.CF_ZONE, c.env.PHOTO_R2_BASE_URL),
-        previewUrl: generatePreviewUrl(photo.r2Key, c.env.CF_ZONE, c.env.PHOTO_R2_BASE_URL),
+        thumbnailUrl: generateThumbnailUrl(
+          photo.r2Key,
+          c.env.CF_ZONE,
+          c.env.PHOTO_R2_BASE_URL,
+          isDev,
+        ),
+        previewUrl: generatePreviewUrl(photo.r2Key, c.env.CF_ZONE, c.env.PHOTO_R2_BASE_URL, isDev),
         similarity: photoIdToSimilarity.get(photo.id) ?? 0,
       }));
 
