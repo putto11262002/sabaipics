@@ -51,12 +51,15 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		18C1A0D72F1A000100000001 /* Studio.Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Studio.Debug.xcconfig; path = Config/Studio.Debug.xcconfig; sourceTree = "<group>"; };
-		18C1A0D82F1A000100000001 /* Studio.Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Studio.Release.xcconfig; path = Config/Studio.Release.xcconfig; sourceTree = "<group>"; };
 		179FE9AC2F178F650090EBC9 /* SabaiPicsStudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SabaiPicsStudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		179FE9B92F178F660090EBC9 /* SabaiPicsStudioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SabaiPicsStudioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		179FE9C32F178F660090EBC9 /* SabaiPicsStudioUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SabaiPicsStudioUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		17D895BB2F17E09B00FE1698 /* GPhoto2Framework.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = GPhoto2Framework.xcodeproj; path = Vendor/GPhoto2Framework/GPhoto2Framework/GPhoto2Framework.xcodeproj; sourceTree = "<group>"; };
+		18C1A0D72F1A000100000001 /* Studio.Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Studio.Debug.xcconfig; path = Config/Studio.Debug.xcconfig; sourceTree = "<group>"; };
+		18C1A0D82F1A000100000001 /* Studio.Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Studio.Release.xcconfig; path = Config/Studio.Release.xcconfig; sourceTree = "<group>"; };
+		18C1A0D92F1A000100000001 /* Studio.Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Studio.Local.xcconfig; path = Config/Studio.Local.xcconfig; sourceTree = "<group>"; };
+		18C1A0DA2F1A000100000001 /* Studio.Local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Studio.Local.xcconfig.example; path = Config/Studio.Local.xcconfig.example; sourceTree = "<group>"; };
+		18D9B5F82F1A111100000002 /* SabaiPicsStudio-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = SabaiPicsStudio-Info.plist; path = Config/SabaiPicsStudio-Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -108,6 +111,9 @@
 			isa = PBXGroup;
 			children = (
 				18C1A0D72F1A000100000001 /* Studio.Debug.xcconfig */,
+				18D9B5F82F1A111100000002 /* SabaiPicsStudio-Info.plist */,
+				18C1A0D92F1A000100000001 /* Studio.Local.xcconfig */,
+				18C1A0DA2F1A000100000001 /* Studio.Local.xcconfig.example */,
 				18C1A0D82F1A000100000001 /* Studio.Release.xcconfig */,
 				17D895BB2F17E09B00FE1698 /* GPhoto2Framework.xcodeproj */,
 				179FE9AE2F178F650090EBC9 /* SabaiPicsStudio */,
@@ -249,7 +255,7 @@
 			mainGroup = 179FE9A32F178F650090EBC9;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				18C1A0D42F1A000100000001 /* clerk-ios */,
+				18C1A0D42F1A000100000001 /* XCRemoteSwiftPackageReference "clerk-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 179FE9AD2F178F650090EBC9 /* Products */;
@@ -339,25 +345,6 @@
 			targetProxy = 179FE9C42F178F660090EBC9 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		18C1A0D42F1A000100000001 /* clerk-ios */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/clerk/clerk-ios";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.71.4;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		18C1A0D52F1A000100000001 /* Clerk */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 18C1A0D42F1A000100000001 /* clerk-ios */;
-			productName = Clerk;
-		};
-/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		179FE9CB2F178F660090EBC9 /* Debug */ = {
@@ -491,15 +478,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6896G3Y4GD;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_ClerkPublishableKey = "$(CLERK_PUBLISHABLE_KEY)";
-				INFOPLIST_KEY_NSCameraUsageDescription = "SabaiPics Studio needs access to detect and download photos from your professional camera via USB or WiFi.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "SabaiPics Studio needs local network access to discover and connect to cameras on your WiFi network.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Config/SabaiPicsStudio-Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -525,15 +505,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6896G3Y4GD;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_ClerkPublishableKey = "$(CLERK_PUBLISHABLE_KEY)";
-				INFOPLIST_KEY_NSCameraUsageDescription = "SabaiPics Studio needs access to detect and download photos from your professional camera via USB or WiFi.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "SabaiPics Studio needs local network access to discover and connect to cameras on your WiFi network.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Config/SabaiPicsStudio-Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -661,6 +634,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		18C1A0D42F1A000100000001 /* XCRemoteSwiftPackageReference "clerk-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/clerk/clerk-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.71.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		18C1A0D52F1A000100000001 /* Clerk */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 18C1A0D42F1A000100000001 /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = Clerk;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 179FE9A42F178F650090EBC9 /* Project object */;
 }
