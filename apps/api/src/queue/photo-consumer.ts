@@ -378,10 +378,12 @@ function processPhoto(
 
     if (error.type === 'face_service') {
       const faceErr = error.cause;
+      logData.faceErrorType = faceErr.type;
       if (faceErr.type === 'provider_failed') {
         logData.provider = faceErr.provider;
         logData.retryable = faceErr.retryable;
         logData.throttle = faceErr.throttle;
+        logData.cause = faceErr.cause;
         if (faceErr.provider === 'aws') {
           logData.errorName = (faceErr as Extract<FaceServiceError, { provider: 'aws' }>).errorName;
         }
@@ -517,6 +519,7 @@ export async function queue(
               logData.provider = faceErr.provider;
               logData.retryable = faceErr.retryable;
               logData.throttle = faceErr.throttle;
+              logData.cause = faceErr.cause;
             }
             break;
           }
