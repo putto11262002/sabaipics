@@ -256,10 +256,14 @@ async function processUpload(
           })
           .returning();
 
-        // Update intent to completed
+        // Update intent to completed with photoId mapping
         await tx
           .update(uploadIntents)
-          .set({ status: 'completed', completedAt: new Date().toISOString() })
+          .set({
+            status: 'completed',
+            completedAt: new Date().toISOString(),
+            photoId: newPhoto.id,
+          })
           .where(eq(uploadIntents.id, intent.id));
 
         return newPhoto;
