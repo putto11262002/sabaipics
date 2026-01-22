@@ -7,8 +7,6 @@ import { requirePhotographer, requireConsent, type PhotographerVariables } from 
 import type { Bindings } from '../../types';
 import { generatePngQrCode } from '@juit/qrcode';
 import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './schema';
-import { searchRouter } from './search';
-import { downloadsRouter } from './downloads';
 
 // =============================================================================
 // Types
@@ -43,7 +41,7 @@ async function generateEventQR(
   baseUrl: string,
   size: QRSize = 'medium',
 ): Promise<Uint8Array> {
-  const searchUrl = `${baseUrl}/events/${eventId}/search`;
+  const searchUrl = `${baseUrl}/participant/events/${eventId}/search`;
 
   return await generatePngQrCode(searchUrl, {
     ecLevel: 'M',
@@ -298,30 +296,4 @@ export const eventsRouter = new Hono<Env>()
         },
       });
     },
-  )
-  // GET /events/:id/public - Public event info (no auth required)
-  .get('/:id/public', zValidator('param', eventParamsSchema), async (c) => {
-    const db = c.var.db();
-    const { id } = c.req.valid('param');
-
-    const [event] = await db
-      .select({ name: events.name })
-      .from(events)
-      .where(eq(events.id, id))
-      .limit(1);
-
-    if (!event) {
-      return c.json(notFoundError(), 404);
-    }
-
-    return c.json({
-      data: {
-        name: event.name,
-      },
-    });
-  })
-
-  // Mount participant search router (public endpoint)
-  .route('/', searchRouter)
-  // Mount participant downloads router (public endpoint)
-  .route('/', downloadsRouter);
+  );
