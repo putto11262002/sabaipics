@@ -6,7 +6,7 @@ iOS Studio architecture changes. See `ARCHITECTURE.md` for current design.
 
 ## 2026-01-25
 
-### Update 9: Camera Discovery Retry Logic (SAB-37)
+### Update 11: Camera Discovery Retry Logic (SAB-37)
 
 **Status:** Implemented
 
@@ -43,7 +43,7 @@ Added two-layer retry strategy for more reliable camera discovery:
 
 ---
 
-### Update 8: Double-Disconnect Bug Fix (SAB-41)
+### Update 10: Double-Disconnect Bug Fix (SAB-41)
 
 **Status:** Implemented
 
@@ -68,6 +68,37 @@ stopMonitoring():
 ```
 
 **Files:** CanonEventSource.swift, PTPIPEventMonitor.swift
+
+---
+
+## 2026-01-22
+
+### Update 9: Tab Shell + Capture Mode Entry
+
+**Status:** Implemented
+
+Reframed Studio as a tab-based app with capture as a full-screen mode.
+
+- Added a native tab bar with an action-style Capture tab (presents capture via full-screen cover).
+- Added `CaptureModeView` wrapper so capture can be closed consistently back to the main app shell.
+- Added placeholder Events and Profile screens to support event gating + sign out.
+
+**Files:** RootFlowView.swift, MainTabView.swift, CaptureModeView.swift, EventsHomeView.swift, ProfileView.swift
+
+---
+
+### Update 8: Clerk Authentication (iOS)
+
+**Status:** Implemented
+
+Added Clerk-based sign-in to Studio.
+
+- Clerk iOS SDK integrated via Swift Package Manager.
+- App reads `CLERK_PUBLISHABLE_KEY` from build settings and injects it into Info.plist (`ClerkPublishableKey`).
+- `RootFlowView` gates access: signed out shows Clerk auth UI; signed in continues to app shell.
+- Added local dev config pattern (`Studio.Local.xcconfig` copied from example; gitignored).
+
+**Files:** SabaiPicsStudioApp.swift, RootFlowView.swift, SabaiPicsStudio.xcodeproj/project.pbxproj, Config/SabaiPicsStudio-Info.plist, Config/Studio.\*.xcconfig
 
 ---
 

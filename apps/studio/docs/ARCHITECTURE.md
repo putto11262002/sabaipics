@@ -97,6 +97,15 @@ API:         Triggers processing, iOS device purges local
 
 ---
 
+## Navigation Shell
+
+Studio uses a tab-based app shell, while keeping capture as a full-screen mode.
+
+- App shell + capture mode: `IOS/APP_SHELL.md`
+- Auth details: `IOS/AUTH.md`
+
+---
+
 ## Open Questions
 
 - Retry strategy: Exponential backoff? Max attempts?

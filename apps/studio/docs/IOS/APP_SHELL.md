@@ -19,7 +19,7 @@ The key idea is to keep the camera/transfer flow strict and linear, while making
 - Signed out: show Clerk auth UI
 - Signed in: show the main app shell
 
-See also: `apps/studio/docs/ios/auth.md`.
+See also: `AUTH.md`.
 
 ### Main tabs
 

@@ -15,7 +15,7 @@ This doc describes how authentication is implemented in the iOS Studio app (`app
 `SabaiPicsStudioApp` renders `RootFlowView`.
 
 - If signed out: show Clerk's `AuthView()`.
-- If signed in: show the existing `ContentView()` (PTP camera flow).
+- If signed in: show the main app shell (`MainTabView`).
 
 This intentionally avoids adding auth states to `AppCoordinator.appState`.
 
@@ -23,6 +23,10 @@ Relevant files:
 
 - `apps/studio/SabaiPicsStudio/SabaiPicsStudioApp.swift`
 - `apps/studio/SabaiPicsStudio/Views/RootFlowView.swift`
+
+See also:
+
+- App shell + capture mode: `APP_SHELL.md`
 
 ### Clerk lifecycle
 
