@@ -80,3 +80,5 @@ apps/studio/.build/
 
 # Syncthing temp files
 **/.syncthing.*.tmp
+
+opencode.json
