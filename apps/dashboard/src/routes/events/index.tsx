@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router";
-import { Button } from "@sabaipics/ui/components/button";
-import { Alert } from "@sabaipics/ui/components/alert";
-import { Skeleton } from "@sabaipics/ui/components/skeleton";
-import { Badge } from "@sabaipics/ui/components/badge";
-import { Input } from "@sabaipics/ui/components/input";
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router';
+import { Button } from '@sabaipics/ui/components/button';
+import { Alert } from '@sabaipics/ui/components/alert';
+import { Skeleton } from '@sabaipics/ui/components/skeleton';
+import { Badge } from '@sabaipics/ui/components/badge';
+import { Input } from '@sabaipics/ui/components/input';
 import {
   Pagination,
   PaginationContent,
@@ -13,11 +13,8 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@sabaipics/ui/components/pagination";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@sabaipics/ui/components/toggle-group";
+} from '@sabaipics/ui/components/pagination';
+import { ToggleGroup, ToggleGroupItem } from '@sabaipics/ui/components/toggle-group';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -25,57 +22,51 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@sabaipics/ui/components/breadcrumb";
+} from '@sabaipics/ui/components/breadcrumb';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-} from "@sabaipics/ui/components/dropdown-menu";
+} from '@sabaipics/ui/components/dropdown-menu';
 import {
   Empty,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
   EmptyDescription,
-} from "@sabaipics/ui/components/empty";
-import { Calendar, Plus, MoreHorizontal, ExternalLink, Download, Trash2, Eye, Search } from "lucide-react";
-import { formatDistanceToNow, parseISO, differenceInDays } from "date-fns";
-import { useEvents } from "../../hooks/events/useEvents";
-import { CreateEventModal } from "../../components/events/CreateEventModal";
-import { useCopyToClipboard } from "../../hooks/use-copy-to-clipboard";
+} from '@sabaipics/ui/components/empty';
+import {
+  Calendar,
+  Plus,
+  MoreHorizontal,
+  ExternalLink,
+  Download,
+  Trash2,
+  Eye,
+  Search,
+} from 'lucide-react';
+import { formatDistanceToNow, parseISO, differenceInDays } from 'date-fns';
+import { useEvents } from '../../hooks/events/useEvents';
+import { CreateEventModal } from '../../components/events/CreateEventModal';
+import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
+import { useDownloadQR } from '../../hooks/events/useDownloadQR';
 
-type StatusFilter = "all" | "active" | "expiring" | "expired";
+type StatusFilter = 'all' | 'active' | 'expiring' | 'expired';
 
 export default function EventsPage() {
   const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [page, setPage] = useState(0);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const { data, isLoading, error, refetch } = useEvents(page, 20);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
+  const downloadQR = useDownloadQR();
 
-  const handleDownloadQR = async (qrCodeUrl: string, accessCode: string) => {
-    try {
-      const response = await fetch(qrCodeUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `event-qr-${accessCode}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Failed to download QR code:", error);
-    }
-  };
-
-  const handleCopyLink = (accessCode: string) => {
-    const searchUrl = `${window.location.origin}/search/${accessCode}`;
+  const handleCopyLink = (eventId: string) => {
+    const searchUrl = `${window.location.origin}/events/${eventId}/search`;
     copyToClipboard(searchUrl);
   };
 
@@ -88,24 +79,21 @@ export default function EventsPage() {
     // Apply search filter
     if (searchQuery) {
       filtered = filtered.filter((event) =>
-        event.name.toLowerCase().includes(searchQuery.toLowerCase())
+        event.name.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
 
     // Apply status filter
-    if (statusFilter !== "all") {
+    if (statusFilter !== 'all') {
       filtered = filtered.filter((event) => {
-        const daysUntilExpiry = differenceInDays(
-          parseISO(event.expiresAt),
-          new Date()
-        );
+        const daysUntilExpiry = differenceInDays(parseISO(event.expiresAt), new Date());
         const isExpired = daysUntilExpiry <= 0;
         const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0;
         const isActive = daysUntilExpiry > 7;
 
-        if (statusFilter === "expired") return isExpired;
-        if (statusFilter === "expiring") return isExpiringSoon;
-        if (statusFilter === "active") return isActive;
+        if (statusFilter === 'expired') return isExpired;
+        if (statusFilter === 'expiring') return isExpiringSoon;
+        if (statusFilter === 'active') return isActive;
         return true;
       });
     }
@@ -242,14 +230,12 @@ export default function EventsPage() {
         <div className="text-center py-12">
           <Search className="size-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No events found</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Try adjusting your search or filters
-          </p>
+          <p className="text-sm text-muted-foreground mb-4">Try adjusting your search or filters</p>
           <Button
             variant="outline"
             onClick={() => {
-              setSearchQuery("");
-              setStatusFilter("all");
+              setSearchQuery('');
+              setStatusFilter('all');
             }}
           >
             Clear filters
@@ -260,151 +246,170 @@ export default function EventsPage() {
       {/* Event List */}
       {filteredEvents.length > 0 && (
         <>
-        <div className="space-y-3">
-          {filteredEvents.map((event) => {
-            const daysUntilExpiry = differenceInDays(
-              parseISO(event.expiresAt),
-              new Date()
-            );
-            const isExpired = daysUntilExpiry <= 0;
-            const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0;
+          <div className="space-y-3">
+            {filteredEvents.map((event) => {
+              const daysUntilExpiry = differenceInDays(parseISO(event.expiresAt), new Date());
+              const isExpired = daysUntilExpiry <= 0;
+              const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0;
 
-            return (
-              <div
-                key={event.id}
-                className="group flex items-center justify-between gap-4 rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors cursor-pointer"
-                onClick={() => navigate(`/events/${event.id}`)}
-              >
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold text-lg truncate">{event.name}</h3>
-                    {isExpired ? (
-                      <Badge variant="destructive" className="text-xs">Expired</Badge>
-                    ) : isExpiringSoon ? (
-                      <Badge variant="outline" className="border-orange-500 text-orange-500 text-xs">
-                        Expires in {daysUntilExpiry}d
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                        Active
-                      </Badge>
-                    )}
+              return (
+                <div
+                  key={event.id}
+                  className="group flex items-center justify-between gap-4 rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/events/${event.id}`)}
+                >
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold text-lg truncate">{event.name}</h3>
+                      {isExpired ? (
+                        <Badge variant="destructive" className="text-xs">
+                          Expired
+                        </Badge>
+                      ) : isExpiringSoon ? (
+                        <Badge
+                          variant="outline"
+                          className="border-orange-500 text-orange-500 text-xs"
+                        >
+                          Expires in {daysUntilExpiry}d
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                          Active
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
+                      <span>
+                        Created{' '}
+                        {formatDistanceToNow(parseISO(event.createdAt), { addSuffix: true })}
+                      </span>
+                      {event.startDate && event.endDate && (
+                        <>
+                          <span className="hidden sm:inline">•</span>
+                          <span className="hidden sm:inline">
+                            {new Date(event.startDate).toLocaleDateString()} -{' '}
+                            {new Date(event.endDate).toLocaleDateString()}
+                          </span>
+                        </>
+                      )}
+                      <span className="hidden sm:inline">•</span>
+                      <span>
+                        Expires{' '}
+                        {formatDistanceToNow(parseISO(event.expiresAt), { addSuffix: true })}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
-                    <span>
-                      Created {formatDistanceToNow(parseISO(event.createdAt), { addSuffix: true })}
-                    </span>
-                    {event.startDate && event.endDate && (
-                      <>
-                        <span className="hidden sm:inline">•</span>
-                        <span className="hidden sm:inline">
-                          {new Date(event.startDate).toLocaleDateString()} - {new Date(event.endDate).toLocaleDateString()}
-                        </span>
-                      </>
-                    )}
-                    <span className="hidden sm:inline">•</span>
-                    <span>
-                      Expires {formatDistanceToNow(parseISO(event.expiresAt), { addSuffix: true })}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="flex-shrink-0" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="size-4" />
-                        <span className="sr-only">Actions</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => navigate(`/events/${event.id}`)}>
-                        <Eye className="mr-2 size-4" />
-                        View Event
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleCopyLink(event.accessCode)}>
-                        <ExternalLink className="mr-2 size-4" />
-                        {isCopied ? "Link Copied!" : "Copy Search Link"}
-                      </DropdownMenuItem>
-                      {event.qrCodeUrl && (
-                        <DropdownMenuItem onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}>
+                  <div
+                    className="flex-shrink-0"
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  >
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="size-4" />
+                          <span className="sr-only">Actions</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => navigate(`/events/${event.id}`)}>
+                          <Eye className="mr-2 size-4" />
+                          View Event
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleCopyLink(event.id)}>
+                          <ExternalLink className="mr-2 size-4" />
+                          {isCopied ? 'Link Copied!' : 'Copy Search Link'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            downloadQR.mutate({ eventId: event.id, eventName: event.name })
+                          }
+                        >
                           <Download className="mr-2 size-4" />
                           Download QR Code
                         </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem className="text-destructive">
-                        <Trash2 className="mr-2 size-4" />
-                        Delete Event
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        <DropdownMenuItem className="text-destructive">
+                          <Trash2 className="mr-2 size-4" />
+                          Delete Event
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        {/* Pagination */}
-        {data && data.pagination.totalPages > 1 && (
-          <div className="mt-6 flex justify-center">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    className={!data.pagination.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                  />
-                </PaginationItem>
-                {Array.from({ length: data.pagination.totalPages }, (_, i) => i).map((pageNum) => {
-                  // Show first page, last page, current page, and pages around current
-                  const showPage =
-                    pageNum === 0 ||
-                    pageNum === data.pagination.totalPages - 1 ||
-                    Math.abs(pageNum - page) <= 1;
+          {/* Pagination */}
+          {data && data.pagination.totalPages > 1 && (
+            <div className="mt-6 flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      className={
+                        !data.pagination.hasPrevPage
+                          ? 'pointer-events-none opacity-50'
+                          : 'cursor-pointer'
+                      }
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: data.pagination.totalPages }, (_, i) => i).map(
+                    (pageNum) => {
+                      // Show first page, last page, current page, and pages around current
+                      const showPage =
+                        pageNum === 0 ||
+                        pageNum === data.pagination.totalPages - 1 ||
+                        Math.abs(pageNum - page) <= 1;
 
-                  if (!showPage) {
-                    // Show ellipsis for gaps
-                    if (pageNum === page - 2 || pageNum === page + 2) {
+                      if (!showPage) {
+                        // Show ellipsis for gaps
+                        if (pageNum === page - 2 || pageNum === page + 2) {
+                          return (
+                            <PaginationItem key={pageNum}>
+                              <PaginationEllipsis />
+                            </PaginationItem>
+                          );
+                        }
+                        return null;
+                      }
+
                       return (
                         <PaginationItem key={pageNum}>
-                          <PaginationEllipsis />
+                          <PaginationLink
+                            onClick={() => setPage(pageNum)}
+                            isActive={pageNum === page}
+                            className="cursor-pointer"
+                          >
+                            {pageNum + 1}
+                          </PaginationLink>
                         </PaginationItem>
                       );
-                    }
-                    return null;
-                  }
-
-                  return (
-                    <PaginationItem key={pageNum}>
-                      <PaginationLink
-                        onClick={() => setPage(pageNum)}
-                        isActive={pageNum === page}
-                        className="cursor-pointer"
-                      >
-                        {pageNum + 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  );
-                })}
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() => setPage((p) => Math.min(data.pagination.totalPages - 1, p + 1))}
-                    className={!data.pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
-        )}
+                    },
+                  )}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() =>
+                        setPage((p) => Math.min(data.pagination.totalPages - 1, p + 1))
+                      }
+                      className={
+                        !data.pagination.hasNextPage
+                          ? 'pointer-events-none opacity-50'
+                          : 'cursor-pointer'
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </>
       )}
 
       {/* Create Event Modal */}
-      <CreateEventModal
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-      />
+      <CreateEventModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} />
     </div>
   );
 }
