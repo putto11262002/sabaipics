@@ -50,11 +50,6 @@ export function EventCard({ event, onClick }: EventCardProps) {
         <div className="text-muted-foreground">
           Expires {formatDistanceToNow(parseISO(event.expiresAt))} from now
         </div>
-        <div className="flex gap-3 text-sm">
-          <span className="text-muted-foreground">
-            Access Code: <span className="font-mono font-semibold text-foreground">{event.accessCode}</span>
-          </span>
-        </div>
       </CardFooter>
     </Card>
   );

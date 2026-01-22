@@ -6,7 +6,6 @@ import { events } from '@sabaipics/db';
 import { requirePhotographer, requireConsent, type PhotographerVariables } from '../../middleware';
 import type { Bindings } from '../../types';
 import { generatePngQrCode } from '@juit/qrcode';
-import { generateAccessCode } from './access-code';
 import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './schema';
 import { searchRouter } from './search';
 import { downloadsRouter } from './downloads';
@@ -84,15 +83,6 @@ function invalidDateRangeError() {
   };
 }
 
-function accessCodeGenerationFailedError() {
-  return {
-    error: {
-      code: 'ACCESS_CODE_GENERATION_FAILED' as const,
-      message: 'Failed to generate unique access code. Please try again.',
-    },
-  };
-}
-
 function qrGenerationFailedError(reason: string) {
   return {
     error: {
@@ -125,30 +115,6 @@ export const eventsRouter = new Hono<Env>()
         return c.json(invalidDateRangeError(), 400);
       }
 
-      // Generate unique access code with retry logic
-      const maxRetries = 5;
-      let accessCode: string | null = null;
-
-      for (let attempts = 0; attempts < maxRetries; attempts++) {
-        const candidateCode = generateAccessCode();
-
-        // Check if code already exists
-        const [existing] = await db
-          .select({ id: events.id })
-          .from(events)
-          .where(eq(events.accessCode, candidateCode))
-          .limit(1);
-
-        if (!existing) {
-          accessCode = candidateCode;
-          break;
-        }
-      }
-
-      if (!accessCode) {
-        return c.json(accessCodeGenerationFailedError(), 500);
-      }
-
       // Calculate expiry date (30 days from now)
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30);
@@ -161,7 +127,6 @@ export const eventsRouter = new Hono<Env>()
           name: body.name,
           startDate: body.startDate,
           endDate: body.endDate,
-          accessCode,
           qrCodeR2Key: null, // No longer storing QR codes
           rekognitionCollectionId: null,
           expiresAt: expiresAt.toISOString(),
@@ -176,7 +141,6 @@ export const eventsRouter = new Hono<Env>()
             name: created.name,
             startDate: created.startDate,
             endDate: created.endDate,
-            accessCode: created.accessCode,
             qrCodeUrl: null, // Client-side generation
             rekognitionCollectionId: created.rekognitionCollectionId,
             expiresAt: created.expiresAt,
@@ -207,7 +171,6 @@ export const eventsRouter = new Hono<Env>()
           name: events.name,
           startDate: events.startDate,
           endDate: events.endDate,
-          accessCode: events.accessCode,
           createdAt: events.createdAt,
           expiresAt: events.expiresAt,
         })
@@ -272,7 +235,6 @@ export const eventsRouter = new Hono<Env>()
           name: event.name,
           startDate: event.startDate,
           endDate: event.endDate,
-          accessCode: event.accessCode,
           qrCodeUrl: null, // Client-side generation
           rekognitionCollectionId: event.rekognitionCollectionId,
           expiresAt: event.expiresAt,

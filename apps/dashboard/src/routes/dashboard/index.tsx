@@ -18,6 +18,7 @@ import { PageHeader } from "../../components/shell/page-header";
 import { useDashboardData } from "../../hooks/dashboard/useDashboardData";
 import { useEvents } from "../../hooks/events/useEvents";
 import { useCopyToClipboard } from "../../hooks/use-copy-to-clipboard";
+import { useApiClient } from "../../lib/api";
 import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
 import { Button } from "@sabaipics/ui/components/button";
 import { Badge } from "@sabaipics/ui/components/badge";
@@ -51,6 +52,7 @@ export function DashboardPage() {
 	const { data, isLoading, error, refetch, isRefetching } = useDashboardData();
 	const { data: eventsData, isLoading: eventsLoading } = useEvents(0, 10);
 	const { copyToClipboard, isCopied } = useCopyToClipboard();
+	const { getToken } = useApiClient();
 
 	const dashboardData = data?.data;
 
@@ -61,14 +63,20 @@ export function DashboardPage() {
 		return days <= 7 && days >= 0;
 	};
 
-	const handleDownloadQR = async (qrCodeUrl: string, accessCode: string) => {
+	const handleDownloadQR = async (eventId: string, eventName: string) => {
 		try {
-			const response = await fetch(qrCodeUrl);
+			const token = await getToken();
+			const response = await fetch(
+				`${import.meta.env.VITE_API_URL}/events/${eventId}/qr-download?size=medium`,
+				{
+					headers: token ? { Authorization: `Bearer ${token}` } : {},
+				},
+			);
 			const blob = await response.blob();
 			const url = window.URL.createObjectURL(blob);
 			const a = document.createElement("a");
 			a.href = url;
-			a.download = `event-qr-${accessCode}.png`;
+			a.download = `${eventName.replace(/[^a-z0-9]/gi, "-")}-medium-qr.png`;
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
@@ -78,8 +86,8 @@ export function DashboardPage() {
 		}
 	};
 
-	const handleCopyLink = (accessCode: string) => {
-		const searchUrl = `${window.location.origin}/search/${accessCode}`;
+	const handleCopyLink = (eventId: string) => {
+		const searchUrl = `${window.location.origin}/events/${eventId}/search`;
 		copyToClipboard(searchUrl);
 	};
 
@@ -320,16 +328,14 @@ export function DashboardPage() {
 																<Eye className="mr-2 size-4" />
 																View Event
 															</DropdownMenuItem>
-															<DropdownMenuItem onClick={() => handleCopyLink(event.accessCode)}>
-																<ExternalLink className="mr-2 size-4" />
-																{isCopied ? "Link Copied!" : "Copy Search Link"}
-															</DropdownMenuItem>
-															{event.qrCodeUrl && (
-																<DropdownMenuItem onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}>
-																	<Download className="mr-2 size-4" />
-																	Download QR Code
-																</DropdownMenuItem>
-															)}
+										<DropdownMenuItem onClick={() => handleCopyLink(event.id)}>
+											<ExternalLink className="mr-2 size-4" />
+											{isCopied ? "Link Copied!" : "Copy Search Link"}
+										</DropdownMenuItem>
+										<DropdownMenuItem onClick={() => handleDownloadQR(event.id, event.name)}>
+											<Download className="mr-2 size-4" />
+											Download QR Code
+										</DropdownMenuItem>
 															<DropdownMenuItem className="text-destructive">
 																<Trash2 className="mr-2 size-4" />
 																Delete Event

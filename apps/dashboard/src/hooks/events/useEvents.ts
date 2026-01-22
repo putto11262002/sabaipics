@@ -7,7 +7,6 @@ export interface Event {
   name: string;
   startDate: string | null;
   endDate: string | null;
-  accessCode: string;
   qrCodeUrl: string | null;
   rekognitionCollectionId: string | null;
   expiresAt: string;

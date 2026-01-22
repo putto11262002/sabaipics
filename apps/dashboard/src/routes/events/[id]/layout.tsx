@@ -21,6 +21,7 @@ import {
 import { MoreVertical, Download, ExternalLink, Trash2 } from 'lucide-react';
 import { useEvent } from '../../../hooks/events/useEvent';
 import { useCopyToClipboard } from '../../../hooks/use-copy-to-clipboard';
+import { useApiClient } from '../../../lib/api';
 import { cn } from '@sabaipics/ui/lib/utils';
 import { ScrollArea } from '@sabaipics/ui/components/scroll-area';
 
@@ -37,15 +38,22 @@ export default function EventDetailLayout() {
   const navigate = useNavigate();
   const { data, isLoading, error, refetch } = useEvent(id);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
+  const { getToken } = useApiClient();
 
-  const handleDownloadQR = async (qrCodeUrl: string, accessCode: string) => {
+  const handleDownloadQR = async (eventId: string, eventName: string) => {
     try {
-      const response = await fetch(qrCodeUrl);
+      const token = await getToken();
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/events/${eventId}/qr-download?size=medium`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `event-qr-${accessCode}.png`;
+      a.download = `${eventName.replace(/[^a-z0-9]/gi, '-')}-medium-qr.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -55,8 +63,8 @@ export default function EventDetailLayout() {
     }
   };
 
-  const handleCopyLink = (accessCode: string) => {
-    const searchUrl = `${window.location.origin}/search/${accessCode}`;
+  const handleCopyLink = (eventId: string) => {
+    const searchUrl = `${window.location.origin}/events/${eventId}/search`;
     copyToClipboard(searchUrl);
   };
 
@@ -123,18 +131,16 @@ export default function EventDetailLayout() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleCopyLink(event.accessCode)}>
+              <DropdownMenuItem onClick={() => handleCopyLink(event.id)}>
                 <ExternalLink className="mr-2 size-4" />
                 {isCopied ? 'Link Copied!' : 'Copy Search Link'}
               </DropdownMenuItem>
-              {event.qrCodeUrl && (
-                <DropdownMenuItem
-                  onClick={() => handleDownloadQR(event.qrCodeUrl!, event.accessCode)}
-                >
-                  <Download className="mr-2 size-4" />
-                  Download QR Code
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem
+                onClick={() => handleDownloadQR(event.id, event.name)}
+              >
+                <Download className="mr-2 size-4" />
+                Download QR Code
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive">
                 <Trash2 className="mr-2 size-4" />

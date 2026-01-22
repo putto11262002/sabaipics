@@ -20,12 +20,14 @@ import { useParams } from "react-router";
 import QRCodeSVG from "react-qr-code";
 import { useEvent } from "../../../../hooks/events/useEvent";
 import { useCopyToClipboard } from "../../../../hooks/use-copy-to-clipboard";
+import { useApiClient } from "../../../../lib/api";
 
 export default function EventDetailsTab() {
   const { id } = useParams<{ id: string }>();
   const { data } = useEvent(id);
   const { copyToClipboard } = useCopyToClipboard();
   const [isDownloading, setIsDownloading] = useState(false);
+  const { getToken } = useApiClient();
 
   if (!data?.data) {
     return null;
@@ -36,13 +38,19 @@ export default function EventDetailsTab() {
   const daysUntilExpiry = differenceInDays(parseISO(event.expiresAt), new Date());
   const isExpired = daysUntilExpiry <= 0;
   const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0;
-  const searchUrl = `${window.location.origin}/search/${event.accessCode}`;
-  const slideshowUrl = `${window.location.origin}/slideshow/${event.accessCode}`;
+  const searchUrl = `${window.location.origin}/events/${event.id}/search`;
+  const slideshowUrl = `${window.location.origin}/events/${event.id}/slideshow`;
 
   const handleDownloadQR = async (size: "small" | "medium" | "large") => {
     setIsDownloading(true);
     try {
-      const response = await fetch(`/api/events/${event.id}/qr-download?size=${size}`);
+      const token = await getToken();
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/events/${event.id}/qr-download?size=${size}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
       if (!response.ok) throw new Error("Failed to download QR code");
 
       const blob = await response.blob();
@@ -61,8 +69,8 @@ export default function EventDetailsTab() {
     }
   };
 
-  const handleCopyLink = (accessCode: string) => {
-    copyToClipboard(`${window.location.origin}/search/${accessCode}`);
+  const handleCopyLink = (eventId: string) => {
+    copyToClipboard(`${window.location.origin}/events/${eventId}/search`);
   };
 
   return (
@@ -210,7 +218,7 @@ export default function EventDetailsTab() {
                     aria-label="Copy search link"
                     title="Copy search link"
                     size="icon-xs"
-                    onClick={() => handleCopyLink(event.accessCode)}
+                    onClick={() => handleCopyLink(event.id)}
                   >
                     <Copy />
                   </InputGroupButton>
