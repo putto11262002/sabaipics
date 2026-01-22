@@ -1,0 +1,7 @@
+// SabaiPicsStudio Debug configuration
+
+// Clerk
+CLERK_PUBLISHABLE_KEY =
+
+// Local developer overrides (gitignored)
+#include "Studio.Local.xcconfig"

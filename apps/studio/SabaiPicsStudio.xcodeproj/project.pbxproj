@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		17D895C82F17E10300FE1698 /* gphoto2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 17D895C32F17E09B00FE1698 /* gphoto2.framework */; };
 		17D895C92F17E10300FE1698 /* gphoto2.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 17D895C32F17E09B00FE1698 /* gphoto2.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		18C1A0D62F1A000100000001 /* Clerk in Frameworks */ = {isa = PBXBuildFile; productRef = 18C1A0D52F1A000100000001 /* Clerk */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +51,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		18C1A0D72F1A000100000001 /* Studio.Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Studio.Debug.xcconfig; path = Config/Studio.Debug.xcconfig; sourceTree = "<group>"; };
+		18C1A0D82F1A000100000001 /* Studio.Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Studio.Release.xcconfig; path = Config/Studio.Release.xcconfig; sourceTree = "<group>"; };
 		179FE9AC2F178F650090EBC9 /* SabaiPicsStudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SabaiPicsStudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		179FE9B92F178F660090EBC9 /* SabaiPicsStudioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SabaiPicsStudioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		179FE9C32F178F660090EBC9 /* SabaiPicsStudioUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SabaiPicsStudioUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -79,6 +82,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				18C1A0D62F1A000100000001 /* Clerk in Frameworks */,
 				17D895C82F17E10300FE1698 /* gphoto2.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -103,6 +107,8 @@
 		179FE9A32F178F650090EBC9 = {
 			isa = PBXGroup;
 			children = (
+				18C1A0D72F1A000100000001 /* Studio.Debug.xcconfig */,
+				18C1A0D82F1A000100000001 /* Studio.Release.xcconfig */,
 				17D895BB2F17E09B00FE1698 /* GPhoto2Framework.xcodeproj */,
 				179FE9AE2F178F650090EBC9 /* SabaiPicsStudio */,
 				179FE9BC2F178F660090EBC9 /* SabaiPicsStudioTests */,
@@ -158,6 +164,7 @@
 			);
 			name = SabaiPicsStudio;
 			packageProductDependencies = (
+				18C1A0D52F1A000100000001 /* Clerk */,
 			);
 			productName = SabaiPicsStudio;
 			productReference = 179FE9AC2F178F650090EBC9 /* SabaiPicsStudio.app */;
@@ -241,6 +248,9 @@
 			);
 			mainGroup = 179FE9A32F178F650090EBC9;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				18C1A0D42F1A000100000001 /* clerk-ios */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 179FE9AD2F178F650090EBC9 /* Products */;
 			projectDirPath = "";
@@ -329,6 +339,25 @@
 			targetProxy = 179FE9C42F178F660090EBC9 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		18C1A0D42F1A000100000001 /* clerk-ios */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/clerk/clerk-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.71.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		18C1A0D52F1A000100000001 /* Clerk */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 18C1A0D42F1A000100000001 /* clerk-ios */;
+			productName = Clerk;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		179FE9CB2F178F660090EBC9 /* Debug */ = {
@@ -454,6 +483,7 @@
 		};
 		179FE9CE2F178F660090EBC9 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 18C1A0D72F1A000100000001 /* Studio.Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -462,6 +492,7 @@
 				DEVELOPMENT_TEAM = 6896G3Y4GD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ClerkPublishableKey = "$(CLERK_PUBLISHABLE_KEY)";
 				INFOPLIST_KEY_NSCameraUsageDescription = "SabaiPics Studio needs access to detect and download photos from your professional camera via USB or WiFi.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "SabaiPics Studio needs local network access to discover and connect to cameras on your WiFi network.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -469,7 +500,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -486,6 +517,7 @@
 		};
 		179FE9CF2F178F660090EBC9 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 18C1A0D82F1A000100000001 /* Studio.Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -494,6 +526,7 @@
 				DEVELOPMENT_TEAM = 6896G3Y4GD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ClerkPublishableKey = "$(CLERK_PUBLISHABLE_KEY)";
 				INFOPLIST_KEY_NSCameraUsageDescription = "SabaiPics Studio needs access to detect and download photos from your professional camera via USB or WiFi.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "SabaiPics Studio needs local network access to discover and connect to cameras on your WiFi network.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -501,7 +534,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

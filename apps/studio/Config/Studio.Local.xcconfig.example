@@ -1,0 +1,5 @@
+// Local developer overrides (do not commit secrets)
+//
+// Copy to `apps/studio/Config/Studio.Local.xcconfig` and fill values.
+
+CLERK_PUBLISHABLE_KEY = pk_test_REPLACE_ME

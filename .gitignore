@@ -56,6 +56,9 @@ yarn-error.log*
 apps/studio/**/*.xcodeproj/xcuserdata/
 apps/studio/**/*.xcodeproj/project.xcworkspace/xcuserdata/
 
+## Local Studio config overrides
+# (If you add additional local-only config files, ignore them here.)
+
 ## Build generated
 apps/studio/build/
 apps/studio/DerivedData/
