@@ -5,7 +5,6 @@ import { RouterProvider } from 'react-router';
 import { Toaster } from 'sonner';
 import '@sabaipics/ui/styles/globals.css';
 import 'react-photo-album/rows.css';
-import 'yet-another-react-lightbox/styles.css';
 import { router } from './router';
 
 const queryClient = new QueryClient({
