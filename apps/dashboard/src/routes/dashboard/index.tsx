@@ -64,7 +64,7 @@ export function DashboardPage() {
   };
 
   const handleCopyLink = (eventId: string) => {
-    const searchUrl = `${window.location.origin}/events/${eventId}/search`;
+    const searchUrl = `${window.location.origin}/participant/events/${eventId}/search`;
     copyToClipboard(searchUrl);
   };
 

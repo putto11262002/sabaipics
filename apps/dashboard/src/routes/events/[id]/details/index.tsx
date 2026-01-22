@@ -36,11 +36,11 @@ export default function EventDetailsTab() {
   const daysUntilExpiry = differenceInDays(parseISO(event.expiresAt), new Date());
   const isExpired = daysUntilExpiry <= 0;
   const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0;
-  const searchUrl = `${window.location.origin}/events/${event.id}/search`;
+  const searchUrl = `${window.location.origin}/participant/events/${event.id}/search`;
   const slideshowUrl = `${window.location.origin}/events/${event.id}/slideshow`;
 
   const handleCopyLink = (eventId: string) => {
-    copyToClipboard(`${window.location.origin}/events/${eventId}/search`);
+    copyToClipboard(`${window.location.origin}/participant/events/${eventId}/search`);
   };
 
   return (

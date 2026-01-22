@@ -26,7 +26,7 @@ export interface EventPublic {
 }
 
 export async function getEventPublic(eventId: string): Promise<EventPublic> {
-  const response = await fetch(`${API_URL}/events/${eventId}/public`);
+  const response = await fetch(`${API_URL}/participant/events/${eventId}`);
 
   if (!response.ok) {
     const error = (await response.json()) as ApiError;
@@ -46,7 +46,7 @@ export async function searchPhotos(
   formData.append('selfie', selfie);
   formData.append('consentAccepted', String(consentAccepted));
 
-  const response = await fetch(`${API_URL}/events/${eventId}/search`, {
+  const response = await fetch(`${API_URL}/participant/events/${eventId}/search`, {
     method: 'POST',
     body: formData,
   });
@@ -61,11 +61,11 @@ export async function searchPhotos(
 }
 
 export function getDownloadUrl(eventId: string, photoId: string): string {
-  return `${API_URL}/events/${eventId}/photos/${photoId}/download`;
+  return `${API_URL}/participant/events/${eventId}/photos/${photoId}/download`;
 }
 
 export async function downloadBulk(eventId: string, photoIds: string[]): Promise<Blob> {
-  const response = await fetch(`${API_URL}/events/${eventId}/photos/download`, {
+  const response = await fetch(`${API_URL}/participant/events/${eventId}/photos/download`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
