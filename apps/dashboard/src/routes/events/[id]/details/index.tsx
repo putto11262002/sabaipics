@@ -1,33 +1,31 @@
-import { useState } from "react";
-import { Button } from "@sabaipics/ui/components/button";
-import { Badge } from "@sabaipics/ui/components/badge";
-import { Input } from "@sabaipics/ui/components/input";
+import { Button } from '@sabaipics/ui/components/button';
+import { Badge } from '@sabaipics/ui/components/badge';
+import { Input } from '@sabaipics/ui/components/input';
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-} from "@sabaipics/ui/components/input-group";
+} from '@sabaipics/ui/components/input-group';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@sabaipics/ui/components/dropdown-menu";
-import { Copy, Presentation, ExternalLink, Calendar, Clock, Download } from "lucide-react";
-import { parseISO, differenceInDays } from "date-fns";
-import { useParams } from "react-router";
-import QRCodeSVG from "react-qr-code";
-import { useEvent } from "../../../../hooks/events/useEvent";
-import { useCopyToClipboard } from "../../../../hooks/use-copy-to-clipboard";
-import { useApiClient } from "../../../../lib/api";
+} from '@sabaipics/ui/components/dropdown-menu';
+import { Copy, Presentation, ExternalLink, Calendar, Clock, Download } from 'lucide-react';
+import { parseISO, differenceInDays } from 'date-fns';
+import { useParams } from 'react-router';
+import QRCodeSVG from 'react-qr-code';
+import { useEvent } from '../../../../hooks/events/useEvent';
+import { useCopyToClipboard } from '../../../../hooks/use-copy-to-clipboard';
+import { useDownloadQR } from '../../../../hooks/events/useDownloadQR';
 
 export default function EventDetailsTab() {
   const { id } = useParams<{ id: string }>();
   const { data } = useEvent(id);
   const { copyToClipboard } = useCopyToClipboard();
-  const [isDownloading, setIsDownloading] = useState(false);
-  const { getToken } = useApiClient();
+  const downloadQR = useDownloadQR();
 
   if (!data?.data) {
     return null;
@@ -41,34 +39,6 @@ export default function EventDetailsTab() {
   const searchUrl = `${window.location.origin}/events/${event.id}/search`;
   const slideshowUrl = `${window.location.origin}/events/${event.id}/slideshow`;
 
-  const handleDownloadQR = async (size: "small" | "medium" | "large") => {
-    setIsDownloading(true);
-    try {
-      const token = await getToken();
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/events/${event.id}/qr-download?size=${size}`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
-      );
-      if (!response.ok) throw new Error("Failed to download QR code");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${event.name.replace(/[^a-z0-9]/gi, "-")}-${size}-qr.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Failed to download QR code:", error);
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
   const handleCopyLink = (eventId: string) => {
     copyToClipboard(`${window.location.origin}/events/${eventId}/search`);
   };
@@ -78,11 +48,11 @@ export default function EventDetailsTab() {
       <div className="space-y-6">
         <header className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm font-semibold text-muted-foreground">
-              Event access
-            </p>
+            <p className="text-sm font-semibold text-muted-foreground">Event access</p>
             {isExpired ? (
-              <Badge variant="destructive" className="text-xs">Expired</Badge>
+              <Badge variant="destructive" className="text-xs">
+                Expired
+              </Badge>
             ) : isExpiringSoon ? (
               <Badge variant="outline" className="border-orange-500 text-orange-500 text-xs">
                 Expires in {daysUntilExpiry}d
@@ -103,32 +73,40 @@ export default function EventDetailsTab() {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">QR code</h3>
             <div className="flex h-72 items-center justify-center rounded-3xl border bg-white p-6 shadow-sm">
-              <QRCodeSVG
-                value={searchUrl}
-                level="M"
-                style={{ height: '100%', width: 'auto' }}
-              />
+              <QRCodeSVG value={searchUrl} level="M" style={{ height: '100%', width: 'auto' }} />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button disabled={isDownloading} variant="outline" size="icon">
+                <Button disabled={downloadQR.isPending} variant="outline" size="icon">
                   <Download className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem onClick={() => handleDownloadQR("small")}>
+                <DropdownMenuItem
+                  onClick={() =>
+                    downloadQR.mutate({ eventId: event.id, eventName: event.name, size: 'small' })
+                  }
+                >
                   <div className="flex flex-col">
                     <span className="font-medium">Small</span>
                     <span className="text-xs text-muted-foreground">256px - Mobile sharing</span>
                   </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDownloadQR("medium")}>
+                <DropdownMenuItem
+                  onClick={() =>
+                    downloadQR.mutate({ eventId: event.id, eventName: event.name, size: 'medium' })
+                  }
+                >
                   <div className="flex flex-col">
                     <span className="font-medium">Medium</span>
                     <span className="text-xs text-muted-foreground">512px - General use</span>
                   </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDownloadQR("large")}>
+                <DropdownMenuItem
+                  onClick={() =>
+                    downloadQR.mutate({ eventId: event.id, eventName: event.name, size: 'large' })
+                  }
+                >
                   <div className="flex flex-col">
                     <span className="font-medium">Large</span>
                     <span className="text-xs text-muted-foreground">1200px - Print quality</span>
@@ -155,23 +133,21 @@ export default function EventDetailsTab() {
       <aside className="space-y-6">
         <section className="space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-muted-foreground">
-              Event timeline
-            </h3>
+            <h3 className="text-sm font-semibold text-muted-foreground">Event timeline</h3>
           </div>
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="size-4 text-muted-foreground" />
               <span className="text-muted-foreground">Start</span>
               <span className="ml-auto font-medium">
-                {event.startDate ? new Date(event.startDate).toLocaleString() : "Not set"}
+                {event.startDate ? new Date(event.startDate).toLocaleString() : 'Not set'}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="size-4 text-muted-foreground" />
               <span className="text-muted-foreground">End</span>
               <span className="ml-auto font-medium">
-                {event.endDate ? new Date(event.endDate).toLocaleString() : "Not set"}
+                {event.endDate ? new Date(event.endDate).toLocaleString() : 'Not set'}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm">
@@ -191,18 +167,14 @@ export default function EventDetailsTab() {
           </div>
           {isExpiringSoon && (
             <p className="text-sm text-destructive">
-              Expires in {daysUntilExpiry} day{daysUntilExpiry === 1 ? "" : "s"}.
+              Expires in {daysUntilExpiry} day{daysUntilExpiry === 1 ? '' : 's'}.
             </p>
           )}
         </section>
         <section className="space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-muted-foreground">
-              FTP access
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Credentials will appear once enabled.
-            </p>
+            <h3 className="text-sm font-semibold text-muted-foreground">FTP access</h3>
+            <p className="text-xs text-muted-foreground">Credentials will appear once enabled.</p>
           </div>
           <div className="space-y-4">
             <Input readOnly placeholder="FTP username (coming soon)" />
@@ -222,7 +194,12 @@ export default function EventDetailsTab() {
                   >
                     <Copy />
                   </InputGroupButton>
-                  <InputGroupButton asChild size="icon-xs" aria-label="Open search link" title="Open search link">
+                  <InputGroupButton
+                    asChild
+                    size="icon-xs"
+                    aria-label="Open search link"
+                    title="Open search link"
+                  >
                     <a href={searchUrl} target="_blank" rel="noopener noreferrer">
                       <ExternalLink />
                     </a>
