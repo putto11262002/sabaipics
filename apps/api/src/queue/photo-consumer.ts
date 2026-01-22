@@ -174,18 +174,17 @@ function persistFacesAndUpdatePhoto(
 
     if (!event.collectionId) {
       // Create collection, handle ResourceAlreadyExistsException (race condition)
-      yield* provider.createCollection(job.event_id)
-        .orElse((faceErr) => {
-          // Handle AlreadyExistsException (race condition) - treat as success
-          if (faceErr.type === 'provider_failed' && faceErr.provider === 'aws') {
-            const awsErr = faceErr as Extract<FaceServiceError, { provider: 'aws' }>;
-            if (isResourceAlreadyExistsError(awsErr.errorName)) {
-              return ok(getCollectionId(job.event_id));
-            }
+      yield* provider.createCollection(job.event_id).orElse((faceErr) => {
+        // Handle AlreadyExistsException (race condition) - treat as success
+        if (faceErr.type === 'provider_failed' && faceErr.provider === 'aws') {
+          const awsErr = faceErr as Extract<FaceServiceError, { provider: 'aws' }>;
+          if (isResourceAlreadyExistsError(awsErr.errorName)) {
+            return ok(getCollectionId(job.event_id));
           }
-          // Other errors propagate
-          return err<string, PhotoProcessingError>({ type: 'face_service', cause: faceErr });
-        });
+        }
+        // Other errors propagate
+        return err<string, PhotoProcessingError>({ type: 'face_service', cause: faceErr });
+      });
 
       // Update event with collection ID (idempotent)
       yield* ResultAsync.fromPromise(
@@ -193,7 +192,11 @@ function persistFacesAndUpdatePhoto(
           .update(events)
           .set({ rekognitionCollectionId: getCollectionId(job.event_id) })
           .where(eq(events.id, job.event_id)),
-        (cause): PhotoProcessingError => ({ type: 'database', operation: 'update_event_collection', cause }),
+        (cause): PhotoProcessingError => ({
+          type: 'database',
+          operation: 'update_event_collection',
+          cause,
+        }),
       );
     }
 
@@ -221,18 +224,19 @@ function persistFacesAndUpdatePhoto(
         // Note: event counts (photo_count, face_count) are not stored in the events table schema
         // If needed in the future, add columns to events table and update them here
       }),
-      (cause): PhotoProcessingError => ({ type: 'database', operation: 'transaction_persist', cause }),
+      (cause): PhotoProcessingError => ({
+        type: 'database',
+        operation: 'transaction_persist',
+        cause,
+      }),
     );
 
     // POST-STEP: Log unindexed faces (informational)
     if (data.unindexedFaces.length > 0) {
-      console.warn(
-        `[Queue] ${data.unindexedFaces.length} faces not indexed`,
-        {
-          photoId: job.photo_id,
-          reasons: data.unindexedFaces.map((f) => f.reasons).flat(),
-        },
-      );
+      console.warn(`[Queue] ${data.unindexedFaces.length} faces not indexed`, {
+        photoId: job.photo_id,
+        reasons: data.unindexedFaces.map((f) => f.reasons).flat(),
+      });
     }
 
     return ok(undefined);
@@ -256,7 +260,11 @@ function fetchImageFromR2(
   ).andThen((object) =>
     object
       ? ok(object)
-      : err<R2ObjectBody, PhotoProcessingError>({ type: 'not_found', resource: 'r2_image', key: r2Key }),
+      : err<R2ObjectBody, PhotoProcessingError>({
+          type: 'not_found',
+          resource: 'r2_image',
+          key: r2Key,
+        }),
   );
 }
 
@@ -282,16 +290,30 @@ function ensureCollection(
       return ok(undefined);
     }
 
-    // Create collection
-    yield* provider.createCollection(eventId)
-      .mapErr((e): PhotoProcessingError => ({ type: 'face_service', cause: e }));
+    // Create collection, handle ResourceAlreadyExistsException (race condition)
+    yield* provider.createCollection(eventId).orElse((faceErr) => {
+      // Handle AlreadyExistsException (race condition) - treat as success
+      if (faceErr.type === 'provider_failed' && faceErr.provider === 'aws') {
+        const awsErr = faceErr as Extract<FaceServiceError, { provider: 'aws' }>;
+        if (isResourceAlreadyExistsError(awsErr.errorName)) {
+          return ok(getCollectionId(eventId));
+        }
+      }
+      // Other errors propagate
+      return err<string, PhotoProcessingError>({ type: 'face_service', cause: faceErr });
+    });
 
     // Update event table
     yield* ResultAsync.fromPromise(
-      db.update(events)
+      db
+        .update(events)
         .set({ rekognitionCollectionId: getCollectionId(eventId) })
         .where(eq(events.id, eventId)),
-      (e): PhotoProcessingError => ({ type: 'database', operation: 'update_event_collection', cause: e }),
+      (e): PhotoProcessingError => ({
+        type: 'database',
+        operation: 'update_event_collection',
+        cause: e,
+      }),
     );
 
     return ok(undefined);
@@ -322,25 +344,28 @@ function processPhoto(
     let imageBytes = originalBytes;
     if (originalBytes.byteLength > MAX_REKOGNITION_SIZE) {
       // Best-effort transform: use orElse to fallback to original bytes on failure
-      imageBytes = yield* transformImageForRekognition(env, originalBytes)
-        .orElse((transformErr) => {
+      imageBytes = yield* transformImageForRekognition(env, originalBytes).orElse(
+        (transformErr) => {
           console.error(`[Queue] Transform failed, using original`, {
             photoId: job.photo_id,
             error: transformErr.type === 'transform' ? transformErr.message : transformErr.type,
           });
           return ok(originalBytes);
-        });
+        },
+      );
     }
 
     // Step 4: Ensure collection exists
     yield* ensureCollection(provider, db, job.event_id);
 
     // Step 5: Index faces using unified provider interface
-    const indexResult = yield* provider.indexPhoto({
-      eventId: job.event_id,
-      photoId: job.photo_id,
-      imageData: imageBytes,
-    }).mapErr((e): PhotoProcessingError => ({ type: 'face_service', cause: e }));
+    const indexResult = yield* provider
+      .indexPhoto({
+        eventId: job.event_id,
+        photoId: job.photo_id,
+        imageData: imageBytes,
+      })
+      .mapErr((e): PhotoProcessingError => ({ type: 'face_service', cause: e }));
 
     return ok(indexResult);
   }).mapErr((error) => {
@@ -517,7 +542,9 @@ export async function queue(
                 photoId: job.photo_id,
                 type: persistErr.type,
                 ...(persistErr.type === 'database' ? { operation: persistErr.operation } : {}),
-                ...(persistErr.type === 'face_service' ? { faceErrorType: persistErr.cause.type } : {}),
+                ...(persistErr.type === 'face_service'
+                  ? { faceErrorType: persistErr.cause.type }
+                  : {}),
               });
             })
             .match(
@@ -530,7 +557,10 @@ export async function queue(
                 // Best-effort: mark photo with retryable error
                 const errorName = getErrorName(persistErr);
                 await ResultAsync.fromPromise(
-                  db.update(photos).set({ retryable: true, errorName }).where(eq(photos.id, job.photo_id)),
+                  db
+                    .update(photos)
+                    .set({ retryable: true, errorName })
+                    .where(eq(photos.id, job.photo_id)),
                   (e) => e,
                 ).match(
                   () => {},
@@ -556,7 +586,10 @@ export async function queue(
           // Throttle: retry with longer backoff
           if (isThrottle) {
             await ResultAsync.fromPromise(
-              db.update(photos).set({ retryable: true, errorName }).where(eq(photos.id, job.photo_id)),
+              db
+                .update(photos)
+                .set({ retryable: true, errorName })
+                .where(eq(photos.id, job.photo_id)),
               (e) => e,
             ).match(
               () => {},
@@ -570,7 +603,10 @@ export async function queue(
           // Non-retryable: mark as failed
           if (!isRetryable) {
             await ResultAsync.fromPromise(
-              db.update(photos).set({ status: 'failed', retryable: false, errorName }).where(eq(photos.id, job.photo_id)),
+              db
+                .update(photos)
+                .set({ status: 'failed', retryable: false, errorName })
+                .where(eq(photos.id, job.photo_id)),
               (e) => e,
             ).match(
               () => {},
@@ -583,7 +619,10 @@ export async function queue(
 
           // Retryable: retry with backoff
           await ResultAsync.fromPromise(
-            db.update(photos).set({ retryable: true, errorName }).where(eq(photos.id, job.photo_id)),
+            db
+              .update(photos)
+              .set({ retryable: true, errorName })
+              .where(eq(photos.id, job.photo_id)),
             (e) => e,
           ).match(
             () => {},
@@ -600,5 +639,9 @@ export async function queue(
     await rateLimiter.reportThrottle(2000);
   }
 
-  console.log(`[Queue] Batch complete`, { batchSize: batch.messages.length, successCount, failCount });
+  console.log(`[Queue] Batch complete`, {
+    batchSize: batch.messages.length,
+    successCount,
+    failCount,
+  });
 }
