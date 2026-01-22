@@ -1,6 +1,0 @@
-// Local developer overrides.
-//
-// This file is intentionally committed so the include in other xcconfig files
-// never breaks the build. You can edit values locally and keep them out of git.
-
-CLERK_PUBLISHABLE_KEY =

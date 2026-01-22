@@ -59,7 +59,7 @@
 		18C1A0D82F1A000100000001 /* Studio.Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Studio.Release.xcconfig; path = Config/Studio.Release.xcconfig; sourceTree = "<group>"; };
 		18C1A0D92F1A000100000001 /* Studio.Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Studio.Local.xcconfig; path = Config/Studio.Local.xcconfig; sourceTree = "<group>"; };
 		18C1A0DA2F1A000100000001 /* Studio.Local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Studio.Local.xcconfig.example; path = Config/Studio.Local.xcconfig.example; sourceTree = "<group>"; };
-		18D9B5F82F1A111100000002 /* SabaiPicsStudio-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = SabaiPicsStudio-Info.plist; path = Config/SabaiPicsStudio-Info.plist; sourceTree = "<group>"; };
+		18D9B5F82F1A111100000002 /* SabaiPicsStudio-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "SabaiPicsStudio-Info.plist"; path = "Config/SabaiPicsStudio-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -479,7 +479,7 @@
 				DEVELOPMENT_TEAM = 6896G3Y4GD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Config/SabaiPicsStudio-Info.plist;
+				INFOPLIST_FILE = "Config/SabaiPicsStudio-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -506,7 +506,7 @@
 				DEVELOPMENT_TEAM = 6896G3Y4GD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Config/SabaiPicsStudio-Info.plist;
+				INFOPLIST_FILE = "Config/SabaiPicsStudio-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
