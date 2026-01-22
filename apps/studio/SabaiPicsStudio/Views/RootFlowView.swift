@@ -20,7 +20,7 @@ struct RootFlowView: View {
                 AuthView()
                     .ignoresSafeArea()
             } else {
-                ContentView()
+                MainTabView()
             }
         }
     }
