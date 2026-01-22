@@ -6,6 +6,7 @@ on:
     paths:
       - 'apps/event/**'
       - 'packages/ui/**'
+  workflow_dispatch:
 
 jobs:
   deploy:
