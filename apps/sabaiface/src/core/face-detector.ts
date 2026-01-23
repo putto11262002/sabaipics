@@ -38,6 +38,13 @@ export interface DetectedFace {
   gender?: string;          // Optional gender ('male' | 'female')
   genderConfidence?: number; // Optional gender confidence (0-1)
   expressions?: Record<string, number>; // Optional emotions
+
+  /**
+   * Source image dimensions in pixels.
+   * Used for converting pixel bounding boxes to ratio format.
+   */
+  imageWidth?: number;
+  imageHeight?: number;
 }
 
 /**
@@ -138,7 +145,7 @@ export class FaceDetector {
       }
 
       // Convert to our domain model
-      return detections.map((detection) => this.convertDetection(detection));
+      return detections.map((detection) => this.convertDetection(detection, imageWidth, imageHeight));
     } catch (error) {
       console.error('[FaceDetector] Face detection failed:', error);
       throw new Error(`Face detection failed: ${error}`);
@@ -187,7 +194,7 @@ export class FaceDetector {
   /**
    * Convert face-api.js detection result to our domain model.
    */
-  private convertDetection(detection: any): DetectedFace {
+  private convertDetection(detection: any, imageWidth: number, imageHeight: number): DetectedFace {
     const box = detection.detection.box;
 
     // Convert landmarks from face-api.js format to simple point array
@@ -209,6 +216,8 @@ export class FaceDetector {
       descriptor: detection.descriptor,
       confidence: detection.detection.score,
       landmarks,
+      imageWidth,
+      imageHeight,
     };
 
     // Add optional attributes if detected

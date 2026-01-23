@@ -80,3 +80,8 @@ apps/studio/.build/
 
 # Syncthing temp files
 **/.syncthing.*.tmp
+
+# Eval run outputs (keep .gitkeep)
+eval/runs/*.json
+eval/runs/*.csv
+!eval/runs/.gitkeep

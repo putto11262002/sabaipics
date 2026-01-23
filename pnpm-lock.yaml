@@ -338,6 +338,28 @@ importers:
         specifier: ^5.8.0
         version: 5.9.3
 
+  packages/face-eval:
+    dependencies:
+      aws4fetch:
+        specifier: ^1.0.20
+        version: 1.0.20
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
+      neverthrow:
+        specifier: ^8.2.0
+        version: 8.2.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.3
+        version: 22.19.3
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
   packages/ui:
     dependencies:
       '@radix-ui/react-alert-dialog':
@@ -7927,7 +7949,7 @@ snapshots:
 
   '@types/node-fetch@2.6.13':
     dependencies:
-      '@types/node': 20.19.28
+      '@types/node': 22.19.3
       form-data: 4.0.5
     optional: true
 
@@ -7957,13 +7979,13 @@ snapshots:
 
   '@types/pg@8.11.6':
     dependencies:
-      '@types/node': 24.10.4
+      '@types/node': 22.19.3
       pg-protocol: 1.10.3
       pg-types: 4.1.0
 
   '@types/pg@8.16.0':
     dependencies:
-      '@types/node': 24.10.4
+      '@types/node': 22.19.3
       pg-protocol: 1.10.3
       pg-types: 2.2.0
 

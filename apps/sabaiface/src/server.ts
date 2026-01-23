@@ -20,8 +20,50 @@ import type { FaceService } from './domain/face-service';
 // =============================================================================
 
 const PORT = parseInt(process.env.PORT || '8086');
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/sabaiface';
+const DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/sabaiface';
 const MODELS_PATH = process.env.MODELS_PATH || './models';
+
+// =============================================================================
+// ML Tuning Parameters (Low False-Positive Defaults)
+// =============================================================================
+// These parameters are tuned for production use with emphasis on precision
+// over recall - better to miss a match than return a wrong one.
+
+/** Minimum cosine similarity for face search matches (0-1). Higher = stricter. */
+const SEARCH_MIN_SIMILARITY = Math.max(
+  0,
+  Math.min(1, parseFloat(process.env.SEARCH_MIN_SIMILARITY || '0.97')),
+);
+
+/** Quality filter mode for indexing: 'auto' filters low-quality faces, 'none' indexes all */
+const INDEX_QUALITY_FILTER = (
+  ['auto', 'none'].includes(process.env.INDEX_QUALITY_FILTER || '')
+    ? process.env.INDEX_QUALITY_FILTER
+    : 'none'
+) as 'auto' | 'none';
+
+/** Minimum detection confidence for indexing faces (0-1) */
+const INDEX_MIN_CONFIDENCE = Math.max(
+  0,
+  Math.min(
+    1,
+    parseFloat(process.env.INDEX_MIN_CONFIDENCE || process.env.FACE_CONFIDENCE_THRESHOLD || '0.5'),
+  ),
+);
+
+/**
+ * Exported configuration for use by other modules.
+ */
+export const config = {
+  PORT,
+  DATABASE_URL,
+  MODELS_PATH,
+  // ML tuning
+  SEARCH_MIN_SIMILARITY,
+  INDEX_QUALITY_FILTER,
+  INDEX_MIN_CONFIDENCE,
+} as const;
 
 // =============================================================================
 // Initialization
@@ -65,6 +107,10 @@ async function startServer() {
     port: PORT,
     database: DATABASE_URL.replace(/:[^:@]+@/, ':****@'),
     modelsPath: MODELS_PATH,
+    // ML tuning
+    searchMinSimilarity: SEARCH_MIN_SIMILARITY,
+    indexQualityFilter: INDEX_QUALITY_FILTER,
+    indexMinConfidence: INDEX_MIN_CONFIDENCE,
   });
 
   // Initialize face service
@@ -95,10 +141,13 @@ async function startServer() {
 
   // 404 handler
   app.notFound((c) => {
-    return c.json({
-      __type: 'ResourceNotFoundException',
-      message: 'The requested resource was not found',
-    }, 404);
+    return c.json(
+      {
+        __type: 'ResourceNotFoundException',
+        message: 'The requested resource was not found',
+      },
+      404,
+    );
   });
 
   // Start HTTP server
