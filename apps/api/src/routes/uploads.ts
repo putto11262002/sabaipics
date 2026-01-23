@@ -57,13 +57,10 @@ const presignRequestSchema = z.object({
 });
 
 const statusQuerySchema = z.object({
-  ids: z
-    .string()
-    .min(1, 'At least one ID required')
-    .transform((s) => s.split(','))
-    .pipe(
-      z.array(z.string().uuid('Invalid upload ID format')).min(1).max(50, 'Maximum 50 IDs allowed'),
-    ),
+  ids: z.preprocess(
+    (val) => (typeof val === 'string' ? val.split(',') : val),
+    z.array(z.string().uuid('Invalid upload ID format')).min(1).max(50, 'Maximum 50 IDs allowed'),
+  ),
 });
 
 const repressignParamsSchema = z.object({
