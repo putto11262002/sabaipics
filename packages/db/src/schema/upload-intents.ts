@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { timestamptz, createdAtCol } from "./common";
 import { events } from "./events";
 import { photographers } from "./photographers";
+import { photos } from "./photos";
 
 // Status enum for upload intent lifecycle
 export const uploadIntentStatuses = [
@@ -44,6 +45,9 @@ export const uploadIntents = pgTable(
     // Error tracking (for failed status)
     errorCode: text("error_code"),
     errorMessage: text("error_message"),
+
+    // Result tracking (for completed status)
+    photoId: uuid("photo_id").references(() => photos.id, { onDelete: "set null" }),
 
     // Timestamps
     createdAt: createdAtCol(),

@@ -9,7 +9,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { eq, and, gt, sql } from 'drizzle-orm';
+import { eq, and, gt, sql, inArray } from 'drizzle-orm';
 import {
   events,
   creditLedger,
@@ -37,6 +37,8 @@ const ALLOWED_MIME_TYPES = [
 
 const PRESIGN_TTL_SECONDS = 300; // 5 minutes
 
+const REPRESSIGN_ALLOWED_STATUSES = ['pending', 'expired', 'failed'] as const;
+
 // =============================================================================
 // Schemas
 // =============================================================================
@@ -52,6 +54,17 @@ const presignRequestSchema = z.object({
     .positive('Content length must be positive')
     .max(MAX_FILE_SIZE, `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024} MB`),
   filename: z.string().optional(),
+});
+
+const statusQuerySchema = z.object({
+  ids: z.preprocess(
+    (val) => (typeof val === 'string' ? val.split(',') : val),
+    z.array(z.string().uuid('Invalid upload ID format')).min(1).max(50, 'Maximum 50 IDs allowed'),
+  ),
+});
+
+const repressignParamsSchema = z.object({
+  uploadId: z.string().uuid('Invalid upload ID format'),
 });
 
 // =============================================================================
@@ -168,6 +181,184 @@ export const uploadsRouter = new Hono<Env>()
         .orTee((e) => e.cause && console.error(`[uploads/presign] ${e.code}:`, e.cause))
         .match(
           (data) => c.json({ data }, 201),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // =========================================================================
+  // GET /uploads/status - Poll upload intent status (SAB-47)
+  // =========================================================================
+  .get(
+    '/status',
+    requirePhotographer(),
+    zValidator('query', statusQuerySchema),
+    async (c) => {
+      return safeTry(async function* () {
+        const photographer = c.var.photographer;
+        const db = c.var.db();
+        const { ids } = c.req.valid('query');
+
+        const intents = yield* ResultAsync.fromPromise(
+          db
+            .select({
+              id: uploadIntents.id,
+              eventId: uploadIntents.eventId,
+              status: uploadIntents.status,
+              errorCode: uploadIntents.errorCode,
+              errorMessage: uploadIntents.errorMessage,
+              photoId: uploadIntents.photoId,
+              uploadedAt: uploadIntents.uploadedAt,
+              completedAt: uploadIntents.completedAt,
+              expiresAt: uploadIntents.expiresAt,
+            })
+            .from(uploadIntents)
+            .where(
+              and(
+                inArray(uploadIntents.id, ids),
+                eq(uploadIntents.photographerId, photographer.id),
+              ),
+            ),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        // IDs not found or not owned are simply omitted (no enumeration)
+        return ok(
+          intents.map((i) => ({
+            uploadId: i.id,
+            eventId: i.eventId,
+            status: i.status,
+            errorCode: i.errorCode,
+            errorMessage: i.errorMessage,
+            photoId: i.photoId,
+            uploadedAt: i.uploadedAt ?? null,
+            completedAt: i.completedAt ?? null,
+            expiresAt: i.expiresAt,
+          })),
+        );
+      })
+        .orTee((e) => e.cause && console.error('[uploads/status]', e.cause))
+        .match(
+          (data) => c.json({ data }),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // =========================================================================
+  // POST /uploads/:uploadId/presign - Re-presign for retry (SAB-48)
+  // =========================================================================
+  .post(
+    '/:uploadId/presign',
+    requirePhotographer(),
+    zValidator('param', repressignParamsSchema),
+    async (c) => {
+      return safeTry(async function* () {
+        const photographer = c.var.photographer;
+        const db = c.var.db();
+        const { uploadId } = c.req.valid('param');
+
+        // 1. Find intent and verify ownership (NOT_FOUND for both missing + not owned)
+        const [intent] = yield* ResultAsync.fromPromise(
+          db
+            .select({
+              id: uploadIntents.id,
+              eventId: uploadIntents.eventId,
+              status: uploadIntents.status,
+              contentType: uploadIntents.contentType,
+              contentLength: uploadIntents.contentLength,
+            })
+            .from(uploadIntents)
+            .where(
+              and(eq(uploadIntents.id, uploadId), eq(uploadIntents.photographerId, photographer.id)),
+            )
+            .limit(1),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        if (!intent) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Upload not found' });
+        }
+
+        // 2. Check state machine - only allow re-presign for certain states
+        if (
+          !REPRESSIGN_ALLOWED_STATUSES.includes(
+            intent.status as (typeof REPRESSIGN_ALLOWED_STATUSES)[number],
+          )
+        ) {
+          return err<never, HandlerError>({
+            code: 'CONFLICT',
+            message: `Cannot re-presign: upload is ${intent.status}`,
+          });
+        }
+
+        // 3. Verify event still valid (not expired)
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ expiresAt: events.expiresAt })
+            .from(events)
+            .where(eq(events.id, intent.eventId))
+            .limit(1),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        if (!event || new Date(event.expiresAt) < new Date()) {
+          return err<never, HandlerError>({ code: 'GONE', message: 'Event has expired' });
+        }
+
+        // 4. Generate NEW r2Key (rotating strategy - old key becomes orphan)
+        const timestamp = Date.now();
+        const newR2Key = `uploads/${intent.eventId}/${uploadId}-${timestamp}`;
+        const newExpiresAt = new Date(Date.now() + PRESIGN_TTL_SECONDS * 1000);
+
+        // 5. Generate presigned URL
+        const presignResult = yield* ResultAsync.fromPromise(
+          generatePresignedPutUrl(c.env.CF_ACCOUNT_ID, c.env.R2_ACCESS_KEY_ID, c.env.R2_SECRET_ACCESS_KEY, {
+            bucket: c.env.PHOTO_BUCKET_NAME,
+            key: newR2Key,
+            contentType: intent.contentType,
+            contentLength: intent.contentLength,
+            expiresIn: PRESIGN_TTL_SECONDS,
+          }),
+          (e): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Failed to generate presigned URL',
+            cause: e,
+          }),
+        );
+
+        // 6. Update intent with new key, reset status and errors
+        yield* ResultAsync.fromPromise(
+          db
+            .update(uploadIntents)
+            .set({
+              r2Key: newR2Key,
+              status: 'pending',
+              expiresAt: newExpiresAt.toISOString(),
+              errorCode: null,
+              errorMessage: null,
+            })
+            .where(eq(uploadIntents.id, uploadId)),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        return ok({
+          uploadId,
+          putUrl: presignResult.url,
+          objectKey: newR2Key,
+          expiresAt: newExpiresAt.toISOString(),
+          requiredHeaders: {
+            'Content-Type': intent.contentType,
+            'Content-Length': String(intent.contentLength),
+            'If-None-Match': '*',
+          },
+        });
+      })
+        .orTee((e) =>
+          e.cause && console.error(`[uploads/${c.req.param('uploadId')}/presign]`, e.cause),
+        )
+        .match(
+          (data) => c.json({ data }),
           (e) => apiError(c, e),
         );
     },
