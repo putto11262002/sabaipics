@@ -1,28 +1,29 @@
 {
-	"name": "sabaipics",
-	"private": true,
-	"scripts": {
-		"build": "turbo run build",
-		"dev": "turbo run dev",
-		"test": "turbo run test",
-		"lint": "turbo run lint",
-		"format": "prettier --write \"**/*.{ts,tsx,md}\"",
-		"check-types": "turbo run check-types",
-		"deploy:prod": "pnpm build && pnpm --filter=@sabaipics/api deploy:prod && pnpm --filter=@sabaipics/dashboard deploy:prod"
-	},
-	"devDependencies": {
-		"prettier": "^3.6.2",
-		"turbo": "^2.6.3",
-		"typescript": "5.9.2",
-		"wrangler": "^4.20.0"
-	},
-	"packageManager": "pnpm@9.0.0",
-	"pnpm": {
-		"overrides": {
-			"vitest>vite": "^6.0.0"
-		}
-	},
-	"engines": {
-		"node": ">=20.0.0"
-	}
+  "name": "sabaipics",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types",
+    "deploy:prod": "pnpm build && pnpm --filter=@sabaipics/api deploy:prod && pnpm --filter=@sabaipics/dashboard deploy:prod",
+    "deploy:recognition": "fly deploy . -c apps/sabaiface/fly.toml"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.6.3",
+    "typescript": "5.9.2",
+    "wrangler": "^4.20.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "pnpm": {
+    "overrides": {
+      "vitest>vite": "^6.0.0"
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
 }
