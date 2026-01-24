@@ -85,7 +85,8 @@ def extract_faces(img_array: np.ndarray, max_faces: int = 100) -> list:
     """Extract faces and embeddings from image using DeepFace."""
     try:
         # Use represent to get embeddings + face regions
-        results = DeepFace.represent(
+        # DeepFace.represent returns List[Dict[str, Any]]
+        results: list = DeepFace.represent(
             img_path=img_array,
             model_name=MODEL_NAME,
             detector_backend=DETECTOR_BACKEND,
@@ -97,12 +98,14 @@ def extract_faces(img_array: np.ndarray, max_faces: int = 100) -> list:
         faces = []
         for r in results[:max_faces]:
             # DeepFace returns confidence as 'face_confidence'
-            confidence = r.get("face_confidence", 1.0)
+            # r is a dict with keys: embedding, facial_area, face_confidence
+            face_data: dict = r  # type: ignore
+            confidence = face_data.get("face_confidence", 1.0)
             if confidence >= MIN_CONFIDENCE:
                 faces.append(
                     {
-                        "embedding": np.array(r["embedding"]),
-                        "bbox": r.get("facial_area", {}),
+                        "embedding": np.array(face_data["embedding"]),
+                        "bbox": face_data.get("facial_area", {}),
                         "confidence": confidence,
                     }
                 )
@@ -269,33 +272,20 @@ def search_faces_by_image(collection_id: str, request: SearchFacesByImageRequest
     # Search for matches
     threshold = (request.FaceMatchThreshold or 80.0) / 100.0  # Convert to 0-1
     stored_faces = collections[collection_id]["faces"]
-    
+
     matches = []
     for stored in stored_faces:
         similarity = cosine_similarity(query_embedding, np.array(stored["embedding"]))
         if similarity >= threshold:
-            matches.append({
-                "Similarity": similarity * 100,  # Convert to 0-100
-                "Face": {
-                    "FaceId": stored["face_id"],
-                    "ExternalImageId": stored["external_image_id"],
-                    "Confidence": stored["confidence"] * 100,
-                },
-            })
-    
-    # Sort by similarity descending and limit
-    matches.sort(key=lambda x: x["Similarity"], reverse=True)
-    max_results = request.MaxFaces or 20
-    matches = matches[:max_results]
-    
-    query_bbox = to_aws_bbox(query_face["bbox"], img_width, img_height)
-    
-    return {
-        "SearchedFaceBoundingBox": query_bbox,
-        "SearchedFaceConfidence": query_face["confidence"] * 100,
-        "FaceMatches": matches,
-        "FaceModelVersion": f"deepface-{MODEL_NAME}",
-    }
+            matches.append(
+                {
+                    "Similarity": similarity * 100,  # Convert to 0-100
+                    "Face": {
+                        "FaceId": stored["face_id"],
+                        "ExternalImageId": stored["external_image_id"],
+                        "Confidence": stored["confidence"] * 100,
+                    },
+                }
             )
 
     # Sort by similarity descending and limit

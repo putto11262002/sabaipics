@@ -15,6 +15,6 @@ dependencies = [
 [project.scripts]
 recognition = "main:app"
 
-[tool.uv.scripts]
-dev = "uvicorn main:app --reload --port 8087"
-start = "python main.py"
+# Run commands:
+# uv run uvicorn main:app --reload --port 8087  (dev)
+# uv run python main.py  (start)
