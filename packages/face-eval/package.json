@@ -6,6 +6,9 @@
   "description": "Self-contained CLI for face recognition evaluation",
   "scripts": {
     "eval": "tsx src/cli.ts",
+    "dataset:upload": "tsx scripts/upload-eval-dataset.ts",
+    "dataset:download": "tsx scripts/download-eval-dataset.ts",
+    "ignore:upload": "tsx scripts/upload-ignore.ts",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {

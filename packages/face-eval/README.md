@@ -2,87 +2,155 @@
 
 Self-contained evaluation CLI for face recognition providers.
 
-## Outputs
-
-Results persist to repo-root relative paths:
-
-- `eval/runs/<run_id>.json` - Run metadata (config, metrics, per-query results)
-- `eval/runs/runs.csv` - Append-only CSV for comparing runs over time
-
-## Dataset Setup
-
-### 1. Download the Kaggle Dataset
-
-Download the [Pins Face Recognition](https://www.kaggle.com/datasets/hereisburak/pins-face-recognition) dataset from Kaggle.
-
-After extracting, you should have a folder structure like:
+## Package Structure
 
 ```
-/path/to/105_classes_pins_dataset/
-├── pins_Adam Driver/
-│   ├── Adam Driver0_0.jpg
-│   ├── ground.npy
-│   └── ...
-├── pins_Adriana Lima/
-│   └── ...
-└── ...
+packages/face-eval/
+├── src/                  # TypeScript CLI source
+├── scripts/
+│   ├── generate-eval-dataset.py   # Python dataset generator
+│   ├── upload-eval-dataset.ts     # Upload dataset to R2
+│   ├── download-eval-dataset.ts   # Download dataset from R2
+│   └── upload-ignore.ts           # Upload ignore file to R2
+├── runs/                 # Eval run outputs (gitignored)
+└── data/                 # Downloaded datasets (gitignored)
 ```
 
-### 2. Set Environment Variable
+## Quick Start
+
+### 1. Download Dataset from R2
 
 ```bash
-export SABAIFACE_DATASET_PATH=/path/to/105_classes_pins_dataset
+# Set R2 credentials
+export R2_ACCOUNT_ID=...
+export R2_ACCESS_KEY_ID=...
+export R2_SECRET_ACCESS_KEY=...
+
+# Download dataset
+pnpm --filter @sabaipics/face-eval dataset:download --version v1
 ```
 
-Or pass `--source` directly to commands.
-
-### 3. Generate Ground Truth
+### 2. Run Evaluation
 
 ```bash
-pnpm --filter @sabaipics/face-eval eval dataset generate \
-  --source $SABAIFACE_DATASET_PATH \
-  --output ground-truth.json \
-  --people 10 \
-  --images 10 \
-  --ratio 0.8
-```
-
-Options:
-
-- `--source <path>` - Kaggle dataset root (or use `SABAIFACE_DATASET_PATH` env)
-- `--output <path>` - Output JSON path (default: `ground-truth.json`)
-- `--people <n>` - Number of people to include (default: 10)
-- `--images <n>` - Images per person (default: 10)
-- `--ratio <0-1>` - Index/query split ratio (default: 0.8 = 80% index, 20% query)
-- `--seed <n>` - Random seed for reproducibility (default: 42)
-
-Requirements: Python 3 with `numpy` installed.
-
-## Running Evaluations
-
-### SabaiFace (face-api.js)
-
-```bash
-# Start SabaiFace server first
-pnpm --filter @sabaipics/sabaiface dev
-
-# Run eval
-pnpm --filter @sabaipics/face-eval eval run sabaiface \
-  --endpoint http://localhost:8086 \
-  --dataset ground-truth.json
-```
-
-### AWS Rekognition
-
-```bash
-# Set AWS credentials
+# AWS Rekognition
 export AWS_REGION=ap-southeast-1
 export AWS_ACCESS_KEY_ID=...
 export AWS_SECRET_ACCESS_KEY=...
 
-# Run eval
 pnpm --filter @sabaipics/face-eval eval run aws \
-  --dataset ground-truth.json
+  --dataset ./data/v1/index.json
+```
+
+---
+
+## Dataset Management
+
+### Download Dataset
+
+```bash
+pnpm --filter @sabaipics/face-eval dataset:download \
+  --version v1 \
+  --output ./data
+```
+
+Options:
+
+- `--version, -v` - Dataset version (default: v1)
+- `--output, -o` - Output directory (default: ./data)
+- `--skip-ignore` - Don't download ignore.json
+
+### Upload Dataset (Admin)
+
+First generate a dataset locally, then upload:
+
+```bash
+# Generate dataset from Kaggle source
+pnpm --filter @sabaipics/face-eval eval dataset generate \
+  --source /path/to/kaggle \
+  --output ./testimages
+
+# Upload to R2
+pnpm --filter @sabaipics/face-eval dataset:upload \
+  --source ./testimages \
+  --version v1
+```
+
+### Upload Ignore File
+
+After reviewing selfies, create an ignore.json and upload:
+
+```bash
+pnpm --filter @sabaipics/face-eval ignore:upload \
+  --file ./ignore.json \
+  --dataset-version v1 \
+  --description "Initial review - removed wrong faces"
+```
+
+---
+
+## Ignore Files
+
+The ignore system allows marking bad selfies/images without re-uploading the dataset.
+
+### Format
+
+```json
+{
+  "ignore": {
+    "228A9455_0": true,
+    "228A9460_0": "wrong person",
+    "10003_228A9844": "mislabeled group"
+  }
+}
+```
+
+- Key = image ID (selfie or index image)
+- Value = `true` or reason string
+
+### How It Works
+
+1. `ignore.json` is stored separately from dataset images in R2
+2. `download-eval-dataset.ts` fetches the latest ignore file
+3. Eval code automatically skips ignored images
+4. Ignore file can be updated independently (versioned)
+
+### R2 Structure
+
+```
+sabaipics-eval-datasets/
+  v1/
+    index.json
+    manifest.json
+    selfies/...
+    index/...
+  ignore/
+    v1-ignore-001.json    # First review
+    v1-ignore-002.json    # Second review
+    v1-ignore-latest.json # Current active
+```
+
+---
+
+## Running Evaluations
+
+### AWS Rekognition
+
+```bash
+export AWS_REGION=ap-southeast-1
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+
+pnpm --filter @sabaipics/face-eval eval run aws \
+  --dataset ./data/v1/index.json
+```
+
+### SabaiFace
+
+```bash
+pnpm --filter @sabaipics/face-eval eval run sabaiface \
+  --endpoint http://localhost:8086 \
+  --dataset ./data/v1/index.json
 ```
 
 ### Common Options
@@ -91,17 +159,43 @@ pnpm --filter @sabaipics/face-eval eval run aws \
 --min-similarity <0..1>          # Threshold (default: 0.94 for aws, 0.4 for sabaiface)
 --min-similarity-list <csv>      # Grid search: run for each value
 --max-results <n>                # Max results per query (default: 20)
---eval-ks <csv>                  # K values for Recall@K (default: 10,20)
+--index-subset <n>               # Use only first N index images (quick test)
 --dry-run                        # Print config without running
 ```
 
-## Example: Grid Search
+---
+
+## Environment Variables
+
+### R2 (Dataset Storage)
 
 ```bash
-pnpm --filter @sabaipics/face-eval eval run sabaiface \
-  --endpoint http://localhost:8086 \
-  --dataset ground-truth.json \
-  --min-similarity-list 0.90,0.92,0.94,0.96
+R2_ACCOUNT_ID=...           # Cloudflare account ID
+R2_ACCESS_KEY_ID=...        # R2 access key
+R2_SECRET_ACCESS_KEY=...    # R2 secret key
+R2_BUCKET_NAME=...          # Bucket name (default: sabaipics-eval-datasets)
+SKIP_DATASET_DOWNLOAD=1     # Skip download (for CI)
 ```
 
-This appends one row to `eval/runs/runs.csv` for each threshold value.
+### AWS (Rekognition Provider)
+
+```bash
+AWS_REGION=ap-southeast-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+### SabaiFace Provider
+
+```bash
+SABAIFACE_ENDPOINT=http://localhost:8086
+```
+
+---
+
+## Output
+
+Results are written to `packages/face-eval/runs/`:
+
+- `runs.csv` - Append-only CSV with metrics from all runs
+- `<timestamp>-<uuid>.json` - Full run metadata
