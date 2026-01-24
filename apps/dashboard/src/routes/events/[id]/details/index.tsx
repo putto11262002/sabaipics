@@ -1,18 +1,18 @@
-import { Button } from '@sabaipics/ui/components/button';
-import { Badge } from '@sabaipics/ui/components/badge';
-import { Input } from '@sabaipics/ui/components/input';
+import { Button } from '@sabaipics/uiv2/components/button';
+import { Badge } from '@sabaipics/uiv2/components/badge';
+import { Input } from '@sabaipics/uiv2/components/input';
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-} from '@sabaipics/ui/components/input-group';
+} from '@sabaipics/uiv2/components/input-group';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@sabaipics/ui/components/dropdown-menu';
+} from '@sabaipics/uiv2/components/dropdown-menu';
 import { Copy, Presentation, ExternalLink, Calendar, Clock, Download } from 'lucide-react';
 import { parseISO, differenceInDays } from 'date-fns';
 import { useParams } from 'react-router';

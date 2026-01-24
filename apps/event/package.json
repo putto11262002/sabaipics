@@ -16,7 +16,7 @@
     "pages:deploy:staging": "pnpm build:staging && wrangler pages deploy dist --project-name=event-staging"
   },
   "dependencies": {
-    "@sabaipics/ui": "workspace:*",
+    "@sabaipics/uiv2": "workspace:*",
     "@tanstack/react-query": "^5.80.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

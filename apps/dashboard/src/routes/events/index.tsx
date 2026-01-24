@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import { Button } from '@sabaipics/ui/components/button';
-import { Alert } from '@sabaipics/ui/components/alert';
-import { Skeleton } from '@sabaipics/ui/components/skeleton';
-import { Badge } from '@sabaipics/ui/components/badge';
-import { Input } from '@sabaipics/ui/components/input';
+import { Button } from '@sabaipics/uiv2/components/button';
+import { Alert } from '@sabaipics/uiv2/components/alert';
+import { Skeleton } from '@sabaipics/uiv2/components/skeleton';
+import { Badge } from '@sabaipics/uiv2/components/badge';
+import { Input } from '@sabaipics/uiv2/components/input';
 import {
   Pagination,
   PaginationContent,
@@ -13,8 +13,8 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from '@sabaipics/ui/components/pagination';
-import { ToggleGroup, ToggleGroupItem } from '@sabaipics/ui/components/toggle-group';
+} from '@sabaipics/uiv2/components/pagination';
+import { ToggleGroup, ToggleGroupItem } from '@sabaipics/uiv2/components/toggle-group';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -22,21 +22,21 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@sabaipics/ui/components/breadcrumb';
+} from '@sabaipics/uiv2/components/breadcrumb';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-} from '@sabaipics/ui/components/dropdown-menu';
+} from '@sabaipics/uiv2/components/dropdown-menu';
 import {
   Empty,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
   EmptyDescription,
-} from '@sabaipics/ui/components/empty';
+} from '@sabaipics/uiv2/components/empty';
 import {
   Calendar,
   Plus,

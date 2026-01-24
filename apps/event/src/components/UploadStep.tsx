@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Camera, ChevronLeft } from 'lucide-react';
-import { Button } from '@sabaipics/ui/components/button';
-// import { Alert, AlertTitle, AlertDescription } from '@sabaipics/ui/components/alert';
+import { Button } from '@sabaipics/uiv2/components/button';
+// import { Alert, AlertTitle, AlertDescription } from '@sabaipics/uiv2/components/alert';
 // import { Lightbulb } from 'lucide-react';
 import { th } from '@/lib/i18n';
 

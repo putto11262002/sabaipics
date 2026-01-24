@@ -1,11 +1,11 @@
-import { ChevronRight, type LucideIcon } from "lucide-react";
-import { Link, useLocation } from "react-router";
+import { ChevronRight, type LucideIcon } from 'lucide-react';
+import { Link, useLocation } from 'react-router';
 
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@sabaipics/ui/components/collapsible";
+} from '@sabaipics/uiv2/components/collapsible';
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -16,7 +16,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-} from "@sabaipics/ui/components/sidebar";
+} from '@sabaipics/uiv2/components/sidebar';
 
 export function NavMain({
   items,
@@ -39,13 +39,12 @@ export function NavMain({
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => {
-          const isActive =
-            item.isActive || location.pathname.startsWith(item.url);
+          const isActive = item.isActive || location.pathname.startsWith(item.url);
 
           return (
             <Collapsible key={item.title} asChild defaultOpen={isActive}>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip={item.title}>
+                <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
                   <Link to={item.url}>
                     <item.icon />
                     <span>{item.title}</span>

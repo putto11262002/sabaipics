@@ -1,6 +1,6 @@
-import { Button } from '@sabaipics/ui/components/button';
-import { Checkbox } from '@sabaipics/ui/components/checkbox';
-import { Skeleton } from '@sabaipics/ui/components/skeleton';
+import { Button } from '@sabaipics/uiv2/components/button';
+import { Checkbox } from '@sabaipics/uiv2/components/checkbox';
+import { Skeleton } from '@sabaipics/uiv2/components/skeleton';
 import { th } from '@/lib/i18n';
 
 interface ConsentStepProps {

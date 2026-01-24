@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router';
 import { Toaster } from 'sonner';
-import '@sabaipics/ui/styles/globals.css';
+import '@sabaipics/uiv2/styles/globals.css';
 import 'react-photo-album/rows.css';
 import { router } from './router';
 

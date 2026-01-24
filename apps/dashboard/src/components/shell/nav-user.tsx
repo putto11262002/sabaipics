@@ -6,7 +6,7 @@ import {
 	Avatar,
 	AvatarFallback,
 	AvatarImage,
-} from "@sabaipics/ui/components/avatar";
+} from "@sabaipics/uiv2/components/avatar";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -14,13 +14,13 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
-} from "@sabaipics/ui/components/dropdown-menu";
+} from "@sabaipics/uiv2/components/dropdown-menu";
 import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
 	useSidebar,
-} from "@sabaipics/ui/components/sidebar";
+} from "@sabaipics/uiv2/components/sidebar";
 
 export function NavUser() {
 	const { isMobile } = useSidebar();

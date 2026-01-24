@@ -1,7 +1,7 @@
 import * as React from "react";
 
-import { Separator } from "@sabaipics/ui/components/separator";
-import { SidebarTrigger } from "@sabaipics/ui/components/sidebar";
+import { Separator } from "@sabaipics/uiv2/components/separator";
+import { SidebarTrigger } from "@sabaipics/uiv2/components/sidebar";
 import {
 	Breadcrumb,
 	BreadcrumbItem,
@@ -9,7 +9,7 @@ import {
 	BreadcrumbList,
 	BreadcrumbPage,
 	BreadcrumbSeparator,
-} from "@sabaipics/ui/components/breadcrumb";
+} from "@sabaipics/uiv2/components/breadcrumb";
 
 interface BreadcrumbItem {
 	label: string;

@@ -1,5 +1,5 @@
 import { ImageOff } from 'lucide-react';
-import { Button } from '@sabaipics/ui/components/button';
+import { Button } from '@sabaipics/uiv2/components/button';
 import { th } from '@/lib/i18n';
 
 interface EmptyStepProps {

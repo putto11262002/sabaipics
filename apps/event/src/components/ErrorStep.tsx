@@ -1,6 +1,6 @@
 import { AlertCircle, Clock, ServerCrash, SearchX } from 'lucide-react';
-import { Button } from '@sabaipics/ui/components/button';
-import { Alert, AlertDescription, AlertTitle } from '@sabaipics/ui/components/alert';
+import { Button } from '@sabaipics/uiv2/components/button';
+import { Alert, AlertDescription, AlertTitle } from '@sabaipics/uiv2/components/alert';
 import { th } from '@/lib/i18n';
 
 type ErrorType = 'NO_FACE' | 'RATE_LIMITED' | 'NOT_FOUND' | 'SERVER' | null;
