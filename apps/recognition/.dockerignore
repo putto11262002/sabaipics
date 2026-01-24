@@ -1,0 +1,12 @@
+# Ignore local environment
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.venv.bak/
+
+# Ignore data directory
+data/
+
+# Ignore Python cache
+*.egg-info/
