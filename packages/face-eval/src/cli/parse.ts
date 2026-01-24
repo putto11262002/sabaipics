@@ -14,7 +14,7 @@ export interface RunCommand {
   fetchMultiplier: number;
   indexMaxFaces: number;
   indexQualityFilter: 'auto' | 'none';
-  indexSubset?: number; // Optional: limit index to first N images for quick tests
+  indexSubset?: number;
   dryRun: boolean;
 }
 
@@ -25,8 +25,6 @@ export interface DatasetGenerateCommand {
   output: string;
   people: number;
   images: number;
-  ratio: number;
-  seed: number;
 }
 
 export type ParsedCli = RunCommand | DatasetGenerateCommand | { type: 'help'; message?: string };
@@ -59,8 +57,6 @@ function parseDatasetCommand(argv: string[]): ParsedCli {
       output: { type: 'string' },
       people: { type: 'string' },
       images: { type: 'string' },
-      ratio: { type: 'string' },
-      seed: { type: 'string' },
       help: { type: 'boolean' },
       h: { type: 'boolean' },
     },
@@ -69,29 +65,24 @@ function parseDatasetCommand(argv: string[]): ParsedCli {
 
   if (values.help || values.h) return { type: 'help' };
 
-  const source = values.source || process.env.SABAIFACE_DATASET_PATH;
-  if (!source) {
-    return {
-      type: 'help',
-      message: '--source is required (or set SABAIFACE_DATASET_PATH env var)',
-    };
+  if (!values.source) {
+    return { type: 'help', message: '--source is required' };
   }
 
-  const output = values.output || 'ground-truth.json';
-  const people = Math.max(1, Number.parseInt(values.people ?? '10', 10));
-  const images = Math.max(1, Number.parseInt(values.images ?? '10', 10));
-  const ratio = Math.max(0.1, Math.min(0.99, Number.parseFloat(values.ratio ?? '0.8')));
-  const seed = Number.parseInt(values.seed ?? '42', 10);
+  if (!values.output) {
+    return { type: 'help', message: '--output is required' };
+  }
+
+  const people = Math.max(1, Number.parseInt(values.people ?? '100', 10));
+  const images = Math.max(1, Number.parseInt(values.images ?? '5', 10));
 
   return {
     command: 'dataset',
     subcommand: 'generate',
-    source,
-    output,
+    source: values.source,
+    output: values.output,
     people,
     images,
-    ratio,
-    seed,
   };
 }
 

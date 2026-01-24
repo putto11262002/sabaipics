@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 async function exists(p: string): Promise<boolean> {
   return fs
@@ -18,4 +19,14 @@ export async function findRepoRoot(startDir: string = process.cwd()): Promise<st
     if (parent === current) return startDir;
     current = parent;
   }
+}
+
+/**
+ * Get the package root directory (where package.json lives)
+ */
+export function getPackageRoot(): string {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  // src/repo.ts -> package root is ../
+  return path.resolve(__dirname, '..');
 }

@@ -3,20 +3,21 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 
 import type { DatasetGenerateCommand } from './cli/parse.ts';
-import { findRepoRoot } from './repo.ts';
+import { getPackageRoot } from './repo.ts';
 
 /**
- * Run dataset generation by wrapping the existing Python script.
+ * Run dataset generation using the Python script.
  *
- * The Python script uses numpy to parse .npy files from the Kaggle dataset,
- * which makes pure TypeScript porting impractical. Instead, we call the
- * Python script and capture its output.
+ * The Python script uses numpy/opencv to parse .npz files from the Kaggle dataset,
+ * which makes pure TypeScript porting impractical.
  */
 export async function runDatasetGenerate(cmd: DatasetGenerateCommand): Promise<void> {
-  const repoRoot = await findRepoRoot();
+  const packageRoot = getPackageRoot();
 
   // Resolve paths
-  const sourcePath = path.isAbsolute(cmd.source) ? cmd.source : path.resolve(repoRoot, cmd.source);
+  const sourcePath = path.isAbsolute(cmd.source)
+    ? cmd.source
+    : path.resolve(process.cwd(), cmd.source);
   const outputPath = path.isAbsolute(cmd.output)
     ? cmd.output
     : path.resolve(process.cwd(), cmd.output);
@@ -37,16 +38,17 @@ export async function runDatasetGenerate(cmd: DatasetGenerateCommand): Promise<v
   }
 
   // Create output directory if needed
-  const outputDir = path.dirname(outputPath);
-  await fs.mkdir(outputDir, { recursive: true });
+  await fs.mkdir(outputPath, { recursive: true });
 
-  // Find the Python script
-  const pythonScript = path.join(repoRoot, 'apps/sabaiface/scripts/extract-recognition-dataset.py');
+  // Find the Python script relative to package root
+  const pythonScript = path.join(packageRoot, 'scripts', 'generate-eval-dataset.py');
 
   try {
     await fs.access(pythonScript);
   } catch {
-    throw new Error(`Python script not found: ${pythonScript}`);
+    throw new Error(
+      `Python script not found: ${pythonScript}\n\nExpected at: packages/face-eval/scripts/generate-eval-dataset.py`,
+    );
   }
 
   console.log('Dataset Generation');
@@ -55,52 +57,36 @@ export async function runDatasetGenerate(cmd: DatasetGenerateCommand): Promise<v
   console.log(`Output:  ${outputPath}`);
   console.log(`People:  ${cmd.people}`);
   console.log(`Images:  ${cmd.images}`);
-  console.log(
-    `Ratio:   ${(cmd.ratio * 100).toFixed(0)}% index / ${((1 - cmd.ratio) * 100).toFixed(0)}% query`,
-  );
-  console.log(`Seed:    ${cmd.seed}`);
   console.log('');
-
-  // We need to modify the Python script to accept --output, or we can do the following:
-  // Run the Python script and then move/copy the output file
-  // For now, let's just invoke the Python script and then read + write the output ourselves
-
-  // Actually, let's just call the Python script directly and let it write to its default location,
-  // then copy to the desired output path. The Python script writes to:
-  // apps/sabaiface/tests/fixtures/eval/dataset/recognition/ground-truth.local.json
-
-  const defaultOutputPath = path.join(
-    repoRoot,
-    'apps/sabaiface/tests/fixtures/eval/dataset/recognition/ground-truth.local.json',
-  );
 
   const args = [
     pythonScript,
     '--dataset',
     sourcePath,
-    '--people',
+    '--output',
+    outputPath,
+    '--num-people',
     String(cmd.people),
-    '--images',
+    '--selfies-per-person',
     String(cmd.images),
-    '--ratio',
-    String(cmd.ratio),
-    '--seed',
-    String(cmd.seed),
+    '--min-images',
+    String(Math.max(cmd.images + 10, 20)), // Need enough for selfies + index
   ];
 
   console.log('Running Python script...');
+  console.log(`  python3 ${args.slice(1).join(' ')}`);
   console.log('');
 
   await new Promise<void>((resolve, reject) => {
     const proc = spawn('python3', args, {
       stdio: 'inherit',
-      cwd: path.join(repoRoot, 'apps/sabaiface'),
+      cwd: process.cwd(),
     });
 
     proc.on('error', (err) => {
       reject(
         new Error(
-          `Failed to start Python: ${err.message}\n\nMake sure python3 and numpy are installed.`,
+          `Failed to start Python: ${err.message}\n\nMake sure python3, numpy, opencv-python, and pillow are installed.`,
         ),
       );
     });
@@ -114,15 +100,15 @@ export async function runDatasetGenerate(cmd: DatasetGenerateCommand): Promise<v
     });
   });
 
-  // Copy to desired output location if different
-  if (path.resolve(outputPath) !== path.resolve(defaultOutputPath)) {
-    console.log('');
-    console.log(`Copying to: ${outputPath}`);
-    await fs.copyFile(defaultOutputPath, outputPath);
-  }
+  const indexJsonPath = path.join(outputPath, 'index.json');
 
   console.log('');
-  console.log('Done! Use this file with:');
-  console.log(`  eval run sabaiface --dataset ${outputPath}`);
-  console.log(`  eval run aws --dataset ${outputPath}`);
+  console.log('Done! Generated dataset at:');
+  console.log(`  ${outputPath}/`);
+  console.log('');
+  console.log('Use with eval:');
+  console.log(`  pnpm --filter @sabaipics/face-eval eval run aws --dataset ${indexJsonPath}`);
+  console.log(
+    `  pnpm --filter @sabaipics/face-eval eval run sabaiface --dataset ${indexJsonPath} --endpoint <url>`,
+  );
 }

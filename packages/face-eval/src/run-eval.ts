@@ -3,11 +3,16 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 import type { RunCommand } from './cli/parse.ts';
-import { loadDataset, filterDatasetToSubset } from './dataset.ts';
+import {
+  loadDataset,
+  filterDatasetToSubset,
+  resolveIndexImages,
+  resolveAllIdentities,
+} from './dataset.ts';
 import { getGitInfo } from './git.ts';
 import { calculateMetrics, type SearchResult } from './metrics.ts';
 import { appendRunCsv, writeRunMetadata } from './persist.ts';
-import { findRepoRoot } from './repo.ts';
+import { getPackageRoot } from './repo.ts';
 import { createAWSProvider } from './providers/aws-provider.ts';
 import { createSabaiFaceProvider } from './providers/sabaiface-provider.ts';
 import type { FaceRecognitionProvider } from './providers/types.ts';
@@ -95,7 +100,7 @@ function toFixedOrEmpty(n: number, digits: number): number {
 }
 
 export async function runEval(cmd: RunCommand) {
-  const repoRoot = await findRepoRoot();
+  const packageRoot = getPackageRoot();
   const timestampUtc = new Date().toISOString();
   const runId = makeRunId(new Date(timestampUtc));
 
@@ -134,8 +139,8 @@ export async function runEval(cmd: RunCommand) {
 
   const collectionId = `eval-${cmd.provider}-${Date.now()}`;
 
-  const runMetaPath = path.join(repoRoot, 'eval', 'runs', `${runId}.json`);
-  const runsCsvPath = path.join(repoRoot, 'eval', 'runs', 'runs.csv');
+  const runMetaPath = path.join(packageRoot, 'runs', `${runId}.json`);
+  const runsCsvPath = path.join(packageRoot, 'runs', 'runs.csv');
 
   await writeRunMetadata(runMetaPath, {
     runId,
@@ -153,10 +158,10 @@ export async function runEval(cmd: RunCommand) {
       datasetId: dataset.datasetId,
       datasetHash: dataset.datasetHash,
       datasetPath: path.isAbsolute(dataset.datasetPath)
-        ? path.relative(repoRoot, dataset.datasetPath)
+        ? path.relative(process.cwd(), dataset.datasetPath)
         : dataset.datasetPath,
       datasetRoot: path.isAbsolute(dataset.datasetRoot)
-        ? path.relative(repoRoot, dataset.datasetRoot)
+        ? path.relative(process.cwd(), dataset.datasetRoot)
         : dataset.datasetRoot,
     },
     params: {
@@ -186,27 +191,23 @@ export async function runEval(cmd: RunCommand) {
   if (
     cmd.indexSubset &&
     cmd.indexSubset > 0 &&
-    cmd.indexSubset < dataset.groundTruth.indexSet.length
+    cmd.indexSubset < dataset.index.index_images.length
   ) {
-    const allIndexImages = dataset.groundTruth.indexSet.map((item) =>
-      typeof item === 'string' ? item : item.name,
-    );
     // Deterministic subset - take first N images
-    const subsetImages = allIndexImages.slice(0, cmd.indexSubset);
+    const subsetImages = dataset.index.index_images.slice(0, cmd.indexSubset);
     workingDataset = filterDatasetToSubset(dataset, subsetImages);
     console.log(
-      `[face-eval] using subset: ${cmd.indexSubset} of ${allIndexImages.length} index images`,
+      `[face-eval] using subset: ${cmd.indexSubset} of ${dataset.index.index_images.length} index images`,
     );
   }
 
-  const totalIndex = workingDataset.groundTruth.indexSet.length;
+  const indexImages = resolveIndexImages(workingDataset);
+  const identities = resolveAllIdentities(workingDataset);
+  const totalIndex = indexImages.length;
 
   console.log(
     `[face-eval] indexing images=${totalIndex} maxFaces=${cmd.indexMaxFaces} qualityFilter=${cmd.indexQualityFilter}`,
   );
-  if (dataset.isNewFormat) {
-    console.log(`[face-eval] using new index.json format`);
-  }
 
   const indexStart = Date.now();
   let indexedImages = 0;
@@ -214,23 +215,13 @@ export async function runEval(cmd: RunCommand) {
   let indexErrors = 0;
 
   try {
-    for (const indexItem of workingDataset.groundTruth.indexSet) {
-      const imageName = typeof indexItem === 'string' ? indexItem : indexItem.name;
-      const imagePath = typeof indexItem === 'string' ? null : indexItem.path;
-
+    for (const indexImage of indexImages) {
       try {
-        let imageBuffer: ArrayBuffer;
-        if (imagePath) {
-          imageBuffer = await loadImage(imagePath);
-        } else {
-          // Legacy fallback - try to find the image
-          const legacyPath = path.join(dataset.datasetRoot, 'index', `${imageName}.jpg`);
-          imageBuffer = await loadImage(legacyPath);
-        }
+        const imageBuffer = await loadImage(indexImage.path);
 
         const r = await provider.indexPhoto({
           eventId: collectionId,
-          photoId: imageName,
+          photoId: indexImage.name,
           imageData: imageBuffer,
           options: {
             maxFaces: Math.max(1, Math.min(100, cmd.indexMaxFaces)),
@@ -262,21 +253,10 @@ export async function runEval(cmd: RunCommand) {
 
       const searchResults: SearchResult[] = [];
 
-      for (const [personId, person] of Object.entries(workingDataset.groundTruth.identities)) {
-        for (let i = 0; i < person.queryImages.length; i++) {
-          const queryImageName = person.queryImages[i];
-          const queryImagePath = person.queryImagePaths?.[i];
-
+      for (const identity of identities) {
+        for (const selfie of identity.selfies) {
           try {
-            let imageBuffer: ArrayBuffer;
-            if (queryImagePath) {
-              imageBuffer = await loadImage(queryImagePath);
-            } else {
-              // Legacy fallback
-              imageBuffer = await loadImage(
-                path.join(workingDataset.datasetRoot, 'selfies', personId, `${queryImageName}.jpg`),
-              );
-            }
+            const imageBuffer = await loadImage(selfie.path);
 
             const start = Date.now();
             const r = await provider.findImagesByFace({
@@ -297,10 +277,16 @@ export async function runEval(cmd: RunCommand) {
               )
               .slice(0, cmd.maxResults);
 
+            // Expected images are the index_matches for this identity
+            const expectedImages = identity.indexMatches.map((m) => m.name);
+
             searchResults.push({
-              queryImage: queryImageName,
-              queryPersonId: Number.parseInt(personId, 10) || 0,
-              expectedImages: person.containedInIndexImages,
+              queryImage: selfie.id,
+              queryPersonId:
+                typeof identity.personId === 'number'
+                  ? identity.personId
+                  : parseInt(String(identity.personId), 10) || 0,
+              expectedImages,
               results: photos.map((p: { photoId: string; similarity: number }) => ({
                 image: p.photoId,
                 similarity: p.similarity,
@@ -364,7 +350,7 @@ export async function runEval(cmd: RunCommand) {
 
     await appendRunCsv(runsCsvPath, CSV_HEADER, rows);
     console.log(
-      `[face-eval] appended ${rows.length} row(s) to ${path.relative(repoRoot, runsCsvPath)}`,
+      `[face-eval] appended ${rows.length} row(s) to ${path.relative(process.cwd(), runsCsvPath)}`,
     );
   } finally {
     const del = await provider.deleteCollection(collectionId);

@@ -4,122 +4,101 @@ import crypto from 'node:crypto';
 
 import { findRepoRoot } from './repo.ts';
 
-// Legacy format (ground-truth.json)
-export interface GroundTruthIdentity {
-  indexImages: string[];
-  queryImages: string[];
-  containedInIndexImages: string[];
-  indexImagePaths?: string[];
-  queryImagePaths?: string[];
-  containedInIndexPaths?: string[];
+/**
+ * Ignore map - image ID to boolean or reason string
+ */
+export type IgnoreMap = Record<string, boolean | string>;
+
+/**
+ * Ignore file format (ignore.json)
+ */
+export interface IgnoreFile {
+  version?: string;
+  updated_at?: string;
+  updated_by?: string;
+  description?: string;
+  ignore: IgnoreMap;
 }
 
-export interface GroundTruth {
-  metadata?: {
-    datasetPath?: string;
-    generatedAt?: string;
-    numPeople?: number;
-    imagesPerPerson?: number;
-    indexSize?: number;
-    querySize?: number;
-    totalUniqueIndexImages?: number;
-    totalQueryImages?: number;
-  };
-  indexSet: Array<string | { name: string; path: string }>;
-  identities: Record<string, GroundTruthIdentity & { personId?: number; name?: string }>;
-}
-
-// New format (index.json)
-export interface IndexJsonIdentity {
+/**
+ * Identity in index.json format
+ */
+export interface DatasetIdentity {
   event: string;
   person_id: number | string;
   selfies: string[]; // face IDs like "228A9455_0"
   index_matches: string[]; // index image names like "10003_228A9844"
 }
 
-export interface IndexJson {
+/**
+ * index.json dataset format
+ */
+export interface DatasetIndex {
   description?: string;
   num_identities: number;
   num_index_images: number;
   selfies_per_person: number;
   index_images: string[];
-  identities: Record<string, IndexJsonIdentity>;
+  identities: Record<string, DatasetIdentity>;
+  ignore?: IgnoreMap; // Optional inline ignore map
 }
 
+/**
+ * Loaded dataset with resolved paths
+ */
 export interface LoadedDataset {
+  /** Path to the index.json file */
   datasetPath: string;
+  /** Filename of the dataset (e.g., "index.json") */
   datasetId: string;
+  /** SHA256 hash of index.json content */
   datasetHash: string;
+  /** Root directory containing selfies/ and index/ folders */
   datasetRoot: string;
-  groundTruth: GroundTruth;
-  // New format fields
-  isNewFormat: boolean;
-  indexJson?: IndexJson;
+  /** Parsed index.json */
+  index: DatasetIndex;
+  /** Merged ignore map (from index.json + ignore.json) */
+  ignore: IgnoreMap;
+  /** Number of ignored images */
+  ignoreCount: number;
 }
 
 /**
- * Detect if JSON is new format (index.json) or legacy (ground-truth.json)
+ * Resolved index image with name and full path
  */
-function isIndexJsonFormat(data: any): data is IndexJson {
-  return (
-    typeof data.num_identities === 'number' &&
-    Array.isArray(data.index_images) &&
-    typeof data.identities === 'object' &&
-    Object.values(data.identities).some(
-      (id: any) => Array.isArray(id.selfies) && Array.isArray(id.index_matches),
-    )
-  );
+export interface ResolvedIndexImage {
+  name: string;
+  path: string;
 }
 
 /**
- * Convert new index.json format to legacy GroundTruth format for compatibility
+ * Resolved identity with full paths
  */
-function convertIndexJsonToGroundTruth(indexJson: IndexJson, datasetRoot: string): GroundTruth {
-  const identities: Record<string, GroundTruthIdentity & { personId?: number; name?: string }> = {};
+export interface ResolvedIdentity {
+  personKey: string;
+  event: string;
+  personId: number | string;
+  selfies: Array<{ id: string; path: string }>;
+  indexMatches: Array<{ name: string; path: string }>;
+}
 
-  for (const [personKey, identity] of Object.entries(indexJson.identities)) {
-    // Build paths for selfies
-    const queryImagePaths = identity.selfies.map((selfieId) =>
-      path.join(datasetRoot, 'selfies', personKey, `${selfieId}.jpg`),
-    );
-
-    // Build paths for index images
-    const indexImagePaths = identity.index_matches.map((imgName) =>
-      path.join(datasetRoot, 'index', `${imgName}.jpg`),
-    );
-
-    identities[personKey] = {
-      personId:
-        typeof identity.person_id === 'number'
-          ? identity.person_id
-          : parseInt(identity.person_id as string, 10),
-      name: personKey,
-      indexImages: identity.index_matches,
-      queryImages: identity.selfies,
-      queryImagePaths,
-      containedInIndexImages: identity.index_matches,
-      containedInIndexPaths: indexImagePaths,
-      indexImagePaths,
-    };
+/**
+ * Load ignore.json if it exists
+ */
+async function loadIgnoreFile(datasetRoot: string): Promise<IgnoreMap> {
+  const ignorePath = path.join(datasetRoot, 'ignore.json');
+  try {
+    const content = await fs.readFile(ignorePath, 'utf8');
+    const ignoreFile = JSON.parse(content) as IgnoreFile;
+    return ignoreFile.ignore || {};
+  } catch {
+    return {};
   }
-
-  // Build indexSet with paths
-  const indexSet = indexJson.index_images.map((imgName) => ({
-    name: imgName,
-    path: path.join(datasetRoot, 'index', `${imgName}.jpg`),
-  }));
-
-  return {
-    metadata: {
-      numPeople: indexJson.num_identities,
-      indexSize: indexJson.num_index_images,
-      querySize: indexJson.num_identities * indexJson.selfies_per_person,
-    },
-    indexSet,
-    identities,
-  };
 }
 
+/**
+ * Load a dataset from index.json path
+ */
 export async function loadDataset(datasetPathArg: string): Promise<LoadedDataset> {
   const repoRoot = await findRepoRoot();
   const datasetPath = path.isAbsolute(datasetPathArg)
@@ -129,40 +108,110 @@ export async function loadDataset(datasetPathArg: string): Promise<LoadedDataset
   const content = await fs.readFile(datasetPath);
   const datasetHash = crypto.createHash('sha256').update(content).digest('hex');
 
-  const rawData = JSON.parse(content.toString('utf8'));
+  const index = JSON.parse(content.toString('utf8')) as DatasetIndex;
   const datasetId = path.basename(datasetPath);
+  const datasetRoot = path.dirname(datasetPath);
 
-  // Determine format and get dataset root
-  const isNewFormat = isIndexJsonFormat(rawData);
-
-  let datasetRoot: string;
-  let groundTruth: GroundTruth;
-  let indexJson: IndexJson | undefined;
-
-  if (isNewFormat) {
-    // New format: datasetRoot is the directory containing index.json
-    datasetRoot = path.dirname(datasetPath);
-    indexJson = rawData as IndexJson;
-    groundTruth = convertIndexJsonToGroundTruth(indexJson, datasetRoot);
-  } else {
-    // Legacy format
-    groundTruth = rawData as GroundTruth;
-    datasetRoot =
-      groundTruth.metadata?.datasetPath ||
-      process.env.SABAIFACE_DATASET_PATH ||
-      path.resolve(repoRoot, 'dataset');
-    datasetRoot = path.isAbsolute(datasetRoot) ? datasetRoot : path.resolve(repoRoot, datasetRoot);
+  // Validate it's the expected format
+  if (!Array.isArray(index.index_images) || typeof index.identities !== 'object') {
+    throw new Error(
+      `Invalid dataset format: expected index.json with index_images[] and identities{}`,
+    );
   }
+
+  // Load ignore map from ignore.json (if exists) and merge with inline ignore
+  const ignoreFromFile = await loadIgnoreFile(datasetRoot);
+  const ignore: IgnoreMap = {
+    ...ignoreFromFile,
+    ...(index.ignore || {}), // Inline ignore takes precedence
+  };
+  const ignoreCount = Object.keys(ignore).length;
 
   return {
     datasetPath,
     datasetId,
     datasetHash,
     datasetRoot,
-    groundTruth,
-    isNewFormat,
-    indexJson,
+    index,
+    ignore,
+    ignoreCount,
   };
+}
+
+/**
+ * Check if an image ID is ignored
+ */
+export function isIgnored(dataset: LoadedDataset, imageId: string): boolean {
+  return imageId in dataset.ignore;
+}
+
+/**
+ * Get ignore reason for an image (or undefined if not ignored)
+ */
+export function getIgnoreReason(dataset: LoadedDataset, imageId: string): string | undefined {
+  const value = dataset.ignore[imageId];
+  if (value === undefined) return undefined;
+  if (typeof value === 'boolean') return 'ignored';
+  return value;
+}
+
+/**
+ * Resolve all index images to full paths (excluding ignored)
+ */
+export function resolveIndexImages(
+  dataset: LoadedDataset,
+  includeIgnored = false,
+): ResolvedIndexImage[] {
+  return dataset.index.index_images
+    .filter((name) => includeIgnored || !isIgnored(dataset, name))
+    .map((name) => ({
+      name,
+      path: path.join(dataset.datasetRoot, 'index', `${name}.jpg`),
+    }));
+}
+
+/**
+ * Resolve a single identity to full paths (excluding ignored selfies)
+ */
+export function resolveIdentity(
+  dataset: LoadedDataset,
+  personKey: string,
+  includeIgnored = false,
+): ResolvedIdentity {
+  const identity = dataset.index.identities[personKey];
+  if (!identity) {
+    throw new Error(`Identity not found: ${personKey}`);
+  }
+
+  return {
+    personKey,
+    event: identity.event,
+    personId: identity.person_id,
+    selfies: identity.selfies
+      .filter((id) => includeIgnored || !isIgnored(dataset, id))
+      .map((id) => ({
+        id,
+        path: path.join(dataset.datasetRoot, 'selfies', personKey, `${id}.jpg`),
+      })),
+    indexMatches: identity.index_matches
+      .filter((name) => includeIgnored || !isIgnored(dataset, name))
+      .map((name) => ({
+        name,
+        path: path.join(dataset.datasetRoot, 'index', `${name}.jpg`),
+      })),
+  };
+}
+
+/**
+ * Resolve all identities to full paths (excluding ignored)
+ */
+export function resolveAllIdentities(
+  dataset: LoadedDataset,
+  includeIgnored = false,
+): ResolvedIdentity[] {
+  return Object.keys(dataset.index.identities)
+    .map((key) => resolveIdentity(dataset, key, includeIgnored))
+    .filter((identity) => identity.selfies.length > 0); // Exclude identities with no valid selfies
 }
 
 /**
@@ -175,39 +224,62 @@ export function filterDatasetToSubset(
 ): LoadedDataset {
   const subsetSet = new Set(indexSubset);
 
-  // Filter index set
-  const filteredIndexSet = dataset.groundTruth.indexSet.filter((item) => {
-    const name = typeof item === 'string' ? item : item.name;
-    return subsetSet.has(name);
-  });
+  // Filter index images
+  const filteredIndexImages = dataset.index.index_images.filter((name) => subsetSet.has(name));
 
   // Filter identities - only keep matches that exist in subset
-  const filteredIdentities: Record<
-    string,
-    GroundTruthIdentity & { personId?: number; name?: string }
-  > = {};
+  const filteredIdentities: Record<string, DatasetIdentity> = {};
 
-  for (const [personKey, identity] of Object.entries(dataset.groundTruth.identities)) {
-    const filteredMatches = identity.containedInIndexImages.filter((img) => subsetSet.has(img));
+  for (const [personKey, identity] of Object.entries(dataset.index.identities)) {
+    const filteredMatches = identity.index_matches.filter((name) => subsetSet.has(name));
 
     // Only include person if they have matches in the subset
     if (filteredMatches.length > 0) {
       filteredIdentities[personKey] = {
         ...identity,
-        containedInIndexImages: filteredMatches,
-        containedInIndexPaths: identity.containedInIndexPaths?.filter((_, i) =>
-          subsetSet.has(identity.containedInIndexImages[i]),
-        ),
+        index_matches: filteredMatches,
       };
     }
   }
 
   return {
     ...dataset,
-    groundTruth: {
-      ...dataset.groundTruth,
-      indexSet: filteredIndexSet,
+    index: {
+      ...dataset.index,
+      index_images: filteredIndexImages,
+      num_index_images: filteredIndexImages.length,
+      num_identities: Object.keys(filteredIdentities).length,
       identities: filteredIdentities,
     },
+  };
+}
+
+/**
+ * Get dataset statistics
+ */
+export function getDatasetStats(dataset: LoadedDataset): {
+  totalIdentities: number;
+  totalSelfies: number;
+  totalIndexImages: number;
+  ignoredImages: number;
+  validSelfies: number;
+  validIndexImages: number;
+} {
+  const allIdentities = resolveAllIdentities(dataset, true);
+  const validIdentities = resolveAllIdentities(dataset, false);
+
+  const totalSelfies = allIdentities.reduce((sum, id) => sum + id.selfies.length, 0);
+  const validSelfies = validIdentities.reduce((sum, id) => sum + id.selfies.length, 0);
+
+  const totalIndexImages = dataset.index.index_images.length;
+  const validIndexImages = resolveIndexImages(dataset, false).length;
+
+  return {
+    totalIdentities: allIdentities.length,
+    totalSelfies,
+    totalIndexImages,
+    ignoredImages: dataset.ignoreCount,
+    validSelfies,
+    validIndexImages,
   };
 }
