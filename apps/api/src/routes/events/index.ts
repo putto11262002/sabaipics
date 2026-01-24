@@ -7,8 +7,6 @@ import { requirePhotographer, requireConsent, type PhotographerVariables } from 
 import type { Bindings } from '../../types';
 import { generatePngQrCode } from '@juit/qrcode';
 import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './schema';
-import { searchRouter } from './search';
-import { downloadsRouter } from './downloads';
 
 // =============================================================================
 // Types
@@ -26,7 +24,7 @@ const MAX_PAGE_SIZE = 100;
 // QR Code Generation
 // =============================================================================
 
-type QRSize = "small" | "medium" | "large";
+type QRSize = 'small' | 'medium' | 'large';
 
 const QR_SIZE_PRESETS: Record<QRSize, number> = {
   small: 256,
@@ -41,12 +39,12 @@ function getScaleForSize(size: QRSize): number {
 async function generateEventQR(
   eventId: string,
   baseUrl: string,
-  size: QRSize = "medium"
+  size: QRSize = 'medium',
 ): Promise<Uint8Array> {
-  const searchUrl = `${baseUrl}/events/${eventId}/search`;
+  const searchUrl = `${baseUrl}/participant/events/${eventId}/search`;
 
   return await generatePngQrCode(searchUrl, {
-    ecLevel: "M",
+    ecLevel: 'M',
     margin: 4,
     scale: getScaleForSize(size),
   });
@@ -91,7 +89,6 @@ function qrGenerationFailedError(reason: string) {
     },
   };
 }
-
 
 // =============================================================================
 // Routes
@@ -250,9 +247,12 @@ export const eventsRouter = new Hono<Env>()
     requirePhotographer(),
     requireConsent(),
     zValidator('param', eventParamsSchema),
-    zValidator('query', z.object({
-      size: z.enum(['small', 'medium', 'large']).optional().default('medium'),
-    })),
+    zValidator(
+      'query',
+      z.object({
+        size: z.enum(['small', 'medium', 'large']).optional().default('medium'),
+      }),
+    ),
     async (c) => {
       const photographer = c.var.photographer;
       const db = c.var.db();
@@ -296,8 +296,4 @@ export const eventsRouter = new Hono<Env>()
         },
       });
     },
-  )
-  // Mount participant search router (public endpoint)
-  .route('/', searchRouter)
-  // Mount participant downloads router (public endpoint)
-  .route('/', downloadsRouter);
+  );

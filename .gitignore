@@ -85,3 +85,5 @@ apps/studio/.build/
 eval/runs/*.json
 eval/runs/*.csv
 !eval/runs/.gitkeep
+
+opencode.json

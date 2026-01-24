@@ -13,6 +13,7 @@ import { eventsRouter } from './routes/events';
 import { photosRouter } from './routes/photos';
 import { uploadsRouter } from './routes/uploads';
 import { r2Router } from './routes/r2';
+import { participantRouter } from './routes/participant';
 import type { Env, Bindings } from './types';
 
 // Queue consumers
@@ -55,10 +56,14 @@ const app = new Hono<Env>()
   .route('/local/r2', r2Router)
   // Webhooks route (uses c.var.db from above)
   .route('/webhooks', webhookRouter)
+  // Participant routes (public, no auth - for event participants)
+  .route('/participant', participantRouter)
   // Then CORS and auth for all other routes
   .use('/*', (c, next) => {
+    // Support comma-separated origins for dev (e.g., "http://localhost:5173,http://localhost:5174")
+    const allowedOrigins = c.env.CORS_ORIGIN.split(',').map((o) => o.trim());
     return cors({
-      origin: c.env.CORS_ORIGIN,
+      origin: (origin) => (allowedOrigins.includes(origin) ? origin : allowedOrigins[0]),
       credentials: true,
     })(c, next);
   })
