@@ -14,6 +14,7 @@ export interface RunCommand {
   fetchMultiplier: number;
   indexMaxFaces: number;
   indexQualityFilter: 'auto' | 'none';
+  indexSubset?: number; // Optional: limit index to first N images for quick tests
   dryRun: boolean;
 }
 
@@ -123,6 +124,7 @@ export function parseCli(argv: string[]): ParsedCli {
       'fetch-multiplier': { type: 'string' },
       'index-max-faces': { type: 'string' },
       'index-quality-filter': { type: 'string' },
+      'index-subset': { type: 'string' },
       'dry-run': { type: 'boolean' },
       help: { type: 'boolean' },
       h: { type: 'boolean' },
@@ -154,6 +156,9 @@ export function parseCli(argv: string[]): ParsedCli {
 
   const fetchMultiplier = Math.max(1, Number.parseInt(values['fetch-multiplier'] ?? '1', 10));
   const indexMaxFaces = Math.max(1, Number.parseInt(values['index-max-faces'] ?? '100', 10));
+  const indexSubset = values['index-subset']
+    ? Math.max(1, Number.parseInt(values['index-subset'], 10))
+    : undefined;
   const indexQualityFilterRaw = String(values['index-quality-filter'] ?? 'auto');
   if (indexQualityFilterRaw !== 'auto' && indexQualityFilterRaw !== 'none') {
     return {
@@ -175,6 +180,7 @@ export function parseCli(argv: string[]): ParsedCli {
     fetchMultiplier,
     indexMaxFaces,
     indexQualityFilter: indexQualityFilterRaw,
+    indexSubset,
     dryRun: Boolean(values['dry-run']),
   };
 }

@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 import type { RunCommand } from './cli/parse.ts';
-import { loadDataset } from './dataset.ts';
+import { loadDataset, filterDatasetToSubset } from './dataset.ts';
 import { getGitInfo } from './git.ts';
 import { calculateMetrics, type SearchResult } from './metrics.ts';
 import { appendRunCsv, writeRunMetadata } from './persist.ts';
@@ -181,18 +181,32 @@ export async function runEval(cmd: RunCommand) {
     throw new Error(`Failed to create collection: ${create.error.type}`);
   }
 
-  const usePathFormat =
-    Array.isArray(dataset.groundTruth.indexSet) &&
-    dataset.groundTruth.indexSet.length > 0 &&
-    typeof dataset.groundTruth.indexSet[0] !== 'string';
+  // Apply subset filter if specified
+  let workingDataset = dataset;
+  if (
+    cmd.indexSubset &&
+    cmd.indexSubset > 0 &&
+    cmd.indexSubset < dataset.groundTruth.indexSet.length
+  ) {
+    const allIndexImages = dataset.groundTruth.indexSet.map((item) =>
+      typeof item === 'string' ? item : item.name,
+    );
+    // Deterministic subset - take first N images
+    const subsetImages = allIndexImages.slice(0, cmd.indexSubset);
+    workingDataset = filterDatasetToSubset(dataset, subsetImages);
+    console.log(
+      `[face-eval] using subset: ${cmd.indexSubset} of ${allIndexImages.length} index images`,
+    );
+  }
 
-  const totalIndex = usePathFormat
-    ? (dataset.groundTruth.indexSet as Array<{ name: string; path: string }>).length
-    : (dataset.groundTruth.indexSet as string[]).length;
+  const totalIndex = workingDataset.groundTruth.indexSet.length;
 
   console.log(
     `[face-eval] indexing images=${totalIndex} maxFaces=${cmd.indexMaxFaces} qualityFilter=${cmd.indexQualityFilter}`,
   );
+  if (dataset.isNewFormat) {
+    console.log(`[face-eval] using new index.json format`);
+  }
 
   const indexStart = Date.now();
   let indexedImages = 0;
@@ -200,14 +214,19 @@ export async function runEval(cmd: RunCommand) {
   let indexErrors = 0;
 
   try {
-    for (const indexItem of dataset.groundTruth.indexSet) {
+    for (const indexItem of workingDataset.groundTruth.indexSet) {
       const imageName = typeof indexItem === 'string' ? indexItem : indexItem.name;
       const imagePath = typeof indexItem === 'string' ? null : indexItem.path;
 
       try {
-        const imageBuffer = imagePath
-          ? await loadImage(imagePath)
-          : await loadImage(path.join(dataset.datasetRoot, '10002', `${imageName}.jpg`));
+        let imageBuffer: ArrayBuffer;
+        if (imagePath) {
+          imageBuffer = await loadImage(imagePath);
+        } else {
+          // Legacy fallback - try to find the image
+          const legacyPath = path.join(dataset.datasetRoot, 'index', `${imageName}.jpg`);
+          imageBuffer = await loadImage(legacyPath);
+        }
 
         const r = await provider.indexPhoto({
           eventId: collectionId,
@@ -226,7 +245,7 @@ export async function runEval(cmd: RunCommand) {
 
         indexedImages++;
         indexedFaces += r.value.faces.length;
-      } catch {
+      } catch (e) {
         indexErrors++;
       }
     }
@@ -243,15 +262,21 @@ export async function runEval(cmd: RunCommand) {
 
       const searchResults: SearchResult[] = [];
 
-      for (const [personId, person] of Object.entries(dataset.groundTruth.identities)) {
+      for (const [personId, person] of Object.entries(workingDataset.groundTruth.identities)) {
         for (let i = 0; i < person.queryImages.length; i++) {
           const queryImageName = person.queryImages[i];
           const queryImagePath = person.queryImagePaths?.[i];
 
           try {
-            const imageBuffer = queryImagePath
-              ? await loadImage(queryImagePath)
-              : await loadImage(path.join(dataset.datasetRoot, '10002', `${queryImageName}.jpg`));
+            let imageBuffer: ArrayBuffer;
+            if (queryImagePath) {
+              imageBuffer = await loadImage(queryImagePath);
+            } else {
+              // Legacy fallback
+              imageBuffer = await loadImage(
+                path.join(workingDataset.datasetRoot, 'selfies', personId, `${queryImageName}.jpg`),
+              );
+            }
 
             const start = Date.now();
             const r = await provider.findImagesByFace({
@@ -274,7 +299,7 @@ export async function runEval(cmd: RunCommand) {
 
             searchResults.push({
               queryImage: queryImageName,
-              queryPersonId: Number.parseInt(personId, 10),
+              queryPersonId: Number.parseInt(personId, 10) || 0,
               expectedImages: person.containedInIndexImages,
               results: photos.map((p: { photoId: string; similarity: number }) => ({
                 image: p.photoId,
@@ -282,7 +307,7 @@ export async function runEval(cmd: RunCommand) {
               })),
               durationMs,
             });
-          } catch {
+          } catch (e) {
             // ignore
           }
         }
