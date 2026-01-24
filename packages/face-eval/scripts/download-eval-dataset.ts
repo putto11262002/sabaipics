@@ -5,24 +5,27 @@
  * Downloads dataset from R2 with local caching.
  * Only downloads files that don't exist locally or have different hashes.
  *
+ * Cache Location (shared across all project clones):
+ *   Default: ~/.cache/sabaipics/eval-datasets/
+ *   Override: SABAIPICS_CACHE_DIR environment variable
+ *
  * Usage:
- *   pnpm --filter @sabaipics/face-eval eval dataset download \
- *     --version v1 \
- *     --output ./data
+ *   pnpm --filter @sabaipics/face-eval dataset:download --version v1
  *
  * Environment:
- *   R2_ACCOUNT_ID        - Cloudflare account ID
- *   R2_ACCESS_KEY_ID     - R2 access key
- *   R2_SECRET_ACCESS_KEY - R2 secret key
- *   R2_BUCKET_NAME       - R2 bucket name (default: sabaipics-eval-datasets)
+ *   R2_ACCOUNT_ID         - Cloudflare account ID
+ *   R2_ACCESS_KEY_ID      - R2 access key
+ *   R2_SECRET_ACCESS_KEY  - R2 secret key
+ *   R2_BUCKET_NAME        - R2 bucket name (default: sabaipics-eval-datasets)
+ *   SABAIPICS_CACHE_DIR   - Override global cache directory
  *   SKIP_DATASET_DOWNLOAD - Set to "1" to skip download
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 import { AwsClient } from 'aws4fetch';
+import { getGlobalCacheDir } from '../src/repo.ts';
 
 // Types
 interface ManifestFile {
@@ -49,15 +52,9 @@ interface IgnoreFile {
 
 interface DownloadOptions {
   version: string;
-  output: string;
+  output?: string; // If not provided, uses global cache
   skipIgnore?: boolean;
 }
-
-// Get package root
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PACKAGE_ROOT = path.resolve(__dirname, '..');
-const DEFAULT_OUTPUT = path.join(PACKAGE_ROOT, 'data');
 
 // R2 Configuration
 function getR2Config() {
@@ -178,8 +175,9 @@ export async function downloadDataset(options: DownloadOptions): Promise<void> {
   console.log('║                    Eval Dataset Download from R2                             ║');
   console.log('╚══════════════════════════════════════════════════════════════════════════════╝');
 
-  const outputPath = path.resolve(output);
-  const versionPath = path.join(outputPath, version);
+  // Use global cache if no output specified
+  const cacheDir = output ? path.resolve(output) : getGlobalCacheDir();
+  const versionPath = path.join(cacheDir, version);
 
   console.log(`\nVersion: ${version}`);
   console.log(`Output:  ${versionPath}\n`);
@@ -315,7 +313,7 @@ async function main() {
   const args = process.argv.slice(2);
 
   let version = 'v1';
-  let output = DEFAULT_OUTPUT;
+  let output: string | undefined;
   let skipIgnore = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -326,14 +324,19 @@ async function main() {
     } else if (args[i] === '--skip-ignore') {
       skipIgnore = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
+      const defaultCache = getGlobalCacheDir();
       console.log(`Usage: download-eval-dataset.ts [--version <v1>] [--output <path>] [--skip-ignore]
 
 Options:
   --version, -v   Dataset version (default: v1)
-  --output, -o    Output directory (default: ./data)
+  --output, -o    Output directory (default: global cache)
   --skip-ignore   Don't download ignore.json
 
+Global Cache (shared across all project clones):
+  ${defaultCache}
+
 Environment:
+  SABAIPICS_CACHE_DIR   Override global cache directory
   R2_ACCOUNT_ID         Cloudflare account ID
   R2_ACCESS_KEY_ID      R2 access key
   R2_SECRET_ACCESS_KEY  R2 secret key

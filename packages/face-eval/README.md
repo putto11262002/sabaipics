@@ -12,9 +12,25 @@ packages/face-eval/
 │   ├── upload-eval-dataset.ts     # Upload dataset to R2
 │   ├── download-eval-dataset.ts   # Download dataset from R2
 │   └── upload-ignore.ts           # Upload ignore file to R2
-├── runs/                 # Eval run outputs (gitignored)
-└── data/                 # Downloaded datasets (gitignored)
+└── runs/                 # Eval run outputs (gitignored)
 ```
+
+## Global Cache
+
+Datasets are cached globally so they're shared across all clones of the project:
+
+```
+~/.cache/sabaipics/eval-datasets/
+├── v1/
+│   ├── index.json
+│   ├── ignore.json
+│   ├── selfies/
+│   └── index/
+└── v2/
+    └── ...
+```
+
+Override with `SABAIPICS_CACHE_DIR` environment variable.
 
 ## Quick Start
 
@@ -49,15 +65,17 @@ pnpm --filter @sabaipics/face-eval eval run aws \
 ### Download Dataset
 
 ```bash
-pnpm --filter @sabaipics/face-eval dataset:download \
-  --version v1 \
-  --output ./data
+# Downloads to global cache (~/.cache/sabaipics/eval-datasets/v1/)
+pnpm --filter @sabaipics/face-eval dataset:download --version v1
+
+# Or specify custom output directory
+pnpm --filter @sabaipics/face-eval dataset:download --version v1 --output ./data
 ```
 
 Options:
 
 - `--version, -v` - Dataset version (default: v1)
-- `--output, -o` - Output directory (default: ./data)
+- `--output, -o` - Output directory (default: global cache)
 - `--skip-ignore` - Don't download ignore.json
 
 ### Upload Dataset (Admin)
@@ -174,6 +192,7 @@ R2_ACCOUNT_ID=...           # Cloudflare account ID
 R2_ACCESS_KEY_ID=...        # R2 access key
 R2_SECRET_ACCESS_KEY=...    # R2 secret key
 R2_BUCKET_NAME=...          # Bucket name (default: sabaipics-eval-datasets)
+SABAIPICS_CACHE_DIR=...     # Override global cache dir (default: ~/.cache/sabaipics/eval-datasets)
 SKIP_DATASET_DOWNLOAD=1     # Skip download (for CI)
 ```
 

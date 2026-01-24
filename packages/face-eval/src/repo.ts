@@ -30,3 +30,30 @@ export function getPackageRoot(): string {
   // src/repo.ts -> package root is ../
   return path.resolve(__dirname, '..');
 }
+
+/**
+ * Get global cache directory for eval datasets.
+ * Shared across all clones of the project.
+ *
+ * Default: ~/.cache/sabaipics/eval-datasets
+ * Override: SABAIPICS_CACHE_DIR environment variable
+ */
+export function getGlobalCacheDir(): string {
+  if (process.env.SABAIPICS_CACHE_DIR) {
+    return process.env.SABAIPICS_CACHE_DIR;
+  }
+
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  if (!home) {
+    throw new Error('Cannot determine home directory. Set SABAIPICS_CACHE_DIR.');
+  }
+
+  return path.join(home, '.cache', 'sabaipics', 'eval-datasets');
+}
+
+/**
+ * Get path to a specific dataset version in global cache
+ */
+export function getDatasetCachePath(version: string): string {
+  return path.join(getGlobalCacheDir(), version);
+}

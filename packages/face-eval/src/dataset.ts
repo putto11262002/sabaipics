@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-import { findRepoRoot } from './repo.ts';
+import { findRepoRoot, getDatasetCachePath } from './repo.ts';
 
 /**
  * Ignore map - image ID to boolean or reason string
@@ -136,6 +136,29 @@ export async function loadDataset(datasetPathArg: string): Promise<LoadedDataset
     ignore,
     ignoreCount,
   };
+}
+
+/**
+ * Load a dataset by version from global cache.
+ *
+ * @param version - Dataset version (e.g., "v1")
+ * @returns Loaded dataset from ~/.cache/sabaipics/eval-datasets/{version}/index.json
+ */
+export async function loadDatasetByVersion(version: string): Promise<LoadedDataset> {
+  const versionPath = getDatasetCachePath(version);
+  const indexPath = path.join(versionPath, 'index.json');
+
+  try {
+    await fs.access(indexPath);
+  } catch {
+    throw new Error(
+      `Dataset version "${version}" not found in cache.\n` +
+        `Expected: ${indexPath}\n` +
+        `Run: pnpm --filter @sabaipics/face-eval dataset:download --version ${version}`,
+    );
+  }
+
+  return loadDataset(indexPath);
 }
 
 /**
