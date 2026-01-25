@@ -91,10 +91,21 @@ actor PTPIPEventMonitor {
 
     /// Stop monitoring events
     func stopMonitoring() async {
+        guard isMonitoring else { return }
         print("[PTPIPEventMonitor] Stopping event monitoring...")
         isMonitoring = false
+
+        // Cancel connection FIRST to interrupt pending receive operations
+        // This prevents waiting for timeout when disconnecting
+        eventConnection?.cancel()
+
         monitorTask?.cancel()
+        // Wait for monitor task to actually complete before returning
+        // This prevents race conditions where resources are cleaned up
+        // while the event loop is still executing
+        await monitorTask?.value
         monitorTask = nil
+        print("[PTPIPEventMonitor] Event monitoring stopped")
     }
 
     /// Main event monitoring loop

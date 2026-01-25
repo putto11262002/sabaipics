@@ -67,34 +67,34 @@ enum AppState: Equatable {
 
 ### Views
 
-| View | Purpose |
-|------|---------|
-| `ContentView` | Root view with state-driven navigation |
-| `ManufacturerSelectionView` | Camera brand selection (Canon, Nikon, Sony) |
-| `HotspotSetupView` | Instructions for enabling Personal Hotspot |
-| `CameraDiscoveryView` | Unified scanning UI - cameras selectable during scan |
-| `WiFiSetupView` | Manual IP entry fallback |
-| `LiveCaptureView` | Main capture screen showing transferred photos |
+| View                        | Purpose                                              |
+| --------------------------- | ---------------------------------------------------- |
+| `ContentView`               | Root view with state-driven navigation               |
+| `ManufacturerSelectionView` | Camera brand selection (Canon, Nikon, Sony)          |
+| `HotspotSetupView`          | Instructions for enabling Personal Hotspot           |
+| `CameraDiscoveryView`       | Unified scanning UI - cameras selectable during scan |
+| `WiFiSetupView`             | Manual IP entry fallback                             |
+| `LiveCaptureView`           | Main capture screen showing transferred photos       |
 
 ### Models
 
-| Model | Purpose |
-|-------|---------|
+| Model              | Purpose                                           |
+| ------------------ | ------------------------------------------------- |
 | `DiscoveredCamera` | Camera found during scan (holds prepared session) |
-| `ActiveCamera` | Camera with active session ready for transfer |
-| `TransferSession` | Manages photo transfer, owns ActiveCamera |
-| `CapturedPhoto` | Single transferred photo with metadata |
+| `ActiveCamera`     | Camera with active session ready for transfer     |
+| `TransferSession`  | Manages photo transfer, owns ActiveCamera         |
+| `CapturedPhoto`    | Single transferred photo with metadata            |
 
 ### Services
 
-| Service | Purpose |
-|---------|---------|
-| `NetworkScannerService` | Parallel IP scan with PTP/IP handshake |
-| `PTPIPSession` | Protocol session (command + event channels) |
-| `CameraEventSource` | Protocol for vendor-specific event monitoring |
-| `CanonEventSource` | Canon polling (0x9116) with adaptive 50-200ms |
-| `StandardEventSource` | Push events for Sony/Fuji/Olympus |
-| `NikonEventSource` | Nikon polling stub (TODO: 0x90C7) |
+| Service                 | Purpose                                       |
+| ----------------------- | --------------------------------------------- |
+| `NetworkScannerService` | Parallel IP scan with PTP/IP handshake        |
+| `PTPIPSession`          | Protocol session (command + event channels)   |
+| `CameraEventSource`     | Protocol for vendor-specific event monitoring |
+| `CanonEventSource`      | Canon polling (0x9116) with adaptive 50-200ms |
+| `StandardEventSource`   | Push events for Sony/Fuji/Olympus             |
+| `NikonEventSource`      | Nikon polling stub (TODO: 0x90C7)             |
 
 ---
 
@@ -121,6 +121,7 @@ AppCoordinator
 ```
 
 **Ownership Rules:**
+
 1. `DiscoveredCamera` holds prepared session during scanning
 2. `ActiveCamera` takes ownership when user selects (session extracted)
 3. `TransferSession` owns ActiveCamera and all photos
@@ -132,13 +133,13 @@ AppCoordinator
 
 ### Scanner Functions
 
-| Function | Purpose |
-|----------|---------|
-| `startScan()` | Start parallel IP scan (172.20.10.2-20) |
-| `stopScan()` | Cancel in-flight tasks only. Does NOT disconnect. |
-| `disconnectOtherCameras(except:)` | Disconnect all except selected |
-| `disconnectAllCameras()` | Disconnect all (when navigating away) |
-| `cleanup()` | stopScan() + disconnectAllCameras() + reset |
+| Function                          | Purpose                                           |
+| --------------------------------- | ------------------------------------------------- |
+| `startScan()`                     | Start parallel IP scan (172.20.10.2-20)           |
+| `stopScan()`                      | Cancel in-flight tasks only. Does NOT disconnect. |
+| `disconnectOtherCameras(except:)` | Disconnect all except selected                    |
+| `disconnectAllCameras()`          | Disconnect all (when navigating away)             |
+| `cleanup()`                       | stopScan() + disconnectAllCameras() + reset       |
 
 ### Cancellation Behavior
 
@@ -176,6 +177,36 @@ User taps Back
        └── 3. coordinator.backToManufacturerSelection()
 ```
 
+### Session Disconnect Sequence
+
+**Critical:** Order matters to prevent hanging on network I/O during disconnect.
+
+```
+TransferSession.end()
+       │
+       ├── 1. await camera.disconnect()
+       │          │
+       │          └── PTPIPSession.disconnect()
+       │                     │
+       │                     ├── 1. sendCloseSession() (while connection active)
+       │                     ├── 2. eventSource.stopMonitoring()
+       │                     │          ├── 1. isMonitoring = false
+       │                     │          ├── 2. connection.cancel() ← CRITICAL: interrupts pending I/O
+       │                     │          ├── 3. task.cancel()
+       │                     │          ├── 4. await task.value ← wait for cleanup
+       │                     │          └── 5. task = nil
+       │                     └── 3. cancel TCP connections
+       └── 2. photos.removeAll()
+```
+
+**Cancellation Pattern:**
+
+- Network calls wrapped in `withTaskCancellationHandler` (CanonEventSource)
+- `connection.cancel()` called BEFORE awaiting task (interrupts pending I/O)
+- Tasks awaited to ensure complete cleanup before returning
+
+**Without this pattern:** Tasks hang on `receive()` waiting for timeout, causing multiple disconnect attempts (SAB-41).
+
 ---
 
 ## Photo Transfer
@@ -194,12 +225,12 @@ PTPIPSession
 
 Canon cameras require polling (no push events). Uses libgphoto2's adaptive pattern:
 
-| Parameter | Value |
-|-----------|-------|
-| Start interval | 50ms |
-| Increase per idle cycle | +50ms |
-| Maximum interval | 200ms |
-| Reset on event found | Immediate (0ms) |
+| Parameter               | Value           |
+| ----------------------- | --------------- |
+| Start interval          | 50ms            |
+| Increase per idle cycle | +50ms           |
+| Maximum interval        | 200ms           |
+| Reset on event found    | Immediate (0ms) |
 
 Implemented in `CanonEventSource.pollingLoop()`.
 
@@ -256,6 +287,7 @@ struct LiveCaptureView: View {
 ```
 
 **Key points:**
+
 - `@ObservedObject` directly observes `TransferSession.photos`
 - Alert state is local (`@State`), not in coordinator
 - Navigation via callback, not coordinator method
@@ -371,15 +403,15 @@ SabaiPicsStudio/
 
 ## Key Design Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| Session prepared during scan | Instant connection when user selects |
-| Separate stopScan() from disconnect | No accidental disconnects from timeout |
-| Cancellation-safe with COMMIT POINT | Valuable sessions preserved |
-| Adaptive polling (50-200ms) | Fast response, battery-efficient idle |
-| Direct @ObservedObject in LiveCaptureView | Immediate photo list updates |
-| Local @State for alerts | Simpler, no cleanup needed |
-| RAW file filtering | Only transfer JPEGs (faster, practical) |
-| @MainActor protocol delegate | Safe UI updates from callbacks |
-| CameraEventSource protocol | Multi-vendor support (Canon/Nikon/Sony) |
-| PhotoOperationsProvider protocol | Decouples event detection from download |
+| Decision                                  | Rationale                               |
+| ----------------------------------------- | --------------------------------------- |
+| Session prepared during scan              | Instant connection when user selects    |
+| Separate stopScan() from disconnect       | No accidental disconnects from timeout  |
+| Cancellation-safe with COMMIT POINT       | Valuable sessions preserved             |
+| Adaptive polling (50-200ms)               | Fast response, battery-efficient idle   |
+| Direct @ObservedObject in LiveCaptureView | Immediate photo list updates            |
+| Local @State for alerts                   | Simpler, no cleanup needed              |
+| RAW file filtering                        | Only transfer JPEGs (faster, practical) |
+| @MainActor protocol delegate              | Safe UI updates from callbacks          |
+| CameraEventSource protocol                | Multi-vendor support (Canon/Nikon/Sony) |
+| PhotoOperationsProvider protocol          | Decouples event detection from download |
