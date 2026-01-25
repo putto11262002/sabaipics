@@ -5,7 +5,7 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "@sabaipics/ui/components/card";
+} from "@sabaipics/uiv2/components/card";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import type { Event } from "../../hooks/events/useEvents";
 
@@ -49,11 +49,6 @@ export function EventCard({ event, onClick }: EventCardProps) {
         )}
         <div className="text-muted-foreground">
           Expires {formatDistanceToNow(parseISO(event.expiresAt))} from now
-        </div>
-        <div className="flex gap-3 text-sm">
-          <span className="text-muted-foreground">
-            Access Code: <span className="font-mono font-semibold text-foreground">{event.accessCode}</span>
-          </span>
         </div>
       </CardFooter>
     </Card>

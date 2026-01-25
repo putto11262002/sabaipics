@@ -1,0 +1,40 @@
+# Dependencies (rebuilt in Docker)
+node_modules
+
+# Git
+.git
+.gitignore
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Build outputs
+dist
+*.tsbuildinfo
+
+# Tests
+tests
+*.test.ts
+*.spec.ts
+coverage
+
+# Logs
+*.log
+log/
+
+# Documentation
+*.md
+!README.md
+
+# Scripts (not needed at runtime)
+scripts/
+
+# NOTE: models/ is NOT ignored - we COPY them into the image

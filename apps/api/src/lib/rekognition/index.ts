@@ -35,6 +35,8 @@ export type {
   UnindexedFace,
   SimilarFace,
   PhotoIndexed,
+  PhotoMatch,
+  FindImagesByFaceResponse,
 
   // Raw provider responses (for training data)
   AWSRawFaceRecord,
@@ -44,6 +46,7 @@ export type {
   // Request types
   IndexPhotoRequest,
   FindSimilarRequest,
+  FindImagesByFaceRequest,
 
   // Error types
   FaceServiceError,

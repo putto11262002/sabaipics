@@ -11,17 +11,25 @@
  * Environment:
  *   MODELS_PATH - Target directory (default: ./models)
  *   R2_MODELS_URL - R2 public URL (default: production URL)
+ *   SKIP_MODEL_DOWNLOAD - Set to "1" to skip download (for CI/CD, Docker builds)
  */
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Skip download if flag is set (useful for CI/CD, Docker builds, non-ML devs)
+if (process.env.SKIP_MODEL_DOWNLOAD === '1') {
+  console.log('[models] SKIP_MODEL_DOWNLOAD=1, skipping model download');
+  process.exit(0);
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MODELS_DIR = path.join(__dirname, '../models');
 
 // R2 public URL for face models
-const R2_PUBLIC_URL = process.env.R2_MODELS_URL || 'https://pub-9b5b2bc0a9bc4b03bbbd97fdd1168fed.r2.dev';
+const R2_PUBLIC_URL =
+  process.env.R2_MODELS_URL || 'https://pub-9b5b2bc0a9bc4b03bbbd97fdd1168fed.r2.dev';
 
 // All model files required
 const MODEL_FILES = [

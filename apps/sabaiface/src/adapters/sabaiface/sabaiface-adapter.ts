@@ -26,10 +26,7 @@ import { pixelBoxToRatio } from '../../core/face-detector';
 import { distanceToSimilarity, similarityToDistance } from '../../core/vector-store';
 import { ResultAsync, Result, ok, err } from 'neverthrow';
 import type { FaceServiceError } from '../../domain/errors';
-import {
-  sabaifaceProviderFailed,
-  databaseError,
-} from '../../domain/errors';
+import { sabaifaceProviderFailed, databaseError } from '../../domain/errors';
 
 // =============================================================================
 // SabaiFace Raw Response Types
@@ -71,7 +68,7 @@ export class SabaiFaceAdapter implements FaceService {
   constructor(
     private faceDetector: FaceDetector,
     private vectorStore: VectorStore,
-    private db: InternalDatabase
+    private db: InternalDatabase,
   ) {}
 
   /**
@@ -90,7 +87,7 @@ export class SabaiFaceAdapter implements FaceService {
     // Wrap face detection in ResultAsync
     const detectResult = await ResultAsync.fromPromise(
       this.faceDetector.detectFaces(params.imageData),
-      (cause) => sabaifaceProviderFailed(cause)
+      (cause) => sabaifaceProviderFailed(cause),
     );
 
     if (detectResult.isErr()) {
@@ -108,36 +105,82 @@ export class SabaiFaceAdapter implements FaceService {
       });
     }
 
-    // Get image dimensions from first detection (assuming all from same image)
-    // We need this to convert pixel coordinates to ratios
-    const imageWidth = detections[0].boundingBox.x + detections[0].boundingBox.width;
-    const imageHeight = detections[0].boundingBox.y + detections[0].boundingBox.height;
+    const options = params.options;
+    const maxFaces = options?.maxFaces;
+    const minConfidence = options?.minConfidence ?? 0.5;
+    const qualityFilter = options?.qualityFilter ?? 'auto';
+
+    // Use real image dimensions from FaceDetector if available.
+    const imageWidth = detections[0].imageWidth;
+    const imageHeight = detections[0].imageHeight;
+
+    if (!imageWidth || !imageHeight) {
+      return err(
+        sabaifaceProviderFailed(new Error('FaceDetector did not provide image dimensions')),
+      );
+    }
+
+    // Apply indexing filters (these were previously ignored).
+    // - minConfidence helps reduce noisy/incorrect faces getting indexed.
+    // - maxFaces caps the amount of background faces in group shots.
+    // - qualityFilter AUTO enforces a minimum face size (tunable via env).
+    //
+    // FACE_MIN_AREA_RATIO_AUTO: Minimum face area as ratio of image area.
+    // Used when INDEX_QUALITY_FILTER='auto' to filter out small background faces.
+    // Default 0.0025 = 0.25% of image area (e.g., 50x50 in a 2000x2000 image).
+    const minFaceAreaRatioAuto = parseFloat(process.env.FACE_MIN_AREA_RATIO_AUTO || '0.0025');
+
+    let filteredDetections = detections
+      .filter((d) => d.confidence >= minConfidence)
+      .filter((d) => {
+        if (qualityFilter === 'none') return true;
+        const area = d.boundingBox.width * d.boundingBox.height;
+        const imageArea = imageWidth * imageHeight;
+        if (imageArea <= 0) return true;
+        const ratio = area / imageArea;
+        return ratio >= minFaceAreaRatioAuto;
+      })
+      .sort((a, b) => b.confidence - a.confidence);
+
+    if (typeof maxFaces === 'number') {
+      filteredDetections = filteredDetections.slice(0, Math.max(0, maxFaces));
+    }
+
+    if (filteredDetections.length === 0) {
+      return ok({
+        faces: [],
+        unindexedFaces: [
+          {
+            reasons: ['LOW_QUALITY'],
+          },
+        ],
+        provider: 'sabaiface',
+      });
+    }
 
     // 2. Convert detections to domain Face objects
-    const facesData: Array<{ face: Face; detection: DetectedFace }> = detections.map((det) => {
-      const faceId = crypto.randomUUID();
-      const boundingBox = pixelBoxToRatio(
-        det.boundingBox,
-        imageWidth,
-        imageHeight
-      );
+    const facesData: Array<{ face: Face; detection: DetectedFace }> = filteredDetections.map(
+      (det) => {
+        const faceId = crypto.randomUUID();
+        const boundingBox = pixelBoxToRatio(det.boundingBox, imageWidth, imageHeight);
 
-      const face: Face = {
-        faceId,
-        boundingBox,
-        confidence: det.confidence,
-        externalImageId: params.photoId,
-        attributes: {
-          age: det.age ? { low: det.age - 5, high: det.age + 5 } : undefined,
-          gender: det.gender
-            ? { value: det.gender, confidence: det.genderConfidence ?? 0 }
-            : undefined,
-        },
-        provider: 'sabaiface',
-      };
+        const face: Face = {
+          faceId,
+          boundingBox,
+          confidence: det.confidence,
+          externalImageId: params.photoId,
+          attributes: {
+            age: det.age ? { low: det.age - 5, high: det.age + 5 } : undefined,
+            gender: det.gender
+              ? { value: det.gender, confidence: det.genderConfidence ?? 0 }
+              : undefined,
+          },
+          provider: 'sabaiface',
+        };
 
-      return { face, detection: det };
-    });
+        return { face, detection: det };
+      },
+    );
 
     // 3. Store in database (faces table)
     // NOTE: We insert directly here instead of using vectorStore.addFaces()
@@ -167,7 +210,7 @@ export class SabaiFaceAdapter implements FaceService {
     // Wrap DB insert in ResultAsync
     const insertResult = await ResultAsync.fromPromise(
       this.db.insert(faces).values(rowsToInsert),
-      (cause) => databaseError('insert_faces', cause)
+      (cause) => databaseError('insert_faces', cause),
     );
 
     if (insertResult.isErr()) {
@@ -192,11 +235,13 @@ export class SabaiFaceAdapter implements FaceService {
    *
    * All operations wrapped in ResultAsync for error handling.
    */
-  async findSimilarFaces(params: FindSimilarParams): Promise<Result<SimilarFace[], FaceServiceError>> {
+  async findSimilarFaces(
+    params: FindSimilarParams,
+  ): Promise<Result<SimilarFace[], FaceServiceError>> {
     // Wrap face detection in ResultAsync
     const detectResult = await ResultAsync.fromPromise(
       this.faceDetector.detectFaces(params.imageData),
-      (cause) => sabaifaceProviderFailed(cause)
+      (cause) => sabaifaceProviderFailed(cause),
     );
 
     if (detectResult.isErr()) {
@@ -214,15 +259,17 @@ export class SabaiFaceAdapter implements FaceService {
     const queryDescriptor = detections[0].descriptor;
 
     // 3. Search using PostgresVectorStore with pgvector
-    const threshold = similarityToDistance(params.minSimilarity ?? 0.8);
+    // NOTE: Domain minSimilarity is 0-1, but similarityToDistance expects 0-100.
+    const minSimilarity = params.minSimilarity ?? 0.8;
+    const threshold = similarityToDistance(minSimilarity * 100);
     const matchesResult = await ResultAsync.fromPromise(
       this.vectorStore.searchFaces(
         params.eventId,
         queryDescriptor,
         params.maxResults ?? 10,
-        threshold
+        threshold,
       ),
-      (cause) => sabaifaceProviderFailed(cause)
+      (cause) => sabaifaceProviderFailed(cause),
     );
 
     if (matchesResult.isErr()) {
@@ -240,12 +287,9 @@ export class SabaiFaceAdapter implements FaceService {
     const faceIds = matches.map((m) => m.faceId);
     const faceRowsResult = await ResultAsync.fromPromise(
       this.db.query.faces.findMany({
-        where: and(
-          eq(faces.provider, 'sabaiface'),
-          inArray(faces.id, faceIds)
-        ),
+        where: and(eq(faces.provider, 'sabaiface'), inArray(faces.id, faceIds)),
       }),
-      (cause) => databaseError('find_faces', cause)
+      (cause) => databaseError('find_faces', cause),
     );
 
     if (faceRowsResult.isErr()) {
@@ -279,7 +323,7 @@ export class SabaiFaceAdapter implements FaceService {
     }
 
     console.log(
-      `[SabaiFace] Found ${similarFaces.length} similar faces (threshold: ${params.minSimilarity ?? 0.8})`
+      `[SabaiFace] Found ${similarFaces.length} similar faces (threshold: ${params.minSimilarity ?? 0.8})`,
     );
 
     return ok(similarFaces);
@@ -294,7 +338,7 @@ export class SabaiFaceAdapter implements FaceService {
     // Wrap vector store delete in ResultAsync
     const vectorDeleteResult = await ResultAsync.fromPromise(
       this.vectorStore.deleteFaces(eventId, faceIds),
-      (cause) => sabaifaceProviderFailed(cause)
+      (cause) => sabaifaceProviderFailed(cause),
     );
 
     if (vectorDeleteResult.isErr()) {
@@ -303,15 +347,8 @@ export class SabaiFaceAdapter implements FaceService {
 
     // Delete from database
     const dbDeleteResult = await ResultAsync.fromPromise(
-      this.db
-        .delete(faces)
-        .where(
-          and(
-            eq(faces.provider, 'sabaiface'),
-            inArray(faces.id, faceIds)
-          )
-        ),
-      (cause) => databaseError('delete_faces', cause)
+      this.db.delete(faces).where(and(eq(faces.provider, 'sabaiface'), inArray(faces.id, faceIds))),
+      (cause) => databaseError('delete_faces', cause),
     );
 
     if (dbDeleteResult.isErr()) {
@@ -330,7 +367,7 @@ export class SabaiFaceAdapter implements FaceService {
   async deleteCollection(eventId: string): Promise<Result<void, FaceServiceError>> {
     const result = await ResultAsync.fromPromise(
       this.vectorStore.deleteCollection(eventId),
-      (cause) => sabaifaceProviderFailed(cause)
+      (cause) => sabaifaceProviderFailed(cause),
     );
 
     if (result.isErr()) {
@@ -349,7 +386,7 @@ export class SabaiFaceAdapter implements FaceService {
   async createCollection(eventId: string): Promise<Result<string, FaceServiceError>> {
     const result = await ResultAsync.fromPromise(
       this.vectorStore.createCollection(eventId),
-      (cause) => sabaifaceProviderFailed(cause)
+      (cause) => sabaifaceProviderFailed(cause),
     );
 
     if (result.isErr()) {
@@ -369,7 +406,7 @@ export class SabaiFaceAdapter implements FaceService {
    */
   private buildRawResponse(
     detections: DetectedFace[],
-    processingTimeMs: number
+    processingTimeMs: number,
   ): SabaiFaceRawResponse {
     return {
       provider: 'sabaiface',

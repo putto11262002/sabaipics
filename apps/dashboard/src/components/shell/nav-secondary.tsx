@@ -8,7 +8,7 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
-} from "@sabaipics/ui/components/sidebar";
+} from "@sabaipics/uiv2/components/sidebar";
 
 export function NavSecondary({
 	items,

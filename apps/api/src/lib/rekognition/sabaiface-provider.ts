@@ -18,6 +18,9 @@ import { ResultAsync, err, ok, safeTry } from 'neverthrow';
 import type {
   IndexPhotoRequest,
   FindSimilarRequest,
+  FindImagesByFaceRequest,
+  FindImagesByFaceResponse,
+  PhotoMatch,
   PhotoIndexed,
   SimilarFace,
   Face,
@@ -223,6 +226,41 @@ function transformSearchResponse(data: any): SimilarFace[] {
   );
 }
 
+function transformImageSearchResponse(data: any): FindImagesByFaceResponse {
+  // Aggregate face matches by externalImageId (our photoId)
+  const photoMap = new Map<string, PhotoMatch>();
+
+  data.FaceMatches?.forEach((m: any) => {
+    const photoId = m.Face?.ExternalImageId;
+    if (!photoId) return;
+
+    const similarity = normalizeConfidence(m.Similarity);
+
+    const existing = photoMap.get(photoId);
+    if (existing) {
+      // Keep highest similarity score
+      if (similarity > existing.similarity) {
+        existing.similarity = similarity;
+      }
+      // Increment face count
+      existing.faceCount = (existing.faceCount ?? 1) + 1;
+    } else {
+      // New photo match
+      photoMap.set(photoId, {
+        photoId,
+        similarity,
+        faceCount: 1,
+      });
+    }
+  });
+
+  return {
+    photos: Array.from(photoMap.values()),
+    totalMatchedFaces: data.FaceMatches?.length || 0,
+    provider: 'sabaiface',
+  };
+}
+
 // =============================================================================
 // Encoding Helpers
 // =============================================================================
@@ -319,6 +357,46 @@ export function createSabaiFaceProvider(config: SabaiFaceProviderConfig): FaceRe
       return ok(transformSearchResponse(data));
     });
 
+  const findImagesByFace = (request: FindImagesByFaceRequest): ResultAsync<FindImagesByFaceResponse, FaceServiceError> =>
+    safeTry(async function* () {
+      const url = `${endpoint}/collections/${request.eventId}/search-faces-by-image`;
+      const base64Image = arrayBufferToBase64(request.imageData);
+
+      // Use multiplier for aggregation: request more faces to get more unique photos
+      const maxFacesMultiplier = 3;
+      const maxFaces = (request.maxResults ?? 10) * maxFacesMultiplier;
+
+      const response = yield* ResultAsync.fromPromise(
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            Image: { Bytes: base64Image },
+            MaxFaces: maxFaces,
+            FaceMatchThreshold: (request.minSimilarity ?? 0.8) * 100,
+          }),
+        }),
+        networkErrorToFaceServiceError,
+      ).safeUnwrap();
+
+      if (!response.ok) {
+        let errorBody: HTTPErrorResponse = { message: response.statusText };
+        try {
+          errorBody = await response.json();
+        } catch {
+          // Use default error if JSON parsing fails
+        }
+        return err(httpErrorToFaceServiceError(response.status, errorBody));
+      }
+
+      const data = yield* ResultAsync.fromPromise(
+        response.json() as Promise<any>,
+        jsonParseErrorToFaceServiceError,
+      ).safeUnwrap();
+
+      return ok(transformImageSearchResponse(data));
+    });
+
   const deleteFaces = (eventId: string, faceIds: string[]): ResultAsync<void, FaceServiceError> =>
     safeTry(async function* () {
       const params = new URLSearchParams();
@@ -398,6 +476,7 @@ export function createSabaiFaceProvider(config: SabaiFaceProviderConfig): FaceRe
   return {
     indexPhoto,
     findSimilarFaces,
+    findImagesByFace,
     deleteFaces,
     deleteCollection,
     createCollection,

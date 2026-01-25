@@ -21,20 +21,13 @@ export function usePhotos({
         throw new Error('eventId is required');
       }
 
-      const res = await listPhotos(
-        {
-          param: { eventId },
-          json: {
-            ...(pageParam ? { cursor: pageParam } : {}),
-            ...(status ? { status } : {}),
-          },
+      const res = await listPhotos({
+        param: { eventId },
+        json: {
+          ...(pageParam ? { cursor: pageParam } : {}),
+          ...(status ? { status } : {}),
         },
-        {
-          init: {
-            credentials: 'include',
-          },
-        },
-      );
+      });
 
       if (!res.ok) {
         throw new Error(`Failed to fetch photos: ${res.status}`);
@@ -49,9 +42,7 @@ export function usePhotos({
         : undefined;
     },
     enabled: !!eventId,
-    refetchOnWindowFocus: !import.meta.env.DEV, // Disable refetch on window focus in dev
-    refetchOnMount: false, // Don't refetch on mount if data exists
-    refetchInterval: 1000 * 60, // 1 min
-    staleTime: 30 * 1000, // 30 seconds - show stale data while refetching
+    refetchOnWindowFocus: false,
+    refetchOnMount: 'always', // Always refetch on mount to get fresh data
   });
 }

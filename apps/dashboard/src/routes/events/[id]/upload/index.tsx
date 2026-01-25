@@ -7,50 +7,48 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sabaipics/ui/components/alert-dialog';
+} from '@sabaipics/uiv2/components/alert-dialog';
 import { parseISO, differenceInDays } from 'date-fns';
 import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
 import { useParams } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
 import { PhotoUploadZone } from './_components/PhotoUploadZone';
 import { UploadLog } from './_components/UploadLog';
 import { useUploadQueue } from './_components/useUploadQueue';
 import { useEvent } from '../../../../hooks/events/useEvent';
+import { Spinner } from '@sabaipics/uiv2/components/spinner';
 
 export default function EventUploadTab() {
   const { id } = useParams<{ id: string }>();
-  const { data } = useEvent(id);
-  const queryClient = useQueryClient();
+  const { data, isLoading, error } = useEvent(id);
 
-  if (!data?.data) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (error || !data?.data) {
     return null;
   }
 
-  const event = data.data;
+  return <EventUploadTabContent event={data.data} />;
+}
 
+function EventUploadTabContent({ event }: { event: { id: string; expiresAt: string } }) {
   const daysUntilExpiry = differenceInDays(parseISO(event.expiresAt), new Date());
   const isExpired = daysUntilExpiry <= 0;
 
-  const {
-    addFiles,
-    uploadingItems,
-  } = useUploadQueue(event.id);
-
-  // Expose queryClient for useUploadQueue to use
-  useEffect(() => {
-    (window as any).__queryClient = queryClient;
-    return () => {
-      delete (window as any).__queryClient;
-    };
-  }, [queryClient]);
+  const { addFiles, uploadingItems, uploadLogEntries } = useUploadQueue(event.id);
 
   // Block navigation if uploads are in progress
   const hasActiveUploads = uploadingItems.length > 0;
 
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      hasActiveUploads && currentLocation.pathname !== nextLocation.pathname
+      hasActiveUploads && currentLocation.pathname !== nextLocation.pathname,
   );
 
   // Browser navigation guard (back button, close tab, refresh)
@@ -74,16 +72,13 @@ export default function EventUploadTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>Upload in Progress</AlertDialogTitle>
             <AlertDialogDescription>
-              You have {uploadingItems.length} photo(s) uploading. If you leave now, the uploads will be cancelled and you'll lose progress.
+              You have {uploadingItems.length} photo(s) uploading. If you leave now, the uploads
+              will be cancelled and you'll lose progress.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => blocker.reset()}>
-              Stay
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={() => blocker.proceed()}>
-              Leave
-            </AlertDialogAction>
+            <AlertDialogCancel onClick={() => blocker.reset()}>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={() => blocker.proceed()}>Leave</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -91,19 +86,12 @@ export default function EventUploadTab() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Upload Photos</h3>
-
-        {/* Upload dropzone */}
-        <PhotoUploadZone
-          onFilesSelected={addFiles}
-          disabled={isExpired}
-        />
-      </div>
+    <div className="space-y-6 py-4">
+      {/* Upload dropzone */}
+      <PhotoUploadZone onFilesSelected={addFiles} disabled={isExpired} />
 
       {/* Upload log - shows photos currently uploading, indexing, or failed */}
-      <UploadLog eventId={event.id} />
+      <UploadLog entries={uploadLogEntries} />
     </div>
   );
 }

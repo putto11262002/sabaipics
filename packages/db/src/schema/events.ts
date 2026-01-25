@@ -15,7 +15,6 @@ export const events = pgTable(
     name: text("name").notNull(),
     startDate: timestamptz("start_date"),
     endDate: timestamptz("end_date"),
-    accessCode: text("access_code").notNull().unique(), // 6-char code for QR
     qrCodeR2Key: text("qr_code_r2_key"), // R2 key for generated QR PNG
     rekognitionCollectionId: text("rekognition_collection_id"), // Nullable, created on first upload
     expiresAt: timestamptz("expires_at").notNull(),
@@ -23,7 +22,6 @@ export const events = pgTable(
   },
   (table) => [
     index("events_photographer_id_idx").on(table.photographerId),
-    index("events_access_code_idx").on(table.accessCode),
   ]
 );
 

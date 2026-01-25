@@ -50,7 +50,6 @@ const mockEvent = {
   name: "Test Event",
   startDate: null,
   endDate: null,
-  accessCode: "ABC123",
   qrCodeR2Key: "qr/ABC123.png",
   rekognitionCollectionId: null,
   expiresAt: "2026-02-10T00:00:00Z",
@@ -257,18 +256,8 @@ describe("POST /events - Success", () => {
     const body = await res.json();
     if ("data" in body) {
       expect(body.data.name).toBe("Test Event");
-      expect(body.data.accessCode).toMatch(/^[A-Z0-9]{6}$/);
-      expect(body.data.qrCodeUrl).toBeTruthy();
+      expect(body.data.qrCodeUrl).toBeNull();
       expect(body.data.rekognitionCollectionId).toBeNull();
-      expect(mockBucket.put).toHaveBeenCalledWith(
-        expect.stringMatching(/^qr\/[A-Z0-9]{6}\.png$/),
-        expect.any(Uint8Array),
-        expect.objectContaining({
-          httpMetadata: expect.objectContaining({
-            contentType: "image/png",
-          }),
-        })
-      );
     } else {
       throw new Error("Expected data response");
     }
@@ -560,7 +549,7 @@ describe("GET /events/:id", () => {
     if ("data" in body) {
       expect(body.data.id).toBe(MOCK_EVENT_ID);
       expect(body.data.name).toBe("Test Event");
-      expect(body.data.qrCodeUrl).toBeTruthy();
+      expect(body.data.qrCodeUrl).toBeNull();
     } else {
       throw new Error("Expected data response");
     }

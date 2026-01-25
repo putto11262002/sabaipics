@@ -1,82 +1,54 @@
-import { AspectRatio } from "@sabaipics/ui/components/aspect-ratio";
-import { Badge } from "@sabaipics/ui/components/badge";
-import { Skeleton } from "@sabaipics/ui/components/skeleton";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@sabaipics/ui/components/empty";
-import { Check, Image as ImageIcon } from "lucide-react";
-import type { Photo } from "../../hooks/photos/usePhotos";
-import { useState, useEffect, useRef } from "react";
-import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
-import { toast } from "sonner";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from '@sabaipics/uiv2/components/empty';
+import { Check, Image as ImageIcon } from 'lucide-react';
+import type { Photo } from '../../hooks/photos/usePhotos';
+import { useState, useMemo } from 'react';
 
-const MAX_SELECTION = 15;
+import Lightbox from 'yet-another-react-lightbox';
+import 'yet-another-react-lightbox/styles.css';
+
+// import optional lightbox plugins
+import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
+import Slideshow from 'yet-another-react-lightbox/plugins/slideshow';
+// import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
+import Zoom from 'yet-another-react-lightbox/plugins/zoom';
+import 'yet-another-react-lightbox/plugins/thumbnails.css';
+
+import { RowsPhotoAlbum } from 'react-photo-album';
+import 'react-photo-album/rows.css';
 
 interface PhotosGridViewProps {
   photos: Photo[];
-  isLoading: boolean;
-  onPhotoClick: (index: number) => void;
-  onSelectionChange?: (photoIds: string[]) => void;
-  isSelectionMode?: boolean;
+  onPhotoSelected: (id: string) => void;
+  selectedPhotoIds: string[];
+  isSelelectable: boolean;
 }
 
 export function PhotosGridView({
-  photos,
-  isLoading,
-  onPhotoClick,
-  onSelectionChange,
-  isSelectionMode = false
+  photos: _photos,
+  onPhotoSelected,
+  selectedPhotoIds,
+  isSelelectable,
 }: PhotosGridViewProps) {
-  const [rowSelection, setRowSelection] = useState({});
-  const previousPhotoIdsRef = useRef<string[]>([]);
+  const [index, setIndex] = useState(-1);
 
-  const table = useReactTable({
-    data: photos,
-    columns: [],
-    state: { rowSelection },
-    enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: (_, index) => String(index),
-    enableMultiRowSelection: true,
-  });
-
-  // Notify parent of selection changes (only when actually changed)
-  useEffect(() => {
-    const selectedRows = table.getFilteredSelectedRowModel().rows;
-    const photoIds = selectedRows.map((row) => photos[parseInt(row.id)].id);
-
-    // Only notify if the actual photo IDs changed
-    const prevIds = previousPhotoIdsRef.current;
-    const hasChanged = photoIds.length !== prevIds.length ||
-      photoIds.some((id, i) => prevIds[i] !== id);
-
-    if (hasChanged) {
-      previousPhotoIdsRef.current = photoIds;
-      onSelectionChange?.(photoIds);
-    }
-  }, [rowSelection, photos, onSelectionChange]);
-
-  const handleToggleRowSelection = (rowId: string, value: boolean) => {
-    const row = table.getRow(rowId);
-    const currentSelectionCount = table.getFilteredSelectedRowModel().rows.length;
-    const isCurrentlySelected = row.getIsSelected();
-
-    if (value && !isCurrentlySelected && currentSelectionCount >= MAX_SELECTION) {
-      toast.error(`Maximum ${MAX_SELECTION} photos can be selected`);
-      return;
-    }
-    row.toggleSelected(!!value);
-  };
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-square w-full" />
-        ))}
-      </div>
-    );
-  }
+  const photos = useMemo(
+    () =>
+      _photos
+        ? _photos.map((photo) => ({
+            src: photo.thumbnailUrl,
+            height: photo.height ?? 1,
+            width: photo.width ?? 1,
+            key: photo.id,
+          }))
+        : [],
+    [_photos],
+  );
 
   // Empty state
   if (photos.length === 0) {
@@ -84,7 +56,7 @@ export function PhotosGridView({
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">
-            <ImageIcon className="size-12" />
+            <ImageIcon className="size-6" />
           </EmptyMedia>
           <EmptyTitle>No photos uploaded yet</EmptyTitle>
           <EmptyDescription>
@@ -94,85 +66,55 @@ export function PhotosGridView({
       </Empty>
     );
   }
-
-  // Grid view with photos
   return (
     <>
-      {/* Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-        {photos.map((photo, index) => {
-          const row = table.getRow(String(index));
-          const isSelected = row.getIsSelected();
+      <Lightbox
+        slides={photos}
+        open={index >= 0}
+        index={index}
+        close={() => setIndex(-1)}
+        // enable optional lightbox plugins
+        plugins={[Fullscreen, Slideshow, Zoom]}
+      />
+      <RowsPhotoAlbum
+        photos={photos}
+        onClick={(event) => {
+          if (!isSelelectable) {
+            setIndex(event.index);
+            return;
+          }
 
-          const handlePhotoClick = () => {
-            if (isSelectionMode) {
-              handleToggleRowSelection(String(index), !isSelected);
-            } else {
-              onPhotoClick(index);
+          if (!event.photo.key) {
+            return;
+          }
+
+          onPhotoSelected(event.photo.key);
+        }}
+        render={{
+          container: (props) => {
+            const { ref, ...rest } = props;
+            return <div className="bg-muted" ref={ref} {...rest} />;
+          },
+          extras: (_unused, context) => {
+            if (!context.photo.key) {
+              return null;
             }
-          };
 
-          return (
-            <div
-              key={photo.id}
-              className={`relative group cursor-pointer ${isSelected ? 'ring-2 ring-primary' : ''}`}
-              onClick={handlePhotoClick}
-            >
-              {/* Selected overlay */}
-              {isSelected && (
+            const isSelected = selectedPhotoIds.includes(context.photo.key);
+            if (isSelected) {
+              return (
                 <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center">
-                  <div className="bg-primary rounded-full p-2">
-                    <Check className="size-6 text-primary-foreground" />
+                  <div className="bg-muted rounded-md border border-2 p-2">
+                    <Check className="size-4 text-foreground" />
                   </div>
                 </div>
-              )}
+              );
+            }
 
-              {/* Photo display */}
-              <div>
-                <AspectRatio ratio={1} className="overflow-hidden">
-                  <img
-                    src={photo.thumbnailUrl}
-                    alt=""
-                    className={`object-cover w-full h-full transition-transform ${isSelectionMode ? '' : 'group-hover:scale-105'}`}
-                    loading="lazy"
-                    decoding="async"
-                    fetchPriority={index < 4 ? 'high' : 'auto'}
-                  />
-                </AspectRatio>
-
-                {/* Status and face count badges */}
-                {!isSelectionMode && (
-                  <>
-                    {/* Status badge (for non-indexed photos) */}
-                    {photo.status === 'uploading' && (
-                      <Badge variant="secondary" className="absolute top-2 right-2">
-                        Uploading
-                      </Badge>
-                    )}
-                    {photo.status === 'indexing' && (
-                      <Badge variant="secondary" className="absolute top-2 right-2">
-                        Indexing
-                      </Badge>
-                    )}
-                    {photo.status === 'failed' && (
-                      <Badge variant="destructive" className="absolute top-2 right-2">
-                        Failed
-                      </Badge>
-                    )}
-
-                    {/* Face count badge (only for indexed photos on hover) */}
-                    {photo.status === 'indexed' && (
-                      <Badge className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {photo.faceCount} {photo.faceCount === 1 ? "face" : "faces"}
-                      </Badge>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            return null;
+          },
+        }}
+      />
     </>
   );
 }

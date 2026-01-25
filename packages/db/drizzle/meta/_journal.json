@@ -64,6 +64,34 @@
       "when": 1768224372290,
       "tag": "0008_narrow_payback",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1768968129206,
+      "tag": "0009_good_green_goblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1769003991634,
+      "tag": "0010_military_nuke",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1769015754999,
+      "tag": "0011_common_green_goblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1769101526171,
+      "tag": "0012_misty_sway",
+      "breakpoints": true
     }
   ]
 }

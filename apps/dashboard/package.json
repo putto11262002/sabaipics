@@ -12,14 +12,15 @@
     "preview": "vite preview",
     "check-types": "tsc --noEmit",
     "deploy:staging": "pnpm build:staging && wrangler pages deploy dist --project-name=dashboard --branch=staging",
-    "deploy:prod": "pnpm build:prod && wrangler pages deploy dist --project-name=dashboard --branch=main"
+    "deploy:prod": "pnpm build:prod && wrangler pages deploy dist --project-name=dashboard --branch=main",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-slot": "^1.2.4",
     "@sabaipics/api": "workspace:*",
     "@sabaipics/auth": "workspace:*",
-    "@sabaipics/ui": "workspace:*",
+    "@sabaipics/uiv2": "workspace:*",
     "@tanstack/react-query": "^5.90.12",
     "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
@@ -30,6 +31,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.70.0",
+    "react-photo-album": "^3.4.0",
     "react-qr-code": "^2.0.18",
     "react-router": "^7.10.1",
     "recharts": "2.15.4",

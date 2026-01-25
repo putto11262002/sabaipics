@@ -1,7 +1,7 @@
 import { AlertCircle, ArrowLeft, Check, CreditCard, RefreshCw } from "lucide-react";
 import { Link } from "react-router";
-import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
-import { Button } from "@sabaipics/ui/components/button";
+import { Alert, AlertDescription, AlertTitle } from "@sabaipics/uiv2/components/alert";
+import { Button } from "@sabaipics/uiv2/components/button";
 import {
   Card,
   CardContent,
@@ -9,10 +9,10 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@sabaipics/ui/components/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@sabaipics/ui/components/empty";
-import { Skeleton } from "@sabaipics/ui/components/skeleton";
-import { Spinner } from "@sabaipics/ui/components/spinner";
+} from "@sabaipics/uiv2/components/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@sabaipics/uiv2/components/empty";
+import { Skeleton } from "@sabaipics/uiv2/components/skeleton";
+import { Spinner } from "@sabaipics/uiv2/components/spinner";
 import { useCreditPackages } from "../../../hooks/credits/useCreditPackages";
 import { usePurchaseCheckout } from "../../../hooks/credits/usePurchaseCheckout";
 import { useState } from "react";

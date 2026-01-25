@@ -6,7 +6,7 @@ import {
   ArrowLeft,
   LayoutDashboard,
 } from "lucide-react";
-import { Button } from "@sabaipics/ui/components/button";
+import { Button } from "@sabaipics/uiv2/components/button";
 import {
   Empty,
   EmptyContent,
@@ -14,13 +14,13 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@sabaipics/ui/components/empty";
+} from "@sabaipics/uiv2/components/empty";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
-} from "@sabaipics/ui/components/alert";
-import { Spinner } from "@sabaipics/ui/components/spinner";
+} from "@sabaipics/uiv2/components/alert";
+import { Spinner } from "@sabaipics/uiv2/components/spinner";
 import { useApiClient } from "../../../lib/api";
 
 interface PurchaseStatusResponse {
