@@ -64,14 +64,14 @@ struct CameraDiscoveryView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(content: toolbarContent)
         .onAppear {
-            print("[CameraDiscoveryView] 🔍 View appeared, starting scan")
+            print("[CameraDiscoveryView] View appeared, starting scan")
             startScanWithTimeout()
         }
         .onDisappear {
             timeoutTask?.cancel()
         }
         .onChange(of: scanner.discoveredCameras) { newCameras in
-            print("[CameraDiscoveryView] 📸 Cameras updated: \(newCameras.count) found")
+            print("[CameraDiscoveryView] Cameras updated: \(newCameras.count) found")
             coordinator.updateDiscoveredCameras(newCameras)
         }
         .customConfirmationDialog(
@@ -137,7 +137,7 @@ struct CameraDiscoveryView: View {
 
             // Rescan button
             Button(action: {
-                print("[CameraDiscoveryView] 🔍 Rescan tapped")
+                print("[CameraDiscoveryView] Rescan tapped")
                 startScanWithTimeout()
             }) {
                 HStack(spacing: 4) {
@@ -237,7 +237,7 @@ struct CameraDiscoveryView: View {
 
             // Try again button
             Button(action: {
-                print("[CameraDiscoveryView] 🔍 Try Again tapped")
+                print("[CameraDiscoveryView] Try Again tapped")
                 startScanWithTimeout()
             }) {
                 Text("Try Again")
@@ -258,7 +258,7 @@ struct CameraDiscoveryView: View {
 
     private var footerView: some View {
         Button(action: {
-            print("[CameraDiscoveryView] 📝 Enter IP Manually tapped")
+            print("[CameraDiscoveryView] Enter IP Manually tapped")
             // Cancel timeout and stop scan before navigating
             timeoutTask?.cancel()
             scanner.stopScan()
@@ -272,47 +272,23 @@ struct CameraDiscoveryView: View {
 
     // MARK: - Actions
 
-    /// Start scan with 30-second timeout
+    /// Start scan (no timeout - scanner completes naturally after all waves)
+    /// User can cancel manually via Back button or by selecting a camera
     private func startScanWithTimeout() {
-        print("[CameraDiscoveryView] 🔍 startScanWithTimeout()")
+        print("[CameraDiscoveryView] Starting scan (no timeout, waves will complete naturally)")
 
-        // Cancel any existing timeout
+        // Cancel any existing timeout task (legacy, kept for safety)
         timeoutTask?.cancel()
 
-        // Start scanning
+        // Start scanning - scanner will complete after all waves (max ~15s)
+        // User can cancel anytime via Back button
         scanner.startScan()
-
-        // Start timeout timer (30 seconds)
-        timeoutTask = Task {
-            do {
-                try await Task.sleep(nanoseconds: 30_000_000_000)
-            } catch {
-                // Task was cancelled - do NOT proceed
-                print("[CameraDiscoveryView] ⏹ Timeout cancelled")
-                return
-            }
-
-            // Only proceed if not cancelled
-            guard !Task.isCancelled else {
-                print("[CameraDiscoveryView] ⏹ Timeout task was cancelled")
-                return
-            }
-
-            // If still scanning after 30s, stop scan (just cancels tasks, no disconnect)
-            await MainActor.run {
-                if case .scanning = scanner.state {
-                    print("[CameraDiscoveryView] ⏰ 30s timeout - stopping scan")
-                    scanner.stopScan()
-                    // stopScan() already sets state to .completed
-                }
-            }
-        }
     }
 
     /// Handle camera selection
     /// Flow: Cancel timeout -> Stop scan -> Extract session -> Disconnect others -> Proceed
     private func selectCamera(_ camera: DiscoveredCamera) {
-        print("[CameraDiscoveryView] 📸 selectCamera(\(camera.name))")
+        print("[CameraDiscoveryView] selectCamera(\(camera.name))")
 
         // 1. Cancel timeout task
         timeoutTask?.cancel()
@@ -331,7 +307,7 @@ struct CameraDiscoveryView: View {
     /// Handle back button
     /// Flow: Cancel timeout -> Cleanup scanner (stop + disconnect all) -> Navigate back
     private func handleBack() {
-        print("[CameraDiscoveryView] ⬅️ handleBack()")
+        print("[CameraDiscoveryView] handleBack()")
 
         // 1. Cancel timeout task
         timeoutTask?.cancel()

@@ -6,6 +6,43 @@ iOS Studio architecture changes. See `ARCHITECTURE.md` for current design.
 
 ## 2026-01-25
 
+### Update 9: Camera Discovery Retry Logic (SAB-37)
+
+**Status:** Implemented
+
+Added two-layer retry strategy for more reliable camera discovery:
+
+**Layer 1 - Scan Waves:**
+
+- Runs full IP scan up to 3 times
+- 3s delay between waves
+- Handles cameras joining network after scan starts
+- Removed 30s view timeout - waves complete naturally
+
+**Layer 2 - Per-IP Retry:**
+
+- Retries TCP connection up to 3 times per IP
+- 0.5s delay between retries
+- Smart error classification (retry ECONNREFUSED/ETIMEDOUT, fail fast on EHOSTUNREACH/EACCES)
+
+**Connection Timeout Fix:**
+
+- Replaced TaskGroup-based timeout with polling-based approach
+- NWConnection callbacks run on background queue (avoids main thread deadlock)
+- 50ms polling interval, 2s hard timeout guaranteed
+- Fixes issue where connections hung for 75s instead of timing out
+
+**Timing:**
+| Case | Time |
+|------|------|
+| Camera ready immediately | ~2-3s |
+| Camera joins during wave 2 | ~6-9s |
+| No camera found | ~15s max |
+
+**Files:** NetworkScannerService.swift, CameraDiscoveryView.swift, PTP_IP_ARCHITECTURE.md
+
+---
+
 ### Update 8: Double-Disconnect Bug Fix (SAB-41)
 
 **Status:** Implemented
