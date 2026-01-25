@@ -17,7 +17,7 @@
     "APP_BASE_URL": "http://localhost:8081",
     "CF_ZONE": "sabaipics.com",
     "CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
-    "PHOTO_BUCKET_NAME": "sabaipics-photos",
+    "PHOTO_BUCKET_NAME": "sabaipics-photos-dev",
     "PHOTO_R2_BASE_URL": "https://devphotos.sabaipics.com",
     "RETENTION_DAYS": "30",
     "CLEANUP_BATCH_SIZE": "10",
