@@ -73,8 +73,18 @@ class CanonEventSource: CameraEventSource {
     }
 
     func stopMonitoring() async {
+        guard isMonitoring else { return }
         isMonitoring = false
+
+        // Cancel connection FIRST to interrupt pending send/receive operations
+        // This prevents hanging on network calls during disconnect
+        commandConnection?.cancel()
+
         pollingTask?.cancel()
+        // Wait for polling task to actually complete before returning
+        // This prevents race conditions where resources are cleaned up
+        // while the polling loop is still executing
+        await pollingTask?.value
         pollingTask = nil
     }
 
@@ -185,11 +195,19 @@ class CanonEventSource: CameraEventSource {
         let getEventCommand = command.canonGetEvent()
         let commandData = getEventCommand.toData()
 
-        // Send command
-        try await sendData(connection: connection, data: commandData)
+        // Send command with cancellation support
+        try await withTaskCancellationHandler {
+            try await sendData(connection: connection, data: commandData)
+        } onCancel: {
+            connection.cancel()
+        }
 
-        // Read response (may contain data packets with events)
-        let response = try await receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCommand.transactionID)
+        // Read response (may contain data packets with events) with cancellation support
+        let response = try await withTaskCancellationHandler {
+            try await receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCommand.transactionID)
+        } onCancel: {
+            connection.cancel()
+        }
 
         // Parse events from response data
         guard let eventData = response.data, !eventData.isEmpty else {
