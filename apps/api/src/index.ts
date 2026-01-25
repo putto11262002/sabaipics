@@ -54,11 +54,9 @@ const app = new Hono<Env>()
   })
   // R2 proxy route (public, no auth - serves QR codes and other assets)
   .route('/local/r2', r2Router)
-  // Webhooks route (uses c.var.db from above)
+  // Webhooks route (no CORS needed - server-to-server calls)
   .route('/webhooks', webhookRouter)
-  // Participant routes (public, no auth - for event participants)
-  .route('/participant', participantRouter)
-  // Then CORS and auth for all other routes
+  // CORS middleware - must be before participant and other browser-facing routes
   .use('/*', (c, next) => {
     // Support comma-separated origins for dev (e.g., "http://localhost:5173,http://localhost:5174")
     const allowedOrigins = c.env.CORS_ORIGIN.split(',').map((o) => o.trim());
@@ -67,6 +65,8 @@ const app = new Hono<Env>()
       credentials: true,
     })(c, next);
   })
+  // Participant routes (public, no auth - for event participants)
+  .route('/participant', participantRouter)
   // Admin routes - API key auth, no Clerk (must be before Clerk middleware)
   .route('/admin', adminRouter)
   .use('/*', createClerkAuth())

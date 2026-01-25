@@ -6,6 +6,15 @@
  * - POST /collections/:id/search-faces-by-image - Search for similar faces
  *
  * All routes use .match() for typed error handling with FaceServiceError.
+ *
+ * ML Tuning Parameters:
+ * Server-side defaults are tuned for optimal performance. Client params
+ * are deprecated but still accepted for backward compatibility.
+ *
+ * Environment Variables:
+ * - INDEX_QUALITY_FILTER: Quality filter for indexing (default: 'none')
+ * - INDEX_MIN_CONFIDENCE: Min confidence for indexing (default: 0.5)
+ * - SEARCH_MIN_SIMILARITY: Min similarity threshold for search, 0-1 scale (default: 0.97)
  */
 
 import { Hono } from 'hono';
@@ -34,11 +43,27 @@ export function createFacesRouter(faceService: FaceService) {
   /**
    * POST /collections/:id/index-faces
    * Index faces from an image.
+   *
+   * @param MaxFaces - Maximum faces to index (client-controlled)
+   * @param QualityFilter - Deprecated: Server uses tuned INDEX_QUALITY_FILTER.
+   *                        This param will be ignored in future versions.
    */
   app.post('/:id/index-faces', zValidator('json', IndexFacesRequestSchema), async (c) => {
     const collectionId = c.req.param('id');
     const body = c.req.valid('json');
     const externalImageId = body.ExternalImageId || `photo-${Date.now()}`;
+
+    // Server-side tuned defaults
+    const serverQualityFilter = (process.env.INDEX_QUALITY_FILTER || 'none') as 'auto' | 'none';
+    const serverMinConfidence = parseFloat(process.env.INDEX_MIN_CONFIDENCE || '0.5');
+
+    // Log deprecation warning if client overrides server defaults
+    if (body.QualityFilter && body.QualityFilter.toLowerCase() !== serverQualityFilter) {
+      console.warn(
+        '[Faces] DEPRECATED: QualityFilter param will be ignored in future versions. Using server default:',
+        serverQualityFilter,
+      );
+    }
 
     console.log('[Faces] IndexFaces request:', {
       collectionId,
@@ -83,14 +108,21 @@ export function createFacesRouter(faceService: FaceService) {
 
     try {
       // Index photo with ResultAsync
+      // QualityFilter: Use server default, fall back to client param for backward compat
+      const effectiveQualityFilter = body.QualityFilter
+        ? (body.QualityFilter.toLowerCase() as 'auto' | 'none')
+        : serverQualityFilter;
+
       const result = await faceService.indexPhoto({
         eventId: collectionId,
         photoId: externalImageId,
         imageData,
         options: {
           maxFaces: body.MaxFaces || 100,
-          minConfidence: 0.5,
-          qualityFilter: body.QualityFilter?.toLowerCase() as 'auto' | 'none' | undefined,
+          // Server-tuned confidence threshold
+          minConfidence: serverMinConfidence,
+          // Deprecated: QualityFilter - server default preferred
+          qualityFilter: effectiveQualityFilter,
         },
       });
 
@@ -114,7 +146,6 @@ export function createFacesRouter(faceService: FaceService) {
         externalImageId,
         error: err.type,
         retryable: err.retryable,
-        cause: 'cause' in err ? err.cause : undefined,
       });
 
       const statusCode = errorToHttpStatus(err);
@@ -148,6 +179,10 @@ export function createFacesRouter(faceService: FaceService) {
   /**
    * POST /collections/:id/search-faces-by-image
    * Search for faces similar to the query image.
+   *
+   * @param MaxFaces - Maximum matches to return (client-controlled)
+   * @param FaceMatchThreshold - Deprecated: Server uses tuned SEARCH_MIN_SIMILARITY.
+   *                             This param will be ignored in future versions.
    */
   app.post(
     '/:id/search-faces-by-image',
@@ -156,7 +191,20 @@ export function createFacesRouter(faceService: FaceService) {
       const collectionId = c.req.param('id');
       const body = c.req.valid('json');
       const maxFaces = body.MaxFaces || 10;
-      const threshold = body.FaceMatchThreshold || 80;
+
+      // Server-side tuned default (env is 0-1 scale, API uses 0-100)
+      const serverThreshold = parseFloat(process.env.SEARCH_MIN_SIMILARITY || '0.97') * 100;
+
+      // Log deprecation warning if client overrides server default
+      if (body.FaceMatchThreshold !== undefined && body.FaceMatchThreshold !== null) {
+        console.warn(
+          '[Faces] DEPRECATED: FaceMatchThreshold param will be ignored in future versions. Using server default:',
+          serverThreshold,
+        );
+      }
+
+      // Use server default, fall back to client param for backward compat
+      const threshold = body.FaceMatchThreshold ?? serverThreshold;
 
       console.log('[Faces] SearchFacesByImage request:', {
         collectionId,

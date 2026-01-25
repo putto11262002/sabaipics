@@ -66,14 +66,14 @@ const uploadPhotoSchema = z.object({
 // Public transform URLs (cached at edge)
 function generateThumbnailUrl(env: Bindings, r2Key: string): string {
   if (process.env.NODE_ENV === 'development') {
-    return `${env.API_BASE_URL}/local/r2/${r2Key}`;
+    return `${env.PHOTO_R2_BASE_URL}/${r2Key}`;
   }
   return `https://${env.CF_ZONE}/cdn-cgi/image/width=400,fit=cover,format=auto,quality=75/${env.PHOTO_R2_BASE_URL}/${r2Key}`;
 }
 
 function generatePreviewUrl(env: Bindings, r2Key: string): string {
   if (process.env.NODE_ENV === 'development') {
-    return `${env.API_BASE_URL}/local/r2/${r2Key}`;
+    return `${env.PHOTO_R2_BASE_URL}/${r2Key}`;
   }
   return `https://${env.CF_ZONE}/cdn-cgi/image/width=1200,fit=contain,format=auto,quality=85/${env.PHOTO_R2_BASE_URL}/${r2Key}`;
 }

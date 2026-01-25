@@ -4,7 +4,7 @@ import {
   EmptyMedia,
   EmptyTitle,
   EmptyDescription,
-} from '@sabaipics/ui/components/empty';
+} from '@sabaipics/uiv2/components/empty';
 import { Check, Image as ImageIcon } from 'lucide-react';
 import type { Photo } from '../../hooks/photos/usePhotos';
 import { useState, useMemo } from 'react';

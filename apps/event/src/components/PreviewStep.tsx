@@ -1,6 +1,6 @@
 import { ChevronLeft } from 'lucide-react';
-import { Button } from '@sabaipics/ui/components/button';
-import { AspectRatio } from '@sabaipics/ui/components/aspect-ratio';
+import { Button } from '@sabaipics/uiv2/components/button';
+import { AspectRatio } from '@sabaipics/uiv2/components/aspect-ratio';
 import { th } from '@/lib/i18n';
 
 interface PreviewStepProps {

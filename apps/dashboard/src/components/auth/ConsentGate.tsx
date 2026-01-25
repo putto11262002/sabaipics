@@ -5,8 +5,8 @@ import {
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
-} from "@sabaipics/ui/components/empty";
-import { Spinner } from "@sabaipics/ui/components/spinner";
+} from "@sabaipics/uiv2/components/empty";
+import { Spinner } from "@sabaipics/uiv2/components/spinner";
 import { useConsentStatus } from "../../hooks/consent/useConsentStatus";
 
 interface ConsentGateProps {

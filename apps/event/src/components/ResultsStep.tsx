@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react';
 import { Download, Check, RefreshCw, Image, Info } from 'lucide-react';
 import { RowsPhotoAlbum, type Photo } from 'react-photo-album';
 import { toast } from 'sonner';
-import { Button } from '@sabaipics/ui/components/button';
-import { Alert, AlertDescription } from '@sabaipics/ui/components/alert';
+import { Button } from '@sabaipics/uiv2/components/button';
+import { Alert, AlertDescription } from '@sabaipics/uiv2/components/alert';
 import { downloadBulk } from '@/lib/api';
 import { th } from '@/lib/i18n';
 

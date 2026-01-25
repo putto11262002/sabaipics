@@ -1,9 +1,9 @@
-import * as React from "react";
-import { Camera, LayoutDashboard, CalendarDays } from "lucide-react";
+import * as React from 'react';
+import { Camera, LayoutDashboard, CalendarDays } from 'lucide-react';
 
-import { NavMain } from "./nav-main";
-import { NavSecondary } from "./nav-secondary";
-import { NavUser } from "./nav-user";
+import { NavMain } from './nav-main';
+import { NavSecondary } from './nav-secondary';
+import { NavUser } from './nav-user';
 import {
   Sidebar,
   SidebarContent,
@@ -12,19 +12,18 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@sabaipics/ui/components/sidebar";
+} from '@sabaipics/uiv2/components/sidebar';
 
 const data = {
   navMain: [
     {
-      title: "Dashboard",
-      url: "/dashboard",
+      title: 'Dashboard',
+      url: '/dashboard',
       icon: LayoutDashboard,
-      isActive: true,
     },
     {
-      title: "Events",
-      url: "/events",
+      title: 'Events',
+      url: '/events',
       icon: CalendarDays,
     },
     // {

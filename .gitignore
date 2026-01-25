@@ -81,4 +81,24 @@ apps/studio/.build/
 # Syncthing temp files
 **/.syncthing.*.tmp
 
+# Eval run outputs (keep .gitkeep)
+packages/face-eval/runs/*.json
+packages/face-eval/runs/*.csv
+!packages/face-eval/runs/.gitkeep
+
+# Eval dataset cache (downloaded from R2)
+packages/face-eval/data/
+
 opencode.json
+
+# MCP config (local)
+.mcp.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Test images (large dataset, keep external)
+testimages/

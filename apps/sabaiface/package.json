@@ -19,8 +19,6 @@
     "test": "vitest",
     "test:watch": "vitest --watch",
     "test:run": "vitest run",
-    "test:recognition-eval": "tsx tests/manual/test-recognition-eval.ts",
-    "test:aws-vs-recognition": "tsx tests/manual/test-aws-vs-recognition.ts",
     "label": "tsx tests/fixtures/images/label-server.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

@@ -5,7 +5,7 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "@sabaipics/ui/components/card";
+} from "@sabaipics/uiv2/components/card";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import type { Event } from "../../hooks/events/useEvents";
 

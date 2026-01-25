@@ -7,7 +7,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sabaipics/ui/components/alert-dialog';
+} from '@sabaipics/uiv2/components/alert-dialog';
 import { parseISO, differenceInDays } from 'date-fns';
 import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
@@ -16,7 +16,7 @@ import { PhotoUploadZone } from './_components/PhotoUploadZone';
 import { UploadLog } from './_components/UploadLog';
 import { useUploadQueue } from './_components/useUploadQueue';
 import { useEvent } from '../../../../hooks/events/useEvent';
-import { Spinner } from '@sabaipics/ui/components/spinner';
+import { Spinner } from '@sabaipics/uiv2/components/spinner';
 
 export default function EventUploadTab() {
   const { id } = useParams<{ id: string }>();

@@ -1,4 +1,4 @@
-import { Spinner } from '@sabaipics/ui/components/spinner';
+import { Spinner } from '@sabaipics/uiv2/components/spinner';
 import { th } from '@/lib/i18n';
 
 export function SearchingStep() {
