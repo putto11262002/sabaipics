@@ -18,35 +18,38 @@ export type UploadIntentStatus = UploadIntent['status'];
 // Mapped types for UI
 // =============================================================================
 
-/** Mapped status for UI (matches existing photo status flow) */
-export type MappedUploadStatus = 'uploading' | 'indexing' | 'indexed' | 'failed';
+/**
+ * Mapped intent status for UI
+ * - uploading: still uploading to R2 or processing in queue (pending/uploaded)
+ * - completed: photo record created, has photoId - switch to photo status polling
+ * - failed: upload failed or expired
+ */
+export type MappedIntentStatus = 'uploading' | 'completed' | 'failed';
 
 /** Upload intent with mapped status for UI consumption */
 export interface MappedUploadIntent {
   uploadId: string;
   eventId: string;
-  status: MappedUploadStatus;
+  status: MappedIntentStatus;
   photoId: string | null;
   errorMessage: string | null;
 }
 
 /**
- * Maps API intent status to UI status
+ * Maps API intent status to simplified UI status
  *
  * API statuses → UI statuses:
- * - pending → uploading (waiting for R2 upload to complete)
- * - uploaded → indexing (processing in queue)
- * - completed → indexed (done, has photoId)
+ * - pending/uploaded → uploading (still in upload flow)
+ * - completed → completed (has photoId, switch to photo polling)
  * - failed/expired → failed
  */
-function mapIntentStatus(status: UploadIntentStatus): MappedUploadStatus {
+function mapIntentStatus(status: UploadIntentStatus): MappedIntentStatus {
   switch (status) {
     case 'pending':
-      return 'uploading';
     case 'uploaded':
-      return 'indexing';
+      return 'uploading';
     case 'completed':
-      return 'indexed';
+      return 'completed';
     case 'failed':
     case 'expired':
       return 'failed';
@@ -62,8 +65,8 @@ function mapIntentStatus(status: UploadIntentStatus): MappedUploadStatus {
 /**
  * Hook for polling upload intent status (v2 presigned upload flow)
  *
- * Polls GET /uploads/status for upload intents and maps statuses
- * to the existing UI status model (uploading → indexing → indexed)
+ * Polls GET /uploads/status until intent is completed (has photoId)
+ * or failed. Once completed, caller should switch to photo status polling.
  */
 export function useUploadIntentStatus(
   uploadIds: string[],

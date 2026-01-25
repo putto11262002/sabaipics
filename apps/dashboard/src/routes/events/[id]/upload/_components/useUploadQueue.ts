@@ -91,17 +91,18 @@ export function useUploadQueue(eventId: string | undefined) {
       const existing = uploadLogRef.current.get(logEntryId);
       if (!existing) return;
 
-      if (intent.status === 'indexed' && intent.photoId) {
+      if (intent.status === 'completed' && intent.photoId) {
         // Intent completed - replace temp entry with photo entry
         uploadLogRef.current.delete(logEntryId);
         uploadIdToLogIdRef.current.delete(intent.uploadId);
         pendingIntentIdsRef.current.delete(intent.uploadId);
 
         // Create new entry with real photoId
+        // Photo starts at 'uploading' status, will be updated by photo status polling
         uploadLogRef.current.set(intent.photoId, {
           id: intent.photoId,
           fileName: existing.fileName,
-          status: 'indexing', // Will be updated by photo status polling
+          status: 'uploading',
           fileSize: existing.fileSize,
           uploadedAt: existing.uploadedAt,
         });
@@ -114,13 +115,8 @@ export function useUploadQueue(eventId: string | undefined) {
         });
         pendingIntentIdsRef.current.delete(intent.uploadId);
         uploadIdToLogIdRef.current.delete(intent.uploadId);
-      } else if (intent.status === 'indexing') {
-        // Still processing - update status
-        uploadLogRef.current.set(logEntryId, {
-          ...existing,
-          status: 'indexing',
-        });
       }
+      // intent.status === 'uploading' - no action needed, keep polling
     });
 
     setUploadLogVersion((v) => v + 1);
