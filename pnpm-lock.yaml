@@ -109,6 +109,12 @@ importers:
         specifier: 4.59.3
         version: 4.59.3
 
+  apps/api/workers/r2-notification-proxy:
+    devDependencies:
+      wrangler:
+        specifier: ^4.59.3
+        version: 4.59.3
+
   apps/dashboard:
     dependencies:
       '@hookform/resolvers':

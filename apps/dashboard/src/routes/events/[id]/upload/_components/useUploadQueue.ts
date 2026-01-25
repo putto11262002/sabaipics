@@ -1,10 +1,22 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { useUploadPhoto } from '../../../../../hooks/photos/useUploadPhoto';
+import { usePresignedUpload } from '../../../../../hooks/photos/usePresignedUpload';
+import {
+  useUploadIntentStatus,
+  type MappedUploadIntent,
+} from '../../../../../hooks/photos/useUploadIntentStatus';
 import { usePhotos, type Photo } from '../../../../../hooks/photos/usePhotos';
-import { usePhotosStatus } from '../../../../../hooks/photos/usePhotoStatus';
-import type { UploadQueueItem } from './upload';
+import { usePhotosStatus, type PhotoStatus } from '../../../../../hooks/photos/usePhotoStatus';
 
-export type { UploadQueueItem };
+export interface UploadQueueItem {
+  id: string;
+  file: File;
+  status: 'queued' | 'uploading' | 'uploaded' | 'failed';
+  progress?: number;
+  error?: string;
+  errorStatus?: number;
+  uploadId?: string; // Set after presign succeeds (v2 flow)
+  photoId?: string; // Set when processing completes (from intent status)
+}
 
 export interface UploadLogEntry {
   id: string;
@@ -15,12 +27,14 @@ export interface UploadLogEntry {
   faceCount?: number | null | undefined;
   error?: string;
   uploadedAt: string;
+  // Track uploadId for entries still waiting for photoId
+  uploadId?: string;
 }
 
 const MAX_TOKENS = 5;
 
 export function useUploadQueue(eventId: string | undefined) {
-  const uploadPhotoMutation = useUploadPhoto();
+  const presignedUploadMutation = usePresignedUpload();
 
   // Fetch existing photos from API (uploading/indexing/failed)
   const photosQuery = usePhotos({
@@ -33,11 +47,16 @@ export function useUploadQueue(eventId: string | undefined) {
   const indexedForRemovalRef = useRef<Set<string>>(new Set()); // Track entries scheduled for removal
   const [, setUploadLogVersion] = useState(0); // Force re-renders
 
+  // Track upload intent IDs for polling (Phase 1: until completed)
+  const pendingIntentIdsRef = useRef<Set<string>>(new Set());
+  // Map uploadId -> temp log entry id (for replacing when photoId is received)
+  const uploadIdToLogIdRef = useRef<Map<string, string>>(new Map());
+
   // Initialize upload log with photos from API
   useEffect(() => {
     if (!photosQuery.data) return;
 
-    const initialPhotos = photosQuery.data.pages.flatMap((page) => page.data);
+    const initialPhotos = photosQuery.data.pages.flatMap((page: { data: Photo[] }) => page.data);
     initialPhotos.forEach((photo: Photo) => {
       uploadLogRef.current.set(photo.id, {
         id: photo.id,
@@ -52,23 +71,77 @@ export function useUploadQueue(eventId: string | undefined) {
     setUploadLogVersion((v) => v + 1);
   }, [photosQuery.data]);
 
-  // Status polling for upload log entries
-  const pollableIds = Array.from(uploadLogRef.current.values())
+  // =========================================================================
+  // Phase 1: Poll upload intents until completed (get photoId)
+  // =========================================================================
+  const pendingIntentIds = Array.from(pendingIntentIdsRef.current);
+
+  const { data: intentStatuses } = useUploadIntentStatus(pendingIntentIds, {
+    refetchInterval: pendingIntentIds.length > 0 ? 2000 : false,
+  });
+
+  // Process intent status updates
+  useEffect(() => {
+    if (!intentStatuses) return;
+
+    intentStatuses.forEach((intent: MappedUploadIntent) => {
+      const logEntryId = uploadIdToLogIdRef.current.get(intent.uploadId);
+      if (!logEntryId) return;
+
+      const existing = uploadLogRef.current.get(logEntryId);
+      if (!existing) return;
+
+      if (intent.status === 'completed' && intent.photoId) {
+        // Intent completed - replace temp entry with photo entry
+        uploadLogRef.current.delete(logEntryId);
+        uploadIdToLogIdRef.current.delete(intent.uploadId);
+        pendingIntentIdsRef.current.delete(intent.uploadId);
+
+        // Create new entry with real photoId
+        // Photo starts at 'uploading' status, will be updated by photo status polling
+        uploadLogRef.current.set(intent.photoId, {
+          id: intent.photoId,
+          fileName: existing.fileName,
+          status: 'uploading',
+          fileSize: existing.fileSize,
+          uploadedAt: existing.uploadedAt,
+        });
+      } else if (intent.status === 'failed') {
+        // Intent failed - update log entry
+        uploadLogRef.current.set(logEntryId, {
+          ...existing,
+          status: 'failed',
+          error: intent.errorMessage || 'Processing failed',
+        });
+        pendingIntentIdsRef.current.delete(intent.uploadId);
+        uploadIdToLogIdRef.current.delete(intent.uploadId);
+      }
+      // intent.status === 'uploading' - no action needed, keep polling
+    });
+
+    setUploadLogVersion((v) => v + 1);
+  }, [intentStatuses]);
+
+  // =========================================================================
+  // Phase 2: Poll photo statuses for face indexing (existing behavior)
+  // =========================================================================
+  const pollablePhotoIds = Array.from(uploadLogRef.current.values())
     .filter((e) => {
       const isOptimistic = /^\d+-/.test(e.id);
-      return !isOptimistic && e.status !== 'indexed' && e.status !== 'failed';
+      const hasPendingIntent = e.uploadId && pendingIntentIdsRef.current.has(e.uploadId);
+      return !isOptimistic && !hasPendingIntent && e.status !== 'indexed' && e.status !== 'failed';
     })
     .map((e) => e.id);
 
-  const { data: statuses } = usePhotosStatus(pollableIds, {
-    refetchInterval: pollableIds.length > 0 ? 2000 : false,
+  const { data: photoStatuses } = usePhotosStatus(pollablePhotoIds, {
+    refetchInterval: pollablePhotoIds.length > 0 ? 2000 : false,
   });
 
-  // Update upload log from polling
+  // Update upload log from photo status polling
   useEffect(() => {
-    if (!statuses) return;
+    if (!photoStatuses) return;
 
-    statuses.forEach((status) => {
+    photoStatuses.forEach((status: PhotoStatus) => {
       const existing = uploadLogRef.current.get(status.id);
       if (!existing) return;
 
@@ -82,19 +155,19 @@ export function useUploadQueue(eventId: string | undefined) {
     });
 
     setUploadLogVersion((v) => v + 1);
-  }, [statuses]);
+  }, [photoStatuses]);
 
   // Remove indexed entries from upload log after 3 second delay
   useEffect(() => {
-    if (!statuses) return;
+    if (!photoStatuses) return;
 
-    const indexedPhotos = statuses.filter((s) => s.status === 'indexed');
+    const indexedPhotos = photoStatuses.filter((s: PhotoStatus) => s.status === 'indexed');
     if (indexedPhotos.length === 0) return;
 
     // Set timeouts for each indexed photo that isn't already scheduled
     indexedPhotos
-      .filter((p) => !indexedForRemovalRef.current.has(p.id))
-      .forEach((p) => {
+      .filter((p: PhotoStatus) => !indexedForRemovalRef.current.has(p.id))
+      .forEach((p: PhotoStatus) => {
         // Mark as scheduled for removal
         indexedForRemovalRef.current.add(p.id);
 
@@ -105,7 +178,7 @@ export function useUploadQueue(eventId: string | undefined) {
         }, 3000); // 3 second delay to show "Indexed" status
       });
     // Note: No cleanup function - let timeouts fire naturally
-  }, [statuses]);
+  }, [photoStatuses]);
 
   // Helper to sync upload log state
   const syncUploadLog = useCallback(() => {
@@ -131,7 +204,7 @@ export function useUploadQueue(eventId: string | undefined) {
     setDisplayItems(items);
   }, []);
 
-  // Upload a single file
+  // Upload a single file using presigned URL flow
   const uploadFile = useCallback(
     async (item: UploadQueueItem, processNext: () => void) => {
       if (!eventId) return;
@@ -144,35 +217,41 @@ export function useUploadQueue(eventId: string | undefined) {
       syncUploadLog();
 
       try {
-        const result = await uploadPhotoMutation.mutateAsync({
+        // Presigned upload: get presigned URL and upload to R2
+        const result = await presignedUploadMutation.mutateAsync({
           eventId,
           file: item.file,
         });
 
-        // Success - remove from active, update upload log with real photo data
+        // Success - store uploadId for intent polling
+        item.uploadId = result.uploadId;
         activeUploadsRef.current.delete(item.id);
 
-        // Replace temp ID with real ID in upload log
-        uploadLogRef.current.delete(item.id);
-        uploadLogRef.current.set(result.id, {
-          id: result.id,
-          fileName: item.file.name,
-          status: result.status,
-          fileSize: result.fileSize,
-          faceCount: result.faceCount,
-          uploadedAt: result.uploadedAt,
+        // Update upload log - now waiting for intent completion
+        uploadLogRef.current.set(item.id, {
+          ...uploadLogRef.current.get(item.id)!,
+          status: 'indexing', // R2 upload done, now processing in queue
+          uploadId: result.uploadId,
         });
-        syncUploadLog();
 
-        // NOTE: No optimistic gallery updates - gallery refetches on mount
+        // Track for intent polling (Phase 1)
+        pendingIntentIdsRef.current.add(result.uploadId);
+        uploadIdToLogIdRef.current.set(result.uploadId, item.id);
+
+        syncUploadLog();
       } catch (error) {
         const err = error as Error & { status?: number };
         let errorMessage = err.message || 'Upload failed';
 
-        if (err.status === 402) {
-          errorMessage = 'Insufficient credits';
-        } else if (err.status === 410) {
-          errorMessage = 'Event expired';
+        // Fallback mapping if message wasn't set from API
+        if (errorMessage === 'Upload failed') {
+          if (err.status === 402) {
+            errorMessage = 'Insufficient credits';
+          } else if (err.status === 410) {
+            errorMessage = 'Event expired';
+          } else if (err.status === 409) {
+            errorMessage = 'Upload already processing';
+          }
         }
 
         // Update upload log with error
@@ -195,7 +274,7 @@ export function useUploadQueue(eventId: string | undefined) {
         processNext();
       }
     },
-    [eventId, uploadPhotoMutation, syncUploadLog],
+    [eventId, presignedUploadMutation, syncUploadLog],
   );
 
   // Process queue - takes tokens and starts uploads
@@ -255,19 +334,39 @@ export function useUploadQueue(eventId: string | undefined) {
       item.status = 'queued';
       item.error = undefined;
       item.errorStatus = undefined;
+      item.uploadId = undefined; // Clear old uploadId for fresh presign
+
+      // Reset upload log entry
+      uploadLogRef.current.set(itemId, {
+        ...uploadLogRef.current.get(itemId)!,
+        status: 'uploading',
+        error: undefined,
+        uploadId: undefined,
+      });
+      syncUploadLog();
+
       pendingQueueRef.current.push(item);
       processQueue();
     },
-    [processQueue],
+    [processQueue, syncUploadLog],
   );
 
   // Remove a failed upload
   const removeFromQueue = useCallback(
     (itemId: string) => {
+      const item = failedUploadsRef.current.get(itemId);
+      if (item?.uploadId) {
+        // Clean up tracking refs
+        pendingIntentIdsRef.current.delete(item.uploadId);
+        uploadIdToLogIdRef.current.delete(item.uploadId);
+      }
+
       failedUploadsRef.current.delete(itemId);
+      uploadLogRef.current.delete(itemId);
       syncDisplayState();
+      syncUploadLog();
     },
-    [syncDisplayState],
+    [syncDisplayState, syncUploadLog],
   );
 
   // Computed values for UI
