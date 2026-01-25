@@ -14,7 +14,7 @@
  *   R2_ACCOUNT_ID       - Cloudflare account ID
  *   R2_ACCESS_KEY_ID    - R2 access key
  *   R2_SECRET_ACCESS_KEY - R2 secret key
- *   R2_BUCKET_NAME      - R2 bucket name (default: sabaipics-eval-datasets)
+ *   R2_BUCKET_NAME      - R2 bucket name (default: sabai-dataset)
  */
 
 import fs from 'node:fs';
@@ -49,7 +49,7 @@ function getR2Config() {
   const accountId = process.env.R2_ACCOUNT_ID;
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-  const bucketName = process.env.R2_BUCKET_NAME || 'sabaipics-eval-datasets';
+  const bucketName = process.env.R2_BUCKET_NAME || 'sabai-dataset';
 
   if (!accountId || !accessKeyId || !secretAccessKey) {
     throw new Error(
@@ -400,7 +400,7 @@ Environment:
   R2_ACCOUNT_ID        Cloudflare account ID
   R2_ACCESS_KEY_ID     R2 access key
   R2_SECRET_ACCESS_KEY R2 secret key
-  R2_BUCKET_NAME       R2 bucket name (default: sabaipics-eval-datasets)
+  R2_BUCKET_NAME       R2 bucket name (default: sabai-dataset)
 `);
       process.exit(0);
     }

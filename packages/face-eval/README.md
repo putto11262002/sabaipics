@@ -136,7 +136,7 @@ The ignore system allows marking bad selfies/images without re-uploading the dat
 ### R2 Structure
 
 ```
-sabaipics-eval-datasets/
+sabai-dataset/
   v1/
     index.json
     manifest.json
@@ -191,7 +191,7 @@ pnpm --filter @sabaipics/face-eval eval run sabaiface \
 R2_ACCOUNT_ID=...           # Cloudflare account ID
 R2_ACCESS_KEY_ID=...        # R2 access key
 R2_SECRET_ACCESS_KEY=...    # R2 secret key
-R2_BUCKET_NAME=...          # Bucket name (default: sabaipics-eval-datasets)
+R2_BUCKET_NAME=...          # Bucket name (default: sabai-dataset)
 SABAIPICS_CACHE_DIR=...     # Override global cache dir (default: ~/.cache/sabaipics/eval-datasets)
 SKIP_DATASET_DOWNLOAD=1     # Skip download (for CI)
 ```
