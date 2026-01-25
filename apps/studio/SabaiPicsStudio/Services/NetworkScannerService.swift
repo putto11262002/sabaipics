@@ -79,6 +79,21 @@ class NetworkScannerService: ObservableObject {
     /// Timeout for each IP scan (fast timeout for non-responsive IPs)
     private let perIPTimeout: TimeInterval = 2.0
 
+    /// Maximum scan waves (for late-joining cameras)
+    private let maxScanWaves = 3
+
+    /// Delay between scan waves
+    private let waveDelay: TimeInterval = 3.0
+
+    /// Maximum retry attempts per IP for TCP connection
+    private let maxRetryAttempts = 3
+
+    /// Delay between retries
+    private let retryDelay: TimeInterval = 0.5
+
+    /// Background queue for network operations (avoids main thread deadlock)
+    private let networkQueue = DispatchQueue(label: "com.sabaipics.scanner.network", qos: .userInitiated)
+
     /// Persistent GUID for PTP/IP connections (like libgphoto2)
     /// MUST use the same key as WiFiCameraService so Canon cameras recognize us
     private static let guidKey = "com.sabaipics.ptpip.guid"
@@ -155,7 +170,7 @@ class NetworkScannerService: ObservableObject {
     /// NOTE: This ONLY cancels in-flight scan tasks. It does NOT disconnect any discovered cameras.
     /// To disconnect cameras, use disconnectOtherCameras() or disconnectAllCameras() explicitly.
     func stopScan() {
-        print("[NetworkScannerService] 🛑 stopScan() called - cancelling scan tasks only")
+        print("[NetworkScannerService] stopScan() called - cancelling scan tasks only")
         print("[NetworkScannerService]    Current cameras: \(discoveredCameras.count)")
 
         // Cancel the scan task - this propagates to TaskGroup
@@ -164,20 +179,20 @@ class NetworkScannerService: ObservableObject {
 
         // Update state if still scanning
         if case .scanning = state {
-            print("[NetworkScannerService]    State was .scanning → .completed(\(discoveredCameras.count))")
+            print("[NetworkScannerService]    State was .scanning -> .completed(\(discoveredCameras.count))")
             state = .completed(cameraCount: discoveredCameras.count)
         }
 
         // NOTE: We do NOT disconnect any cameras here!
         // Sessions stay alive until explicitly disconnected.
-        print("[NetworkScannerService]    ✓ Scan stopped. Sessions untouched.")
+        print("[NetworkScannerService]    Scan stopped. Sessions untouched.")
     }
 
     /// Disconnect all cameras EXCEPT the selected one
     /// Call this after user selects a camera
     /// - Parameter selected: The camera that was selected (will NOT be disconnected)
     func disconnectOtherCameras(except selected: DiscoveredCamera) async {
-        print("[NetworkScannerService] 🔌 disconnectOtherCameras() - keeping: \(selected.name)")
+        print("[NetworkScannerService] disconnectOtherCameras() - keeping: \(selected.name)")
 
         var disconnectedCount = 0
         for camera in discoveredCameras where camera.id != selected.id {
@@ -186,26 +201,26 @@ class NetworkScannerService: ObservableObject {
             disconnectedCount += 1
         }
 
-        print("[NetworkScannerService]    ✓ Disconnected \(disconnectedCount) other camera(s)")
+        print("[NetworkScannerService]    Disconnected \(disconnectedCount) other camera(s)")
     }
 
     /// Disconnect ALL discovered cameras
     /// Call this when navigating away without selection
     func disconnectAllCameras() async {
-        print("[NetworkScannerService] 🔌 disconnectAllCameras() - \(discoveredCameras.count) cameras")
+        print("[NetworkScannerService] disconnectAllCameras() - \(discoveredCameras.count) cameras")
 
         for camera in discoveredCameras {
             print("[NetworkScannerService]    Disconnecting: \(camera.name) (\(camera.ipAddress))")
             await camera.disconnect()
         }
 
-        print("[NetworkScannerService]    ✓ All cameras disconnected")
+        print("[NetworkScannerService]    All cameras disconnected")
     }
 
     /// Close all connections and reset state
     /// Call this when completely leaving the discovery flow
     func cleanup() {
-        print("[NetworkScannerService] 🧹 cleanup() - full reset")
+        print("[NetworkScannerService] cleanup() - full reset")
 
         // Stop scanning first
         stopScan()
@@ -221,61 +236,121 @@ class NetworkScannerService: ObservableObject {
                     print("[NetworkScannerService]    Cleanup disconnecting: \(camera.name)")
                     await camera.disconnect()
                 }
-                print("[NetworkScannerService]    ✓ Cleanup complete")
+                print("[NetworkScannerService]    Cleanup complete")
             }
         } else {
-            print("[NetworkScannerService]    ✓ No cameras to cleanup")
+            print("[NetworkScannerService]    No cameras to cleanup")
         }
     }
 
     // MARK: - Private Methods
 
-    /// Perform the actual network scan - ALL IPs IN PARALLEL
+    /// Format timestamp for logging (seconds since app start with milliseconds)
+    private static let appStartTime = Date()
+    private func ts() -> String {
+        let elapsed = Date().timeIntervalSince(Self.appStartTime)
+        return String(format: "%07.3f", elapsed)
+    }
+
+    /// Perform the actual network scan - ALL IPs IN PARALLEL with wave-based retry
+    /// Layer 1: Up to 3 scan waves (handles cameras joining network late)
+    /// Layer 2: Per-IP retry within scanIP() (handles slow PTP/IP startup)
     private func performScan() async {
         let totalIPs = scanRange.count
-        print("[NetworkScannerService] 🔍 Starting parallel scan of \(totalIPs) IPs (.2-.20)")
+        let scanStart = Date()
+        print("[\(ts())] [Scanner] ========================================")
+        print("[\(ts())] [Scanner] Starting wave-based scan")
+        print("[\(ts())] [Scanner]   IP range: \(hotspotSubnet).2-20 (\(totalIPs) IPs)")
+        print("[\(ts())] [Scanner]   Max waves: \(maxScanWaves), Wave delay: \(waveDelay)s")
+        print("[\(ts())] [Scanner]   Per-IP timeout: \(perIPTimeout)s, Retries: \(maxRetryAttempts), Retry delay: \(retryDelay)s")
+        print("[\(ts())] [Scanner] ========================================")
 
-        // Track completed count for progress
-        var completedCount = 0
+        // Wave-based scanning - up to maxScanWaves attempts
+        for wave in 1...maxScanWaves {
+            // Check for cancellation before starting wave
+            guard !Task.isCancelled else {
+                print("[Scanner] CANCELLED before wave \(wave)")
+                state = .idle
+                return
+            }
 
-        // Scan ALL IPs in parallel using TaskGroup
-        await withTaskGroup(of: DiscoveredCamera?.self) { group in
-            // Launch all scans simultaneously
-            for lastOctet in scanRange {
-                let ip = "\(hotspotSubnet).\(lastOctet)"
+            let waveStart = Date()
+            print("[\(ts())] [Scanner] ----------------------------------------")
+            print("[\(ts())] [Scanner] WAVE \(wave)/\(maxScanWaves) starting")
+            print("[\(ts())] [Scanner]   Cameras found so far: \(discoveredCameras.count)")
+            print("[\(ts())] [Scanner]   Launching \(totalIPs) parallel scans...")
 
-                group.addTask {
-                    print("[NetworkScannerService] 📡 Scanning \(ip)...")
-                    let result = await self.scanIP(ip)
+            // Track completed count for progress within this wave
+            var completedCount = 0
+            var waveFoundCount = 0
 
+            // Scan ALL IPs in parallel using TaskGroup
+            await withTaskGroup(of: DiscoveredCamera?.self) { group in
+                // Launch all scans simultaneously
+                for lastOctet in scanRange {
+                    let ip = "\(hotspotSubnet).\(lastOctet)"
+
+                    group.addTask {
+                        // Check for cancellation before each IP scan
+                        guard !Task.isCancelled else { return nil }
+                        return await self.scanIP(ip)
+                    }
+                }
+
+                // Collect results as they complete
+                for await result in group {
+                    completedCount += 1
+
+                    // Update progress: account for wave position
+                    // Each wave contributes 1/maxScanWaves to total progress
+                    let waveProgress = Double(completedCount) / Double(totalIPs)
+                    let overallProgress = (Double(wave - 1) + waveProgress) / Double(maxScanWaves)
+                    state = .scanning(progress: overallProgress)
+                    currentScanIP = "Wave \(wave)/\(maxScanWaves) - \(completedCount)/\(totalIPs)"
+
+                    // If camera found, add to list immediately
                     if let camera = result {
-                        print("[NetworkScannerService] ✅ FOUND camera at \(ip): \(camera.name)")
-                    } else {
-                        print("[NetworkScannerService] ❌ No camera at \(ip)")
+                        waveFoundCount += 1
+                        discoveredCameras.append(camera)
+                        print("[\(ts())] [Scanner] FOUND camera: \(camera.name) at \(camera.ipAddress)")
                     }
 
-                    return result
+                    // Check for cancellation
+                    if Task.isCancelled {
+                        print("[Scanner] CANCELLED during wave \(wave) at \(completedCount)/\(totalIPs)")
+                        group.cancelAll()
+                        state = .idle
+                        return
+                    }
                 }
             }
 
-            // Collect results as they complete
-            for await result in group {
-                completedCount += 1
+            let waveDuration = Date().timeIntervalSince(waveStart)
+            print("[\(ts())] [Scanner] WAVE \(wave)/\(maxScanWaves) complete in \(String(format: "%.2f", waveDuration))s, found: \(waveFoundCount)")
 
-                // Update progress
-                let progress = Double(completedCount) / Double(totalIPs)
-                state = .scanning(progress: progress)
-                currentScanIP = "Scanned \(completedCount)/\(totalIPs)"
+            // Early exit if we found cameras - no need to continue waves
+            if !discoveredCameras.isEmpty {
+                print("[Scanner] Camera(s) found, stopping waves early")
+                break
+            }
 
-                // If camera found, add to list immediately
-                if let camera = result {
-                    discoveredCameras.append(camera)
+            // If more waves remain, wait before next wave
+            if wave < maxScanWaves {
+                // Check for cancellation before delay
+                guard !Task.isCancelled else {
+                    print("[Scanner] CANCELLED before wave delay")
+                    state = .idle
+                    return
                 }
 
-                // Check for cancellation
-                if Task.isCancelled {
-                    print("[NetworkScannerService] ⚠️ Scan cancelled")
-                    group.cancelAll()
+                print("[Scanner] No cameras found, waiting \(waveDelay)s before wave \(wave + 1)...")
+
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(waveDelay * 1_000_000_000))
+                    print("[Scanner] Wave delay complete")
+                } catch {
+                    // Sleep was cancelled
+                    print("[Scanner] CANCELLED during wave delay")
                     state = .idle
                     return
                 }
@@ -283,9 +358,67 @@ class NetworkScannerService: ObservableObject {
         }
 
         // Scan complete
+        let totalDuration = Date().timeIntervalSince(scanStart)
         currentScanIP = ""
         state = .completed(cameraCount: discoveredCameras.count)
-        print("[NetworkScannerService] 🏁 Scan complete! Found \(discoveredCameras.count) camera(s)")
+        print("[\(ts())] [Scanner] ========================================")
+        print("[\(ts())] [Scanner] SCAN COMPLETE in \(String(format: "%.2f", totalDuration))s, found: \(discoveredCameras.count)")
+        print("[\(ts())] [Scanner] ========================================")
+    }
+
+    /// Check if error is retryable (camera might still be initializing)
+    /// - ECONNREFUSED: Port not listening yet - retry
+    /// - ETIMEDOUT: Slow response - retry
+    /// - EHOSTUNREACH: No such host - fail fast
+    /// - ENETUNREACH: Wrong network - fail fast
+    private func isRetryableError(_ error: Error) -> Bool {
+        if let nwError = error as? NWError {
+            switch nwError {
+            case .posix(let code):
+                return code == .ECONNREFUSED || code == .ETIMEDOUT
+            default:
+                return false
+            }
+        }
+        return false
+    }
+
+    /// Get human-readable error code description for logging
+    private func errorCodeDescription(_ error: Error) -> String {
+        if let nwError = error as? NWError {
+            switch nwError {
+            case .posix(let code):
+                switch code {
+                case .ECONNREFUSED: return "ECONNREFUSED (port not listening)"
+                case .ETIMEDOUT: return "ETIMEDOUT (no response)"
+                case .EHOSTUNREACH: return "EHOSTUNREACH (no route to host)"
+                case .ENETUNREACH: return "ENETUNREACH (network unreachable)"
+                case .EACCES: return "EACCES (permission denied)"
+                case .ECONNRESET: return "ECONNRESET (connection reset)"
+                default: return "POSIX:\(code.rawValue)"
+                }
+            case .dns(let dnsError):
+                return "DNS:\(dnsError)"
+            case .tls(let tlsStatus):
+                return "TLS:\(tlsStatus)"
+            @unknown default:
+                return nwError.localizedDescription
+            }
+        }
+        if error is CancellationError {
+            return "CANCELLED"
+        }
+        if let scanError = error as? NetworkScannerError {
+            switch scanError {
+            case .timeout:
+                return "TIMEOUT (no response in \(perIPTimeout)s)"
+            case .scanFailed(let reason):
+                return "SCAN_FAILED: \(reason)"
+            case .noHotspotDetected:
+                return "NO_HOTSPOT"
+            }
+        }
+        return error.localizedDescription
     }
 
     /// Scan a single IP address for a camera
@@ -295,9 +428,14 @@ class NetworkScannerService: ObservableObject {
     /// - Stages 1-4: Check for cancellation, cleanup and return nil
     /// - Stage 5 (Session prep): COMMIT POINT - complete even if cancelled, return result
     ///
+    /// Layer 2 Retry: TCP connect retries up to maxRetryAttempts for retryable errors
+    ///
     /// - Parameter ip: IP address to scan
     /// - Returns: DiscoveredCamera if camera found, nil otherwise
     private func scanIP(_ ip: String) async -> DiscoveredCamera? {
+        let scanStart = Date()
+        print("[\(ts())] [Scanner:\(ip)] Starting scan")
+
         // Track resources for cleanup
         var commandConnection: NWConnection?
         var eventConnection: NWConnection?
@@ -308,37 +446,94 @@ class NetworkScannerService: ObservableObject {
             eventConnection?.cancel()
         }
 
-        // === STAGE 1: TCP Connect (Command Channel) ===
+        // === STAGE 1: TCP Connect (Command Channel) with retry ===
         guard !Task.isCancelled else {
-            print("[Scanner:\(ip)] ⏹ Cancelled before TCP connect")
+            print("[Scanner:\(ip)] CANCELLED before TCP connect")
             return nil
         }
 
         let host = NWEndpoint.Host(ip)
         let port = NWEndpoint.Port(rawValue: ptpipPort)!
-        commandConnection = NWConnection(host: host, port: port, using: .tcp)
-        commandConnection?.start(queue: .main)
 
-        do {
-            try await waitForConnection(commandConnection!, timeout: perIPTimeout)
-            print("[Scanner:\(ip)] TCP connected")
-        } catch {
+        print("[Scanner:\(ip)] Stage 1: TCP connect to port \(ptpipPort)")
+
+        // Retry loop for TCP connection (Layer 2)
+        var tcpConnected = false
+        let tcpStart = Date()
+        for attempt in 1...maxRetryAttempts {
+            // Check for cancellation before each retry attempt
+            guard !Task.isCancelled else {
+                print("[Scanner:\(ip)] CANCELLED during TCP retry")
+                cleanupConnections()
+                return nil
+            }
+
+            print("[Scanner:\(ip)]   TCP attempt \(attempt)/\(maxRetryAttempts)...")
+
+            // Clean up previous failed connection attempt
+            commandConnection?.cancel()
+            commandConnection = NWConnection(host: host, port: port, using: .tcp)
+            commandConnection?.start(queue: networkQueue)
+
+            do {
+                try await waitForConnection(commandConnection!, timeout: perIPTimeout)
+                let tcpDuration = Date().timeIntervalSince(tcpStart)
+                print("[Scanner:\(ip)]   TCP connected in \(String(format: "%.2f", tcpDuration))s (attempt \(attempt))")
+                tcpConnected = true
+                break  // Success - exit retry loop
+            } catch {
+                // Classify the error
+                let errorCode = errorCodeDescription(error)
+                let isRetryable = isRetryableError(error)
+
+                if isRetryable {
+                    // Retryable error - log and maybe retry
+                    if attempt < maxRetryAttempts {
+                        print("[Scanner:\(ip)]   TCP failed: \(errorCode) (retryable), waiting \(retryDelay)s...")
+
+                        // Wait before retry
+                        do {
+                            try await Task.sleep(nanoseconds: UInt64(retryDelay * 1_000_000_000))
+                        } catch {
+                            // Sleep cancelled
+                            print("[Scanner:\(ip)]   CANCELLED during retry delay")
+                            cleanupConnections()
+                            return nil
+                        }
+                    } else {
+                        print("[Scanner:\(ip)]   TCP failed: \(errorCode) (retryable), max retries reached")
+                    }
+                } else {
+                    // Non-retryable error - fail fast
+                    print("[Scanner:\(ip)]   TCP failed: \(errorCode) (not retryable, fail fast)")
+                    cleanupConnections()
+                    return nil
+                }
+            }
+        }
+
+        // If TCP connection failed after all retries
+        guard tcpConnected else {
+            let duration = Date().timeIntervalSince(scanStart)
+            print("[Scanner:\(ip)] FAILED after \(String(format: "%.2f", duration))s - TCP connect exhausted retries")
             cleanupConnections()
             return nil
         }
 
         // === STAGE 2: Init Command Handshake ===
         guard !Task.isCancelled else {
-            print("[Scanner:\(ip)] ⏹ Cancelled after TCP connect")
+            print("[Scanner:\(ip)] CANCELLED after TCP connect")
             cleanupConnections()
             return nil
         }
+
+        print("[Scanner:\(ip)] Stage 2: PTP/IP Init handshake")
 
         do {
             // Send Init Command Request
             let initRequest = PTPIPInitCommandRequest(guid: persistentGUID, hostName: hostName)
             try await sendData(connection: commandConnection!, data: initRequest.toData())
-            print("[Scanner:\(ip)] Sent InitCommandRequest")
+            print("[Scanner:\(ip)]   Sent InitCommandRequest")
 
             // Receive Init Command Ack
             let ackHeaderData = try await receiveWithTimeout(
@@ -349,11 +544,11 @@ class NetworkScannerService: ObservableObject {
 
             guard let header = PTPIPHeader.from(ackHeaderData),
                   header.type == PTPIPPacketType.initCommandAck.rawValue else {
-                print("[Scanner:\(ip)] Invalid or wrong packet type")
+                print("[Scanner:\(ip)]   FAILED: Invalid or wrong packet type")
                 cleanupConnections()
                 return nil
             }
-            print("[Scanner:\(ip)] Got InitCommandAck")
+            print("[Scanner:\(ip)]   Received InitCommandAck")
 
             // Read payload
             let payloadLength = Int(header.length) - 8
@@ -364,7 +559,7 @@ class NetworkScannerService: ObservableObject {
             )
 
             guard payloadData.count >= 4 else {
-                print("[Scanner:\(ip)] Payload too short")
+                print("[Scanner:\(ip)]   FAILED: Payload too short (\(payloadData.count) bytes)")
                 cleanupConnections()
                 return nil
             }
@@ -372,7 +567,7 @@ class NetworkScannerService: ObservableObject {
             let connectionNumber = payloadData.withUnsafeBytes {
                 UInt32(littleEndian: $0.loadUnaligned(fromByteOffset: 0, as: UInt32.self))
             }
-            print("[Scanner:\(ip)] ConnectionNumber: \(connectionNumber)")
+            print("[Scanner:\(ip)]   ConnectionNumber: \(connectionNumber)")
 
             // Extract camera name
             var cameraName = "Unknown Camera"
@@ -383,31 +578,35 @@ class NetworkScannerService: ObservableObject {
                     cameraName = name
                 }
             }
-            print("[Scanner:\(ip)] Camera name: \(cameraName)")
+            print("[Scanner:\(ip)]   Camera name: \(cameraName)")
 
             // === STAGE 3: TCP Connect (Event Channel) ===
             guard !Task.isCancelled else {
-                print("[Scanner:\(ip)] ⏹ Cancelled before event channel")
+                print("[Scanner:\(ip)] CANCELLED before event channel")
                 cleanupConnections()
                 return nil
             }
 
+            print("[Scanner:\(ip)] Stage 3: Event channel TCP connect")
+
             eventConnection = NWConnection(host: host, port: port, using: .tcp)
-            eventConnection?.start(queue: .main)
+            eventConnection?.start(queue: networkQueue)
 
             try await waitForConnection(eventConnection!, timeout: perIPTimeout)
-            print("[Scanner:\(ip)] Event channel TCP connected")
+            print("[Scanner:\(ip)]   Event channel connected")
 
             // === STAGE 4: Init Event Handshake ===
             guard !Task.isCancelled else {
-                print("[Scanner:\(ip)] ⏹ Cancelled before event handshake")
+                print("[Scanner:\(ip)] CANCELLED before event handshake")
                 cleanupConnections()
                 return nil
             }
 
+            print("[Scanner:\(ip)] Stage 4: Event channel handshake")
+
             let eventRequest = PTPIPInitEventRequest(connectionNumber: connectionNumber)
             try await sendData(connection: eventConnection!, data: eventRequest.toData())
-            print("[Scanner:\(ip)] Sent InitEventRequest")
+            print("[Scanner:\(ip)]   Sent InitEventRequest")
 
             let eventAckHeaderData = try await receiveWithTimeout(
                 connection: eventConnection!,
@@ -417,16 +616,17 @@ class NetworkScannerService: ObservableObject {
 
             guard let eventAckHeader = PTPIPHeader.from(eventAckHeaderData),
                   eventAckHeader.type == PTPIPPacketType.initEventAck.rawValue else {
-                print("[Scanner:\(ip)] Event channel handshake failed")
+                print("[Scanner:\(ip)]   FAILED: Event channel handshake failed")
                 cleanupConnections()
                 return nil
             }
-            print("[Scanner:\(ip)] Got InitEventAck - HANDSHAKE COMPLETE ✓")
+            print("[Scanner:\(ip)]   Received InitEventAck - handshake complete")
 
             // === STAGE 5: Prepare Session (COMMIT POINT) ===
             // Once we reach here, we FINISH session setup even if cancelled.
             // A successfully prepared session is valuable - don't throw it away!
-            print("[Scanner:\(ip)] 🔒 COMMIT POINT - preparing session (will complete even if cancelled)")
+            print("[Scanner:\(ip)] Stage 5: Session preparation (COMMIT POINT)")
+            print("[Scanner:\(ip)]   Will complete even if cancelled - session is valuable")
 
             let sessionID = UInt32.random(in: 1...UInt32.max)
             let session = await PTPIPSession(sessionID: sessionID, guid: self.persistentGUID)
@@ -441,8 +641,12 @@ class NetworkScannerService: ObservableObject {
 
                 // SUCCESS - Return even if Task.isCancelled is now true
                 // The session is valuable - the caller can decide what to do with it
+                let totalDuration = Date().timeIntervalSince(scanStart)
                 let wasCancelled = Task.isCancelled
-                print("[Scanner:\(ip)] ✅ Session prepared (cancelled=\(wasCancelled)) - returning camera")
+                print("[Scanner:\(ip)] SUCCESS in \(String(format: "%.2f", totalDuration))s")
+                print("[Scanner:\(ip)]   Camera: \(cameraName)")
+                print("[Scanner:\(ip)]   Session ID: \(sessionID)")
+                print("[Scanner:\(ip)]   Was cancelled: \(wasCancelled)")
 
                 return DiscoveredCamera(
                     name: cameraName,
@@ -453,7 +657,9 @@ class NetworkScannerService: ObservableObject {
 
             } catch {
                 // Session preparation failed - clean up everything
-                print("[Scanner:\(ip)] ❌ Session preparation failed: \(error.localizedDescription)")
+                let totalDuration = Date().timeIntervalSince(scanStart)
+                print("[Scanner:\(ip)] FAILED after \(String(format: "%.2f", totalDuration))s")
+                print("[Scanner:\(ip)]   Session preparation error: \(error.localizedDescription)")
                 await session.disconnect()
                 cleanupConnections()
                 return nil
@@ -461,45 +667,80 @@ class NetworkScannerService: ObservableObject {
 
         } catch {
             // Any error in stages 2-4 - clean up
+            let totalDuration = Date().timeIntervalSince(scanStart)
+            print("[Scanner:\(ip)] FAILED after \(String(format: "%.2f", totalDuration))s - \(error.localizedDescription)")
             cleanupConnections()
             return nil
         }
     }
 
-    /// Wait for NWConnection to reach ready state
+    /// Wait for NWConnection to reach ready state with timeout
+    /// Uses actor-isolated state to safely handle the race between connection and timeout
     private func waitForConnection(_ connection: NWConnection, timeout: TimeInterval) async throws {
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask {
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    var resumed = false
-                    connection.stateUpdateHandler = { state in
-                        guard !resumed else { return }
-                        switch state {
-                        case .ready:
-                            resumed = true
-                            continuation.resume()
-                        case .failed(let error):
-                            resumed = true
-                            continuation.resume(throwing: error)
-                        case .cancelled:
-                            resumed = true
-                            continuation.resume(throwing: CancellationError())
-                        default:
-                            break
-                        }
-                    }
+        // Use a class to share state between callback and timeout
+        final class ConnectionState: @unchecked Sendable {
+            var isCompleted = false
+            var result: Result<Void, Error>?
+            let lock = NSLock()
+            
+            func complete(with result: Result<Void, Error>) -> Bool {
+                lock.lock()
+                defer { lock.unlock() }
+                guard !isCompleted else { return false }
+                isCompleted = true
+                self.result = result
+                return true
+            }
+        }
+        
+        let state = ConnectionState()
+        
+        // Set up connection state handler
+        connection.stateUpdateHandler = { connectionState in
+            switch connectionState {
+            case .ready:
+                if state.complete(with: .success(())) {
+                    // State changed to ready
+                }
+            case .failed(let error):
+                _ = state.complete(with: .failure(error))
+            case .waiting(let error):
+                // .waiting means blocked (permission denied, no route, etc.)
+                _ = state.complete(with: .failure(error))
+            case .cancelled:
+                _ = state.complete(with: .failure(CancellationError()))
+            case .setup, .preparing:
+                break  // Still connecting, wait
+            @unknown default:
+                break
+            }
+        }
+        
+        // Poll with timeout
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            // Check if completed
+            state.lock.lock()
+            let completed = state.isCompleted
+            let result = state.result
+            state.lock.unlock()
+            
+            if completed, let result = result {
+                switch result {
+                case .success:
+                    return
+                case .failure(let error):
+                    throw error
                 }
             }
-
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                throw NetworkScannerError.timeout
-            }
-
-            // Wait for first to complete
-            _ = try await group.next()!
-            group.cancelAll()
+            
+            // Sleep briefly before checking again
+            try await Task.sleep(nanoseconds: 50_000_000)  // 50ms
         }
+        
+        // Timeout - mark as completed to prevent late callbacks
+        _ = state.complete(with: .failure(NetworkScannerError.timeout))
+        throw NetworkScannerError.timeout
     }
 
     /// Send data to connection

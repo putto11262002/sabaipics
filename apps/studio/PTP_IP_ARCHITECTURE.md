@@ -154,6 +154,97 @@ return nil  cleanup         cleanup            finish & return  RETURN SUCCESS
 
 **Key principle:** Once session preparation starts, we COMPLETE it even if cancelled. A prepared session is valuable.
 
+### Two-Layer Retry Strategy (SAB-37)
+
+Camera discovery uses a two-layer retry strategy to handle cameras that join the network late or have slow PTP/IP startup.
+
+#### Layer 1: Scan Waves (Network Timing)
+
+Handles cameras that join the Personal Hotspot network after scanning starts.
+
+| Parameter   | Value | Purpose                             |
+| ----------- | ----- | ----------------------------------- |
+| Max waves   | 3     | Full IP range scans                 |
+| Wave delay  | 3s    | Wait between waves                  |
+| Early exit  | Yes   | Stop waves if camera found          |
+| Cancellable | Yes   | Between waves and during wave delay |
+
+```
+Wave 1: Scan .2-.20 in parallel
+   ↓ (no camera found)
+   3s delay
+   ↓
+Wave 2: Scan .2-.20 in parallel
+   ↓ (camera found!)
+   Stop early - return results
+```
+
+#### Layer 2: Per-IP Retry (PTP/IP Timing)
+
+Handles cameras where the PTP/IP listener isn't ready immediately after network connection.
+
+| Parameter   | Value | Purpose                            |
+| ----------- | ----- | ---------------------------------- |
+| Max retries | 3     | TCP connection attempts per IP     |
+| Retry delay | 0.5s  | Wait between retry attempts        |
+| Cancellable | Yes   | Before each retry and during delay |
+
+#### Error Classification
+
+Not all TCP errors are worth retrying. The scanner classifies errors:
+
+| Error Code     | Action    | Reason                                   |
+| -------------- | --------- | ---------------------------------------- |
+| `ECONNREFUSED` | Retry     | Port not listening yet (camera starting) |
+| `ETIMEDOUT`    | Retry     | Slow response (camera busy)              |
+| `EHOSTUNREACH` | Fail fast | No device at this IP                     |
+| `ENETUNREACH`  | Fail fast | Wrong network/subnet                     |
+| Timeout        | Fail fast | No response within perIPTimeout          |
+
+#### Timing Expectations
+
+| Scenario                     | Expected Time |
+| ---------------------------- | ------------- |
+| Camera ready immediately     | ~3s           |
+| Camera needs TCP retry       | ~4-5s         |
+| Camera joins during wave 2   | ~6-9s         |
+| Camera joins during wave 3   | ~9-12s        |
+| No camera found (worst case) | ~15s          |
+
+#### Cancellation Points
+
+Scanning is cancellable at any moment:
+
+1. Before starting each wave
+2. Before each IP scan within a wave
+3. During TCP retry delay (0.5s)
+4. During wave delay (3s)
+
+Uses `guard !Task.isCancelled else { return }` pattern throughout.
+
+#### Connection Timeout Implementation
+
+TCP connection timeout uses a polling-based approach for reliability:
+
+```
+waitForConnection(timeout: 2s):
+  1. Set up NWConnection state handler (runs on background queue)
+  2. Poll every 50ms to check if connection completed
+  3. If timeout reached, throw NetworkScannerError.timeout
+```
+
+**Why polling instead of TaskGroup?**
+
+- TaskGroup-based timeout had reliability issues (tasks not running in parallel correctly)
+- Polling guarantees timeout fires after exactly 2s
+- Background queue for NWConnection avoids main thread deadlock
+
+| Parameter          | Value                           |
+| ------------------ | ------------------------------- |
+| Connection timeout | 2s                              |
+| Poll interval      | 50ms                            |
+| Network queue      | Background (QoS: userInitiated) |
+
 ### Selection Flow
 
 ```
