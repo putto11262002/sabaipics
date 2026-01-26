@@ -1,28 +1,31 @@
-import { useState } from "react";
-import { Badge } from "@sabaipics/uiv2/components/badge";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@sabaipics/uiv2/components/card";
-import { Calendar, Image as ImageIcon, Clock, BarChart3 } from "lucide-react";
-import { parseISO, differenceInDays, differenceInDays as daysBetween, format } from "date-fns";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { useState } from 'react';
+import { Badge } from '@sabaipics/uiv3/components/badge';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription,
+} from '@sabaipics/uiv3/components/card';
+import { Calendar, Image as ImageIcon, Clock, BarChart3 } from 'lucide-react';
+import { parseISO, differenceInDays, differenceInDays as daysBetween, format } from 'date-fns';
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@sabaipics/uiv2/components/chart";
+} from '@sabaipics/uiv3/components/chart';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@sabaipics/uiv2/components/select";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@sabaipics/uiv2/components/toggle-group";
-import { useParams } from "react-router";
-import { useEvent } from "../../../../hooks/events/useEvent";
+} from '@sabaipics/uiv3/components/select';
+import { ToggleGroup, ToggleGroupItem } from '@sabaipics/uiv3/components/toggle-group';
+import { useParams } from 'react-router';
+import { useEvent } from '../../../../hooks/events/useEvent';
 
 // Mock data for photo uploads chart
 const generateMockChartData = (days: number) => {
@@ -32,7 +35,7 @@ const generateMockChartData = (days: number) => {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
     data.push({
-      date: format(date, "yyyy-MM-dd"),
+      date: format(date, 'yyyy-MM-dd'),
       uploads: Math.floor(Math.random() * 50) + 10,
     });
   }
@@ -41,15 +44,15 @@ const generateMockChartData = (days: number) => {
 
 const chartConfig = {
   uploads: {
-    label: "Photos Uploaded",
-    color: "hsl(var(--primary))",
+    label: 'Photos Uploaded',
+    color: 'hsl(var(--primary))',
   },
 } satisfies ChartConfig;
 
 export default function EventStatisticsTab() {
   const { id } = useParams<{ id: string }>();
   const { data } = useEvent(id);
-  const [timeRange, setTimeRange] = useState<"7d" | "30d" | "all">("30d");
+  const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'all'>('30d');
 
   if (!data?.data) {
     return null;
@@ -65,12 +68,13 @@ export default function EventStatisticsTab() {
   const daysSinceCreation = differenceInDays(new Date(), parseISO(event.createdAt));
 
   // Calculate event duration
-  const eventDuration = event.startDate && event.endDate
-    ? daysBetween(parseISO(event.endDate), parseISO(event.startDate)) + 1
-    : null;
+  const eventDuration =
+    event.startDate && event.endDate
+      ? daysBetween(parseISO(event.endDate), parseISO(event.startDate)) + 1
+      : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 py-4">
       {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Photos Stat */}
@@ -80,14 +84,10 @@ export default function EventStatisticsTab() {
               <ImageIcon className="size-4" />
               Total Photos
             </CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums">
-              0
-            </CardTitle>
+            <CardTitle className="text-2xl font-semibold tabular-nums">0</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">
-              No photos uploaded yet
-            </p>
+            <p className="text-xs text-muted-foreground">No photos uploaded yet</p>
           </CardContent>
         </Card>
 
@@ -98,14 +98,10 @@ export default function EventStatisticsTab() {
               <BarChart3 className="size-4" />
               Storage Used
             </CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums">
-              0 MB
-            </CardTitle>
+            <CardTitle className="text-2xl font-semibold tabular-nums">0 MB</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">
-              Of event storage
-            </p>
+            <p className="text-xs text-muted-foreground">Of event storage</p>
           </CardContent>
         </Card>
 
@@ -121,9 +117,7 @@ export default function EventStatisticsTab() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">
-              {daysUntilExpiry} days until expiry
-            </p>
+            <p className="text-xs text-muted-foreground">{daysUntilExpiry} days until expiry</p>
           </CardContent>
         </Card>
 
@@ -136,7 +130,9 @@ export default function EventStatisticsTab() {
             </CardDescription>
             <CardTitle className="text-xl">
               {isExpired ? (
-                <Badge variant="destructive" className="mt-1">Expired</Badge>
+                <Badge variant="destructive" className="mt-1">
+                  Expired
+                </Badge>
               ) : isExpiringSoon ? (
                 <Badge variant="outline" className="mt-1 border-orange-500 text-orange-500">
                   Expires in {daysUntilExpiry}d
@@ -150,7 +146,7 @@ export default function EventStatisticsTab() {
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              {eventDuration ? `${eventDuration} day event` : "Duration not set"}
+              {eventDuration ? `${eventDuration} day event` : 'Duration not set'}
             </p>
           </CardContent>
         </Card>
@@ -162,7 +158,8 @@ export default function EventStatisticsTab() {
           <div>
             <CardTitle>Photo Uploads Over Time</CardTitle>
             <CardDescription>
-              Daily upload activity for the last {timeRange === "7d" ? "7 days" : timeRange === "30d" ? "30 days" : "all time"}
+              Daily upload activity for the last{' '}
+              {timeRange === '7d' ? '7 days' : timeRange === '30d' ? '30 days' : 'all time'}
             </CardDescription>
           </div>
 
@@ -170,7 +167,7 @@ export default function EventStatisticsTab() {
           <ToggleGroup
             type="single"
             value={timeRange}
-            onValueChange={(value) => value && setTimeRange(value as "7d" | "30d" | "all")}
+            onValueChange={(value) => value && setTimeRange(value as '7d' | '30d' | 'all')}
             className="hidden sm:flex"
           >
             <ToggleGroupItem value="7d" variant="outline">
@@ -187,7 +184,7 @@ export default function EventStatisticsTab() {
           {/* Time Range Selector - Mobile */}
           <Select
             value={timeRange}
-            onValueChange={(value) => setTimeRange(value as "7d" | "30d" | "all")}
+            onValueChange={(value) => setTimeRange(value as '7d' | '30d' | 'all')}
           >
             <SelectTrigger className="w-[140px] sm:hidden">
               <SelectValue />
@@ -202,21 +199,13 @@ export default function EventStatisticsTab() {
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[300px] w-full">
             <AreaChart
-              data={generateMockChartData(timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90)}
+              data={generateMockChartData(timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90)}
               margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
             >
               <defs>
                 <linearGradient id="fillUploads" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="var(--color-uploads)"
-                    stopOpacity={0.8}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="var(--color-uploads)"
-                    stopOpacity={0.1}
-                  />
+                  <stop offset="5%" stopColor="var(--color-uploads)" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="var(--color-uploads)" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -228,18 +217,11 @@ export default function EventStatisticsTab() {
                 minTickGap={32}
                 tickFormatter={(value: string) => {
                   const date = new Date(value);
-                  return format(date, "MMM d");
+                  return format(date, 'MMM d');
                 }}
               />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-              />
-              <ChartTooltip
-                cursor={false}
-                content={<ChartTooltipContent indicator="line" />}
-              />
+              <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+              <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
               <Area
                 dataKey="uploads"
                 type="natural"

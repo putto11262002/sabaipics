@@ -5,10 +5,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@sabaipics/uiv2/components/table";
-import { Checkbox } from "@sabaipics/uiv2/components/checkbox";
-import { Skeleton } from "@sabaipics/uiv2/components/skeleton";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@sabaipics/uiv2/components/empty";
+} from "@sabaipics/uiv3/components/table";
+import { Checkbox } from "@sabaipics/uiv3/components/checkbox";
+import { Skeleton } from "@sabaipics/uiv3/components/skeleton";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@sabaipics/uiv3/components/empty";
 import { Check, Image as ImageIcon } from "lucide-react";
 import type { Photo } from "../../hooks/photos/usePhotos";
 import { useState, useEffect, useRef } from "react";

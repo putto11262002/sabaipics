@@ -1,36 +1,35 @@
-import { createBrowserRouter, Navigate } from "react-router";
-import { SignedIn, SignedOut } from "@sabaipics/auth/react";
-import { ProtectedRoute } from "./components/auth/ProtectedRoute";
-import { ConsentGate } from "./components/auth/ConsentGate";
-import { SignInPage } from "./routes/sign-in";
-import { SignUpPage } from "./routes/sign-up";
-import { OnboardingPage } from "./routes/onboarding";
-import { DashboardPage } from "./routes/dashboard";
-import { CreditPackagesPage } from "./routes/credits/packages";
-import { CreditSuccessPage } from "./routes/credits/success";
-import EventsPage from "./routes/events";
-import EventDetailLayout from "./routes/events/[id]/layout";
-import EventDetailsTab from "./routes/events/[id]/details";
-import EventUploadTab from "./routes/events/[id]/upload";
-import EventStatisticsTab from "./routes/events/[id]/statistics";
-import EventPhotosTab from "./routes/events/[id]/photos";
-import EventFacesTab from "./routes/events/[id]/faces";
-import { Layout } from "./components/Layout";
+import { createBrowserRouter, Navigate } from 'react-router';
+import { SignedIn, SignedOut } from '@sabaipics/auth/react';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { ConsentGate } from './components/auth/ConsentGate';
+import { SignInPage } from './routes/sign-in';
+import { SignUpPage } from './routes/sign-up';
+import { OnboardingPage } from './routes/onboarding';
+import { DashboardPage } from './routes/dashboard';
+import { CreditPackagesPage } from './routes/credits/packages';
+import { CreditSuccessPage } from './routes/credits/success';
+import EventsPage from './routes/events';
+import EventDetailLayout from './routes/events/[id]/layout';
+import EventDetailsTab from './routes/events/[id]/details';
+import EventUploadTab from './routes/events/[id]/upload';
+import EventStatisticsTab from './routes/events/[id]/statistics';
+import EventPhotosTab from './routes/events/[id]/photos';
+import { SidebarLayout } from './components/shell/sidebar-layout';
 
 export const router = createBrowserRouter([
   // Public routes
   {
-    path: "/sign-in/*",
+    path: '/sign-in/*',
     element: <SignInPage />,
   },
   {
-    path: "/sign-up/*",
+    path: '/sign-up/*',
     element: <SignUpPage />,
   },
 
   // Onboarding route (auth required, no consent required)
   {
-    path: "/onboarding",
+    path: '/onboarding',
     element: (
       <ProtectedRoute>
         <OnboardingPage />
@@ -40,7 +39,7 @@ export const router = createBrowserRouter([
 
   // Credits routes (auth + consent required, no sidebar)
   {
-    path: "/credits",
+    path: '/credits',
     element: (
       <ProtectedRoute>
         <ConsentGate />
@@ -48,11 +47,11 @@ export const router = createBrowserRouter([
     ),
     children: [
       {
-        path: "packages",
+        path: 'packages',
         element: <CreditPackagesPage />,
       },
       {
-        path: "success",
+        path: 'success',
         element: <CreditSuccessPage />,
       },
     ],
@@ -63,21 +62,21 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <ConsentGate>
-          <Layout />
+          <SidebarLayout />
         </ConsentGate>
       </ProtectedRoute>
     ),
     children: [
       {
-        path: "/dashboard",
+        path: '/dashboard',
         element: <DashboardPage />,
       },
       {
-        path: "/events",
+        path: '/events',
         element: <EventsPage />,
       },
       {
-        path: "/events/:id",
+        path: '/events/:id',
         element: <EventDetailLayout />,
         children: [
           {
@@ -85,24 +84,20 @@ export const router = createBrowserRouter([
             element: <Navigate to="details" replace />,
           },
           {
-            path: "details",
+            path: 'details',
             element: <EventDetailsTab />,
           },
           {
-            path: "upload",
+            path: 'upload',
             element: <EventUploadTab />,
           },
           {
-            path: "statistics",
+            path: 'statistics',
             element: <EventStatisticsTab />,
           },
           {
-            path: "photos",
+            path: 'photos',
             element: <EventPhotosTab />,
-          },
-          {
-            path: "faces",
-            element: <EventFacesTab />,
           },
         ],
       },
@@ -111,7 +106,7 @@ export const router = createBrowserRouter([
 
   // Root redirect
   {
-    path: "/",
+    path: '/',
     element: (
       <>
         <SignedIn>

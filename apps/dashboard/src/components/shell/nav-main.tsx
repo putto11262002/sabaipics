@@ -5,7 +5,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from '@sabaipics/uiv2/components/collapsible';
+} from '@sabaipics/uiv3/components/collapsible';
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -16,7 +16,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-} from '@sabaipics/uiv2/components/sidebar';
+} from '@sabaipics/uiv3/components/sidebar';
 
 export function NavMain({
   items,
@@ -39,7 +39,7 @@ export function NavMain({
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => {
-          const isActive = item.isActive || location.pathname.startsWith(item.url);
+          const isActive = location.pathname.startsWith(item.url);
 
           return (
             <Collapsible key={item.title} asChild defaultOpen={isActive}>

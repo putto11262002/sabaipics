@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { RouterProvider } from "react-router";
 import { Toaster } from "sonner";
-import "@sabaipics/uiv2/styles/globals.css";
+import "@sabaipics/uiv3/styles/globals.css";
 import "sonner/dist/styles.css";
 import { router } from "./router.tsx";
 

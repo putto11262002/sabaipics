@@ -4,24 +4,24 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Slot } from "radix-ui"
 
-import { cn } from "../../lib/utils"
-import { Button } from "./button"
-import { Input } from "./input"
-import { Separator } from "./separator"
+import { cn } from "@sabaipics/uiv2/lib/utils"
+import { Button } from "@sabaipics/uiv2/components/button"
+import { Input } from "@sabaipics/uiv2/components/input"
+import { Separator } from "@sabaipics/uiv2/components/separator"
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "./sheet"
-import { Skeleton } from "./skeleton"
+} from "@sabaipics/uiv2/components/sheet"
+import { Skeleton } from "@sabaipics/uiv2/components/skeleton"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "./tooltip"
-import { useIsMobile } from "../../hooks/use-mobile"
+} from "@sabaipics/uiv2/components/tooltip"
+import { useIsMobile } from "@sabaipics/uiv2/hooks/use-mobile"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { SidebarLeftIcon } from "@hugeicons/core-free-icons"
 

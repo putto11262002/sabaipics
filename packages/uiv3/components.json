@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "radix-nova",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "hugeicons",
+  "aliases": {
+    "components": "@sabaipics/uiv3/components",
+    "utils": "@sabaipics/uiv3/lib/utils",
+    "ui": "@sabaipics/uiv3/components",
+    "lib": "@sabaipics/uiv3/lib",
+    "hooks": "@sabaipics/uiv3/hooks"
+  }
+}
