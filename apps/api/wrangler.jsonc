@@ -121,6 +121,9 @@
   "env": {
     // Staging environment - auto-deploy from master
     "staging": {
+      "images": {
+        "binding": "IMAGES",
+      },
       "vars": {
         "NODE_ENV": "staging",
         "DASHBOARD_FRONTEND_URL": "https://app-staging.sabaipics.com",
@@ -224,6 +227,9 @@
     },
     // Production environment - manual approval
     "production": {
+      "images": {
+        "binding": "IMAGES",
+      },
       "vars": {
         "NODE_ENV": "production",
         "DASHBOARD_FRONTEND_URL": "https://app.sabaipics.com",

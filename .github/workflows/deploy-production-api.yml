@@ -1,7 +1,11 @@
-name: Deploy Production
+name: Deploy Production API
 
 on:
   workflow_dispatch:
+
+concurrency:
+  group: deploy-production-api
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -79,22 +83,6 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      # Create dashboard env file for production
-      - name: Create Dashboard Env
-        run: |
-          echo "VITE_API_URL=https://api.sabaipics.com" > apps/dashboard/.env.production
-          echo "VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }}" >> apps/dashboard/.env.production
-
-      - run: pnpm build
-
-      # Deploy API to Cloudflare Workers
-      - name: Deploy API
-        run: pnpm --filter=@sabaipics/api deploy:prod
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      # Set API secrets
       - name: Set API Secrets
         working-directory: apps/api
         env:
@@ -123,9 +111,8 @@ jobs:
             echo "$LINE_CHANNEL_ACCESS_TOKEN" | pnpm wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
           fi
 
-      # Deploy Dashboard to Cloudflare Pages
-      - name: Deploy Dashboard
-        run: pnpm --filter=@sabaipics/dashboard deploy:prod
+      - name: Deploy API
+        run: pnpm --filter=@sabaipics/api deploy:prod
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

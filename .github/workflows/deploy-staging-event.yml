@@ -1,0 +1,56 @@
+name: Deploy Staging Event
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/event/**'
+      - 'packages/ui/**'
+      - 'packages/uiv2/**'
+      - 'packages/auth/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'turbo.json'
+      - '.github/workflows/deploy-staging-event.yml'
+
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging-event
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - run: pnpm install
+
+      - name: Create Event Env
+        run: |
+          echo "VITE_API_URL=https://api-staging.sabaipics.com" > apps/event/.env.staging
+          echo "VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }}" >> apps/event/.env.staging
+
+      # Build API first so tsc generates .d.ts files for hono client types
+      # Worker types come from committed worker-configuration.d.ts (generated locally)
+      - name: Build API
+        run: pnpm --filter=@sabaipics/api build
+
+      - name: Build Event
+        run: pnpm --filter=@sabaipics/event build:staging
+
+      - name: Deploy Event
+        run: pnpm --filter=@sabaipics/event exec wrangler pages deploy dist --project-name=event --branch=staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
