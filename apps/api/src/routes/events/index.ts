@@ -274,7 +274,7 @@ export const eventsRouter = new Hono<Env>()
       // Generate QR code on-demand
       let qrPng: Uint8Array;
       try {
-        qrPng = await generateEventQR(event.id, c.env.APP_BASE_URL, size as QRSize);
+        qrPng = await generateEventQR(event.id, c.env.EVENT_FRONTEND_URL, size as QRSize);
       } catch (e) {
         console.error('[QR] Download generation failed:', e);
         const reason = e instanceof Error ? e.message : 'unknown error';

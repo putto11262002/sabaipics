@@ -1,0 +1,48 @@
+name: Deploy Staging Dashboard
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/dashboard/**'
+      - 'packages/ui/**'
+      - 'packages/uiv2/**'
+      - 'packages/auth/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'turbo.json'
+      - '.github/workflows/deploy-staging-dashboard.yml'
+
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging-dashboard
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: stage
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - run: pnpm install
+
+      - name: Create Dashboard Env
+        run: |
+          echo "VITE_API_URL=https://api-staging.sabaipics.com" > apps/dashboard/.env.staging
+          echo "VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }}" >> apps/dashboard/.env.staging
+
+      - name: Deploy Dashboard
+        run: pnpm --filter=@sabaipics/dashboard deploy:staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
