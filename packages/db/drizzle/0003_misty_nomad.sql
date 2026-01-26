@@ -1,1 +1,0 @@
-ALTER TABLE "credit_ledger" ADD CONSTRAINT "credit_ledger_stripe_session_unique" UNIQUE("stripe_session_id");
