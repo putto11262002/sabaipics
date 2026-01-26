@@ -11,14 +11,14 @@
  * Run: pnpm test -- consent
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Hono } from "hono";
-import { createDb, createDbTx } from "@sabaipics/db";
-import { photographers, consentRecords } from "@sabaipics/db";
-import { eq } from "drizzle-orm";
-import { consentRouter } from "./consent";
-import { randomUUID } from "crypto";
-import type { Bindings } from "../types";
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { Hono } from 'hono';
+import { createDb, createDbTx } from '@sabaipics/db';
+import { photographers, consentRecords } from '@sabaipics/db';
+import { eq } from 'drizzle-orm';
+import { consentRouter } from './consent';
+import { randomUUID } from 'crypto';
+import type { Bindings } from '../types';
 
 // =============================================================================
 // Test Setup
@@ -26,7 +26,7 @@ import type { Bindings } from "../types";
 
 const TEST_PHOTOGRAPHER_ID = randomUUID();
 // Must match the userId injected by createClerkAuth middleware when NODE_ENV=test
-const TEST_CLERK_ID = "test_clerk_user_integration";
+const TEST_CLERK_ID = 'test_clerk_user_integration';
 
 /**
  * Create a test photographer in the database.
@@ -40,7 +40,7 @@ async function createTestPhotographer() {
       id: TEST_PHOTOGRAPHER_ID,
       clerkId: TEST_CLERK_ID,
       email: `test-workers-${Date.now()}@sabaipics.com`,
-      name: "Workers Runtime Test",
+      name: 'Workers Runtime Test',
     })
     .returning();
   return photographer;
@@ -51,19 +51,18 @@ async function createTestPhotographer() {
  */
 async function cleanupTestData() {
   const db = createDb(process.env.DATABASE_URL!);
-  await db
-    .delete(consentRecords)
-    .where(eq(consentRecords.photographerId, TEST_PHOTOGRAPHER_ID));
-  await db
-    .delete(photographers)
-    .where(eq(photographers.id, TEST_PHOTOGRAPHER_ID));
+  await db.delete(consentRecords).where(eq(consentRecords.photographerId, TEST_PHOTOGRAPHER_ID));
+  await db.delete(photographers).where(eq(photographers.id, TEST_PHOTOGRAPHER_ID));
 }
 
 // =============================================================================
 // Test
 // =============================================================================
 
-describe("POST /consent - Framework-Level (Hono Router)", () => {
+const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
+const describeDb = hasDatabaseUrl ? describe : describe.skip;
+
+describeDb('POST /consent - Framework-Level (Hono Router)', () => {
   beforeAll(async () => {
     await createTestPhotographer();
   }, 30000);
@@ -72,89 +71,89 @@ describe("POST /consent - Framework-Level (Hono Router)", () => {
     await cleanupTestData();
   }, 30000);
 
-  it(
-    "atomically inserts consent record and updates photographer",
-    async () => {
-      // Build the Hono app with proper env types
-      type Env = {
-        Bindings: Bindings;
-        Variables: {
-          auth: { userId: string; sessionId: string };
-          photographer: { id: string; clerkId: string; email: string; pdpaConsentAt: string | null };
-          db: () => ReturnType<typeof createDb>;
-          dbTx: () => ReturnType<typeof createDbTx>;
-        };
+  it('atomically inserts consent record and updates photographer', async () => {
+    // Build the Hono app with proper env types
+    type Env = {
+      Bindings: Bindings;
+      Variables: {
+        auth: { userId: string; sessionId: string };
+        photographer: { id: string; clerkId: string; email: string; pdpaConsentAt: string | null };
+        db: () => ReturnType<typeof createDb>;
+        dbTx: () => ReturnType<typeof createDbTx>;
       };
+    };
 
-      const app = new Hono<Env>()
-        // Mock auth middleware is bypassed when NODE_ENV=test in createClerkAuth
-        // But we still need to set up the context variables for downstream middleware
-        .use("/*", (c, next) => {
-          c.set("auth", { userId: TEST_CLERK_ID, sessionId: "test_session" });
-          return next();
-        })
-        // Set up DB using c.env.DATABASE_URL (from third param of app.request)
-        .use("/*", (c, next) => {
-          const dbUrl = c.env.DATABASE_URL;
-          c.set("db", () => createDb(dbUrl));
-          c.set("dbTx", () => createDbTx(dbUrl));
-          return next();
-        })
-        // Mock photographer context
-        .use("/*", (c, next) => {
-          c.set("photographer", {
-            id: TEST_PHOTOGRAPHER_ID,
-            clerkId: TEST_CLERK_ID,
-            email: `test@workers.com`,
-            pdpaConsentAt: null,
-          });
-          return next();
-        })
-        // Mount consent router
-        .route("/consent", consentRouter);
+    const app = new Hono<Env>()
+      // Mock auth middleware is bypassed when NODE_ENV=test in createClerkAuth
+      // But we still need to set up the context variables for downstream middleware
+      .use('/*', (c, next) => {
+        c.set('auth', { userId: TEST_CLERK_ID, sessionId: 'test_session' });
+        return next();
+      })
+      // Set up DB using c.env.DATABASE_URL (from third param of app.request)
+      .use('/*', (c, next) => {
+        const dbUrl = c.env.DATABASE_URL;
+        c.set('db', () => createDb(dbUrl));
+        c.set('dbTx', () => createDbTx(dbUrl));
+        return next();
+      })
+      // Mock photographer context
+      .use('/*', (c, next) => {
+        c.set('photographer', {
+          id: TEST_PHOTOGRAPHER_ID,
+          clerkId: TEST_CLERK_ID,
+          email: `test@workers.com`,
+          pdpaConsentAt: null,
+        });
+        return next();
+      })
+      // Mount consent router
+      .route('/consent', consentRouter);
 
-      // Make request using app.request() - pass mock env with DATABASE_URL
-      const res = await app.request("/consent", {
-        method: "POST",
+    // Make request using app.request() - pass mock env with DATABASE_URL
+    const res = await app.request(
+      '/consent',
+      {
+        method: 'POST',
         headers: {
-          "CF-Connecting-IP": "203.0.113.1",
-          "Content-Type": "application/json",
+          'CF-Connecting-IP': '203.0.113.1',
+          'Content-Type': 'application/json',
         },
-      }, { DATABASE_URL: process.env.DATABASE_URL! }); // Pass env bindings - c.env.DATABASE_URL will be available
+      },
+      { DATABASE_URL: process.env.DATABASE_URL! },
+    ); // Pass env bindings - c.env.DATABASE_URL will be available
 
-      // Verify response
-      expect(res.status).toBe(201);
+    // Verify response
+    expect(res.status).toBe(201);
 
-      const body = await res.json() as { data: { consentType: string } };
-      expect(body.data.consentType).toBe("pdpa");
+    const body = (await res.json()) as { data: { consentType: string } };
+    expect(body.data.consentType).toBe('pdpa');
 
-      // Verify DB state - both tables should be updated atomically
-      const db = createDb(process.env.DATABASE_URL!);
+    // Verify DB state - both tables should be updated atomically
+    const db = createDb(process.env.DATABASE_URL!);
 
-      // 1. Check consent_record was created
-      const [consent] = await db
-        .select()
-        .from(consentRecords)
-        .where(eq(consentRecords.photographerId, TEST_PHOTOGRAPHER_ID))
-        .limit(1);
+    // 1. Check consent_record was created
+    const [consent] = await db
+      .select()
+      .from(consentRecords)
+      .where(eq(consentRecords.photographerId, TEST_PHOTOGRAPHER_ID))
+      .limit(1);
 
-      expect(consent).toBeDefined();
-      expect(consent?.consentType).toBe("pdpa");
-      expect(consent?.ipAddress).toBe("203.0.113.1");
+    expect(consent).toBeDefined();
+    expect(consent?.consentType).toBe('pdpa');
+    expect(consent?.ipAddress).toBe('203.0.113.1');
 
-      // 2. Check photographers.pdpa_consent_at was updated
-      const [photographer] = await db
-        .select()
-        .from(photographers)
-        .where(eq(photographers.id, TEST_PHOTOGRAPHER_ID))
-        .limit(1);
+    // 2. Check photographers.pdpa_consent_at was updated
+    const [photographer] = await db
+      .select()
+      .from(photographers)
+      .where(eq(photographers.id, TEST_PHOTOGRAPHER_ID))
+      .limit(1);
 
-      expect(photographer?.pdpaConsentAt).not.toBeNull();
+    expect(photographer?.pdpaConsentAt).not.toBeNull();
 
-      console.log(`✓ Neon transactions work in framework-level test`);
-    },
-    30000
-  );
+    console.log(`✓ Neon transactions work in framework-level test`);
+  }, 30000);
 });
 
 // =============================================================================

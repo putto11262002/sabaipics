@@ -17,22 +17,22 @@
  * Run: pnpm test -- stripe
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Hono } from "hono";
-import { createDb, createDbTx } from "@sabaipics/db";
-import { photographers, creditLedger } from "@sabaipics/db";
-import { eq } from "drizzle-orm";
-import { stripeWebhookRouter } from "./stripe";
-import { randomUUID } from "crypto";
-import type { Bindings } from "../../types";
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { Hono } from 'hono';
+import { createDb, createDbTx } from '@sabaipics/db';
+import { photographers, creditLedger } from '@sabaipics/db';
+import { eq } from 'drizzle-orm';
+import { stripeWebhookRouter } from './stripe';
+import { randomUUID } from 'crypto';
+import type { Bindings } from '../../types';
 
 // =============================================================================
 // Test Setup
 // =============================================================================
 
 const TEST_PHOTOGRAPHER_ID = randomUUID();
-const TEST_CLERK_ID = "test_stripe_" + randomUUID();
-const TEST_STRIPE_SESSION_ID = "cs_test_stripe_webhook_" + randomUUID();
+const TEST_CLERK_ID = 'test_stripe_' + randomUUID();
+const TEST_STRIPE_SESSION_ID = 'cs_test_stripe_webhook_' + randomUUID();
 
 /**
  * Create a test photographer in the database.
@@ -46,7 +46,7 @@ async function createTestPhotographer() {
       id: TEST_PHOTOGRAPHER_ID,
       clerkId: TEST_CLERK_ID,
       email: `test-stripe-${Date.now()}@sabaipics.com`,
-      name: "Stripe Webhook Test",
+      name: 'Stripe Webhook Test',
     })
     .returning();
   return photographer;
@@ -57,12 +57,8 @@ async function createTestPhotographer() {
  */
 async function cleanupTestData() {
   const db = createDb(process.env.DATABASE_URL!);
-  await db
-    .delete(creditLedger)
-    .where(eq(creditLedger.photographerId, TEST_PHOTOGRAPHER_ID));
-  await db
-    .delete(photographers)
-    .where(eq(photographers.id, TEST_PHOTOGRAPHER_ID));
+  await db.delete(creditLedger).where(eq(creditLedger.photographerId, TEST_PHOTOGRAPHER_ID));
+  await db.delete(photographers).where(eq(photographers.id, TEST_PHOTOGRAPHER_ID));
 }
 
 /**
@@ -75,23 +71,23 @@ async function cleanupTestData() {
 function createStripeCheckoutEvent() {
   return {
     id: `evt_test_${randomUUID()}`,
-    object: "event",
-    api_version: "2022-11-15",
+    object: 'event',
+    api_version: '2022-11-15',
     created: Math.floor(Date.now() / 1000),
     data: {
       object: {
         id: TEST_STRIPE_SESSION_ID,
-        object: "checkout.session",
-        payment_status: "paid",
+        object: 'checkout.session',
+        payment_status: 'paid',
         metadata: {
           photographer_id: TEST_PHOTOGRAPHER_ID,
-          credits: "10"
+          credits: '10',
         },
         amount_total: 1000,
-        currency: "usd"
-      }
+        currency: 'usd',
+      },
     },
-    type: "checkout.session.completed"
+    type: 'checkout.session.completed',
   };
 }
 
@@ -99,7 +95,10 @@ function createStripeCheckoutEvent() {
 // Tests
 // =============================================================================
 
-describe("POST /webhooks/stripe - Framework-Level (Hono Router)", () => {
+const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
+const describeDb = hasDatabaseUrl ? describe : describe.skip;
+
+describeDb('POST /webhooks/stripe - Framework-Level (Hono Router)', () => {
   beforeAll(async () => {
     await createTestPhotographer();
   }, 30000);
@@ -108,137 +107,141 @@ describe("POST /webhooks/stripe - Framework-Level (Hono Router)", () => {
     await cleanupTestData();
   }, 30000);
 
-  it(
-    "adds credits atomically on checkout.session.completed",
-    async () => {
-      // Build the Hono app with proper env types
-      type Env = {
-        Bindings: Bindings;
-        Variables: {
-          db: () => ReturnType<typeof createDb>;
-          dbTx: () => ReturnType<typeof createDbTx>;
-        };
+  it('adds credits atomically on checkout.session.completed', async () => {
+    // Build the Hono app with proper env types
+    type Env = {
+      Bindings: Bindings;
+      Variables: {
+        db: () => ReturnType<typeof createDb>;
+        dbTx: () => ReturnType<typeof createDbTx>;
       };
+    };
 
-      const app = new Hono<Env>()
-        // Set up DB using process.env.DATABASE_URL!
-        .use("/*", (c, next) => {
-          const dbUrl = c.env.DATABASE_URL;
-          c.set("db", () => createDb(dbUrl));
-          c.set("dbTx", () => createDbTx(dbUrl));
-          return next();
-        })
-        // Mount Stripe webhook router
-        .route("/webhooks/stripe", stripeWebhookRouter);
+    const app = new Hono<Env>()
+      // Set up DB using process.env.DATABASE_URL!
+      .use('/*', (c, next) => {
+        const dbUrl = c.env.DATABASE_URL;
+        c.set('db', () => createDb(dbUrl));
+        c.set('dbTx', () => createDbTx(dbUrl));
+        return next();
+      })
+      // Mount Stripe webhook router
+      .route('/webhooks/stripe', stripeWebhookRouter);
 
-      // Create real Stripe webhook payload
-      const webhookPayload = createStripeCheckoutEvent();
+    // Create real Stripe webhook payload
+    const webhookPayload = createStripeCheckoutEvent();
 
-      // Send webhook using app.request() - pass mock env with bindings
-      const res = await app.request("/webhooks/stripe", {
-        method: "POST",
+    // Send webhook using app.request() - pass mock env with bindings
+    const res = await app.request(
+      '/webhooks/stripe',
+      {
+        method: 'POST',
         headers: {
-          "stripe-signature": "test_signature", // Bypass signature verification in test
-          "Content-Type": "application/json"
+          'stripe-signature': 'test_signature', // Bypass signature verification in test
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(webhookPayload)
-      }, {
+        body: JSON.stringify(webhookPayload),
+      },
+      {
         DATABASE_URL: process.env.DATABASE_URL!,
         STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
-        STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET!
-      }); // Pass env bindings - c.env.* will be available
+        STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET!,
+      },
+    ); // Pass env bindings - c.env.* will be available
 
-      // Verify response
-      expect(res.status).toBe(200);
+    // Verify response
+    expect(res.status).toBe(200);
 
-      // Verify DB state - credit ledger entry created atomically
-      const db = createDb(process.env.DATABASE_URL!);
+    // Verify DB state - credit ledger entry created atomically
+    const db = createDb(process.env.DATABASE_URL!);
 
-      const [credit] = await db
-        .select()
-        .from(creditLedger)
-        .where(eq(creditLedger.stripeSessionId, TEST_STRIPE_SESSION_ID))
-        .limit(1);
+    const [credit] = await db
+      .select()
+      .from(creditLedger)
+      .where(eq(creditLedger.stripeSessionId, TEST_STRIPE_SESSION_ID))
+      .limit(1);
 
-      expect(credit).toBeDefined();
-      expect(credit?.photographerId).toBe(TEST_PHOTOGRAPHER_ID);
-      expect(credit?.amount).toBe(10);
-      expect(credit?.type).toBe("purchase");
-      expect(credit?.stripeSessionId).toBe(TEST_STRIPE_SESSION_ID);
+    expect(credit).toBeDefined();
+    expect(credit?.photographerId).toBe(TEST_PHOTOGRAPHER_ID);
+    expect(credit?.amount).toBe(10);
+    expect(credit?.type).toBe('purchase');
+    expect(credit?.stripeSessionId).toBe(TEST_STRIPE_SESSION_ID);
 
-      console.log(`✓ Stripe webhook transaction works in framework-level test`);
-    },
-    30000
-  );
+    console.log(`✓ Stripe webhook transaction works in framework-level test`);
+  }, 30000);
 
-  it(
-    "is idempotent - duplicate webhook doesn't add credits twice",
-    async () => {
-      // Build the Hono app
-      type Env = {
-        Bindings: Bindings;
-        Variables: {
-          db: () => ReturnType<typeof createDb>;
-          dbTx: () => ReturnType<typeof createDbTx>;
-        };
+  it("is idempotent - duplicate webhook doesn't add credits twice", async () => {
+    // Build the Hono app
+    type Env = {
+      Bindings: Bindings;
+      Variables: {
+        db: () => ReturnType<typeof createDb>;
+        dbTx: () => ReturnType<typeof createDbTx>;
       };
+    };
 
-      const app = new Hono<Env>()
-        .use("/*", (c, next) => {
-          const dbUrl = c.env.DATABASE_URL;
-          c.set("db", () => createDb(dbUrl));
-          c.set("dbTx", () => createDbTx(dbUrl));
-          return next();
-        })
-        .route("/webhooks/stripe", stripeWebhookRouter);
+    const app = new Hono<Env>()
+      .use('/*', (c, next) => {
+        const dbUrl = c.env.DATABASE_URL;
+        c.set('db', () => createDb(dbUrl));
+        c.set('dbTx', () => createDbTx(dbUrl));
+        return next();
+      })
+      .route('/webhooks/stripe', stripeWebhookRouter);
 
-      // Create webhook payload with same session ID
-      const webhookPayload = createStripeCheckoutEvent();
+    // Create webhook payload with same session ID
+    const webhookPayload = createStripeCheckoutEvent();
 
-      // Send webhook TWICE (simulating duplicate Stripe webhook)
-      const mockEnv = {
-        DATABASE_URL: process.env.DATABASE_URL!,
-        STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
-        STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET!
-      };
+    // Send webhook TWICE (simulating duplicate Stripe webhook)
+    const mockEnv = {
+      DATABASE_URL: process.env.DATABASE_URL!,
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET!,
+    };
 
-      const res1 = await app.request("/webhooks/stripe", {
-        method: "POST",
+    const res1 = await app.request(
+      '/webhooks/stripe',
+      {
+        method: 'POST',
         headers: {
-          "stripe-signature": "test_signature",
-          "Content-Type": "application/json"
+          'stripe-signature': 'test_signature',
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(webhookPayload)
-      }, mockEnv);
+        body: JSON.stringify(webhookPayload),
+      },
+      mockEnv,
+    );
 
-      const res2 = await app.request("/webhooks/stripe", {
-        method: "POST",
+    const res2 = await app.request(
+      '/webhooks/stripe',
+      {
+        method: 'POST',
         headers: {
-          "stripe-signature": "test_signature",
-          "Content-Type": "application/json"
+          'stripe-signature': 'test_signature',
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(webhookPayload)
-      }, mockEnv);
+        body: JSON.stringify(webhookPayload),
+      },
+      mockEnv,
+    );
 
-      // Both requests should succeed (200 OK)
-      expect(res1.status).toBe(200);
-      expect(res2.status).toBe(200);
+    // Both requests should succeed (200 OK)
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
 
-      // Verify only ONE credit entry exists (idempotency)
-      const db = createDb(process.env.DATABASE_URL!);
+    // Verify only ONE credit entry exists (idempotency)
+    const db = createDb(process.env.DATABASE_URL!);
 
-      const credits = await db
-        .select()
-        .from(creditLedger)
-        .where(eq(creditLedger.stripeSessionId, TEST_STRIPE_SESSION_ID));
+    const credits = await db
+      .select()
+      .from(creditLedger)
+      .where(eq(creditLedger.stripeSessionId, TEST_STRIPE_SESSION_ID));
 
-      expect(credits.length).toBe(1); // Not 2!
-      expect(credits[0].amount).toBe(10);
+    expect(credits.length).toBe(1); // Not 2!
+    expect(credits[0].amount).toBe(10);
 
-      console.log(`✓ Stripe webhook idempotency works`);
-    },
-    30000
-  );
+    console.log(`✓ Stripe webhook idempotency works`);
+  }, 30000);
 });
 
 // =============================================================================
