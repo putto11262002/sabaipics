@@ -72,7 +72,7 @@ jobs:
         uses: neondatabase/create-branch-action@v5
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: preview/pr-${{ github.event.number }}-${{ needs.setup.outputs.branch }}
+          branch_name: ${{ format('preview/pr-{0}-{1}', github.event.number, needs.setup.outputs.branch) }}
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Run Migrations
@@ -93,5 +93,5 @@ jobs:
         uses: neondatabase/delete-branch-action@v3
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch: preview/pr-${{ github.event.number }}-${{ needs.setup.outputs.branch }}
+          branch: ${{ format('preview/pr-{0}-{1}', github.event.number, needs.setup.outputs.branch) }}
           api_key: ${{ secrets.NEON_API_KEY }}
