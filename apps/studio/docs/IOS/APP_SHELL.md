@@ -16,7 +16,7 @@ The key idea is to keep the camera/transfer flow strict and linear, while making
 
 `RootFlowView` is responsible for:
 
-- Signed out: show Clerk auth UI
+- Signed out: show custom branded auth UI
 - Signed in: show the main app shell
 
 See also: `AUTH.md`.

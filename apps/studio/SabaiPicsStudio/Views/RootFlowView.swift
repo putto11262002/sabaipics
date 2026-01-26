@@ -10,15 +10,16 @@ import Clerk
 
 /// App entry gate for authentication.
 ///
-/// Keeps the existing PTP flow (ContentView + AppCoordinator state machine) unchanged.
+/// Shows custom branded auth flow for unauthenticated users.
+/// After successful auth, shows the main app shell (MainTabView).
 struct RootFlowView: View {
     @Environment(\.clerk) private var clerk
 
     var body: some View {
         Group {
             if clerk.user == nil {
-                AuthView()
-                    .ignoresSafeArea()
+                // Custom auth flow (replaces Clerk's AuthView)
+                AuthFlowContainerView()
             } else {
                 MainTabView()
             }

@@ -4,6 +4,25 @@ iOS Studio architecture changes. See `ARCHITECTURE.md` for current design.
 
 ---
 
+## 2026-01-26
+
+### Update 12: Auth Provider Button Compliance
+
+**Status:** Implemented
+
+Refined the custom auth welcome screen to follow Google/LINE button guidelines.
+
+- Email sign-in button is now outlined (matches the neutral provider button weight).
+- Google sign-in button uses the app's outline style with the official Google "G" icon.
+- LINE sign-in button is now a native button following LINE button guidelines (base `#06C755`, pressed overlay, separator).
+- Copy:
+  - Google: "Continue with Google"
+  - LINE: "Log in with LINE"
+
+**Files:** Views/Auth/WelcomeView.swift, Assets.xcassets
+
+---
+
 ## 2026-01-25
 
 ### Update 11: Camera Discovery Retry Logic (SAB-37)
@@ -95,7 +114,7 @@ Added Clerk-based sign-in to Studio.
 
 - Clerk iOS SDK integrated via Swift Package Manager.
 - App reads `CLERK_PUBLISHABLE_KEY` from build settings and injects it into Info.plist (`ClerkPublishableKey`).
-- `RootFlowView` gates access: signed out shows Clerk auth UI; signed in continues to app shell.
+- `RootFlowView` gates access: signed out shows custom auth UI; signed in continues to app shell.
 - Added local dev config pattern (`Studio.Local.xcconfig` copied from example; gitignored).
 
 **Files:** SabaiPicsStudioApp.swift, RootFlowView.swift, SabaiPicsStudio.xcodeproj/project.pbxproj, Config/SabaiPicsStudio-Info.plist, Config/Studio.\*.xcconfig

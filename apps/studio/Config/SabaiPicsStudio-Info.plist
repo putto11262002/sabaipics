@@ -43,5 +43,7 @@
 	<string>SabaiPics Studio needs local network access to discover and connect to cameras on your WiFi network.</string>
 	<key>ClerkPublishableKey</key>
 	<string>$(CLERK_PUBLISHABLE_KEY)</string>
+	<key>SignUpURL</key>
+	<string>$(SIGNUP_URL)</string>
 </dict>
 </plist>
