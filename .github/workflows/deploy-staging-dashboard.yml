@@ -41,8 +41,16 @@ jobs:
           echo "VITE_API_URL=https://api-staging.sabaipics.com" > apps/dashboard/.env.staging
           echo "VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }}" >> apps/dashboard/.env.staging
 
+      # Build API first so tsc generates .d.ts files for hono client types
+      # Worker types come from committed worker-configuration.d.ts (generated locally)
+      - name: Build API
+        run: pnpm --filter=@sabaipics/api build
+
+      - name: Build Dashboard
+        run: pnpm --filter=@sabaipics/dashboard build:staging
+
       - name: Deploy Dashboard
-        run: pnpm --filter=@sabaipics/dashboard deploy:staging
+        run: pnpm --filter=@sabaipics/dashboard exec wrangler pages deploy dist --project-name=dashboard --branch=staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

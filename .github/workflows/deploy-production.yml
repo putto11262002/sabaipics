@@ -48,11 +48,14 @@ jobs:
             AWS_SECRET_ACCESS_KEY
             STRIPE_SECRET_KEY
             STRIPE_WEBHOOK_SECRET
-            LINE_CHANNEL_SECRET
-            LINE_CHANNEL_ACCESS_TOKEN
             R2_ACCESS_KEY_ID
             R2_SECRET_ACCESS_KEY
             ADMIN_API_KEY
+          )
+          # LINE secrets are optional until LINE integration is enabled
+          optional=(
+            LINE_CHANNEL_SECRET
+            LINE_CHANNEL_ACCESS_TOKEN
           )
 
           for k in "${required[@]}"; do
@@ -60,6 +63,13 @@ jobs:
             if [[ -z "$v" ]]; then
               echo "Missing required secret: $k" >&2
               exit 1
+            fi
+          done
+
+          for k in "${optional[@]}"; do
+            v="${!k:-}"
+            if [[ -z "$v" ]]; then
+              echo "::warning::Optional secret not set: $k (LINE integration disabled)"
             fi
           done
 
@@ -77,11 +87,12 @@ jobs:
           AWS_REGION: us-west-2
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
-          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          # Optional LINE secrets - tests should handle missing values gracefully
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
 
       # NOTE: Integration tests (test:integration) are excluded from CI/CD
       # They make real API calls to AWS/Stripe and should only be run locally
@@ -111,6 +122,11 @@ jobs:
       # Set API secrets
       - name: Set API Secrets
         working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
         run: |
           echo "${{ secrets.DATABASE_URL }}" | pnpm wrangler secret put DATABASE_URL --env production
           echo "${{ secrets.CLERK_SECRET_KEY }}" | pnpm wrangler secret put CLERK_SECRET_KEY --env production
@@ -121,14 +137,16 @@ jobs:
           echo "${{ secrets.AWS_SECRET_ACCESS_KEY }}" | pnpm wrangler secret put AWS_SECRET_ACCESS_KEY --env production
           echo "${{ secrets.STRIPE_SECRET_KEY }}" | pnpm wrangler secret put STRIPE_SECRET_KEY --env production
           echo "${{ secrets.STRIPE_WEBHOOK_SECRET }}" | pnpm wrangler secret put STRIPE_WEBHOOK_SECRET --env production
-          echo "${{ secrets.LINE_CHANNEL_SECRET }}" | pnpm wrangler secret put LINE_CHANNEL_SECRET --env production
-          echo "${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" | pnpm wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
           echo "${{ secrets.R2_ACCESS_KEY_ID }}" | pnpm wrangler secret put R2_ACCESS_KEY_ID --env production
           echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | pnpm wrangler secret put R2_SECRET_ACCESS_KEY --env production
           echo "${{ secrets.ADMIN_API_KEY }}" | pnpm wrangler secret put ADMIN_API_KEY --env production
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Optional LINE secrets
+          if [[ -n "$LINE_CHANNEL_SECRET" ]]; then
+            echo "$LINE_CHANNEL_SECRET" | pnpm wrangler secret put LINE_CHANNEL_SECRET --env production
+          fi
+          if [[ -n "$LINE_CHANNEL_ACCESS_TOKEN" ]]; then
+            echo "$LINE_CHANNEL_ACCESS_TOKEN" | pnpm wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
+          fi
 
       # Deploy Dashboard to Cloudflare Pages
       - name: Deploy Dashboard
