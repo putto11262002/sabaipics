@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { differenceInDays, formatDistanceToNow, parseISO } from 'date-fns';
+import { differenceInDays, parseISO } from 'date-fns';
 import {
   AlertCircle,
   Calendar,
@@ -85,7 +85,7 @@ export function DashboardPage() {
       <SidebarPageHeader breadcrumbs={[{ label: 'Dashboard' }]}>
         <Button asChild size="sm">
           <Link to="/credits/packages">
-            <CreditCard className="mr-2 size-4" />
+            <CreditCard className="mr-1 size-4" />
             Buy Credits
           </Link>
         </Button>
@@ -113,9 +113,9 @@ export function DashboardPage() {
               <span>{error.message}</span>
               <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
                 {isRefetching ? (
-                  <Spinner className="mr-2 size-3" />
+                  <Spinner className="mr-1 size-3" />
                 ) : (
-                  <RefreshCw className="mr-2 size-3" />
+                  <RefreshCw className="mr-1 size-3" />
                 )}
                 Retry
               </Button>
@@ -161,21 +161,8 @@ export function DashboardPage() {
                     </Button>
                   </CardAction>
                 </CardHeader>
-                <CardFooter className="flex-col items-start gap-1.5 text-sm">
-                  {dashboardData.credits.nearestExpiry ? (
-                    <div className="text-muted-foreground">
-                      Expires{' '}
-                      {formatDistanceToNow(parseISO(dashboardData.credits.nearestExpiry), {
-                        addSuffix: true,
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-muted-foreground">
-                      {dashboardData.credits.balance === 0
-                        ? 'Purchase credits to get started'
-                        : 'No expiry'}
-                    </div>
-                  )}
+                <CardFooter className="text-sm text-muted-foreground">
+                  1 credit per photo
                 </CardFooter>
               </Card>
 
@@ -188,7 +175,7 @@ export function DashboardPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardFooter className="text-sm text-muted-foreground">
-                  <ImageIcon className="mr-2 size-4" />
+                  <ImageIcon className="mr-1 size-4" />
                   Across all events
                 </CardFooter>
               </Card>
@@ -202,7 +189,7 @@ export function DashboardPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardFooter className="text-sm text-muted-foreground">
-                  <Smile className="mr-2 size-4" />
+                  <Smile className="mr-1 size-4" />
                   Detected and indexed
                 </CardFooter>
               </Card>
@@ -210,18 +197,11 @@ export function DashboardPage() {
 
             {/* Events Section */}
             <div className="space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold">Recent Events</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {eventsData?.data.length
-                      ? `Your ${eventsData.data.length} most recent event${eventsData.data.length !== 1 ? 's' : ''}`
-                      : 'No events yet'}
-                  </p>
-                </div>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Recent Events</h2>
                 <Button asChild variant="outline" size="sm">
                   <Link to="/events">
-                    <Calendar className="mr-2 size-4" />
+                    <Calendar className="mr-1 size-4" />
                     View All Events
                   </Link>
                 </Button>
