@@ -48,11 +48,14 @@ jobs:
             AWS_SECRET_ACCESS_KEY
             STRIPE_SECRET_KEY
             STRIPE_WEBHOOK_SECRET
-            LINE_CHANNEL_SECRET
-            LINE_CHANNEL_ACCESS_TOKEN
             R2_ACCESS_KEY_ID
             R2_SECRET_ACCESS_KEY
             ADMIN_API_KEY
+          )
+          # LINE secrets are optional until LINE integration is enabled
+          optional=(
+            LINE_CHANNEL_SECRET
+            LINE_CHANNEL_ACCESS_TOKEN
           )
 
           for k in "${required[@]}"; do
@@ -60,6 +63,13 @@ jobs:
             if [[ -z "$v" ]]; then
               echo "Missing required secret: $k" >&2
               exit 1
+            fi
+          done
+
+          for k in "${optional[@]}"; do
+            v="${!k:-}"
+            if [[ -z "$v" ]]; then
+              echo "::warning::Optional secret not set: $k (LINE integration disabled)"
             fi
           done
 
@@ -77,11 +87,12 @@ jobs:
           AWS_REGION: us-west-2
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
-          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          # Optional LINE secrets - tests should handle missing values gracefully
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
 
       # NOTE: Integration tests (test:integration) are excluded from CI/CD
       # They make real API calls to AWS/Stripe and should only be run locally
