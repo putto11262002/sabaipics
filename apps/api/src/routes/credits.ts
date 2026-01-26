@@ -104,11 +104,11 @@ export const creditsRouter = new Hono<Env>()
         .where(eq(photographers.id, photographer.id));
     }
 
-    // Determine redirect URLs (frontend will implement in T-12)
-    // Using first origin from CORS_ORIGIN (may be comma-separated) or default localhost for dev
-    const origin = c.env.CORS_ORIGIN?.split(',')[0] ?? 'http://localhost:5173';
-    const successUrl = `${origin}/credits/success`;
-    const cancelUrl = `${origin}/credits/packages`;
+    // Redirects should be the dashboard frontend, not derived from CORS.
+    const dashboardUrl =
+      c.env.DASHBOARD_FRONTEND_URL ?? c.env.CORS_ORIGIN?.split(',')[0] ?? 'http://localhost:5173';
+    const successUrl = `${dashboardUrl}/credits/success`;
+    const cancelUrl = `${dashboardUrl}/credits/packages`;
 
     // Create checkout session
     const result = await createCheckoutSession({

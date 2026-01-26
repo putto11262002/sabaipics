@@ -1,12 +1,27 @@
-name: Deploy Production
+name: Deploy Staging API
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/api/**'
+      - 'packages/db/**'
+      - 'packages/auth/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'turbo.json'
+      - '.github/workflows/deploy-staging-api.yml'
+
   workflow_dispatch:
+
+concurrency:
+  group: deploy-staging-api
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: staging
     steps:
       - uses: actions/checkout@v4
 
@@ -63,7 +78,6 @@ jobs:
             fi
           done
 
-      # Run unit tests (no real API calls)
       - name: Run Tests
         run: pnpm --filter=@sabaipics/api test:run
         env:
@@ -83,56 +97,34 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
 
-      # NOTE: Integration tests (test:integration) are excluded from CI/CD
-      # They make real API calls to AWS/Stripe and should only be run locally
-
-      # TODO: Future improvement - run migrations on a test branch first, verify, then merge to main DB
-      # Currently runs migrations directly which is risky for production
       - name: Run Database Migrations
         run: pnpm --filter=@sabaipics/db db:migrate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      # Create dashboard env file for production
-      - name: Create Dashboard Env
-        run: |
-          echo "VITE_API_URL=https://api.sabaipics.com" > apps/dashboard/.env.production
-          echo "VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }}" >> apps/dashboard/.env.production
-
-      - run: pnpm build
-
-      # Deploy API to Cloudflare Workers
-      - name: Deploy API
-        run: pnpm --filter=@sabaipics/api deploy:prod
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      # Set API secrets
       - name: Set API Secrets
         working-directory: apps/api
         run: |
-          echo "${{ secrets.DATABASE_URL }}" | pnpm wrangler secret put DATABASE_URL --env production
-          echo "${{ secrets.CLERK_SECRET_KEY }}" | pnpm wrangler secret put CLERK_SECRET_KEY --env production
-          echo "${{ secrets.CLERK_PUBLISHABLE_KEY }}" | pnpm wrangler secret put CLERK_PUBLISHABLE_KEY --env production
-          echo "${{ secrets.CLERK_JWT_KEY }}" | pnpm wrangler secret put CLERK_JWT_KEY --env production
-          echo "${{ secrets.CLERK_WEBHOOK_SIGNING_SECRET }}" | pnpm wrangler secret put CLERK_WEBHOOK_SIGNING_SECRET --env production
-          echo "${{ secrets.AWS_ACCESS_KEY_ID }}" | pnpm wrangler secret put AWS_ACCESS_KEY_ID --env production
-          echo "${{ secrets.AWS_SECRET_ACCESS_KEY }}" | pnpm wrangler secret put AWS_SECRET_ACCESS_KEY --env production
-          echo "${{ secrets.STRIPE_SECRET_KEY }}" | pnpm wrangler secret put STRIPE_SECRET_KEY --env production
-          echo "${{ secrets.STRIPE_WEBHOOK_SECRET }}" | pnpm wrangler secret put STRIPE_WEBHOOK_SECRET --env production
-          echo "${{ secrets.LINE_CHANNEL_SECRET }}" | pnpm wrangler secret put LINE_CHANNEL_SECRET --env production
-          echo "${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" | pnpm wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
-          echo "${{ secrets.R2_ACCESS_KEY_ID }}" | pnpm wrangler secret put R2_ACCESS_KEY_ID --env production
-          echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | pnpm wrangler secret put R2_SECRET_ACCESS_KEY --env production
-          echo "${{ secrets.ADMIN_API_KEY }}" | pnpm wrangler secret put ADMIN_API_KEY --env production
+          echo "${{ secrets.DATABASE_URL }}" | pnpm wrangler secret put DATABASE_URL --env staging
+          echo "${{ secrets.CLERK_SECRET_KEY }}" | pnpm wrangler secret put CLERK_SECRET_KEY --env staging
+          echo "${{ secrets.CLERK_PUBLISHABLE_KEY }}" | pnpm wrangler secret put CLERK_PUBLISHABLE_KEY --env staging
+          echo "${{ secrets.CLERK_JWT_KEY }}" | pnpm wrangler secret put CLERK_JWT_KEY --env staging
+          echo "${{ secrets.CLERK_WEBHOOK_SIGNING_SECRET }}" | pnpm wrangler secret put CLERK_WEBHOOK_SIGNING_SECRET --env staging
+          echo "${{ secrets.AWS_ACCESS_KEY_ID }}" | pnpm wrangler secret put AWS_ACCESS_KEY_ID --env staging
+          echo "${{ secrets.AWS_SECRET_ACCESS_KEY }}" | pnpm wrangler secret put AWS_SECRET_ACCESS_KEY --env staging
+          echo "${{ secrets.STRIPE_SECRET_KEY }}" | pnpm wrangler secret put STRIPE_SECRET_KEY --env staging
+          echo "${{ secrets.STRIPE_WEBHOOK_SECRET }}" | pnpm wrangler secret put STRIPE_WEBHOOK_SECRET --env staging
+          echo "${{ secrets.LINE_CHANNEL_SECRET }}" | pnpm wrangler secret put LINE_CHANNEL_SECRET --env staging
+          echo "${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" | pnpm wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env staging
+          echo "${{ secrets.R2_ACCESS_KEY_ID }}" | pnpm wrangler secret put R2_ACCESS_KEY_ID --env staging
+          echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | pnpm wrangler secret put R2_SECRET_ACCESS_KEY --env staging
+          echo "${{ secrets.ADMIN_API_KEY }}" | pnpm wrangler secret put ADMIN_API_KEY --env staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      # Deploy Dashboard to Cloudflare Pages
-      - name: Deploy Dashboard
-        run: pnpm --filter=@sabaipics/dashboard deploy:prod
+      - name: Deploy API
+        run: pnpm --filter=@sabaipics/api deploy:staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

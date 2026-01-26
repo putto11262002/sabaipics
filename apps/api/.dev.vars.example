@@ -16,10 +16,10 @@ CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\nYOUR_PUBLIC_KEY_HERE\n-----END PUBLIC
 # Format: whsec_xxxxx
 CLERK_WEBHOOK_SIGNING_SECRET=whsec_xxxxx
 
-# ngrok static domain (each developer gets their own free static domain)
-# Get from: https://dashboard.ngrok.com/domains → New Domain
-# Format: xxx.ngrok-free.app or xxx.ngrok-free.dev
-NGROK_DOMAIN=your-domain.ngrok-free.app
+# Frontend URLs (configured in apps/api/wrangler.jsonc vars)
+# You normally don't need to set these in .dev.vars.
+# DASHBOARD_FRONTEND_URL=http://localhost:5173
+# EVENT_FRONTEND_URL=http://localhost:5174
 
 # Neon Database Connection String
 # Get from: Neon Console → Dashboard → Connection Details → Connection String
@@ -61,24 +61,8 @@ ADMIN_API_KEY=admin-dev-key-change-in-production
 LINE_CHANNEL_SECRET=xxxxx
 LINE_CHANNEL_ACCESS_TOKEN=xxxxx
 
-# App Base URL for QR code generation
-# Local development: Use your local frontend URL
-# This is used to generate QR codes that encode event search URLs
-APP_BASE_URL=http://localhost:5173
-
-# Image URLs for CF Images transformations and R2 storage
-# CF_DOMAIN: Your Cloudflare zone domain (must have Images transformations enabled)
-# R2_BASE_URL: Your R2 bucket custom domain OR dev URL
-#
-# For local development, use R2 dev URL format:
-#   https://pub-<account-id>.r2.dev/<bucket-name>
-# Get your account ID from: https://dash.cloudflare.com/to/account-id
-#
-# For staging/production, use custom domains:
-#   R2_BASE_URL=https://photos-staging.sabaipics.com
-#   R2_BASE_URL=https://photos.sabaipics.com
-CF_DOMAIN=https://sabaipics.com
-R2_BASE_URL=https://pub-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.r2.dev/sabaipics-photos
+# Legacy notes (kept for reference)
+# - CF_DOMAIN / R2_BASE_URL were older names; runtime code now uses CF_ZONE + PHOTO_R2_BASE_URL.
 
 # R2 API Credentials for presigned URLs (optional, for download URL protection)
 # Get from: Cloudflare Dashboard → R2 → Manage R2 API Tokens

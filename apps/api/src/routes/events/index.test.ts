@@ -5,28 +5,32 @@
  * See: https://hono.dev/guides/testing
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Hono } from "hono";
-import { testClient } from "hono/testing";
-import { eventsRouter } from "./index";
-import type { Database } from "@sabaipics/db";
-import type { PhotographerVariables } from "../../middleware";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Hono } from 'hono';
+import { testClient } from 'hono/testing';
+import { eventsRouter } from './index';
+import type { Database } from '@sabaipics/db';
+import type { PhotographerVariables } from '../../middleware';
 
 // Mock the normalizeImage function
-vi.mock("../../lib/images/normalize", () => ({
+vi.mock('../../lib/images/normalize', () => ({
   normalizeImage: vi.fn().mockResolvedValue(new ArrayBuffer(1024)),
   DEFAULT_NORMALIZE_OPTIONS: {
-    format: "jpeg",
+    format: 'jpeg',
     maxWidth: 4000,
     maxHeight: 4000,
     quality: 90,
-    fit: "scale-down",
+    fit: 'scale-down',
   },
 }));
 
 // Minimal R2Bucket type for testing
 type R2Bucket = {
-  put: (key: string, value: Uint8Array, options?: { httpMetadata?: { contentType: string } }) => Promise<void>;
+  put: (
+    key: string,
+    value: Uint8Array,
+    options?: { httpMetadata?: { contentType: string } },
+  ) => Promise<void>;
   delete: (key: string) => Promise<void>;
 };
 
@@ -34,26 +38,26 @@ type R2Bucket = {
 // Test Setup
 // =============================================================================
 
-const MOCK_PHOTOGRAPHER_ID = "11111111-1111-1111-1111-111111111111";
-const MOCK_CLERK_ID = "clerk_123";
-const MOCK_SESSION_ID = "session_123";
-const MOCK_EVENT_ID = "22222222-2222-2222-2222-222222222222";
+const MOCK_PHOTOGRAPHER_ID = '11111111-1111-1111-1111-111111111111';
+const MOCK_CLERK_ID = 'clerk_123';
+const MOCK_SESSION_ID = 'session_123';
+const MOCK_EVENT_ID = '22222222-2222-2222-2222-222222222222';
 
 const mockPhotographer = {
   id: MOCK_PHOTOGRAPHER_ID,
-  pdpaConsentAt: "2026-01-01T00:00:00Z",
+  pdpaConsentAt: '2026-01-01T00:00:00Z',
 };
 
 const mockEvent = {
   id: MOCK_EVENT_ID,
   photographerId: MOCK_PHOTOGRAPHER_ID,
-  name: "Test Event",
+  name: 'Test Event',
   startDate: null,
   endDate: null,
-  qrCodeR2Key: "qr/ABC123.png",
+  qrCodeR2Key: 'qr/ABC123.png',
   rekognitionCollectionId: null,
-  expiresAt: "2026-02-10T00:00:00Z",
-  createdAt: "2026-01-10T00:00:00Z",
+  expiresAt: '2026-02-10T00:00:00Z',
+  createdAt: '2026-01-10T00:00:00Z',
 };
 
 // Mock R2 bucket factory
@@ -82,7 +86,7 @@ function createMockDb() {
   const mockDb = {
     select: vi.fn().mockImplementation((...args) => {
       // Check if this is a count query (selecting count(*)::int)
-      if (args.length > 0 && typeof args[0] === "object" && "count" in (args[0] as any)) {
+      if (args.length > 0 && typeof args[0] === 'object' && 'count' in (args[0] as any)) {
         return countResult(...args);
       }
       // Regular select - return mockDb for chaining
@@ -117,7 +121,7 @@ function createTestApp(options: {
 
   type Env = {
     Bindings: {
-      APP_BASE_URL: string;
+      EVENT_FRONTEND_URL: string;
       PHOTOS_BUCKET: R2Bucket;
     };
     Variables: PhotographerVariables;
@@ -125,46 +129,47 @@ function createTestApp(options: {
 
   const app = new Hono<Env>()
     // Mock auth context (simulates Clerk middleware)
-    .use("/*", (c, next) => {
+    .use('/*', (c, next) => {
       if (hasAuth) {
-        c.set("auth", { userId: MOCK_CLERK_ID, sessionId: MOCK_SESSION_ID });
+        c.set('auth', { userId: MOCK_CLERK_ID, sessionId: MOCK_SESSION_ID });
       }
       return next();
     })
     // Mock DB
-    .use("/*", (c, next) => {
-      c.set("db", () => mockDb as unknown as Database);
+    .use('/*', (c, next) => {
+      c.set('db', () => mockDb as unknown as Database);
       return next();
     })
     // Mock photographer lookup for requirePhotographer middleware
-    .use("/*", (c, next) => {
+    .use('/*', (c, next) => {
       // Store the original limit mock
       const originalLimit = mockDb.limit;
       // Override limit for the requirePhotographer query (it calls .limit(1))
       // Then restore original for subsequent DB calls
       let hasBeenCalled = false;
       mockDb.limit = vi.fn().mockImplementation((...args) => {
-        if (!hasBeenCalled && typeof args[0] === "number") {
+        if (!hasBeenCalled && typeof args[0] === 'number') {
           // This is the requirePhotographer middleware calling .limit(1)
           hasBeenCalled = true;
           mockDb.limit = originalLimit; // Restore original for next calls
           // Return a thenable that behaves like a Promise resolving to photographer array
           return {
             offset: vi.fn().mockResolvedValue(photographer ? [photographer] : []),
-            then: (resolve: (value: unknown) => void) => resolve(photographer ? [photographer] : []),
+            then: (resolve: (value: unknown) => void) =>
+              resolve(photographer ? [photographer] : []),
           };
         }
         return originalLimit(...args);
       });
       return next();
     })
-    .route("/events", eventsRouter);
+    .route('/events', eventsRouter);
 
   return { app, mockDb, mockBucket };
 }
 
 const MOCK_ENV = (mockBucket: R2Bucket) => ({
-  APP_BASE_URL: "https://sabaipics.com",
+  EVENT_FRONTEND_URL: 'https://event.sabaipics.com',
   PHOTOS_BUCKET: mockBucket,
 });
 
@@ -172,44 +177,44 @@ const MOCK_ENV = (mockBucket: R2Bucket) => ({
 // Auth Tests
 // =============================================================================
 
-describe("POST /events - Auth", () => {
-  it("returns 401 without authentication", async () => {
+describe('POST /events - Auth', () => {
+  it('returns 401 without authentication', async () => {
     const mockBucket = createMockR2Bucket();
     const { app } = createTestApp({ hasAuth: false });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
     const res = await client.events.$post({
-      json: { name: "Test Event" },
+      json: { name: 'Test Event' },
     });
 
     expect(res.status).toBe(401);
     const body = await res.json();
-    if ("error" in body) {
-      expect(body.error.code).toBe("UNAUTHENTICATED");
+    if ('error' in body) {
+      expect(body.error.code).toBe('UNAUTHENTICATED');
     } else {
-      throw new Error("Expected error response");
+      throw new Error('Expected error response');
     }
   });
 
-  it("returns 403 when photographer not found", async () => {
+  it('returns 403 when photographer not found', async () => {
     const mockBucket = createMockR2Bucket();
     const { app } = createTestApp({ photographer: null });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
     const res = await client.events.$post({
-      json: { name: "Test Event" },
+      json: { name: 'Test Event' },
     });
 
     expect(res.status).toBe(403);
     const body = await res.json();
-    if ("error" in body) {
-      expect(body.error.code).toBe("FORBIDDEN");
+    if ('error' in body) {
+      expect(body.error.code).toBe('FORBIDDEN');
     } else {
-      throw new Error("Expected error response");
+      throw new Error('Expected error response');
     }
   });
 
-  it("returns 403 without PDPA consent", async () => {
+  it('returns 403 without PDPA consent', async () => {
     const mockBucket = createMockR2Bucket();
     const { app } = createTestApp({
       photographer: { id: MOCK_PHOTOGRAPHER_ID, pdpaConsentAt: null },
@@ -217,15 +222,15 @@ describe("POST /events - Auth", () => {
     const client = testClient(app, MOCK_ENV(mockBucket));
 
     const res = await client.events.$post({
-      json: { name: "Test Event" },
+      json: { name: 'Test Event' },
     });
 
     expect(res.status).toBe(403);
     const body = await res.json();
-    if ("error" in body) {
-      expect(body.error.code).toBe("FORBIDDEN");
+    if ('error' in body) {
+      expect(body.error.code).toBe('FORBIDDEN');
     } else {
-      throw new Error("Expected error response");
+      throw new Error('Expected error response');
     }
   });
 });
@@ -234,12 +239,12 @@ describe("POST /events - Auth", () => {
 // POST /events Tests
 // =============================================================================
 
-describe("POST /events - Success", () => {
+describe('POST /events - Success', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("creates event with valid input", async () => {
+  it('creates event with valid input', async () => {
     const mockBucket = createMockR2Bucket();
     const mockDb = createMockDb();
     const { app, mockBucket: bucket } = createTestApp({
@@ -249,23 +254,27 @@ describe("POST /events - Success", () => {
     const client = testClient(app, MOCK_ENV(bucket));
 
     const res = await client.events.$post({
-      json: { name: "Test Event" },
+      json: { name: 'Test Event' },
     });
 
     expect(res.status).toBe(201);
     const body = await res.json();
-    if ("data" in body) {
-      expect(body.data.name).toBe("Test Event");
+    if ('data' in body) {
+      expect(body.data.name).toBe('Test Event');
       expect(body.data.qrCodeUrl).toBeNull();
       expect(body.data.rekognitionCollectionId).toBeNull();
     } else {
-      throw new Error("Expected data response");
+      throw new Error('Expected data response');
     }
   });
 
-  it("creates event with dates", async () => {
+  it('creates event with dates', async () => {
     const mockBucket = createMockR2Bucket();
-    const eventWithDates = { ...mockEvent, startDate: "2026-01-15T10:00:00Z", endDate: "2026-01-15T18:00:00Z" };
+    const eventWithDates = {
+      ...mockEvent,
+      startDate: '2026-01-15T10:00:00Z',
+      endDate: '2026-01-15T18:00:00Z',
+    };
     const mockDb = createMockDb();
     mockDb.returning = vi.fn().mockResolvedValueOnce([eventWithDates]);
     const { app } = createTestApp({
@@ -274,30 +283,30 @@ describe("POST /events - Success", () => {
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
-    const startDate = "2026-01-15T10:00:00Z";
-    const endDate = "2026-01-15T18:00:00Z";
+    const startDate = '2026-01-15T10:00:00Z';
+    const endDate = '2026-01-15T18:00:00Z';
 
     const res = await client.events.$post({
-      json: { name: "Test Event", startDate, endDate },
+      json: { name: 'Test Event', startDate, endDate },
     });
 
     expect(res.status).toBe(201);
     const body = await res.json();
-    if ("data" in body) {
+    if ('data' in body) {
       expect(body.data.startDate).toBe(startDate);
       expect(body.data.endDate).toBe(endDate);
     } else {
-      throw new Error("Expected data response");
+      throw new Error('Expected data response');
     }
   });
 });
 
-describe("POST /events - Validation", () => {
+describe('POST /events - Validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("rejects empty name", async () => {
+  it('rejects empty name', async () => {
     const mockBucket = createMockR2Bucket();
     const { app } = createTestApp({
       mockBucket: mockBucket as unknown as R2Bucket,
@@ -305,15 +314,15 @@ describe("POST /events - Validation", () => {
     const client = testClient(app, MOCK_ENV(mockBucket));
 
     const res = await client.events.$post({
-      json: { name: "" },
+      json: { name: '' },
     });
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toHaveProperty("error");
+    expect(body).toHaveProperty('error');
   });
 
-  it("rejects name too long", async () => {
+  it('rejects name too long', async () => {
     const mockBucket = createMockR2Bucket();
     const { app } = createTestApp({
       mockBucket: mockBucket as unknown as R2Bucket,
@@ -321,15 +330,15 @@ describe("POST /events - Validation", () => {
     const client = testClient(app, MOCK_ENV(mockBucket));
 
     const res = await client.events.$post({
-      json: { name: "a".repeat(201) },
+      json: { name: 'a'.repeat(201) },
     });
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toHaveProperty("error");
+    expect(body).toHaveProperty('error');
   });
 
-  it("rejects invalid date format", async () => {
+  it('rejects invalid date format', async () => {
     const mockBucket = createMockR2Bucket();
     const { app } = createTestApp({
       mockBucket: mockBucket as unknown as R2Bucket,
@@ -337,15 +346,15 @@ describe("POST /events - Validation", () => {
     const client = testClient(app, MOCK_ENV(mockBucket));
 
     const res = await client.events.$post({
-      json: { name: "Test Event", startDate: "not-a-date" },
+      json: { name: 'Test Event', startDate: 'not-a-date' },
     });
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toHaveProperty("error");
+    expect(body).toHaveProperty('error');
   });
 
-  it("rejects start date after end date", async () => {
+  it('rejects start date after end date', async () => {
     const mockBucket = createMockR2Bucket();
     const { app } = createTestApp({
       mockBucket: mockBucket as unknown as R2Bucket,
@@ -354,18 +363,18 @@ describe("POST /events - Validation", () => {
 
     const res = await client.events.$post({
       json: {
-        name: "Test Event",
-        startDate: "2026-01-20T10:00:00Z",
-        endDate: "2026-01-15T10:00:00Z",
+        name: 'Test Event',
+        startDate: '2026-01-20T10:00:00Z',
+        endDate: '2026-01-15T10:00:00Z',
       },
     });
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    if ("error" in body) {
-      expect(body.error.code).toBe("INVALID_DATE_RANGE");
+    if ('error' in body) {
+      expect(body.error.code).toBe('INVALID_DATE_RANGE');
     } else {
-      throw new Error("Expected error response");
+      throw new Error('Expected error response');
     }
   });
 });
@@ -374,7 +383,7 @@ describe("POST /events - Validation", () => {
 // GET /events Tests (with pagination)
 // =============================================================================
 
-describe("GET /events", () => {
+describe('GET /events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -399,16 +408,16 @@ describe("GET /events", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    if ("data" in body) {
+    if ('data' in body) {
       expect(Array.isArray(body.data)).toBe(true);
       expect(body.data.length).toBe(1);
-      expect(body.data[0].name).toBe("Test Event");
+      expect(body.data[0].name).toBe('Test Event');
     } else {
-      throw new Error("Expected data response");
+      throw new Error('Expected data response');
     }
   });
 
-  it("returns empty array for new photographer", async () => {
+  it('returns empty array for new photographer', async () => {
     const mockBucket = createMockR2Bucket();
     const mockDb = createMockDb();
     mockDb.limit = vi.fn().mockReturnValue({
@@ -427,14 +436,14 @@ describe("GET /events", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    if ("data" in body) {
+    if ('data' in body) {
       expect(body.data).toEqual([]);
     } else {
-      throw new Error("Expected data response");
+      throw new Error('Expected data response');
     }
   });
 
-  it("uses default page=0 and limit=20 when not provided", async () => {
+  it('uses default page=0 and limit=20 when not provided', async () => {
     const mockBucket = createMockR2Bucket();
     const mockDb = createMockDb();
     mockDb.limit = vi.fn().mockReturnValue({
@@ -453,14 +462,14 @@ describe("GET /events", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    if ("data" in body) {
+    if ('data' in body) {
       expect(Array.isArray(body.data)).toBe(true);
     } else {
-      throw new Error("Expected data response");
+      throw new Error('Expected data response');
     }
   });
 
-  it("limits results to max 100", async () => {
+  it('limits results to max 100', async () => {
     const mockBucket = createMockR2Bucket();
     const { app } = createTestApp({
       mockBucket: mockBucket as unknown as R2Bucket,
@@ -474,10 +483,10 @@ describe("GET /events", () => {
     // Schema has .max(100), so values > 100 return 400 validation error
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toHaveProperty("error");
+    expect(body).toHaveProperty('error');
   });
 
-  it("orders by createdAt desc", async () => {
+  it('orders by createdAt desc', async () => {
     const mockBucket = createMockR2Bucket();
     const mockDb = createMockDb();
     mockDb.limit = vi.fn().mockReturnValue({
@@ -502,12 +511,12 @@ describe("GET /events", () => {
 // GET /events/:id Tests
 // =============================================================================
 
-describe("GET /events/:id", () => {
+describe('GET /events/:id', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("returns event if photographer owns it", async () => {
+  it('returns event if photographer owns it', async () => {
     const mockBucket = createMockR2Bucket();
     const mockDb = createMockDb();
     // Track limit calls - the createTestApp mock handles the first call (requirePhotographer)
@@ -540,22 +549,22 @@ describe("GET /events/:id", () => {
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
-    const res = await client.events[":id"].$get({
+    const res = await client.events[':id'].$get({
       param: { id: MOCK_EVENT_ID },
     });
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    if ("data" in body) {
+    if ('data' in body) {
       expect(body.data.id).toBe(MOCK_EVENT_ID);
-      expect(body.data.name).toBe("Test Event");
+      expect(body.data.name).toBe('Test Event');
       expect(body.data.qrCodeUrl).toBeNull();
     } else {
-      throw new Error("Expected data response");
+      throw new Error('Expected data response');
     }
   });
 
-  it("returns 404 if event not found", async () => {
+  it('returns 404 if event not found', async () => {
     const mockBucket = createMockR2Bucket();
     const mockDb = createMockDb();
     const originalLimit = mockDb.limit;
@@ -576,22 +585,22 @@ describe("GET /events/:id", () => {
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
-    const res = await client.events[":id"].$get({
-      param: { id: "00000000-0000-0000-0000-000000000000" },
+    const res = await client.events[':id'].$get({
+      param: { id: '00000000-0000-0000-0000-000000000000' },
     });
 
     expect(res.status).toBe(404);
     const body = await res.json();
-    if ("error" in body) {
-      expect(body.error.code).toBe("NOT_FOUND");
+    if ('error' in body) {
+      expect(body.error.code).toBe('NOT_FOUND');
     } else {
-      throw new Error("Expected error response");
+      throw new Error('Expected error response');
     }
   });
 
   it("returns 404 if photographer doesn't own event", async () => {
     // Event owned by different photographer
-    const otherEvent = { ...mockEvent, photographerId: "33333333-3333-3333-3333-333333333333" };
+    const otherEvent = { ...mockEvent, photographerId: '33333333-3333-3333-3333-333333333333' };
     const mockBucket = createMockR2Bucket();
     const mockDb = createMockDb();
     const originalLimit = mockDb.limit;
@@ -612,34 +621,34 @@ describe("GET /events/:id", () => {
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
-    const res = await client.events[":id"].$get({
+    const res = await client.events[':id'].$get({
       param: { id: MOCK_EVENT_ID },
     });
 
     // Should return NOT_FOUND, not FORBIDDEN (prevents enumeration)
     expect(res.status).toBe(404);
     const body = await res.json();
-    if ("error" in body) {
-      expect(body.error.code).toBe("NOT_FOUND");
+    if ('error' in body) {
+      expect(body.error.code).toBe('NOT_FOUND');
     } else {
-      throw new Error("Expected error response");
+      throw new Error('Expected error response');
     }
   });
 
-  it("rejects invalid UUID", async () => {
+  it('rejects invalid UUID', async () => {
     const mockBucket = createMockR2Bucket();
     const { app } = createTestApp({
       mockBucket: mockBucket as unknown as R2Bucket,
     });
     const client = testClient(app, MOCK_ENV(mockBucket));
 
-    const res = await client.events[":id"].$get({
-      param: { id: "not-a-uuid" },
+    const res = await client.events[':id'].$get({
+      param: { id: 'not-a-uuid' },
     });
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toHaveProperty("error");
+    expect(body).toHaveProperty('error');
   });
 });
 
@@ -759,7 +768,7 @@ describe("POST /events/:id/photos - Photo Upload", () => {
 
     type Env = {
       Bindings: {
-        APP_BASE_URL: string;
+        EVENT_FRONTEND_URL: string;
         PHOTOS_BUCKET: R2Bucket;
         PHOTO_QUEUE: typeof mockQueue;
         PHOTO_R2_BASE_URL: string;
@@ -804,7 +813,7 @@ describe("POST /events/:id/photos - Photo Upload", () => {
     mockBucket: R2Bucket,
     mockQueue: { send: ReturnType<typeof vi.fn> }
   ) => ({
-    APP_BASE_URL: "https://sabaipics.com",
+    EVENT_FRONTEND_URL: "https://event.sabaipics.com",
     PHOTOS_BUCKET: mockBucket,
     PHOTO_QUEUE: mockQueue,
     PHOTO_R2_BASE_URL: "https://photos.sabaipics.com",

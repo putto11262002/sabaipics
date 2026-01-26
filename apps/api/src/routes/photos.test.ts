@@ -1,36 +1,38 @@
-import { describe, it, expect, vi } from "vitest";
-import { Hono } from "hono";
-import { testClient } from "hono/testing";
-import { photosRouter } from "./photos";
-import type { Database } from "@sabaipics/db";
-import type { PhotographerVariables } from "../middleware";
+import { describe, it, expect, vi } from 'vitest';
+import { Hono } from 'hono';
+import { testClient } from 'hono/testing';
+import { photosRouter } from './photos';
+import type { Database } from '@sabaipics/db';
+import type { PhotographerVariables } from '../middleware';
 
-const MOCK_PHOTOGRAPHER_ID = "11111111-1111-1111-1111-111111111111";
-const MOCK_EVENT_ID = "22222222-2222-2222-2222-222222222222";
-const MOCK_PHOTO_ID = "33333333-3333-3333-3333-333333333333";
+const MOCK_PHOTOGRAPHER_ID = '11111111-1111-1111-1111-111111111111';
+const MOCK_EVENT_ID = '22222222-2222-2222-2222-222222222222';
+const MOCK_PHOTO_ID = '33333333-3333-3333-3333-333333333333';
 
 // Create mock DB that supports chaining
 // Query sequence:
 // 1. requirePhotographer middleware: photographers lookup
 // 2. Handler: event ownership check
 // 3. Handler: photos query (with orderBy + limit)
-function createMockDb(options: {
-  event?: { id: string } | null;
-  photos?: Array<{
-    id: string;
-    r2Key: string;
-    status: string;
-    faceCount: number;
-    uploadedAt: Date;
-  }>;
-  photographer?: { id: string; pdpaConsentAt: string | null } | null;
-} = {}) {
+function createMockDb(
+  options: {
+    event?: { id: string } | null;
+    photos?: Array<{
+      id: string;
+      r2Key: string;
+      status: string;
+      faceCount: number;
+      uploadedAt: Date;
+    }>;
+    photographer?: { id: string; pdpaConsentAt: string | null } | null;
+  } = {},
+) {
   const {
     event = { id: MOCK_EVENT_ID },
     photos = [],
     photographer = {
       id: MOCK_PHOTOGRAPHER_ID,
-      pdpaConsentAt: "2026-01-01T00:00:00Z",
+      pdpaConsentAt: '2026-01-01T00:00:00Z',
     },
   } = options;
 
@@ -73,24 +75,26 @@ function createMockDb(options: {
 }
 
 // Create test app with mocked dependencies
-function createTestApp(options: {
-  event?: { id: string } | null;
-  photos?: Array<{
-    id: string;
-    r2Key: string;
-    status: string;
-    faceCount: number;
-    uploadedAt: Date;
-  }>;
-  photographer?: { id: string; pdpaConsentAt: string | null } | null;
-  hasAuth?: boolean;
-} = {}) {
+function createTestApp(
+  options: {
+    event?: { id: string } | null;
+    photos?: Array<{
+      id: string;
+      r2Key: string;
+      status: string;
+      faceCount: number;
+      uploadedAt: Date;
+    }>;
+    photographer?: { id: string; pdpaConsentAt: string | null } | null;
+    hasAuth?: boolean;
+  } = {},
+) {
   const {
     event = { id: MOCK_EVENT_ID },
     photos = [],
     photographer = {
       id: MOCK_PHOTOGRAPHER_ID,
-      pdpaConsentAt: "2026-01-01T00:00:00Z",
+      pdpaConsentAt: '2026-01-01T00:00:00Z',
     },
     hasAuth = true,
   } = options;
@@ -103,42 +107,42 @@ function createTestApp(options: {
   };
 
   const app = new Hono<Env>()
-    .use("/*", (c, next) => {
+    .use('/*', (c, next) => {
       if (hasAuth) {
-        c.set("auth", { userId: "clerk_123", sessionId: "session_123" });
+        c.set('auth', { userId: 'clerk_123', sessionId: 'session_123' });
       }
       return next();
     })
-    .use("/*", (c, next) => {
-      c.set("db", () => mockDb as unknown as Database);
+    .use('/*', (c, next) => {
+      c.set('db', () => mockDb as unknown as Database);
       return next();
     })
-    .use("/*", (c, next) => {
+    .use('/*', (c, next) => {
       // Initialize env object (required for tests since it's not auto-initialized)
       c.env = c.env || {};
       // Set mock environment for CF_ZONE and PHOTO_R2_BASE_URL
-      c.env.CF_ZONE = "https://sabaipics.com";
-      c.env.PHOTO_R2_BASE_URL = "https://photos.sabaipics.com";
-      c.env.R2_ACCESS_KEY_ID = "test-key-id";
-      c.env.R2_SECRET_ACCESS_KEY = "test-secret-key";
-      c.env.CF_ACCOUNT_ID = "test-account-id";
-      c.env.PHOTO_BUCKET_NAME = "sabaipics-photos";
+      c.env.CF_ZONE = 'sabaipics.com';
+      c.env.PHOTO_R2_BASE_URL = 'https://photos.sabaipics.com';
+      c.env.R2_ACCESS_KEY_ID = 'test-key-id';
+      c.env.R2_SECRET_ACCESS_KEY = 'test-secret-key';
+      c.env.CF_ACCOUNT_ID = 'test-account-id';
+      c.env.PHOTO_BUCKET_NAME = 'sabaipics-photos';
       if (photographer) {
-        c.set("photographer", photographer);
+        c.set('photographer', photographer);
       }
       return next();
     })
-    .route("/", photosRouter);
+    .route('/', photosRouter);
 
   return { app };
 }
 
-describe("POST /events/:id/photos", () => {
-  describe("Auth tests", () => {
-    it("returns 401 without authentication", async () => {
+describe('POST /events/:id/photos', () => {
+  describe('Auth tests', () => {
+    it('returns 401 without authentication', async () => {
       const { app } = createTestApp({ hasAuth: false });
       const client = testClient(app);
-      const res = await client.events[":eventId"].photos.$post({
+      const res = await client.events[':eventId'].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
         json: {},
       });
@@ -146,10 +150,10 @@ describe("POST /events/:id/photos", () => {
       expect(res.status).toBe(401);
     });
 
-    it("returns 403 without photographer in context", async () => {
+    it('returns 403 without photographer in context', async () => {
       const { app } = createTestApp({ photographer: null });
       const client = testClient(app);
-      const res = await client.events[":eventId"].photos.$post({
+      const res = await client.events[':eventId'].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
         json: {},
       });
@@ -159,58 +163,61 @@ describe("POST /events/:id/photos", () => {
     });
   });
 
-  describe("Event ownership verification", () => {
-    it("returns 404 for non-existent event", async () => {
+  describe('Event ownership verification', () => {
+    it('returns 404 for non-existent event', async () => {
       const { app } = createTestApp({ event: null });
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$post({
+      const res = await client.events[':eventId'].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
         json: {},
       });
 
       expect(res.status).toBe(404);
 
-      const body = await res.json() as { error: { code: string; message: string } };
-      expect(body.error.code).toBe("NOT_FOUND");
+      const body = (await res.json()) as { error: { code: string; message: string } };
+      expect(body.error.code).toBe('NOT_FOUND');
     });
   });
 
-  describe("Pagination and data", () => {
-    it("returns photos with proper pagination format", async () => {
+  describe('Pagination and data', () => {
+    it('returns photos with proper pagination format', async () => {
       const mockPhotos = [
         {
           id: MOCK_PHOTO_ID,
-          r2Key: "events/abc-123/photo.jpg",
-          status: "indexed",
+          r2Key: 'events/abc-123/photo.jpg',
+          status: 'indexed',
           faceCount: 5,
-          uploadedAt: new Date("2025-01-10T12:00:00Z"),
+          uploadedAt: new Date('2025-01-10T12:00:00Z'),
         },
       ];
 
       const { app } = createTestApp({ photos: mockPhotos });
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$post({
+      const res = await client.events[':eventId'].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
         json: {},
       });
 
       expect(res.status).toBe(200);
-      const body = await res.json() as { data: unknown[]; pagination: { hasMore: boolean; nextCursor: string | null } };
+      const body = (await res.json()) as {
+        data: unknown[];
+        pagination: { hasMore: boolean; nextCursor: string | null };
+      };
       expect(body.data).toHaveLength(1);
       expect(body.pagination.hasMore).toBe(false);
       expect(body.pagination.nextCursor).toBeNull();
     });
 
-    it("returns hasMore=true when more photos exist", async () => {
+    it('returns hasMore=true when more photos exist', async () => {
       // Create 21 photos (limit is 20)
       const mockPhotos = Array.from({ length: 21 }, (_, i) => ({
         id: `photo-${i}`,
         r2Key: `events/abc-123/photo-${i}.jpg`,
-        status: "indexed" as const,
+        status: 'indexed' as const,
         faceCount: i,
-        uploadedAt: new Date(`2025-01-10T${String(i).padStart(2, "0")}:00:00Z`),
+        uploadedAt: new Date(`2025-01-10T${String(i).padStart(2, '0')}:00:00Z`),
       }));
 
       const mockDb = createMockDb({ photos: mockPhotos });
@@ -221,78 +228,85 @@ describe("POST /events/:id/photos", () => {
       };
 
       const app = new Hono<Env>()
-        .use("/*", (c, next) => {
-          c.set("auth", { userId: "clerk_123", sessionId: "session_123" });
+        .use('/*', (c, next) => {
+          c.set('auth', { userId: 'clerk_123', sessionId: 'session_123' });
           return next();
         })
-        .use("/*", (c, next) => {
-          c.set("db", () => mockDb as unknown as Database);
+        .use('/*', (c, next) => {
+          c.set('db', () => mockDb as unknown as Database);
           return next();
         })
-        .use("/*", (c, next) => {
+        .use('/*', (c, next) => {
           // Initialize env object (required for tests since it's not auto-initialized)
           c.env = c.env || {};
-          c.set("photographer", {
+          c.set('photographer', {
             id: MOCK_PHOTOGRAPHER_ID,
-            pdpaConsentAt: "2026-01-01T00:00:00Z",
+            pdpaConsentAt: '2026-01-01T00:00:00Z',
           });
-          c.env.CF_ZONE = "https://sabaipics.com";
-          c.env.R2_BASE_URL = "https://photos.sabaipics.com";
-          c.env.R2_ACCESS_KEY_ID = "test-key-id";
-          c.env.R2_SECRET_ACCESS_KEY = "test-secret-key";
-          c.env.CLOUDFLARE_ACCOUNT_ID = "test-account-id";
+          c.env.CF_ZONE = 'sabaipics.com';
+          c.env.PHOTO_R2_BASE_URL = 'https://photos.sabaipics.com';
+          c.env.R2_ACCESS_KEY_ID = 'test-key-id';
+          c.env.R2_SECRET_ACCESS_KEY = 'test-secret-key';
+          c.env.CF_ACCOUNT_ID = 'test-account-id';
+          c.env.PHOTO_BUCKET_NAME = 'sabaipics-photos';
           return next();
         })
-        .route("/", photosRouter);
+        .route('/', photosRouter);
 
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$post({
+      const res = await client.events[':eventId'].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
         json: { limit: 20 },
       });
 
       expect(res.status).toBe(200);
-      const body = await res.json() as { data: unknown[]; pagination: { hasMore: boolean; nextCursor: string | null } };
+      const body = (await res.json()) as {
+        data: unknown[];
+        pagination: { hasMore: boolean; nextCursor: string | null };
+      };
       // Should return 20 photos with hasMore=true since there are 21 total
       expect(body.data.length).toBe(20);
     });
 
-    it("returns empty array for event with no photos", async () => {
+    it('returns empty array for event with no photos', async () => {
       const { app } = createTestApp({ photos: [] });
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$post({
+      const res = await client.events[':eventId'].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
         json: {},
       });
 
       expect(res.status).toBe(200);
-      const body = await res.json() as { data: unknown[]; pagination: { hasMore: boolean; nextCursor: string | null } };
+      const body = (await res.json()) as {
+        data: unknown[];
+        pagination: { hasMore: boolean; nextCursor: string | null };
+      };
       expect(body.data).toEqual([]);
       expect(body.pagination.hasMore).toBe(false);
       expect(body.pagination.nextCursor).toBeNull();
     });
   });
 
-  describe("Validation", () => {
-    it("rejects invalid event ID format", async () => {
+  describe('Validation', () => {
+    it('rejects invalid event ID format', async () => {
       const { app } = createTestApp();
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$post({
-        param: { eventId: "not-a-uuid" },
+      const res = await client.events[':eventId'].photos.$post({
+        param: { eventId: 'not-a-uuid' },
         json: {},
       });
 
       expect(res.status).toBe(400);
     });
 
-    it("rejects limit greater than 50", async () => {
+    it('rejects limit greater than 50', async () => {
       const { app } = createTestApp();
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$post({
+      const res = await client.events[':eventId'].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
         json: { limit: 51 },
       });
@@ -300,11 +314,11 @@ describe("POST /events/:id/photos", () => {
       expect(res.status).toBe(400);
     });
 
-    it("rejects limit less than 1", async () => {
+    it('rejects limit less than 1', async () => {
       const { app } = createTestApp();
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$post({
+      const res = await client.events[':eventId'].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
         json: { limit: 0 },
       });
@@ -312,13 +326,13 @@ describe("POST /events/:id/photos", () => {
       expect(res.status).toBe(400);
     });
 
-    it("rejects invalid cursor datetime format", async () => {
+    it('rejects invalid cursor datetime format', async () => {
       const { app } = createTestApp();
       const client = testClient(app);
 
-      const res = await client.events[":eventId"].photos.$post({
+      const res = await client.events[':eventId'].photos.$post({
         param: { eventId: MOCK_EVENT_ID },
-        json: { cursor: "not-a-datetime" },
+        json: { cursor: 'not-a-datetime' },
       });
 
       expect(res.status).toBe(400);

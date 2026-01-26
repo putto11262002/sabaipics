@@ -1,18 +1,39 @@
-name: CI
+name: PR Checks
 
 on:
   pull_request:
     branches: [master]
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - closed
+
+concurrency:
+  group: ${{ format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  setup:
+    name: Setup
     runs-on: ubuntu-latest
+    outputs:
+      branch: ${{ steps.branch_name.outputs.current_branch }}
+    steps:
+      - name: Get branch name
+        id: branch_name
+        uses: tj-actions/branch-names@v8
+
+  build_and_test:
+    name: Build + Test
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
 
       - uses: pnpm/action-setup@v4
         with:
@@ -22,6 +43,90 @@ jobs:
 
       - run: pnpm build
 
-      # Run functional + workers tests (no real AWS calls)
       - name: Run Tests
         run: pnpm --filter=@sabaipics/api test:run
+
+  neon_preview_db:
+    name: Neon Preview DB (Migrate)
+    needs: setup
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    env:
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+    steps:
+      - name: Check Neon Config
+        id: neon_enabled
+        run: |
+          set -euo pipefail
+          if [[ -n "${NEON_PROJECT_ID}" && -n "${NEON_API_KEY}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Neon Disabled
+        if: steps.neon_enabled.outputs.enabled != 'true'
+        run: echo "Neon preview DB disabled (missing NEON_PROJECT_ID or NEON_API_KEY)."
+
+      - uses: actions/checkout@v4
+        if: steps.neon_enabled.outputs.enabled == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.neon_enabled.outputs.enabled == 'true'
+        with:
+          node-version: '22'
+
+      - uses: pnpm/action-setup@v4
+        if: steps.neon_enabled.outputs.enabled == 'true'
+        with:
+          version: 9.0.0
+
+      - run: pnpm install
+        if: steps.neon_enabled.outputs.enabled == 'true'
+
+      - name: Create Neon Branch
+        id: neon
+        uses: neondatabase/create-branch-action@v5
+        if: steps.neon_enabled.outputs.enabled == 'true'
+        with:
+          project_id: ${{ env.NEON_PROJECT_ID }}
+          branch_name: ${{ format('preview/pr-{0}-{1}', github.event.number, needs.setup.outputs.branch) }}
+          api_key: ${{ env.NEON_API_KEY }}
+
+      - name: Run Migrations
+        run: pnpm --filter=@sabaipics/db db:migrate
+        if: steps.neon_enabled.outputs.enabled == 'true'
+        env:
+          DATABASE_URL: '${{ steps.neon.outputs.db_url }}'
+
+  neon_cleanup:
+    name: Neon Preview DB (Cleanup)
+    needs: setup
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+    env:
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+    steps:
+      - name: Check Neon Config
+        id: neon_enabled
+        run: |
+          set -euo pipefail
+          if [[ -n "${NEON_PROJECT_ID}" && -n "${NEON_API_KEY}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Neon Disabled
+        if: steps.neon_enabled.outputs.enabled != 'true'
+        run: echo "Neon preview DB cleanup disabled (missing NEON_PROJECT_ID or NEON_API_KEY)."
+
+      - name: Delete Neon Branch
+        uses: neondatabase/delete-branch-action@v3
+        if: steps.neon_enabled.outputs.enabled == 'true'
+        with:
+          project_id: ${{ env.NEON_PROJECT_ID }}
+          branch: ${{ format('preview/pr-{0}-{1}', github.event.number, needs.setup.outputs.branch) }}
+          api_key: ${{ env.NEON_API_KEY }}
