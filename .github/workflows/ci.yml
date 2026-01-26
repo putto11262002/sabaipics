@@ -50,33 +50,53 @@ jobs:
     name: Neon Preview DB (Migrate)
     needs: setup
     runs-on: ubuntu-latest
-    if: |
-      github.event.action != 'closed' &&
-      vars.NEON_PROJECT_ID != '' &&
-      secrets.NEON_API_KEY != ''
+    if: github.event.action != 'closed'
+    env:
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
     steps:
+      - name: Check Neon Config
+        id: neon_enabled
+        run: |
+          set -euo pipefail
+          if [[ -n "${NEON_PROJECT_ID}" && -n "${NEON_API_KEY}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Neon Disabled
+        if: steps.neon_enabled.outputs.enabled != 'true'
+        run: echo "Neon preview DB disabled (missing NEON_PROJECT_ID or NEON_API_KEY)."
+
       - uses: actions/checkout@v4
+        if: steps.neon_enabled.outputs.enabled == 'true'
 
       - uses: actions/setup-node@v4
+        if: steps.neon_enabled.outputs.enabled == 'true'
         with:
           node-version: '22'
 
       - uses: pnpm/action-setup@v4
+        if: steps.neon_enabled.outputs.enabled == 'true'
         with:
           version: 9.0.0
 
       - run: pnpm install
+        if: steps.neon_enabled.outputs.enabled == 'true'
 
       - name: Create Neon Branch
         id: neon
         uses: neondatabase/create-branch-action@v5
+        if: steps.neon_enabled.outputs.enabled == 'true'
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
+          project_id: ${{ env.NEON_PROJECT_ID }}
           branch_name: ${{ format('preview/pr-{0}-{1}', github.event.number, needs.setup.outputs.branch) }}
-          api_key: ${{ secrets.NEON_API_KEY }}
+          api_key: ${{ env.NEON_API_KEY }}
 
       - name: Run Migrations
         run: pnpm --filter=@sabaipics/db db:migrate
+        if: steps.neon_enabled.outputs.enabled == 'true'
         env:
           DATABASE_URL: '${{ steps.neon.outputs.db_url }}'
 
@@ -84,14 +104,29 @@ jobs:
     name: Neon Preview DB (Cleanup)
     needs: setup
     runs-on: ubuntu-latest
-    if: |
-      github.event.action == 'closed' &&
-      vars.NEON_PROJECT_ID != '' &&
-      secrets.NEON_API_KEY != ''
+    if: github.event.action == 'closed'
+    env:
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
     steps:
+      - name: Check Neon Config
+        id: neon_enabled
+        run: |
+          set -euo pipefail
+          if [[ -n "${NEON_PROJECT_ID}" && -n "${NEON_API_KEY}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Neon Disabled
+        if: steps.neon_enabled.outputs.enabled != 'true'
+        run: echo "Neon preview DB cleanup disabled (missing NEON_PROJECT_ID or NEON_API_KEY)."
+
       - name: Delete Neon Branch
         uses: neondatabase/delete-branch-action@v3
+        if: steps.neon_enabled.outputs.enabled == 'true'
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
+          project_id: ${{ env.NEON_PROJECT_ID }}
           branch: ${{ format('preview/pr-{0}-{1}', github.event.number, needs.setup.outputs.branch) }}
-          api_key: ${{ secrets.NEON_API_KEY }}
+          api_key: ${{ env.NEON_API_KEY }}
