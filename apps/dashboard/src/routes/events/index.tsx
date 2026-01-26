@@ -6,14 +6,6 @@ import { Alert } from '@sabaipics/uiv2/components/alert';
 import { Skeleton } from '@sabaipics/uiv2/components/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@sabaipics/uiv2/components/toggle-group';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@sabaipics/uiv2/components/breadcrumb';
-import {
   Empty,
   EmptyHeader,
   EmptyMedia,
@@ -21,6 +13,7 @@ import {
   EmptyDescription,
 } from '@sabaipics/uiv2/components/empty';
 import { Calendar, Plus, Search } from 'lucide-react';
+import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { useEvents } from '../../hooks/events/useEvents';
 import { CreateEventModal } from '../../components/events/CreateEventModal';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
@@ -96,149 +89,117 @@ export default function EventsPage() {
     initialPageSize: 20,
   });
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="mb-8 flex items-center justify-between">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Events</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="mb-8">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Events</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-        <Alert variant="destructive">
-          <p className="mb-3">{error.message}</p>
-          <Button onClick={() => refetch()} variant="outline" size="sm">
-            Try Again
-          </Button>
-        </Alert>
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto p-6">
-      {/* Header with Breadcrumb */}
-      <div className="mb-6 flex items-center justify-between">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Events</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
+    <>
+      <SidebarPageHeader
+        breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Events' }]}
+      >
+        <Button onClick={() => setIsCreateModalOpen(true)} size="sm">
           <Plus className="mr-2 size-4" />
           Create Event
         </Button>
-      </div>
+      </SidebarPageHeader>
 
-      {/* Empty State - No events at all */}
-      {filteredEvents.length === 0 && (data?.data.length ?? 0) === 0 && (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Calendar className="size-12 text-muted-foreground" />
-            </EmptyMedia>
-            <EmptyTitle>No events yet</EmptyTitle>
-            <EmptyDescription>
-              Create your first event to start organizing and sharing photos
-            </EmptyDescription>
-          </EmptyHeader>
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <Plus className="mr-2 size-4" />
-            Create Event
-          </Button>
-        </Empty>
-      )}
-
-      {/* Events Table with controls */}
-      {(data?.data.length ?? 0) > 0 && (
-        <div className="space-y-4">
-          {/* Toolbar: Search + Status Filter */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <DataTableSearch table={table} column="name" placeholder="Filter by event name..." />
-            <ToggleGroup
-              type="single"
-              value={statusFilter}
-              onValueChange={(value) => value && setStatusFilter(value as StatusFilter)}
-              className="justify-start sm:justify-end"
-            >
-              <ToggleGroupItem value="all" aria-label="All events">
-                All
-              </ToggleGroupItem>
-              <ToggleGroupItem value="active" aria-label="Active events">
-                Active
-              </ToggleGroupItem>
-              <ToggleGroupItem value="expiring" aria-label="Expiring soon">
-                Expiring
-              </ToggleGroupItem>
-              <ToggleGroupItem value="expired" aria-label="Expired events">
-                Expired
-              </ToggleGroupItem>
-            </ToggleGroup>
+      <div className="flex flex-1 flex-col gap-4 p-4">
+        {/* Loading State */}
+        {isLoading && (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
           </div>
+        )}
 
-          {/* No Results State - when filters applied but no matches */}
-          {filteredEvents.length === 0 ? (
-            <div className="text-center py-12">
-              <Search className="size-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No events found</h3>
-              <p className="text-sm text-muted-foreground mb-4">Try adjusting your filters</p>
-              <Button variant="outline" onClick={() => setStatusFilter('all')}>
-                Clear filters
-              </Button>
-            </div>
-          ) : (
-            <>
-              {/* Table */}
-              <DataTable table={table} emptyMessage="No events found." />
+        {/* Error State */}
+        {error && (
+          <Alert variant="destructive">
+            <p className="mb-3">{error.message}</p>
+            <Button onClick={() => refetch()} variant="outline" size="sm">
+              Try Again
+            </Button>
+          </Alert>
+        )}
 
-              {/* Pagination */}
-              <DataTablePagination table={table} />
-            </>
-          )}
-        </div>
-      )}
+        {/* Success State */}
+        {!isLoading && !error && (
+          <>
+            {/* Empty State - No events at all */}
+            {filteredEvents.length === 0 && (data?.data.length ?? 0) === 0 && (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Calendar className="size-12 text-muted-foreground" />
+                  </EmptyMedia>
+                  <EmptyTitle>No events yet</EmptyTitle>
+                  <EmptyDescription>
+                    Create your first event to start organizing and sharing photos
+                  </EmptyDescription>
+                </EmptyHeader>
+                <Button onClick={() => setIsCreateModalOpen(true)}>
+                  <Plus className="mr-2 size-4" />
+                  Create Event
+                </Button>
+              </Empty>
+            )}
+
+            {/* Events Table with controls */}
+            {(data?.data.length ?? 0) > 0 && (
+              <div className="space-y-4">
+                {/* Toolbar: Search + Status Filter */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <DataTableSearch
+                    table={table}
+                    column="name"
+                    placeholder="Filter by event name..."
+                  />
+                  <ToggleGroup
+                    type="single"
+                    value={statusFilter}
+                    onValueChange={(value) => value && setStatusFilter(value as StatusFilter)}
+                    className="justify-start sm:justify-end"
+                  >
+                    <ToggleGroupItem value="all" aria-label="All events">
+                      All
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="active" aria-label="Active events">
+                      Active
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="expiring" aria-label="Expiring soon">
+                      Expiring
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="expired" aria-label="Expired events">
+                      Expired
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+
+                {/* No Results State - when filters applied but no matches */}
+                {filteredEvents.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Search className="size-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No events found</h3>
+                    <p className="text-sm text-muted-foreground mb-4">Try adjusting your filters</p>
+                    <Button variant="outline" onClick={() => setStatusFilter('all')}>
+                      Clear filters
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Table */}
+                    <DataTable table={table} emptyMessage="No events found." />
+
+                    {/* Pagination */}
+                    <DataTablePagination table={table} />
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Create Event Modal */}
       <CreateEventModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} />
-    </div>
+    </>
   );
 }

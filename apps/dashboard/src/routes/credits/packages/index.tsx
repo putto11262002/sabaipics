@@ -1,7 +1,7 @@
-import { AlertCircle, ArrowLeft, Check, CreditCard, RefreshCw } from "lucide-react";
-import { Link } from "react-router";
-import { Alert, AlertDescription, AlertTitle } from "@sabaipics/uiv2/components/alert";
-import { Button } from "@sabaipics/uiv2/components/button";
+import { AlertCircle, Check, CreditCard, RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@sabaipics/uiv2/components/alert';
+import { Button } from '@sabaipics/uiv2/components/button';
+import { PageHeader } from '../../../components/shell/page-header';
 import {
   Card,
   CardContent,
@@ -9,13 +9,19 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@sabaipics/uiv2/components/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@sabaipics/uiv2/components/empty";
-import { Skeleton } from "@sabaipics/uiv2/components/skeleton";
-import { Spinner } from "@sabaipics/uiv2/components/spinner";
-import { useCreditPackages } from "../../../hooks/credits/useCreditPackages";
-import { usePurchaseCheckout } from "../../../hooks/credits/usePurchaseCheckout";
-import { useState } from "react";
+} from '@sabaipics/uiv2/components/card';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@sabaipics/uiv2/components/empty';
+import { Skeleton } from '@sabaipics/uiv2/components/skeleton';
+import { Spinner } from '@sabaipics/uiv2/components/spinner';
+import { useCreditPackages } from '../../../hooks/credits/useCreditPackages';
+import { usePurchaseCheckout } from '../../../hooks/credits/usePurchaseCheckout';
+import { useState } from 'react';
 
 export function CreditPackagesPage() {
   const { data, isLoading, error, refetch, isRefetching } = useCreditPackages();
@@ -36,8 +42,8 @@ export function CreditPackagesPage() {
 
   const formatPrice = (priceInSatang: number) => {
     const priceInThb = priceInSatang / 100;
-    return new Intl.NumberFormat("th-TH", {
-      style: "decimal",
+    return new Intl.NumberFormat('th-TH', {
+      style: 'decimal',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(priceInThb);
@@ -48,18 +54,8 @@ export function CreditPackagesPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b">
-        <div className="container mx-auto flex h-16 items-center gap-4 px-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link to="/dashboard">
-              <ArrowLeft className="size-5" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-lg font-semibold">Buy Credits</h1>
-          </div>
-        </div>
-      </header>
+      <PageHeader backHref="/dashboard" breadcrumbs={[{ label: 'Buy Credits' }]} />
+
       <div className="container mx-auto flex flex-1 flex-col gap-6 p-4 md:p-6">
         {/* Header Section */}
         <div className="text-center">
@@ -83,12 +79,7 @@ export function CreditPackagesPage() {
             <AlertTitle>Error loading packages</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
               <span>{error.message}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refetch()}
-                disabled={isRefetching}
-              >
+              <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
                 {isRefetching ? (
                   <Spinner className="mr-2 size-3" />
                 ) : (
@@ -105,7 +96,8 @@ export function CreditPackagesPage() {
             <AlertCircle className="size-4" />
             <AlertTitle>Checkout failed</AlertTitle>
             <AlertDescription>
-              {checkoutMutation.error?.message || "Failed to create checkout session. Please try again."}
+              {checkoutMutation.error?.message ||
+                'Failed to create checkout session. Please try again.'}
             </AlertDescription>
           </Alert>
         )}
@@ -131,10 +123,7 @@ export function CreditPackagesPage() {
               const isPopular = index === 1; // Middle package is "popular"
 
               return (
-                <Card
-                  key={pkg.id}
-                  className={isPopular ? "relative border-primary shadow-lg" : ""}
-                >
+                <Card key={pkg.id} className={isPopular ? 'relative border-primary shadow-lg' : ''}>
                   {isPopular && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                       <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
@@ -159,7 +148,9 @@ export function CreditPackagesPage() {
 
                     {/* Credits */}
                     <div className="rounded-lg bg-muted p-4 text-center">
-                      <div className="text-3xl font-bold tabular-nums">{pkg.credits.toLocaleString()}</div>
+                      <div className="text-3xl font-bold tabular-nums">
+                        {pkg.credits.toLocaleString()}
+                      </div>
                       <div className="text-sm text-muted-foreground">Credits</div>
                     </div>
 
@@ -189,7 +180,7 @@ export function CreditPackagesPage() {
                       disabled={isPurchasing || checkoutMutation.isPending}
                       className="w-full"
                       size="lg"
-                      variant={isPopular ? "default" : "outline"}
+                      variant={isPopular ? 'default' : 'outline'}
                     >
                       {isPurchasing ? (
                         <>
@@ -214,8 +205,8 @@ export function CreditPackagesPage() {
         {data && displayPackages.length > 0 && (
           <div className="mx-auto max-w-2xl text-center text-sm text-muted-foreground">
             <p>
-              Secure payment powered by Stripe. Credits expire 6 months after purchase.
-              Need more credits? Contact us for enterprise plans.
+              Secure payment powered by Stripe. Credits expire 6 months after purchase. Need more
+              credits? Contact us for enterprise plans.
             </p>
           </div>
         )}

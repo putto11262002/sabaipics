@@ -10,7 +10,7 @@ import {
   Smile,
 } from 'lucide-react';
 
-import { PageHeader } from '../../components/shell/page-header';
+import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { useDashboardData } from '../../hooks/dashboard/useDashboardData';
 import { useEvents } from '../../hooks/events/useEvents';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
@@ -82,14 +82,14 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader breadcrumbs={[{ label: 'Dashboard' }]}>
+      <SidebarPageHeader breadcrumbs={[{ label: 'Dashboard' }]}>
         <Button asChild size="sm">
           <Link to="/credits/packages">
             <CreditCard className="mr-2 size-4" />
             Buy Credits
           </Link>
         </Button>
-      </PageHeader>
+      </SidebarPageHeader>
 
       <div className="flex flex-1 flex-col gap-4 p-4">
         {/* Loading State */}
