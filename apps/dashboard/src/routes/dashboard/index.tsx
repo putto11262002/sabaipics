@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { differenceInDays, formatDistanceToNow, parseISO } from 'date-fns';
 import {
@@ -7,11 +8,6 @@ import {
   Image as ImageIcon,
   RefreshCw,
   Smile,
-  MoreHorizontal,
-  ExternalLink,
-  Download,
-  Trash2,
-  Eye,
 } from 'lucide-react';
 
 import { PageHeader } from '../../components/shell/page-header';
@@ -19,9 +15,10 @@ import { useDashboardData } from '../../hooks/dashboard/useDashboardData';
 import { useEvents } from '../../hooks/events/useEvents';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useDownloadQR } from '../../hooks/events/useDownloadQR';
+import { DataTable, useEventsTable, createColumns } from '../../components/events-table';
+import type { EventTableActions } from '../../components/events-table';
 import { Alert, AlertDescription, AlertTitle } from '@sabaipics/uiv2/components/alert';
 import { Button } from '@sabaipics/uiv2/components/button';
-import { Badge } from '@sabaipics/uiv2/components/badge';
 import {
   Card,
   CardAction,
@@ -30,13 +27,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@sabaipics/uiv2/components/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@sabaipics/uiv2/components/dropdown-menu';
 import {
   Empty,
   EmptyDescription,
@@ -67,6 +57,28 @@ export function DashboardPage() {
     const searchUrl = `${window.location.origin}/participant/events/${eventId}/search`;
     copyToClipboard(searchUrl);
   };
+
+  // Create action handlers for the table
+  const tableActions: EventTableActions = {
+    onViewEvent: (eventId: string) => navigate(`/events/${eventId}`),
+    onCopySearchLink: (eventId: string) => handleCopyLink(eventId),
+    onDownloadQR: (eventId: string, eventName: string) => downloadQR.mutate({ eventId, eventName }),
+    onDeleteEvent: (eventId: string) => {
+      // TODO: Implement delete event
+      console.log('Delete event:', eventId);
+    },
+    isCopied,
+  };
+
+  // Create columns with action handlers
+  const columns = useMemo(() => createColumns(tableActions), [tableActions]);
+
+  // Create table instance - show all 10 items without pagination
+  const table = useEventsTable({
+    columns,
+    data: eventsData?.data ?? [],
+    initialPageSize: 10,
+  });
 
   return (
     <>
@@ -234,103 +246,8 @@ export function DashboardPage() {
                   </EmptyHeader>
                 </Empty>
               ) : (
-                <div className="space-y-3">
-                  {eventsData.data.map((event) => {
-                    const daysUntilExpiry = differenceInDays(parseISO(event.expiresAt), new Date());
-                    const isExpired = daysUntilExpiry <= 0;
-                    const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0;
-
-                    return (
-                      <div
-                        key={event.id}
-                        className="group flex items-center justify-between gap-4 rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors cursor-pointer"
-                        onClick={() => navigate(`/events/${event.id}`)}
-                      >
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold text-lg truncate">{event.name}</h3>
-                            {isExpired ? (
-                              <Badge variant="destructive" className="text-xs">
-                                Expired
-                              </Badge>
-                            ) : isExpiringSoon ? (
-                              <Badge
-                                variant="outline"
-                                className="border-orange-500 text-orange-500 text-xs"
-                              >
-                                Expires in {daysUntilExpiry}d
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="secondary"
-                                className="bg-green-100 text-green-800 text-xs"
-                              >
-                                Active
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
-                            <span>
-                              Created{' '}
-                              {formatDistanceToNow(parseISO(event.createdAt), { addSuffix: true })}
-                            </span>
-                            {event.startDate && event.endDate && (
-                              <>
-                                <span className="hidden sm:inline">•</span>
-                                <span className="hidden sm:inline">
-                                  {new Date(event.startDate).toLocaleDateString()} -{' '}
-                                  {new Date(event.endDate).toLocaleDateString()}
-                                </span>
-                              </>
-                            )}
-                            <span className="hidden sm:inline">•</span>
-                            <span>
-                              Expires{' '}
-                              {formatDistanceToNow(parseISO(event.expiresAt), { addSuffix: true })}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div
-                          className="flex-shrink-0"
-                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                        >
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="size-4" />
-                                <span className="sr-only">Actions</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => navigate(`/events/${event.id}`)}>
-                                <Eye className="mr-2 size-4" />
-                                View Event
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleCopyLink(event.id)}>
-                                <ExternalLink className="mr-2 size-4" />
-                                {isCopied ? 'Link Copied!' : 'Copy Search Link'}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  downloadQR.mutate({ eventId: event.id, eventName: event.name })
-                                }
-                              >
-                                <Download className="mr-2 size-4" />
-                                Download QR Code
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive">
-                                <Trash2 className="mr-2 size-4" />
-                                Delete Event
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                /* Just the table - no search, no pagination for dashboard */
+                <DataTable table={table} emptyMessage="No events yet." />
               )}
             </div>
           </>
