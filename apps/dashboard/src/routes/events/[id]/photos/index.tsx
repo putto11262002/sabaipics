@@ -160,7 +160,7 @@ export default function EventPhotosTab() {
             </Button>
             <Button
               size="sm"
-              variant="destructiveOutline"
+              variant="destructive"
               onClick={handleBulkDelete}
               disabled={
                 selectedPhotoIds.length === 0 ||
