@@ -286,7 +286,8 @@ TransferSession.end()
        │                     │          ├── 3. task.cancel()
        │                     │          ├── 4. await task.value ← wait for cleanup
        │                     │          └── 5. task = nil
-       │                     └── 3. cancel TCP connections
+       │                     ├── 3. eventSource.cleanup() ← vendor-specific cleanup
+       │                     └── 4. cancel TCP connections
        └── 2. photos.removeAll()
 ```
 
@@ -297,6 +298,30 @@ TransferSession.end()
 - Tasks awaited to ensure complete cleanup before returning
 
 **Without this pattern:** Tasks hang on `receive()` waiting for timeout, causing multiple disconnect attempts (SAB-41).
+
+### Canon Graceful Disconnect (SAB-57)
+
+Canon cameras require additional cleanup steps per gphoto2lib's `camera_exit()` pattern:
+
+```
+CanonEventSource.cleanup()
+       │
+       ├── 1. drainPendingEvents()     ← Poll GetEvent once to clear queue
+       │          └── Send Canon_EOS_GetEvent, discard response
+       │
+       ├── 2. disableEventMode()       ← Tell camera we're done monitoring
+       │          └── Send SetEventMode(0)
+       │
+       ├── 3. stopMonitoring()         ← Stop polling loop
+       │
+       └── 4. Clear references         ← Release connections
+```
+
+**Why this matters:**
+
+- Without `SetEventMode(0)`, camera may continue trying to report events
+- Without draining events, pending events may cause state inconsistency
+- Matches gphoto2lib behavior for proper PTP spec compliance
 
 ---
 

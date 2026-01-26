@@ -4,6 +4,34 @@ iOS Studio architecture changes. See `ARCHITECTURE.md` for current design.
 
 ---
 
+## 2026-01-27
+
+### Update 17: Canon Graceful Disconnect (SAB-57)
+
+**Status:** Implemented (untested)
+
+Added PTP spec-compliant disconnect handling for Canon cameras, matching gphoto2lib's `camera_exit()` pattern.
+
+**Problem:** Our disconnect sent `CloseSession` without proper Canon cleanup. Camera may continue trying to report events and not return to normal state.
+
+**Solution:** Updated `CanonEventSource.cleanup()` to perform graceful shutdown:
+
+| Step | Action                 | Purpose                          |
+| ---- | ---------------------- | -------------------------------- |
+| 1    | `drainPendingEvents()` | Poll once to clear event queue   |
+| 2    | `disableEventMode()`   | Send `SetEventMode(0)` to camera |
+| 3    | `stopMonitoring()`     | Stop polling loop                |
+| 4    | Clear references       | Release connections              |
+
+**New Methods:**
+
+- `drainPendingEvents()` - Polls Canon GetEvent once to clear pending events
+- `disableEventMode()` - Sends `SetEventMode(0)` to disable event reporting
+
+**Files:** CanonEventSource.swift, PTP_IP_ARCHITECTURE.md
+
+---
+
 ## 2026-01-26
 
 ### Update 16: Design System (Theme Colors + Button Styles)
