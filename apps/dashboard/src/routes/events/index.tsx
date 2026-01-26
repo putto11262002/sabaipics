@@ -103,10 +103,33 @@ export default function EventsPage() {
       <div className="flex flex-1 flex-col gap-4 p-4">
         {/* Loading State */}
         {isLoading && (
-          <div className="space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
+          <div className="space-y-4">
+            {/* Toolbar skeleton */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <Skeleton className="h-9 w-full sm:w-64" />
+              <Skeleton className="h-9 w-full sm:w-72" />
+            </div>
+            {/* Table skeleton */}
+            <div className="rounded-lg border">
+              {/* Header */}
+              <div className="flex items-center gap-4 border-b bg-muted/50 px-4 py-3">
+                <Skeleton className="size-4" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-24 ml-auto" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="size-4" />
+              </div>
+              {/* Rows */}
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 border-b last:border-0 px-4 py-3">
+                  <Skeleton className="size-4" />
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-4 w-20 ml-auto" />
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="size-4" />
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -186,7 +209,11 @@ export default function EventsPage() {
                 ) : (
                   <>
                     {/* Table */}
-                    <DataTable table={table} emptyMessage="No events found." />
+                    <DataTable
+                      table={table}
+                      emptyMessage="No events found."
+                      onRowClick={(event) => navigate(`/events/${event.id}`)}
+                    />
 
                     {/* Pagination */}
                     <DataTablePagination table={table} />

@@ -208,9 +208,27 @@ export function DashboardPage() {
               </div>
 
               {eventsLoading ? (
-                <div className="space-y-2">
+                <div className="rounded-lg border">
+                  {/* Header */}
+                  <div className="flex items-center gap-4 border-b bg-muted/50 px-4 py-3">
+                    <Skeleton className="size-4" />
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-24 ml-auto" />
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="size-4" />
+                  </div>
+                  {/* Rows */}
                   {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-20 w-full" />
+                    <div
+                      key={i}
+                      className="flex items-center gap-4 border-b last:border-0 px-4 py-3"
+                    >
+                      <Skeleton className="size-4" />
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-4 w-20 ml-auto" />
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="size-4" />
+                    </div>
                   ))}
                 </div>
               ) : !eventsData?.data.length ? (
@@ -227,7 +245,11 @@ export function DashboardPage() {
                 </Empty>
               ) : (
                 /* Just the table - no search, no pagination for dashboard */
-                <DataTable table={table} emptyMessage="No events yet." />
+                <DataTable
+                  table={table}
+                  emptyMessage="No events yet."
+                  onRowClick={(event) => navigate(`/events/${event.id}`)}
+                />
               )}
             </div>
           </>

@@ -14,9 +14,15 @@ interface DataTableProps<TData> {
   table: TanstackTable<TData>;
   /** Message to show when no results */
   emptyMessage?: string;
+  /** Callback when a row is clicked */
+  onRowClick?: (row: TData) => void;
 }
 
-export function DataTable<TData>({ table, emptyMessage = 'No results.' }: DataTableProps<TData>) {
+export function DataTable<TData>({
+  table,
+  emptyMessage = 'No results.',
+  onRowClick,
+}: DataTableProps<TData>) {
   return (
     <div className="overflow-x-auto">
       <div className="overflow-hidden rounded-lg">
@@ -37,7 +43,12 @@ export function DataTable<TData>({ table, emptyMessage = 'No results.' }: DataTa
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                  onClick={() => onRowClick?.(row.original)}
+                  className={onRowClick ? 'cursor-pointer' : undefined}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
