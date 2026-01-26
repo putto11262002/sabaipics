@@ -22,7 +22,6 @@ const tabs = [
   { name: 'Upload', path: 'upload' },
   { name: 'Photos', path: 'photos' },
   { name: 'Statistics', path: 'statistics' },
-  { name: 'Faces', path: 'faces', disabled: true },
 ];
 
 export default function EventDetailLayout() {
@@ -124,31 +123,22 @@ export default function EventDetailLayout() {
       {/* Tab Navigation */}
       <div className="flex-shrink-0 border-b px-4">
         <div className="flex gap-6 -mb-px">
-          {tabs.map((tab) =>
-            tab.disabled ? (
-              <span
-                key={tab.path}
-                className="pb-3 text-sm font-medium text-muted-foreground opacity-50 cursor-not-allowed border-b-2 border-transparent"
-              >
-                {tab.name}
-              </span>
-            ) : (
-              <NavLink
-                key={tab.path}
-                to={`/events/${id}/${tab.path}`}
-                className={({ isActive }) =>
-                  cn(
-                    'pb-3 text-sm font-medium transition-colors border-b-2',
-                    isActive
-                      ? 'border-primary text-foreground'
-                      : 'border-transparent text-muted-foreground hover:text-foreground',
-                  )
-                }
-              >
-                {tab.name}
-              </NavLink>
-            ),
-          )}
+          {tabs.map((tab) => (
+            <NavLink
+              key={tab.path}
+              to={`/events/${id}/${tab.path}`}
+              className={({ isActive }) =>
+                cn(
+                  'pb-3 text-sm font-medium transition-colors border-b-2',
+                  isActive
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )
+              }
+            >
+              {tab.name}
+            </NavLink>
+          ))}
         </div>
       </div>
 
