@@ -18,8 +18,8 @@ struct RootFlowView: View {
     var body: some View {
         Group {
             if clerk.user == nil {
-                // Custom auth flow (replaces Clerk's AuthView)
-                AuthFlowContainerView()
+                // Experimental: branded welcome + Clerk AuthView in sheet
+                WelcomeWithClerkSheetView()
             } else {
                 MainTabView()
             }

@@ -6,6 +6,38 @@ iOS Studio architecture changes. See `ARCHITECTURE.md` for current design.
 
 ## 2026-01-26
 
+### Update 14: ProfileView with Clerk Account Portal
+
+**Status:** Implemented
+
+Enhanced Profile tab with user info display and Clerk's account management portal.
+
+- Shows user avatar via `UserButton()`
+- Displays username (fallback: full name, then email prefix)
+- Shows email as secondary info
+- "Manage Account" opens Clerk's `UserProfileView()` in sheet
+- "Sign Out" button with red/destructive styling
+
+**Files:** Views/ProfileView.swift
+
+---
+
+### Update 13: Clerk AuthView in Sheet
+
+**Status:** Implemented
+
+Switched from custom auth UI to Clerk's prebuilt `AuthView()` in a sheet with branded welcome screen.
+
+- New `WelcomeWithClerkSheetView` - branded entry with Sign In / Create Account buttons
+- Sign In opens `AuthView(mode: .signIn)`
+- Create Account opens `AuthView(mode: .signUp)`
+- Applied `ClerkTheme` for consistent styling (borderRadius 12, removed focus ring)
+- `RootFlowView` now uses `WelcomeWithClerkSheetView`
+
+**Files:** Views/Auth/WelcomeWithClerkSheetView.swift, Views/RootFlowView.swift
+
+---
+
 ### Update 12: Auth Provider Button Compliance
 
 **Status:** Implemented

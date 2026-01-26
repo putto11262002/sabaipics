@@ -10,44 +10,80 @@ import Clerk
 
 struct ProfileView: View {
     @Environment(\.clerk) private var clerk
-    @State private var signOutError: String?
+    @State private var showAccountPortal = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Account") {
                     if let user = clerk.user {
-                        Text(user.id)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            // User avatar
+                            UserButton()
+                                .frame(width: 44, height: 44)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                // Display name (prefer username, fallback to full name)
+                                Text(displayName(for: user))
+                                    .font(.body)
+                                    .fontWeight(.medium)
+                                
+                                // Email as secondary info
+                                if let email = user.primaryEmailAddress?.emailAddress {
+                                    Text(email)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
                     } else {
                         Text("Not signed in")
                             .foregroundStyle(.secondary)
                     }
                 }
-
+                
                 Section {
-                    Button("Sign out", role: .destructive) {
-                        Task {
-                            do {
-                                try await clerk.signOut()
-                                signOutError = nil
-                            } catch {
-                                signOutError = String(describing: error)
-                            }
-                        }
+                    Button {
+                        showAccountPortal = true
+                    } label: {
+                        Label("Manage Account", systemImage: "person.crop.circle")
                     }
-                }
-
-                if let signOutError {
-                    Section("Error") {
-                        Text(signOutError)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                    
+                    Button {
+                        Task {
+                            try? await clerk.signOut()
+                        }
+                    } label: {
+                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                            .foregroundStyle(.red)
                     }
                 }
             }
             .navigationTitle("Profile")
+            .sheet(isPresented: $showAccountPortal) {
+                UserProfileView()
+            }
         }
+    }
+    
+    /// Returns the best display name for the user
+    private func displayName(for user: User) -> String {
+        // Prefer username if set
+        if let username = user.username, !username.isEmpty {
+            return username
+        }
+        // Fallback to full name
+        let fullName = [user.firstName, user.lastName]
+            .compactMap { $0 }
+            .joined(separator: " ")
+        if !fullName.isEmpty {
+            return fullName
+        }
+        // Last resort: email prefix
+        if let email = user.primaryEmailAddress?.emailAddress {
+            return email.components(separatedBy: "@").first ?? "User"
+        }
+        return "User"
     }
 }

@@ -7,7 +7,7 @@ This doc describes how authentication is implemented in the iOS Studio app (`app
 - Require sign-in before the Studio app can access API-backed features (events, uploads, etc.).
 - Keep the existing PTP/camera state machine unchanged.
 - Make Clerk publishable key configuration simple for local dev.
-- Provide fully custom branded auth UI (not Clerk's prebuilt `AuthView()`).
+- Provide branded welcome screen with Clerk's prebuilt auth views.
 
 ## Architecture
 
@@ -15,52 +15,60 @@ This doc describes how authentication is implemented in the iOS Studio app (`app
 
 `SabaiPicsStudioApp` renders `RootFlowView`.
 
-- If signed out: show custom `AuthFlowContainerView` (branded auth UI).
+- If signed out: show `WelcomeWithClerkSheetView` (branded welcome + Clerk AuthView in sheet).
 - If signed in: show the main app shell (`MainTabView`).
 
 This intentionally avoids adding auth states to `AppCoordinator.appState`.
 
-### Custom Auth UI
+### Auth UI
 
-The app uses a **fully custom auth UI** built with SwiftUI, following Clerk's headless/custom flow APIs strictly.
+The app uses a **branded welcome screen** that presents Clerk's prebuilt `AuthView()` in a sheet.
 
-**Supported auth methods:**
+**Entry point:** `WelcomeWithClerkSheetView`
 
-- Email OTP (passwordless) - sign-in only (users sign up on the web app)
-- Google OAuth sign-in (requires Associated Domains - see below)
-- LINE OAuth sign-in (requires Associated Domains - see below)
+- Shows SabaiPics branding (logo, app name, tagline)
+- "Sign in" button opens `AuthView(mode: .signIn)` in sheet
+- "Create an account" button opens `AuthView(mode: .signUp)` in sheet
 
-**Provider buttons:**
+**Styling:**
 
-- Google: app-styled outline button using the Google "G" icon.
-- LINE: native button following LINE button guidelines (base `#06C755`, pressed overlay, separator), using the official LINE icon.
-- Copy:
-  - Google: "Continue with Google"
-  - LINE: "Log in with LINE"
+Clerk views are customized via `ClerkTheme`:
 
-**Flow architecture:**
+- `borderRadius: 12.0` - matches app's corner radius
+- `ring: .clear` - removes focus ring
+- System background colors
 
-- `AuthFlowCoordinator` - ObservableObject managing state machine and Clerk API calls
-- `AuthFlowState` - Enum representing current auth step (welcome, emailEntry, otpPending, oauthLoading, error)
-- `AuthFlowContainerView` - State-driven navigation container
+**Supported auth methods** (configured in Clerk Dashboard):
 
-**Screens:**
-
-- `WelcomeView` - Branded entry screen with provider buttons
-- `EmailEntryView` - Email input with validation
-- `OTPVerificationView` - 6-digit code input with resend functionality
+- Email OTP (passwordless)
+- Google OAuth (requires Associated Domains - see below)
+- LINE OAuth (requires Associated Domains - see below)
 
 Relevant files:
 
 - `apps/studio/SabaiPicsStudio/SabaiPicsStudioApp.swift`
 - `apps/studio/SabaiPicsStudio/Views/RootFlowView.swift`
-- `apps/studio/SabaiPicsStudio/Views/Auth/` - All custom auth views
-- `apps/studio/SabaiPicsStudio/Coordinators/AuthFlowCoordinator.swift`
+- `apps/studio/SabaiPicsStudio/Views/Auth/WelcomeWithClerkSheetView.swift`
 
 See also:
 
 - App shell + capture mode: `APP_SHELL.md`
-- Implementation plan: `log/ios/006_custom-auth-ui-robust-plan.md`
+
+### Profile & Account Management
+
+The Profile tab uses Clerk's prebuilt views for account management.
+
+**ProfileView features:**
+
+- User avatar via `UserButton()`
+- Username display (fallback: full name → email prefix)
+- Email as secondary info
+- "Manage Account" opens `UserProfileView()` in sheet (full account portal)
+- "Sign Out" button
+
+Relevant files:
+
+- `apps/studio/SabaiPicsStudio/Views/ProfileView.swift`
 
 ### Clerk lifecycle
 
