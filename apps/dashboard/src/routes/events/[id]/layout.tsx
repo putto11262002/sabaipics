@@ -153,7 +153,7 @@ export default function EventDetailLayout() {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto px-4">
         <Outlet />
       </div>
     </div>

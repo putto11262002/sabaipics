@@ -44,7 +44,7 @@ export default function EventDetailsTab() {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+    <div className="grid gap-6 py-4 lg:grid-cols-[1.35fr_0.65fr]">
       <div className="space-y-6">
         <header className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
