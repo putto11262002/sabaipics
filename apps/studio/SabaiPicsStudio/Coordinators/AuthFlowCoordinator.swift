@@ -27,6 +27,10 @@ final class AuthFlowCoordinator: ObservableObject {
     
     @Published private(set) var state: AuthFlowState = .welcome
     @Published private(set) var isLoading: Bool = false
+
+    /// Which OAuth provider is currently being launched (used to show a loading
+    /// indicator on the tapped provider button).
+    @Published private(set) var oauthLoadingProvider: SocialProvider? = nil
     
     /// The email address being used for the current auth attempt
     @Published private(set) var currentEmail: String = ""
@@ -180,7 +184,8 @@ final class AuthFlowCoordinator: ObservableObject {
     /// - Parameter provider: Social provider (Google or LINE)
     func startOAuth(provider: SocialProvider) async {
         isLoading = true
-        state = .oauthLoading(provider: provider)
+        oauthLoadingProvider = provider
+        state = .welcome
         
         do {
             // Map our local SocialProvider enum to Clerk's OAuthProvider
@@ -204,7 +209,8 @@ final class AuthFlowCoordinator: ObservableObject {
                     // SUCCESS - session is automatically active
                     // RootFlowView will detect clerk.user != nil and show MainTabView
                 } else {
-                    state = .error(message: "OAuth sign-in incomplete.", canRetry: true)
+                    // Return to welcome (avoid trapping the user on an error screen)
+                    state = .welcome
                 }
                 
             case .signUp:
@@ -214,11 +220,13 @@ final class AuthFlowCoordinator: ObservableObject {
             }
             
         } catch let error as ClerkAPIError {
-            handleClerkError(error)
+            // Common case: user cancels the OAuth prompt. Avoid showing an error screen.
+            state = .welcome
         } catch {
-            handleGenericError(error)
+            state = .welcome
         }
-        
+
+        oauthLoadingProvider = nil
         isLoading = false
     }
     

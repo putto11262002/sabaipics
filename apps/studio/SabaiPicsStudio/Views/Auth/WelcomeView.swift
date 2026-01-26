@@ -55,11 +55,11 @@ struct WelcomeView: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.primary)
                         .background(
-                            RoundedRectangle(cornerRadius: 4)
+                            RoundedRectangle(cornerRadius: 12)
                                 .fill(Color(.systemBackground))
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 4)
+                            RoundedRectangle(cornerRadius: 12)
                                 .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
                         )
                 }
@@ -72,8 +72,12 @@ struct WelcomeView: View {
                 } label: {
                     EmptyView()
                 }
-                .buttonStyle(GoogleSignInButtonStyle())
-                .accessibilityLabel("Sign in with Google")
+                .buttonStyle(
+                    GoogleSignInButtonStyle(
+                        isLoading: coordinator.oauthLoadingProvider == .google
+                    )
+                )
+                .accessibilityLabel("Continue with Google")
                 
                 // LINE button (official asset: "Log in with LINE")
                 Button {
@@ -83,7 +87,11 @@ struct WelcomeView: View {
                 } label: {
                     EmptyView()
                 }
-                .buttonStyle(LineLoginButtonStyle())
+                .buttonStyle(
+                    LineLoginButtonStyle(
+                        isLoading: coordinator.oauthLoadingProvider == .line
+                    )
+                )
                 .accessibilityLabel("Log in with LINE")
             }
             .padding(.horizontal, 24)
@@ -121,26 +129,39 @@ private struct ProviderImageButtonStyle: ButtonStyle {
 }
 
 private struct GoogleSignInButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 12) {
-            Image("GoogleGMark")
-                .renderingMode(.original)
-                .resizable()
-                .frame(width: 20, height: 20)
+    let isLoading: Bool
 
-            Text("Continue with Google")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.primary)
+    func makeBody(configuration: Configuration) -> some View {
+        ZStack {
+            HStack(spacing: 12) {
+                Image("GoogleGMark")
+                    .renderingMode(.original)
+                    .resizable()
+                    .frame(width: 20, height: 20)
+
+                Text("Continue with Google")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.primary)
+            }
+
+            if isLoading {
+                HStack {
+                    Spacer(minLength: 0)
+                    ProgressView()
+                        .controlSize(.regular)
+                }
+                .padding(.trailing, 2)
+            }
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity)
         .frame(height: 44)
         .background(
-            RoundedRectangle(cornerRadius: 4)
+            RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemBackground))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 4)
+            RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
         )
         .opacity(configuration.isPressed ? 0.95 : 1.0)
@@ -149,6 +170,8 @@ private struct GoogleSignInButtonStyle: ButtonStyle {
 }
 
 private struct LineLoginButtonStyle: ButtonStyle {
+    let isLoading: Bool
+
     // LINE brand colors (from official button guidelines)
     private let baseGreen = Color(red: 6 / 255, green: 199 / 255, blue: 85 / 255) // #06C755
 
@@ -169,6 +192,16 @@ private struct LineLoginButtonStyle: ButtonStyle {
             Text("Log in with LINE")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.white)
+
+            if isLoading {
+                HStack {
+                    Spacer(minLength: 0)
+                    ProgressView()
+                        .tint(.white)
+                        .controlSize(.regular)
+                }
+                .padding(.trailing, 2)
+            }
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity)

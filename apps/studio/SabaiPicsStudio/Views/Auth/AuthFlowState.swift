@@ -32,10 +32,6 @@ enum AuthFlowState: Equatable {
     /// - Parameter email: the email address OTP was sent to
     case otpPending(email: String)
     
-    /// OAuth redirect is in progress
-    /// - Parameter provider: which OAuth provider (Google/LINE)
-    case oauthLoading(provider: SocialProvider)
-    
     /// An error occurred
     /// - Parameter message: user-friendly error message
     /// - Parameter canRetry: whether user can retry the action

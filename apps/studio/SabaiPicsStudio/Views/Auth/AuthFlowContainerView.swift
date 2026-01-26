@@ -37,9 +37,6 @@ struct AuthFlowContainerView: View {
                         email: email
                     )
                     
-                case .oauthLoading(let provider):
-                    OAuthLoadingView(provider: provider)
-                    
                 case .error(let message, let canRetry):
                     AuthErrorView(
                         message: message,
@@ -56,24 +53,6 @@ struct AuthFlowContainerView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: coordinator.state)
-        }
-    }
-}
-
-// MARK: - OAuth Loading View
-
-/// Simple loading view shown during OAuth redirect
-struct OAuthLoadingView: View {
-    let provider: SocialProvider
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
-            
-            Text("Connecting to \(provider.displayName)...")
-                .font(.headline)
-                .foregroundStyle(.secondary)
         }
     }
 }
