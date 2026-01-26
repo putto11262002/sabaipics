@@ -145,17 +145,27 @@ async function processUpload(
       },
     });
 
-    // Transform using CF Images API (same options as DEFAULT_NORMALIZE_OPTIONS)
+    // Transform using CF Images API (same options as V1 upload)
     const transformResponse = yield* ResultAsync.fromPromise(
       env.IMAGES.input(stream)
-        .transform({ width: 4000, height: 4000 })
+        .transform({ width: 4000, fit: 'scale-down' })
         .output({ format: 'image/jpeg', quality: 90 }),
-      (cause): UploadProcessingError => ({ type: 'normalization', key, intentId: intent.id, cause }),
+      (cause): UploadProcessingError => ({
+        type: 'normalization',
+        key,
+        intentId: intent.id,
+        cause,
+      }),
     );
 
     const normalizedBytes = yield* ResultAsync.fromPromise(
       transformResponse.response().arrayBuffer(),
-      (cause): UploadProcessingError => ({ type: 'normalization', key, intentId: intent.id, cause }),
+      (cause): UploadProcessingError => ({
+        type: 'normalization',
+        key,
+        intentId: intent.id,
+        cause,
+      }),
     );
 
     // Extract dimensions from normalized JPEG
