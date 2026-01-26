@@ -1,6 +1,7 @@
 import * as React from 'react';
-import { Camera, LayoutDashboard, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, CalendarDays } from 'lucide-react';
 
+import { LogoMark } from '../icons/logo-mark';
 import { NavMain } from './nav-main';
 import { NavSecondary } from './nav-secondary';
 import { NavUser } from './nav-user';
@@ -9,9 +10,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
 } from '@sabaipics/uiv3/components/sidebar';
 
 const data = {
@@ -66,21 +64,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <a href="/dashboard">
-                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Camera className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">SabaiPics</span>
-                  <span className="truncate text-xs">Photographer</span>
-                </div>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <a href="/dashboard" className="flex items-center gap-2 p-2">
+          <LogoMark className="size-6" />
+          <span className="font-medium">SabaiPics</span>
+        </a>
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />

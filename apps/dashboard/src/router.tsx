@@ -14,7 +14,6 @@ import EventDetailsTab from './routes/events/[id]/details';
 import EventUploadTab from './routes/events/[id]/upload';
 import EventStatisticsTab from './routes/events/[id]/statistics';
 import EventPhotosTab from './routes/events/[id]/photos';
-import EventFacesTab from './routes/events/[id]/faces';
 import { SidebarLayout } from './components/shell/sidebar-layout';
 
 export const router = createBrowserRouter([
@@ -99,10 +98,6 @@ export const router = createBrowserRouter([
           {
             path: 'photos',
             element: <EventPhotosTab />,
-          },
-          {
-            path: 'faces',
-            element: <EventFacesTab />,
           },
         ],
       },
