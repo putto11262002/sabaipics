@@ -1,19 +1,15 @@
-import { Hono } from "hono";
-import { eq, asc, and } from "drizzle-orm";
-import { creditPackages, photographers, creditLedger } from "@sabaipics/db";
-import {
-  requirePhotographer,
-  requireConsent,
-  type PhotographerVariables,
-} from "../middleware";
-import type { Bindings } from "../types";
+import { Hono } from 'hono';
+import { eq, asc, and } from 'drizzle-orm';
+import { creditPackages, photographers, creditLedger } from '@sabaipics/db';
+import { requirePhotographer, requireConsent, type PhotographerVariables } from '../middleware';
+import type { Bindings } from '../types';
 import {
   createStripeClient,
   createCheckoutSession,
   createCustomer,
   findCustomerByPhotographerId,
-} from "../lib/stripe";
-import type { Env } from "../types";
+} from '../lib/stripe';
+import type { Env } from '../types';
 
 /**
  * Credit packages API
@@ -33,7 +29,7 @@ export const creditsRouter = new Hono<Env>()
    * Returns all active credit packages sorted by sortOrder.
    * Public endpoint - no authentication required.
    */
-  .get("/", async (c) => {
+  .get('/', async (c) => {
     const db = c.var.db();
 
     const packages = await db
@@ -58,105 +54,94 @@ export const creditsRouter = new Hono<Env>()
    * Request body: { packageId: string }
    * Response: { data: { checkoutUrl: string, sessionId: string } }
    */
-  .post(
-    "/checkout",
-    requirePhotographer(),
-    requireConsent(),
-    async (c) => {
-      const photographer = c.var.photographer;
-      const db = c.var.db();
+  .post('/checkout', requirePhotographer(), requireConsent(), async (c) => {
+    const photographer = c.var.photographer;
+    const db = c.var.db();
 
-      // Parse request body
-      const body = await c.req.json();
-      const packageId = body?.packageId;
+    // Parse request body
+    const body = await c.req.json();
+    const packageId = body?.packageId;
 
-      // Validate packageId
-      if (!packageId || typeof packageId !== "string") {
-        return c.json(
-          { error: { code: "INVALID_REQUEST", message: "packageId is required" } },
-          400
-        );
-      }
+    // Validate packageId
+    if (!packageId || typeof packageId !== 'string') {
+      return c.json({ error: { code: 'INVALID_REQUEST', message: 'packageId is required' } }, 400);
+    }
 
-      // Query package (must be active)
-      const [pkg] = await db
-        .select()
-        .from(creditPackages)
-        .where(eq(creditPackages.id, packageId))
+    // Query package (must be active)
+    const [pkg] = await db
+      .select()
+      .from(creditPackages)
+      .where(eq(creditPackages.id, packageId))
+      .limit(1);
+
+    if (!pkg || !pkg.active) {
+      return c.json({ error: { code: 'NOT_FOUND', message: 'Credit package not found' } }, 404);
+    }
+
+    // Get or create Stripe customer
+    const stripe = createStripeClient(c.env);
+    let customer = await findCustomerByPhotographerId(stripe, photographer.id);
+
+    if (!customer) {
+      // Fetch photographer email/name for customer creation
+      const [photoRecord] = await db
+        .select({ email: photographers.email, name: photographers.name })
+        .from(photographers)
+        .where(eq(photographers.id, photographer.id))
         .limit(1);
 
-      if (!pkg || !pkg.active) {
-        return c.json(
-          { error: { code: "NOT_FOUND", message: "Credit package not found" } },
-          404
-        );
-      }
-
-      // Get or create Stripe customer
-      const stripe = createStripeClient(c.env);
-      let customer = await findCustomerByPhotographerId(stripe, photographer.id);
-
-      if (!customer) {
-        // Fetch photographer email/name for customer creation
-        const [photoRecord] = await db
-          .select({ email: photographers.email, name: photographers.name })
-          .from(photographers)
-          .where(eq(photographers.id, photographer.id))
-          .limit(1);
-
-        customer = await createCustomer({
-          stripe,
-          photographerId: photographer.id,
-          email: photoRecord.email,
-          name: photoRecord.name ?? undefined,
-        });
-
-        // Store stripe_customer_id for future use
-        await db
-          .update(photographers)
-          .set({ stripeCustomerId: customer.id })
-          .where(eq(photographers.id, photographer.id));
-      }
-
-      // Determine redirect URLs (frontend will implement in T-12)
-      // Using app origin from CORS_ORIGIN or default localhost for dev
-      const origin = c.env.CORS_ORIGIN ?? "http://localhost:5173";
-      const successUrl = `${origin}/credits/success`;
-      const cancelUrl = `${origin}/credits/packages`;
-
-      // Create checkout session
-      const result = await createCheckoutSession({
+      customer = await createCustomer({
         stripe,
-        customerId: customer.id,
-        lineItems: [
-          {
-            name: pkg.name,
-            description: `${pkg.credits} credits for photo uploads`,
-            amount: pkg.priceThb, // priceThb is in satang (smallest unit)
-            quantity: 1,
-            metadata: { package_id: pkg.id, credits: pkg.credits.toString() },
-          },
-        ],
-        successUrl,
-        cancelUrl,
-        metadata: {
-          photographer_id: photographer.id,
-          package_id: pkg.id,
-          package_name: pkg.name,
-          credits: pkg.credits.toString(),
-        },
-        currency: "thb",
-        mode: "payment",
+        photographerId: photographer.id,
+        email: photoRecord.email,
+        name: photoRecord.name ?? undefined,
       });
 
-      return c.json({
-        data: {
-          checkoutUrl: result.url,
-          sessionId: result.sessionId,
-        },
-      });
+      // Store stripe_customer_id for future use
+      await db
+        .update(photographers)
+        .set({ stripeCustomerId: customer.id })
+        .where(eq(photographers.id, photographer.id));
     }
-  )
+
+    // Determine redirect URLs (frontend will implement in T-12)
+    // Using first origin from CORS_ORIGIN (may be comma-separated) or default localhost for dev
+    const origin = c.env.CORS_ORIGIN?.split(',')[0] ?? 'http://localhost:5173';
+    const successUrl = `${origin}/credits/success`;
+    const cancelUrl = `${origin}/credits/packages`;
+
+    // Create checkout session
+    const result = await createCheckoutSession({
+      stripe,
+      customerId: customer.id,
+      lineItems: [
+        {
+          name: pkg.name,
+          description: `${pkg.credits} credits for photo uploads`,
+          amount: pkg.priceThb, // priceThb is in satang (smallest unit)
+          quantity: 1,
+          metadata: { package_id: pkg.id, credits: pkg.credits.toString() },
+        },
+      ],
+      successUrl,
+      cancelUrl,
+      metadata: {
+        photographer_id: photographer.id,
+        package_id: pkg.id,
+        package_name: pkg.name,
+        credits: pkg.credits.toString(),
+      },
+      currency: 'thb',
+      mode: 'payment',
+    });
+
+    return c.json({
+      data: {
+        checkoutUrl: result.url,
+        sessionId: result.sessionId,
+      },
+    });
+  })
   /**
    * GET /credit-packages/purchase/:sessionId
    *
@@ -169,48 +154,40 @@ export const creditsRouter = new Hono<Env>()
    *
    * Security: Users can only check their own purchases (filtered by photographerId)
    */
-  .get(
-    "/purchase/:sessionId",
-    requirePhotographer(),
-    requireConsent(),
-    async (c) => {
-      const sessionId = c.req.param("sessionId");
-      const photographer = c.var.photographer;
-      const db = c.var.db();
+  .get('/purchase/:sessionId', requirePhotographer(), requireConsent(), async (c) => {
+    const sessionId = c.req.param('sessionId');
+    const photographer = c.var.photographer;
+    const db = c.var.db();
 
-      if (!sessionId) {
-        return c.json(
-          { error: { code: "INVALID_REQUEST", message: "sessionId is required" } },
-          400
-        );
-      }
-
-      // Query credit_ledger by stripeSessionId AND photographerId (security)
-      const [purchase] = await db
-        .select({
-          credits: creditLedger.amount,
-          expiresAt: creditLedger.expiresAt,
-        })
-        .from(creditLedger)
-        .where(
-          and(
-            eq(creditLedger.stripeSessionId, sessionId),
-            eq(creditLedger.photographerId, photographer.id),
-            eq(creditLedger.type, "purchase")
-          )
-        )
-        .limit(1);
-
-      if (!purchase) {
-        // No ledger entry found = webhook not received yet
-        return c.json({ fulfilled: false, credits: null });
-      }
-
-      // Ledger entry exists = webhook fulfilled
-      return c.json({
-        fulfilled: true,
-        credits: purchase.credits,
-        expiresAt: purchase.expiresAt,
-      });
+    if (!sessionId) {
+      return c.json({ error: { code: 'INVALID_REQUEST', message: 'sessionId is required' } }, 400);
     }
-  );
+
+    // Query credit_ledger by stripeSessionId AND photographerId (security)
+    const [purchase] = await db
+      .select({
+        credits: creditLedger.amount,
+        expiresAt: creditLedger.expiresAt,
+      })
+      .from(creditLedger)
+      .where(
+        and(
+          eq(creditLedger.stripeSessionId, sessionId),
+          eq(creditLedger.photographerId, photographer.id),
+          eq(creditLedger.type, 'purchase'),
+        ),
+      )
+      .limit(1);
+
+    if (!purchase) {
+      // No ledger entry found = webhook not received yet
+      return c.json({ fulfilled: false, credits: null });
+    }
+
+    // Ledger entry exists = webhook fulfilled
+    return c.json({
+      fulfilled: true,
+      credits: purchase.credits,
+      expiresAt: purchase.expiresAt,
+    });
+  });
