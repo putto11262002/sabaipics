@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { Upload, XCircle } from "lucide-react";
-import { Button } from "@sabaipics/uiv2/components/button";
-import { Alert, AlertDescription } from "@sabaipics/uiv2/components/alert";
-import { cn } from "@sabaipics/uiv2/lib/utils";
+import { Button } from "@sabaipics/uiv3/components/button";
+import { Alert, AlertDescription } from "@sabaipics/uiv3/components/alert";
+import { cn } from "@sabaipics/uiv3/lib/utils";
 
 const ACCEPTED_FORMATS = ["image/jpeg", "image/png", "image/heic", "image/webp"];
 const ACCEPTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".heic", ".webp"];

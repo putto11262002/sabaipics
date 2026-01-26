@@ -8,7 +8,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@sabaipics/uiv2/components/table';
+} from '@sabaipics/uiv3/components/table';
 
 interface DataTableProps<TData> {
   table: TanstackTable<TData>;

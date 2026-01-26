@@ -1,7 +1,7 @@
 import type { Table as TanstackTable } from '@tanstack/react-table';
 import { Search } from 'lucide-react';
 
-import { Input } from '@sabaipics/uiv2/components/input';
+import { Input } from '@sabaipics/uiv3/components/input';
 
 interface DataTableSearchProps<TData> {
   table: TanstackTable<TData>;

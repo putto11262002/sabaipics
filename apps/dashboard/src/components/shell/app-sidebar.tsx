@@ -12,7 +12,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from '@sabaipics/uiv2/components/sidebar';
+} from '@sabaipics/uiv3/components/sidebar';
 
 const data = {
   navMain: [

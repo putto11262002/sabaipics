@@ -1,14 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'react-router';
-import { Button } from '@sabaipics/uiv2/components/button';
+import { Button } from '@sabaipics/uiv3/components/button';
 import { Download, Trash2, CheckSquare } from 'lucide-react';
 import { PhotosGridView } from '../../../../components/photos/PhotosGridView';
 import { usePhotos } from '../../../../hooks/photos/usePhotos';
 import { useDeletePhotos } from '../../../../hooks/photos/useDeletePhotos';
 import { useDownloadPhotos } from '../../../../hooks/photos/useDownloadPhotos';
 import { toast } from 'sonner';
-import { Spinner } from '@sabaipics/uiv2/components/spinner';
-import { Skeleton } from '@sabaipics/uiv2/components/skeleton';
+import { Spinner } from '@sabaipics/uiv3/components/spinner';
+import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
 
 const MAX_SELECTION = 15;
 

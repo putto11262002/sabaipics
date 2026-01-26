@@ -2,7 +2,7 @@ import { Fragment, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 
-import { Button } from '@sabaipics/uiv2/components/button';
+import { Button } from '@sabaipics/uiv3/components/button';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -10,7 +10,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@sabaipics/uiv2/components/breadcrumb';
+} from '@sabaipics/uiv3/components/breadcrumb';
 
 interface BreadcrumbItemType {
   label: string;

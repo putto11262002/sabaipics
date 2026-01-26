@@ -5,7 +5,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from '@sabaipics/uiv2/components/collapsible';
+} from '@sabaipics/uiv3/components/collapsible';
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -16,7 +16,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-} from '@sabaipics/uiv2/components/sidebar';
+} from '@sabaipics/uiv3/components/sidebar';
 
 export function NavMain({
   items,

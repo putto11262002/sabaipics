@@ -1,17 +1,17 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { differenceInDays, parseISO } from 'date-fns';
-import { Button } from '@sabaipics/uiv2/components/button';
-import { Alert } from '@sabaipics/uiv2/components/alert';
-import { Skeleton } from '@sabaipics/uiv2/components/skeleton';
-import { ToggleGroup, ToggleGroupItem } from '@sabaipics/uiv2/components/toggle-group';
+import { Button } from '@sabaipics/uiv3/components/button';
+import { Alert } from '@sabaipics/uiv3/components/alert';
+import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
+import { ToggleGroup, ToggleGroupItem } from '@sabaipics/uiv3/components/toggle-group';
 import {
   Empty,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
   EmptyDescription,
-} from '@sabaipics/uiv2/components/empty';
+} from '@sabaipics/uiv3/components/empty';
 import { Calendar, Plus, Search } from 'lucide-react';
 import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { useEvents } from '../../hooks/events/useEvents';

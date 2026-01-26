@@ -1,14 +1,14 @@
 import type { Table as TanstackTable } from '@tanstack/react-table';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-import { Button } from '@sabaipics/uiv2/components/button';
+import { Button } from '@sabaipics/uiv3/components/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@sabaipics/uiv2/components/select';
+} from '@sabaipics/uiv3/components/select';
 
 interface DataTablePaginationProps<TData> {
   table: TanstackTable<TData>;

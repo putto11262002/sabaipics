@@ -12,11 +12,11 @@
   },
   "iconLibrary": "hugeicons",
   "aliases": {
-    "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
-    "lib": "@/lib",
-    "hooks": "@/hooks"
+    "components": "@sabaipics/uiv2/components",
+    "utils": "@sabaipics/uiv2/lib/utils",
+    "ui": "@sabaipics/uiv2/components",
+    "lib": "@sabaipics/uiv2/lib",
+    "hooks": "@sabaipics/uiv2/hooks"
   },
   "menuColor": "default",
   "menuAccent": "subtle",

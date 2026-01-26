@@ -6,8 +6,8 @@ import {
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
-} from "@sabaipics/uiv2/components/empty";
-import { Spinner } from "@sabaipics/uiv2/components/spinner";
+} from "@sabaipics/uiv3/components/empty";
+import { Spinner } from "@sabaipics/uiv3/components/spinner";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 	const { isLoaded, isSignedIn } = useAuth();

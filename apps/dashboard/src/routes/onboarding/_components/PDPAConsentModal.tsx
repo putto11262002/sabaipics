@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@sabaipics/auth/react";
-import { Button } from "@sabaipics/uiv2/components/button";
-import { Checkbox } from "@sabaipics/uiv2/components/checkbox";
+import { Button } from "@sabaipics/uiv3/components/button";
+import { Checkbox } from "@sabaipics/uiv3/components/checkbox";
 import {
 	Dialog,
 	DialogContent,
@@ -10,11 +10,11 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "@sabaipics/uiv2/components/dialog";
-import { ScrollArea } from "@sabaipics/uiv2/components/scroll-area";
-import { Alert, AlertDescription, AlertTitle } from "@sabaipics/uiv2/components/alert";
+} from "@sabaipics/uiv3/components/dialog";
+import { ScrollArea } from "@sabaipics/uiv3/components/scroll-area";
+import { Alert, AlertDescription, AlertTitle } from "@sabaipics/uiv3/components/alert";
 import { AlertTriangle } from "lucide-react";
-import { Spinner } from "@sabaipics/uiv2/components/spinner";
+import { Spinner } from "@sabaipics/uiv3/components/spinner";
 
 interface PDPAConsentModalProps {
 	open: boolean;

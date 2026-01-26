@@ -2,8 +2,8 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { MoreHorizontal } from 'lucide-react';
 
-import { Button } from '@sabaipics/uiv2/components/button';
-import { Checkbox } from '@sabaipics/uiv2/components/checkbox';
+import { Button } from '@sabaipics/uiv3/components/button';
+import { Checkbox } from '@sabaipics/uiv3/components/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +11,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@sabaipics/uiv2/components/dropdown-menu';
+} from '@sabaipics/uiv3/components/dropdown-menu';
 
 import type { Event } from '../../hooks/events/useEvents';
 

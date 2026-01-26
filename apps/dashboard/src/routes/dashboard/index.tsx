@@ -17,8 +17,8 @@ import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useDownloadQR } from '../../hooks/events/useDownloadQR';
 import { DataTable, useEventsTable, createColumns } from '../../components/events-table';
 import type { EventTableActions } from '../../components/events-table';
-import { Alert, AlertDescription, AlertTitle } from '@sabaipics/uiv2/components/alert';
-import { Button } from '@sabaipics/uiv2/components/button';
+import { Alert, AlertDescription, AlertTitle } from '@sabaipics/uiv3/components/alert';
+import { Button } from '@sabaipics/uiv3/components/button';
 import {
   Card,
   CardAction,
@@ -26,16 +26,16 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@sabaipics/uiv2/components/card';
+} from '@sabaipics/uiv3/components/card';
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from '@sabaipics/uiv2/components/empty';
-import { Skeleton } from '@sabaipics/uiv2/components/skeleton';
-import { Spinner } from '@sabaipics/uiv2/components/spinner';
+} from '@sabaipics/uiv3/components/empty';
+import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
+import { Spinner } from '@sabaipics/uiv3/components/spinner';
 
 export function DashboardPage() {
   const navigate = useNavigate();

@@ -19,8 +19,7 @@
     "declarationMap": true,
     "baseUrl": ".",
     "paths": {
-      "@sabaipics/uiv2/*": ["./src/*"],
-      "@/*": ["./src/*"]
+      "@sabaipics/uiv2/*": ["./src/*"]
     }
   },
   "include": ["src"]

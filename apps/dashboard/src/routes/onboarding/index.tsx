@@ -8,10 +8,10 @@ import {
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
-} from "@sabaipics/uiv2/components/empty";
-import { Spinner } from "@sabaipics/uiv2/components/spinner";
-import { Button } from "@sabaipics/uiv2/components/button";
-import { Alert, AlertDescription, AlertTitle } from "@sabaipics/uiv2/components/alert";
+} from "@sabaipics/uiv3/components/empty";
+import { Spinner } from "@sabaipics/uiv3/components/spinner";
+import { Button } from "@sabaipics/uiv3/components/button";
+import { Alert, AlertDescription, AlertTitle } from "@sabaipics/uiv3/components/alert";
 import { PDPAConsentModal } from "./_components/PDPAConsentModal";
 import { useConsentStatus } from "../../hooks/consent/useConsentStatus";
 

@@ -20,7 +20,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@sabaipics/api": "workspace:*",
     "@sabaipics/auth": "workspace:*",
-    "@sabaipics/uiv2": "workspace:*",
+    "@sabaipics/uiv3": "workspace:*",
     "@tanstack/react-query": "^5.90.12",
     "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",

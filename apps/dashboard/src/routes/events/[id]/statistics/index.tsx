@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Badge } from "@sabaipics/uiv2/components/badge";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@sabaipics/uiv2/components/card";
+import { Badge } from "@sabaipics/uiv3/components/badge";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@sabaipics/uiv3/components/card";
 import { Calendar, Image as ImageIcon, Clock, BarChart3 } from "lucide-react";
 import { parseISO, differenceInDays, differenceInDays as daysBetween, format } from "date-fns";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
@@ -9,18 +9,18 @@ import {
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@sabaipics/uiv2/components/chart";
+} from "@sabaipics/uiv3/components/chart";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@sabaipics/uiv2/components/select";
+} from "@sabaipics/uiv3/components/select";
 import {
   ToggleGroup,
   ToggleGroupItem,
-} from "@sabaipics/uiv2/components/toggle-group";
+} from "@sabaipics/uiv3/components/toggle-group";
 import { useParams } from "react-router";
 import { useEvent } from "../../../../hooks/events/useEvent";
 

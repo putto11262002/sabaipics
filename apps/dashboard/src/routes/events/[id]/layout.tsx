@@ -1,7 +1,7 @@
 import { useParams, useNavigate, Outlet, NavLink } from 'react-router';
-import { Button } from '@sabaipics/uiv2/components/button';
-import { Alert } from '@sabaipics/uiv2/components/alert';
-import { Skeleton } from '@sabaipics/uiv2/components/skeleton';
+import { Button } from '@sabaipics/uiv3/components/button';
+import { Alert } from '@sabaipics/uiv3/components/alert';
+import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,13 +9,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@sabaipics/uiv2/components/dropdown-menu';
+} from '@sabaipics/uiv3/components/dropdown-menu';
 import { MoreVertical } from 'lucide-react';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
 import { useEvent } from '../../../hooks/events/useEvent';
 import { useCopyToClipboard } from '../../../hooks/use-copy-to-clipboard';
 import { useDownloadQR } from '../../../hooks/events/useDownloadQR';
-import { cn } from '@sabaipics/uiv2/lib/utils';
+import { cn } from '@sabaipics/uiv3/lib/utils';
 
 const tabs = [
   { name: 'Details', path: 'details' },

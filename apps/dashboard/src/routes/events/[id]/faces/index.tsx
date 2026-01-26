@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@sabaipics/uiv2/components/card";
+import { Card, CardContent } from "@sabaipics/uiv3/components/card";
 import { Calendar } from "lucide-react";
 
 export default function EventFacesTab() {

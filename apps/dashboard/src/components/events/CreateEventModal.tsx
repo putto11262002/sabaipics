@@ -7,11 +7,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@sabaipics/uiv2/components/dialog";
-import { Button } from "@sabaipics/uiv2/components/button";
-import { Input } from "@sabaipics/uiv2/components/input";
-import { Alert } from "@sabaipics/uiv2/components/alert";
-import { Spinner } from "@sabaipics/uiv2/components/spinner";
+} from "@sabaipics/uiv3/components/dialog";
+import { Button } from "@sabaipics/uiv3/components/button";
+import { Input } from "@sabaipics/uiv3/components/input";
+import { Alert } from "@sabaipics/uiv3/components/alert";
+import { Spinner } from "@sabaipics/uiv3/components/spinner";
 import { eventFormSchema, type EventFormData } from "../../lib/event-form-schema";
 import { useCreateEvent } from "../../hooks/events/useCreateEvent";
 

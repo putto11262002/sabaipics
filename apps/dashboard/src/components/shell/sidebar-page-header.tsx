@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { Separator } from '@sabaipics/uiv2/components/separator';
-import { SidebarTrigger } from '@sabaipics/uiv2/components/sidebar';
+import { Separator } from '@sabaipics/uiv3/components/separator';
+import { SidebarTrigger } from '@sabaipics/uiv3/components/sidebar';
 import { PageHeader } from './page-header';
 
 interface BreadcrumbItemType {

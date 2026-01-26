@@ -6,8 +6,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@sabaipics/uiv2/components/table';
-import { Skeleton } from '@sabaipics/uiv2/components/skeleton';
+} from '@sabaipics/uiv3/components/table';
+import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
 import type { UploadLogEntry } from './useUploadQueue';
 
 // Format file size utility
