@@ -5,23 +5,26 @@
  * All routes are protected by rate limiting per eventId.
  *
  * Routes:
- * - GET  /participant/events/:eventId           - Public event info
- * - POST /participant/events/:eventId/search    - Face search (rate limited)
- * - GET  /participant/events/:eventId/photos/:photoId/download - Single photo
- * - POST /participant/events/:eventId/photos/download - Bulk download as zip
+ * - GET  /participant/events/:eventId                          - Public event info
+ * - GET  /participant/events/:eventId/slideshow                - Slideshow info + config + stats
+ * - GET  /participant/events/:eventId/photos                   - Paginated photos feed
+ * - POST /participant/events/:eventId/search                   - Face search (rate limited)
+ * - GET  /participant/events/:eventId/photos/:photoId/download - Single photo download
+ * - POST /participant/events/:eventId/photos/download          - Bulk download as zip
  */
 
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { eq, and, inArray, isNull } from 'drizzle-orm';
+import { eq, and, inArray, isNull, desc, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { events, photos, participantSearches } from '@sabaipics/db';
+import { events, photos, participantSearches, DEFAULT_SLIDESHOW_CONFIG } from '@sabaipics/db';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
 import { createFaceProvider } from '../../lib/rekognition/provider';
 import type { FaceServiceError } from '../../lib/rekognition/types';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { createZip } from 'littlezipper';
+import { slideshowPhotosQuerySchema } from '../events/slideshow-schema';
 
 // =============================================================================
 // Schemas
@@ -598,6 +601,156 @@ export const participantRouter = new Hono<Env>()
               },
             });
           },
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // =========================================================================
+  // GET /participant/events/:eventId/slideshow - Slideshow info + config + stats
+  // =========================================================================
+  .get('/events/:eventId/slideshow', zValidator('param', eventParamsSchema), async (c) => {
+    return safeTry(async function* () {
+      const db = c.var.db();
+      const { eventId } = c.req.valid('param');
+
+      // Fetch event with slideshow config and logo
+      const [result] = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            name: events.name,
+            subtitle: events.subtitle,
+            logoR2Key: events.logoR2Key,
+            slideshowConfig: events.slideshowConfig,
+            photoCount: sql<number>`(
+              SELECT COUNT(*)::int 
+              FROM ${photos} 
+              WHERE ${photos.eventId} = ${events.id}
+                AND ${photos.status} = 'indexed'
+                AND ${photos.deletedAt} IS NULL
+            )`,
+            searchCount: sql<number>`(
+              SELECT COUNT(*)::int 
+              FROM ${participantSearches} 
+              WHERE ${participantSearches.eventId} = ${events.id}
+            )`,
+          })
+          .from(events)
+          .where(eq(events.id, eventId))
+          .limit(1),
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+      );
+
+      if (!result) {
+        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+      }
+
+      // Generate logo URL if logo exists
+      const logoUrl = result.logoR2Key ? `${c.env.PHOTO_R2_BASE_URL}/${result.logoR2Key}` : null;
+
+      // Use default config if none set
+      const config = result.slideshowConfig ?? DEFAULT_SLIDESHOW_CONFIG;
+
+      return ok({
+        event: {
+          name: result.name,
+          subtitle: result.subtitle,
+          logoUrl,
+        },
+        config,
+        stats: {
+          photoCount: result.photoCount,
+          searchCount: result.searchCount,
+        },
+      });
+    })
+      .orTee((e) => e.cause && console.error(`[${c.req.url}] ${e.code}:`, e.cause))
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
+  })
+
+  // =========================================================================
+  // GET /participant/events/:eventId/photos - Paginated photos feed for slideshow
+  // =========================================================================
+  .get(
+    '/events/:eventId/photos',
+    zValidator('param', eventParamsSchema),
+    zValidator('query', slideshowPhotosQuerySchema),
+    async (c) => {
+      return safeTry(async function* () {
+        const db = c.var.db();
+        const { eventId } = c.req.valid('param');
+        const { cursor, limit } = c.req.valid('query');
+
+        // Verify event exists
+        const [event] = yield* ResultAsync.fromPromise(
+          db.select({ id: events.id }).from(events).where(eq(events.id, eventId)).limit(1),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        // Fetch photos (only indexed, not deleted)
+        // Fetch limit + 1 to determine if there are more results
+        const cursorLimit = limit + 1;
+
+        const photoRows = yield* ResultAsync.fromPromise(
+          db
+            .select({
+              id: photos.id,
+              r2Key: photos.r2Key,
+              uploadedAt: photos.uploadedAt,
+              width: photos.width,
+              height: photos.height,
+            })
+            .from(photos)
+            .where(
+              and(
+                eq(photos.eventId, eventId),
+                eq(photos.status, 'indexed'),
+                isNull(photos.deletedAt),
+                cursor ? lt(photos.uploadedAt, cursor) : undefined,
+              ),
+            )
+            .orderBy(desc(photos.uploadedAt))
+            .limit(cursorLimit),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        // Determine if there are more results
+        const hasMore = photoRows.length > limit;
+        const items = hasMore ? photoRows.slice(0, limit) : photoRows;
+        const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].uploadedAt : null;
+
+        // Generate preview URLs
+        const isDev = c.env.NODE_ENV === 'development';
+        const data = items.map((photo) => ({
+          id: photo.id,
+          previewUrl: generatePreviewUrl(
+            photo.r2Key,
+            c.env.CF_ZONE,
+            c.env.PHOTO_R2_BASE_URL,
+            isDev,
+          ),
+          width: photo.width ?? 1,
+          height: photo.height ?? 1,
+        }));
+
+        return ok({
+          data,
+          pagination: {
+            nextCursor,
+            hasMore,
+          },
+        });
+      })
+        .orTee((e) => e.cause && console.error(`[${c.req.url}] ${e.code}:`, e.cause))
+        .match(
+          (result) => c.json(result),
           (e) => apiError(c, e),
         );
     },

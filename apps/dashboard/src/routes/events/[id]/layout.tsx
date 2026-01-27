@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Outlet, NavLink } from 'react-router';
+import { useParams, useNavigate, Outlet, NavLink, Link } from 'react-router';
 import { Button } from '@sabaipics/uiv3/components/button';
 import { Alert } from '@sabaipics/uiv3/components/alert';
 import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@sabaipics/uiv3/components/dropdown-menu';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, ExternalLink } from 'lucide-react';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
 import { useEvent } from '../../../hooks/events/useEvent';
 import { useCopyToClipboard } from '../../../hooks/use-copy-to-clipboard';
@@ -139,6 +139,13 @@ export default function EventDetailLayout() {
               {tab.name}
             </NavLink>
           ))}
+          <Link
+            to={`/events/${id}/slideshow-editor`}
+            className="flex items-center gap-1.5 border-b-2 border-transparent pb-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Slideshow
+            <ExternalLink className="size-3" />
+          </Link>
         </div>
       </div>
 
