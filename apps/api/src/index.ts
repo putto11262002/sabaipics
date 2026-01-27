@@ -12,6 +12,7 @@ import { photosRouter } from './routes/photos';
 import { uploadsRouter } from './routes/uploads';
 import { r2Router } from './routes/r2';
 import { participantRouter } from './routes/participant';
+import { ftpRouter } from './routes/ftp';
 import type { Env, Bindings } from './types';
 
 // Queue consumers
@@ -67,6 +68,8 @@ const app = new Hono<Env>()
   .route('/participant', participantRouter)
   // Admin routes - API key auth, no Clerk (must be before Clerk middleware)
   .route('/admin', adminRouter)
+  // FTP routes - FTP JWT auth, no Clerk (must be before Clerk middleware)
+  .route('/api/ftp', ftpRouter)
   .use('/*', createClerkAuth())
   .route('/credit-packages', creditsRouter)
   .get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))

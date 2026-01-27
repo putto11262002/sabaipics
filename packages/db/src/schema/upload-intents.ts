@@ -35,7 +35,10 @@ export const uploadIntents = pgTable(
 
     // Expected file metadata (from presign request)
     contentType: text('content_type').notNull(),
-    contentLength: integer('content_length').notNull(),
+    contentLength: integer('content_length'),
+
+    // Upload source (for analytics)
+    source: text('source', { enum: ['web', 'ftp'] }).default('web'),
 
     // Lifecycle
     status: text('status', { enum: uploadIntentStatuses }).notNull().default('pending'),
