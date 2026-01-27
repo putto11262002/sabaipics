@@ -372,7 +372,7 @@ describe('POST /events - Validation', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     if ('error' in body) {
-      expect(body.error.code).toBe('INVALID_DATE_RANGE');
+      expect(body.error.code).toBe('BAD_REQUEST');
     } else {
       throw new Error('Expected error response');
     }
@@ -535,10 +535,7 @@ describe('GET /events/:id', () => {
         return original;
       }
       // Second call - return the event
-      return {
-        offset: vi.fn().mockResolvedValue([mockEvent]),
-        then: (resolve: (value: unknown) => void) => resolve([mockEvent]),
-      };
+      return Promise.resolve([mockEvent]);
     });
     // Replace the base mock with our tracking mock
     mockDb.limit = testLimitMock;
@@ -574,10 +571,7 @@ describe('GET /events/:id', () => {
       if (limitCallCount === 1) {
         return originalLimit(...args);
       }
-      return {
-        offset: vi.fn().mockResolvedValue([]),
-        then: (resolve: (value: unknown) => void) => resolve([]),
-      };
+      return Promise.resolve([]);
     });
     const { app } = createTestApp({
       mockDb,
@@ -610,10 +604,7 @@ describe('GET /events/:id', () => {
       if (limitCallCount === 1) {
         return originalLimit(...args);
       }
-      return {
-        offset: vi.fn().mockResolvedValue([otherEvent]),
-        then: (resolve: (value: unknown) => void) => resolve([otherEvent]),
-      };
+      return Promise.resolve([otherEvent]);
     });
     const { app } = createTestApp({
       mockDb,

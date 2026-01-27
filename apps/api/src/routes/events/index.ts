@@ -7,6 +7,8 @@ import { requirePhotographer, requireConsent, type PhotographerVariables } from 
 import type { Bindings } from '../../types';
 import { generatePngQrCode } from '@juit/qrcode';
 import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './schema';
+import { ResultAsync, safeTry, ok, err } from 'neverthrow';
+import { apiError, type HandlerError } from '../../lib/error';
 
 // =============================================================================
 // Types
@@ -51,46 +53,6 @@ async function generateEventQR(
 }
 
 // =============================================================================
-// Error Helpers
-// =============================================================================
-
-function validationError(message: string) {
-  return {
-    error: {
-      code: 'VALIDATION_ERROR' as const,
-      message,
-    },
-  };
-}
-
-function notFoundError(message: string = 'Event not found') {
-  return {
-    error: {
-      code: 'NOT_FOUND' as const,
-      message,
-    },
-  };
-}
-
-function invalidDateRangeError() {
-  return {
-    error: {
-      code: 'INVALID_DATE_RANGE' as const,
-      message: 'Start date must be before or equal to end date',
-    },
-  };
-}
-
-function qrGenerationFailedError(reason: string) {
-  return {
-    error: {
-      code: 'QR_GENERATION_FAILED' as const,
-      message: `Failed to generate QR code: ${reason}`,
-    },
-  };
-}
-
-// =============================================================================
 // Routes
 // =============================================================================
 
@@ -107,45 +69,53 @@ export const eventsRouter = new Hono<Env>()
       const db = c.var.db();
       const body = c.req.valid('json');
 
-      // Validate date range
-      if (body.startDate && body.endDate && body.startDate > body.endDate) {
-        return c.json(invalidDateRangeError(), 400);
-      }
+      return safeTry(async function* () {
+        // Validate date range
+        if (body.startDate && body.endDate && body.startDate > body.endDate) {
+          return err<never, HandlerError>({
+            code: 'BAD_REQUEST',
+            message: 'Start date must be before or equal to end date',
+          });
+        }
 
-      // Calculate expiry date (30 days from now)
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
+        // Calculate expiry date (30 days from now)
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
 
-      // Insert event record (QR code generated client-side, not stored)
-      const [created] = await db
-        .insert(events)
-        .values({
-          photographerId: photographer.id,
-          name: body.name,
-          startDate: body.startDate,
-          endDate: body.endDate,
-          qrCodeR2Key: null, // No longer storing QR codes
-          rekognitionCollectionId: null,
-          expiresAt: expiresAt.toISOString(),
-        })
-        .returning();
+        // Insert event record (QR code generated client-side, not stored)
+        const [created] = yield* ResultAsync.fromPromise(
+          db
+            .insert(events)
+            .values({
+              photographerId: photographer.id,
+              name: body.name,
+              startDate: body.startDate,
+              endDate: body.endDate,
+              qrCodeR2Key: null, // No longer storing QR codes
+              rekognitionCollectionId: null,
+              expiresAt: expiresAt.toISOString(),
+            })
+            .returning(),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      return c.json(
-        {
-          data: {
-            id: created.id,
-            photographerId: created.photographerId,
-            name: created.name,
-            startDate: created.startDate,
-            endDate: created.endDate,
-            qrCodeUrl: null, // Client-side generation
-            rekognitionCollectionId: created.rekognitionCollectionId,
-            expiresAt: created.expiresAt,
-            createdAt: created.createdAt,
-          },
-        },
-        201,
-      );
+        return ok({
+          id: created.id,
+          photographerId: created.photographerId,
+          name: created.name,
+          startDate: created.startDate,
+          endDate: created.endDate,
+          qrCodeUrl: null, // Client-side generation
+          rekognitionCollectionId: created.rekognitionCollectionId,
+          expiresAt: created.expiresAt,
+          createdAt: created.createdAt,
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] POST /', e.code, e.cause))
+        .match(
+          (data) => c.json({ data }, 201),
+          (e) => apiError(c, e),
+        );
     },
   )
 
@@ -160,45 +130,58 @@ export const eventsRouter = new Hono<Env>()
       const db = c.var.db();
       const { page, limit } = c.req.valid('query');
 
-      const offset = page * limit;
+      return safeTry(async function* () {
+        const offset = page * limit;
 
-      const eventsList = await db
-        .select({
-          id: events.id,
-          name: events.name,
-          startDate: events.startDate,
-          endDate: events.endDate,
-          createdAt: events.createdAt,
-          expiresAt: events.expiresAt,
-        })
-        .from(events)
-        .where(eq(events.photographerId, photographer.id))
-        .orderBy(desc(events.createdAt))
-        .limit(limit)
-        .offset(offset);
+        const eventsList = yield* ResultAsync.fromPromise(
+          db
+            .select({
+              id: events.id,
+              name: events.name,
+              startDate: events.startDate,
+              endDate: events.endDate,
+              createdAt: events.createdAt,
+              expiresAt: events.expiresAt,
+            })
+            .from(events)
+            .where(eq(events.photographerId, photographer.id))
+            .orderBy(desc(events.createdAt))
+            .limit(limit)
+            .offset(offset),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      // Get total count for pagination metadata
-      const [countResult] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(events)
-        .where(eq(events.photographerId, photographer.id));
+        // Get total count for pagination metadata
+        const [countResult] = yield* ResultAsync.fromPromise(
+          db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(events)
+            .where(eq(events.photographerId, photographer.id)),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      const totalCount = countResult?.count ?? 0;
-      const totalPages = Math.ceil(totalCount / limit);
-      const hasNextPage = page + 1 < totalPages;
-      const hasPrevPage = page > 0;
+        const totalCount = countResult?.count ?? 0;
+        const totalPages = Math.ceil(totalCount / limit);
+        const hasNextPage = page + 1 < totalPages;
+        const hasPrevPage = page > 0;
 
-      return c.json({
-        data: eventsList,
-        pagination: {
-          page,
-          limit,
-          totalCount,
-          totalPages,
-          hasNextPage,
-          hasPrevPage,
-        },
-      });
+        return ok({
+          data: eventsList,
+          pagination: {
+            page,
+            limit,
+            totalCount,
+            totalPages,
+            hasNextPage,
+            hasPrevPage,
+          },
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] GET /', e.code, e.cause))
+        .match(
+          (result) => c.json(result),
+          (e) => apiError(c, e),
+        );
     },
   )
 
@@ -213,20 +196,23 @@ export const eventsRouter = new Hono<Env>()
       const db = c.var.db();
       const { id } = c.req.valid('param');
 
-      const [event] = await db.select().from(events).where(eq(events.id, id)).limit(1);
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db.select().from(events).where(eq(events.id, id)).limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      if (!event) {
-        return c.json(notFoundError(), 404);
-      }
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
 
-      // Authorization: ensure photographer owns this event
-      if (event.photographerId !== photographer.id) {
-        // Return NOT_FOUND instead of FORBIDDEN to prevent enumeration
-        return c.json(notFoundError(), 404);
-      }
+        // Authorization: ensure photographer owns this event
+        if (event.photographerId !== photographer.id) {
+          // Return NOT_FOUND instead of FORBIDDEN to prevent enumeration
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
 
-      return c.json({
-        data: {
+        return ok({
           id: event.id,
           photographerId: event.photographerId,
           name: event.name,
@@ -236,8 +222,13 @@ export const eventsRouter = new Hono<Env>()
           rekognitionCollectionId: event.rekognitionCollectionId,
           expiresAt: event.expiresAt,
           createdAt: event.createdAt,
-        },
-      });
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] GET /:id', e.code, e.cause))
+        .match(
+          (data) => c.json({ data }),
+          (e) => apiError(c, e),
+        );
     },
   )
 
@@ -259,41 +250,53 @@ export const eventsRouter = new Hono<Env>()
       const { id } = c.req.valid('param');
       const { size } = c.req.valid('query');
 
-      const [event] = await db.select().from(events).where(eq(events.id, id)).limit(1);
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db.select().from(events).where(eq(events.id, id)).limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      if (!event) {
-        return c.json(notFoundError(), 404);
-      }
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
 
-      // Authorization: ensure photographer owns this event
-      if (event.photographerId !== photographer.id) {
-        // Return NOT_FOUND instead of FORBIDDEN to prevent enumeration
-        return c.json(notFoundError(), 404);
-      }
+        // Authorization: ensure photographer owns this event
+        if (event.photographerId !== photographer.id) {
+          // Return NOT_FOUND instead of FORBIDDEN to prevent enumeration
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
 
-      // Generate QR code on-demand
-      let qrPng: Uint8Array;
-      try {
-        qrPng = await generateEventQR(event.id, c.env.EVENT_FRONTEND_URL, size as QRSize);
-      } catch (e) {
-        console.error('[QR] Download generation failed:', e);
-        const reason = e instanceof Error ? e.message : 'unknown error';
-        return c.json(qrGenerationFailedError(reason), 500);
-      }
+        // Generate QR code on-demand
+        const qrPng = yield* ResultAsync.fromPromise(
+          generateEventQR(event.id, c.env.EVENT_FRONTEND_URL, size as QRSize),
+          (cause): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Failed to generate QR code',
+            cause,
+          }),
+        );
 
-      // Return PNG with download headers
-      const sanitizedName = event.name.replace(/[^a-z0-9]/gi, '-');
-      const filename = `${sanitizedName}-${size}-qr.png`;
-      // Convert Uint8Array to regular ArrayBuffer for Response
-      const arrayBuffer = new ArrayBuffer(qrPng.length);
-      const view = new Uint8Array(arrayBuffer);
-      view.set(qrPng);
-      return new Response(arrayBuffer, {
-        headers: {
-          'Content-Type': 'image/png',
-          'Content-Disposition': `attachment; filename="${filename}"`,
-          'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
-        },
-      });
+        // Return PNG with download headers
+        const sanitizedName = event.name.replace(/[^a-z0-9]/gi, '-');
+        const filename = `${sanitizedName}-${size}-qr.png`;
+        // Convert Uint8Array to regular ArrayBuffer for Response
+        const arrayBuffer = new ArrayBuffer(qrPng.length);
+        const view = new Uint8Array(arrayBuffer);
+        view.set(qrPng);
+        return ok(
+          new Response(arrayBuffer, {
+            headers: {
+              'Content-Type': 'image/png',
+              'Content-Disposition': `attachment; filename="${filename}"`,
+              'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+            },
+          }),
+        );
+      })
+        .orTee((e) => e.cause && console.error('[Events] GET /:id/qr-download', e.code, e.cause))
+        .match(
+          (response) => response,
+          (e) => apiError(c, e),
+        );
     },
   );
