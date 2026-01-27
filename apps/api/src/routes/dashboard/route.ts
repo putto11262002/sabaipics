@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { sql, eq, gt, and, desc } from 'drizzle-orm';
 import { creditLedger, events, photos } from '@sabaipics/db';
-import { requirePhotographer, requireConsent } from '../../middleware';
+import { requirePhotographer } from '../../middleware';
 import type { Env } from '../../types';
 import type { DashboardEvent, DashboardResponse } from './types';
 import { apiError, type HandlerError } from '../../lib/error';
@@ -13,7 +13,7 @@ import { ResultAsync, safeTry, ok } from 'neverthrow';
 
 export const dashboardRouter = new Hono<Env>()
   // GET / - Dashboard data for authenticated photographer
-  .get('/', requirePhotographer(), requireConsent(), async (c) => {
+  .get('/', requirePhotographer(), async (c) => {
     const photographer = c.var.photographer;
     const db = c.var.db();
 

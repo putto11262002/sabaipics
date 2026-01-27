@@ -208,20 +208,6 @@ describe('GET /dashboard - Auth', () => {
     const body = (await res.json()) as unknown as ErrorResponse;
     expect(body.error.code).toBe('FORBIDDEN');
   });
-
-  it('returns 403 when PDPA consent not given', async () => {
-    const { app } = createTestApp({
-      photographer: { id: MOCK_PHOTOGRAPHER_ID, pdpaConsentAt: null },
-    });
-    const client = testClient(app);
-
-    const res = await client.dashboard.$get();
-
-    expect(res.status).toBe(403);
-    const body = (await res.json()) as unknown as ErrorResponse;
-    expect(body.error.code).toBe('FORBIDDEN');
-    expect(body.error.message).toBe('PDPA consent required');
-  });
 });
 
 // =============================================================================

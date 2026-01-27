@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq, asc, and } from 'drizzle-orm';
 import { creditPackages, photographers, creditLedger } from '@sabaipics/db';
-import { requirePhotographer, requireConsent } from '../middleware';
+import { requirePhotographer } from '../middleware';
 import type { Env } from '../types';
 import {
   createStripeClient,
@@ -60,7 +60,7 @@ export const creditsRouter = new Hono<Env>()
    * Request body: { packageId: string }
    * Response: { data: { checkoutUrl: string, sessionId: string } }
    */
-  .post('/checkout', requirePhotographer(), requireConsent(), async (c) => {
+  .post('/checkout', requirePhotographer(), async (c) => {
     return safeTry(async function* () {
       const photographer = c.var.photographer;
       const db = c.var.db();
@@ -192,7 +192,7 @@ export const creditsRouter = new Hono<Env>()
    *
    * Security: Users can only check their own purchases (filtered by photographerId)
    */
-  .get('/purchase/:sessionId', requirePhotographer(), requireConsent(), async (c) => {
+  .get('/purchase/:sessionId', requirePhotographer(), async (c) => {
     return safeTry(async function* () {
       const sessionId = c.req.param('sessionId');
       const photographer = c.var.photographer;

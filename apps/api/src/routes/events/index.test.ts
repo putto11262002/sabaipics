@@ -213,26 +213,6 @@ describe('POST /events - Auth', () => {
       throw new Error('Expected error response');
     }
   });
-
-  it('returns 403 without PDPA consent', async () => {
-    const mockBucket = createMockR2Bucket();
-    const { app } = createTestApp({
-      photographer: { id: MOCK_PHOTOGRAPHER_ID, pdpaConsentAt: null },
-    });
-    const client = testClient(app, MOCK_ENV(mockBucket));
-
-    const res = await client.events.$post({
-      json: { name: 'Test Event' },
-    });
-
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    if ('error' in body) {
-      expect(body.error.code).toBe('FORBIDDEN');
-    } else {
-      throw new Error('Expected error response');
-    }
-  });
 });
 
 // =============================================================================
