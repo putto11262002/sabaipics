@@ -8,6 +8,13 @@
       "when": 1769419981875,
       "tag": "0000_legal_tenebrous",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769504020314,
+      "tag": "0001_material_vulture",
+      "breakpoints": true
     }
   ]
 }
