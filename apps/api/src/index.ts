@@ -5,7 +5,6 @@ import { createDbHttp, createDbTx } from '@sabaipics/db';
 import { authRouter } from './routes/auth';
 import { webhookRouter } from './routes/webhooks';
 import { adminRouter } from './routes/admin';
-import { consentRouter } from './routes/consent';
 import { dashboardRouter } from './routes/dashboard/route';
 import { creditsRouter } from './routes/credits';
 import { eventsRouter } from './routes/events';
@@ -72,7 +71,6 @@ const app = new Hono<Env>()
   .route('/credit-packages', creditsRouter)
   .get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))
   .route('/auth', authRouter)
-  .route('/consent', consentRouter)
   .route('/dashboard', dashboardRouter)
   .route('/events', eventsRouter)
   .route('/uploads', uploadsRouter)
