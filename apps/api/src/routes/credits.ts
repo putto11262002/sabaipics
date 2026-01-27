@@ -1,26 +1,22 @@
 import { Hono } from 'hono';
 import { eq, asc, and } from 'drizzle-orm';
 import { creditPackages, photographers, creditLedger } from '@sabaipics/db';
-import { requirePhotographer, requireConsent, type PhotographerVariables } from '../middleware';
-import type { Bindings } from '../types';
+import { requirePhotographer, requireConsent } from '../middleware';
+import type { Env } from '../types';
 import {
   createStripeClient,
   createCheckoutSession,
   createCustomer,
   findCustomerByPhotographerId,
 } from '../lib/stripe';
-import type { Env } from '../types';
+import { ResultAsync, safeTry, ok, err } from 'neverthrow';
+import { apiError, type HandlerError } from '../lib/error';
 
 /**
  * Credit packages API
  * GET / - Public endpoint (no auth)
  * POST /checkout - Authenticated photographers only
  */
-
-type CheckoutEnv = {
-  Bindings: Bindings;
-  Variables: PhotographerVariables;
-};
 
 export const creditsRouter = new Hono<Env>()
   /**
@@ -30,20 +26,30 @@ export const creditsRouter = new Hono<Env>()
    * Public endpoint - no authentication required.
    */
   .get('/', async (c) => {
-    const db = c.var.db();
+    return safeTry(async function* () {
+      const db = c.var.db();
 
-    const packages = await db
-      .select({
-        id: creditPackages.id,
-        name: creditPackages.name,
-        credits: creditPackages.credits,
-        priceThb: creditPackages.priceThb,
-      })
-      .from(creditPackages)
-      .where(eq(creditPackages.active, true))
-      .orderBy(asc(creditPackages.sortOrder));
+      const packages = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            id: creditPackages.id,
+            name: creditPackages.name,
+            credits: creditPackages.credits,
+            priceThb: creditPackages.priceThb,
+          })
+          .from(creditPackages)
+          .where(eq(creditPackages.active, true))
+          .orderBy(asc(creditPackages.sortOrder)),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
 
-    return c.json({ data: packages });
+      return ok(packages);
+    })
+      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
   })
   /**
    * POST /credit-packages/checkout
@@ -55,92 +61,124 @@ export const creditsRouter = new Hono<Env>()
    * Response: { data: { checkoutUrl: string, sessionId: string } }
    */
   .post('/checkout', requirePhotographer(), requireConsent(), async (c) => {
-    const photographer = c.var.photographer;
-    const db = c.var.db();
+    return safeTry(async function* () {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
 
-    // Parse request body
-    const body = await c.req.json();
-    const packageId = body?.packageId;
+      // Parse request body
+      const body = yield* ResultAsync.fromPromise(
+        c.req.json(),
+        (cause): HandlerError => ({ code: 'BAD_REQUEST', message: 'Invalid request body', cause }),
+      );
+      const packageId = body?.packageId;
 
-    // Validate packageId
-    if (!packageId || typeof packageId !== 'string') {
-      return c.json({ error: { code: 'INVALID_REQUEST', message: 'packageId is required' } }, 400);
-    }
+      // Validate packageId
+      if (!packageId || typeof packageId !== 'string') {
+        return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'packageId is required' });
+      }
 
-    // Query package (must be active)
-    const [pkg] = await db
-      .select()
-      .from(creditPackages)
-      .where(eq(creditPackages.id, packageId))
-      .limit(1);
+      // Query package (must be active)
+      const [pkg] = yield* ResultAsync.fromPromise(
+        db.select().from(creditPackages).where(eq(creditPackages.id, packageId)).limit(1),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
 
-    if (!pkg || !pkg.active) {
-      return c.json({ error: { code: 'NOT_FOUND', message: 'Credit package not found' } }, 404);
-    }
+      if (!pkg || !pkg.active) {
+        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Credit package not found' });
+      }
 
-    // Get or create Stripe customer
-    const stripe = createStripeClient(c.env);
-    let customer = await findCustomerByPhotographerId(stripe, photographer.id);
+      // Get or create Stripe customer
+      const stripe = createStripeClient(c.env);
+      let customer = yield* ResultAsync.fromPromise(
+        findCustomerByPhotographerId(stripe, photographer.id),
+        (cause): HandlerError => ({
+          code: 'BAD_GATEWAY',
+          message: 'Stripe customer lookup failed',
+          cause,
+        }),
+      );
 
-    if (!customer) {
-      // Fetch photographer email/name for customer creation
-      const [photoRecord] = await db
-        .select({ email: photographers.email, name: photographers.name })
-        .from(photographers)
-        .where(eq(photographers.id, photographer.id))
-        .limit(1);
+      if (!customer) {
+        // Fetch photographer email/name for customer creation
+        const [photoRecord] = yield* ResultAsync.fromPromise(
+          db
+            .select({ email: photographers.email, name: photographers.name })
+            .from(photographers)
+            .where(eq(photographers.id, photographer.id))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      customer = await createCustomer({
-        stripe,
-        photographerId: photographer.id,
-        email: photoRecord.email,
-        name: photoRecord.name ?? undefined,
-      });
+        customer = yield* ResultAsync.fromPromise(
+          createCustomer({
+            stripe,
+            photographerId: photographer.id,
+            email: photoRecord.email,
+            name: photoRecord.name ?? undefined,
+          }),
+          (cause): HandlerError => ({
+            code: 'BAD_GATEWAY',
+            message: 'Stripe customer creation failed',
+            cause,
+          }),
+        );
 
-      // Store stripe_customer_id for future use
-      await db
-        .update(photographers)
-        .set({ stripeCustomerId: customer.id })
-        .where(eq(photographers.id, photographer.id));
-    }
+        // Store stripe_customer_id for future use
+        yield* ResultAsync.fromPromise(
+          db
+            .update(photographers)
+            .set({ stripeCustomerId: customer.id })
+            .where(eq(photographers.id, photographer.id)),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+      }
 
-    // Redirects should be the dashboard frontend, not derived from CORS.
-    const dashboardUrl =
-      c.env.DASHBOARD_FRONTEND_URL ?? c.env.CORS_ORIGIN?.split(',')[0] ?? 'http://localhost:5173';
-    const successUrl = `${dashboardUrl}/credits/success`;
-    const cancelUrl = `${dashboardUrl}/credits/packages`;
+      const dashboardUrl = c.env.DASHBOARD_FRONTEND_URL;
+      const successUrl = `${dashboardUrl}/credits/success`;
+      const cancelUrl = `${dashboardUrl}/credits/packages`;
 
-    // Create checkout session
-    const result = await createCheckoutSession({
-      stripe,
-      customerId: customer.id,
-      lineItems: [
-        {
-          name: pkg.name,
-          description: `${pkg.credits} credits for photo uploads`,
-          amount: pkg.priceThb, // priceThb is in satang (smallest unit)
-          quantity: 1,
-          metadata: { package_id: pkg.id, credits: pkg.credits.toString() },
-        },
-      ],
-      successUrl,
-      cancelUrl,
-      metadata: {
-        photographer_id: photographer.id,
-        package_id: pkg.id,
-        package_name: pkg.name,
-        credits: pkg.credits.toString(),
-      },
-      currency: 'thb',
-      mode: 'payment',
-    });
+      // Create checkout session
+      const result = yield* ResultAsync.fromPromise(
+        createCheckoutSession({
+          stripe,
+          customerId: customer.id,
+          lineItems: [
+            {
+              name: pkg.name,
+              description: `${pkg.credits} credits for photo uploads`,
+              amount: pkg.priceThb, // priceThb is in satang (smallest unit)
+              quantity: 1,
+              metadata: { package_id: pkg.id, credits: pkg.credits.toString() },
+            },
+          ],
+          successUrl,
+          cancelUrl,
+          metadata: {
+            photographer_id: photographer.id,
+            package_id: pkg.id,
+            package_name: pkg.name,
+            credits: pkg.credits.toString(),
+          },
+          currency: 'thb',
+          mode: 'payment',
+        }),
+        (cause): HandlerError => ({
+          code: 'BAD_GATEWAY',
+          message: 'Stripe checkout session creation failed',
+          cause,
+        }),
+      );
 
-    return c.json({
-      data: {
+      return ok({
         checkoutUrl: result.url,
         sessionId: result.sessionId,
-      },
-    });
+      });
+    })
+      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
   })
   /**
    * GET /credit-packages/purchase/:sessionId
@@ -155,39 +193,49 @@ export const creditsRouter = new Hono<Env>()
    * Security: Users can only check their own purchases (filtered by photographerId)
    */
   .get('/purchase/:sessionId', requirePhotographer(), requireConsent(), async (c) => {
-    const sessionId = c.req.param('sessionId');
-    const photographer = c.var.photographer;
-    const db = c.var.db();
+    return safeTry(async function* () {
+      const sessionId = c.req.param('sessionId');
+      const photographer = c.var.photographer;
+      const db = c.var.db();
 
-    if (!sessionId) {
-      return c.json({ error: { code: 'INVALID_REQUEST', message: 'sessionId is required' } }, 400);
-    }
+      if (!sessionId) {
+        return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'sessionId is required' });
+      }
 
-    // Query credit_ledger by stripeSessionId AND photographerId (security)
-    const [purchase] = await db
-      .select({
-        credits: creditLedger.amount,
-        expiresAt: creditLedger.expiresAt,
-      })
-      .from(creditLedger)
-      .where(
-        and(
-          eq(creditLedger.stripeSessionId, sessionId),
-          eq(creditLedger.photographerId, photographer.id),
-          eq(creditLedger.type, 'purchase'),
-        ),
-      )
-      .limit(1);
+      // Query credit_ledger by stripeSessionId AND photographerId (security)
+      const [purchase] = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            credits: creditLedger.amount,
+            expiresAt: creditLedger.expiresAt,
+          })
+          .from(creditLedger)
+          .where(
+            and(
+              eq(creditLedger.stripeSessionId, sessionId),
+              eq(creditLedger.photographerId, photographer.id),
+              eq(creditLedger.type, 'purchase'),
+            ),
+          )
+          .limit(1),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
 
-    if (!purchase) {
-      // No ledger entry found = webhook not received yet
-      return c.json({ fulfilled: false, credits: null });
-    }
+      if (!purchase) {
+        // No ledger entry found = webhook not received yet
+        return ok({ fulfilled: false as const, credits: null });
+      }
 
-    // Ledger entry exists = webhook fulfilled
-    return c.json({
-      fulfilled: true,
-      credits: purchase.credits,
-      expiresAt: purchase.expiresAt,
-    });
+      // Ledger entry exists = webhook fulfilled
+      return ok({
+        fulfilled: true as const,
+        credits: purchase.credits,
+        expiresAt: purchase.expiresAt,
+      });
+    })
+      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+      .match(
+        (data) => c.json(data),
+        (e) => apiError(c, e),
+      );
   });

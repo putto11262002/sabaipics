@@ -1,10 +1,12 @@
-import { Hono } from "hono";
-import { z } from "zod";
-import { eq, asc } from "drizzle-orm";
-import { creditPackages } from "@sabaipics/db";
-import { requireAdmin } from "../../middleware";
-import { zValidator } from "@hono/zod-validator";
-import type { Env } from "../../types";
+import { Hono } from 'hono';
+import { z } from 'zod';
+import { eq, asc } from 'drizzle-orm';
+import { creditPackages } from '@sabaipics/db';
+import { requireAdmin } from '../../middleware';
+import { zValidator } from '@hono/zod-validator';
+import { ResultAsync, safeTry, ok, err } from 'neverthrow';
+import type { Env } from '../../types';
+import { apiError, type HandlerError } from '../../lib/error';
 
 // =============================================================================
 // Validation Schemas
@@ -26,100 +28,98 @@ const updatePackageSchema = z.object({
   sortOrder: z.number().int().optional(),
 });
 
-const uuidSchema = z.string().uuid();
-
-// =============================================================================
-// Error Helpers
-// =============================================================================
-
-function validationError(message: string, details?: z.ZodIssue[]) {
-  return {
-    error: {
-      code: "VALIDATION_ERROR",
-      message,
-      ...(details && { details }),
-    },
-  };
-}
-
-function notFoundError(message: string) {
-  return {
-    error: {
-      code: "NOT_FOUND",
-      message,
-    },
-  };
-}
-
 // =============================================================================
 // Routes
 // =============================================================================
 
 export const adminCreditPackagesRouter = new Hono<Env>()
   // GET / - List all packages
-  .get("/", requireAdmin(), async (c) => {
+  .get('/', requireAdmin(), async (c) => {
     const db = c.var.db();
-    const packages = await db
-      .select()
-      .from(creditPackages)
-      .orderBy(asc(creditPackages.sortOrder));
 
-    return c.json({ data: packages });
+    return safeTry(async function* () {
+      const packages = yield* ResultAsync.fromPromise(
+        db.select().from(creditPackages).orderBy(asc(creditPackages.sortOrder)),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      return ok(packages);
+    })
+      .orTee((e) => e.cause && console.error('[Admin]', e.code, e.cause))
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
   })
   // POST / - Create package
-  .post(
-    "/",
-    requireAdmin(),
-    zValidator("json", createPackageSchema),
-    async (c) => {
-      const data = c.req.valid("json");
+  .post('/', requireAdmin(), zValidator('json', createPackageSchema), async (c) => {
+    const data = c.req.valid('json');
+    const db = c.var.db();
 
-      const db = c.var.db();
-      const [created] = await db
-        .insert(creditPackages)
-        .values({
-          name: data.name,
-          credits: data.credits,
-          priceThb: data.priceThb,
-          active: data.active,
-          sortOrder: data.sortOrder,
-        })
-        .returning();
+    return safeTry(async function* () {
+      const [created] = yield* ResultAsync.fromPromise(
+        db
+          .insert(creditPackages)
+          .values({
+            name: data.name,
+            credits: data.credits,
+            priceThb: data.priceThb,
+            active: data.active,
+            sortOrder: data.sortOrder,
+          })
+          .returning(),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
 
-      return c.json({ data: created }, 201);
-    },
-  )
+      return ok(created);
+    })
+      .orTee((e) => e.cause && console.error('[Admin]', e.code, e.cause))
+      .match(
+        (data) => c.json({ data }, 201),
+        (e) => apiError(c, e),
+      );
+  })
   // PATCH /:id - Update package
   .patch(
-    "/:id",
+    '/:id',
     requireAdmin(),
-    zValidator("json", updatePackageSchema),
-    zValidator("param", z.object({ id: z.string().uuid() })),
+    zValidator('json', updatePackageSchema),
+    zValidator('param', z.object({ id: z.string().uuid() })),
     async (c) => {
-      const { id } = c.req.valid("param");
-
-      const data = c.req.valid("json");
-
+      const { id } = c.req.valid('param');
+      const data = c.req.valid('json');
       const db = c.var.db();
 
-      // Check if package exists
-      const [existing] = await db
-        .select({ id: creditPackages.id })
-        .from(creditPackages)
-        .where(eq(creditPackages.id, id))
-        .limit(1);
+      return safeTry(async function* () {
+        // Check if package exists
+        const [existing] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: creditPackages.id })
+            .from(creditPackages)
+            .where(eq(creditPackages.id, id))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      if (!existing) {
-        return c.json(notFoundError("Credit package not found"), 404);
-      }
+        if (!existing) {
+          return err<never, HandlerError>({
+            code: 'NOT_FOUND',
+            message: 'Credit package not found',
+          });
+        }
 
-      // Update package
-      const [updated] = await db
-        .update(creditPackages)
-        .set(data)
-        .where(eq(creditPackages.id, id))
-        .returning();
+        // Update package
+        const [updated] = yield* ResultAsync.fromPromise(
+          db.update(creditPackages).set(data).where(eq(creditPackages.id, id)).returning(),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      return c.json({ data: updated });
+        return ok(updated);
+      })
+        .orTee((e) => e.cause && console.error('[Admin]', e.code, e.cause))
+        .match(
+          (data) => c.json({ data }),
+          (e) => apiError(c, e),
+        );
     },
   );
