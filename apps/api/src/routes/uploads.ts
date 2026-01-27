@@ -344,7 +344,7 @@ export const uploadsRouter = new Hono<Env>()
           expiresAt: newExpiresAt.toISOString(),
           requiredHeaders: {
             'Content-Type': intent.contentType,
-            'Content-Length': String(intent.contentLength),
+            ...(intent.contentLength && { 'Content-Length': String(intent.contentLength) }),
             'If-None-Match': '*',
           },
         });
