@@ -12,6 +12,7 @@ import EventDetailsTab from './routes/events/[id]/details';
 import EventUploadTab from './routes/events/[id]/upload';
 import EventStatisticsTab from './routes/events/[id]/statistics';
 import EventPhotosTab from './routes/events/[id]/photos';
+import EventSlideshowTab from './routes/events/[id]/slideshow';
 import { SidebarLayout } from './components/shell/sidebar-layout';
 
 export const router = createBrowserRouter([
@@ -23,6 +24,16 @@ export const router = createBrowserRouter([
   {
     path: '/sign-up/*',
     element: <SignUpPage />,
+  },
+
+  // Slideshow editor (auth required, no sidebar)
+  {
+    path: '/events/:id/slideshow-editor',
+    element: (
+      <ProtectedRoute>
+        <EventSlideshowTab />
+      </ProtectedRoute>
+    ),
   },
 
   // Credits routes (auth required, no sidebar)
