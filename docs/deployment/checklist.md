@@ -55,6 +55,7 @@ Go to: Repository → Settings → Environments → `<staging|production>`
 - [ ] `R2_ACCESS_KEY_ID`
 - [ ] `R2_SECRET_ACCESS_KEY`
 - [ ] `ADMIN_API_KEY`
+- [ ] `FTP_JWT_SECRET` (base64-encoded, generate: `openssl rand -base64 32`)
 
 **Optional:**
 
