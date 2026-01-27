@@ -92,6 +92,12 @@ No schema changes needed. Existing `photographers.pdpa_consent_at` and `consent_
 - IP address captured in `consent_records` for audit trail
 - No consent bypass possible (blocked by Clerk)
 
+## Commits
+
+1. `7aefa75` - Remove consent middleware, sync from Clerk webhook
+2. `e64176a` - Remove consent endpoint and tests
+3. `695c6f5` - Remove consent router registration and fix test syntax
+
 ## Next Steps
 
 1. Enable "Require express consent to legal documents" in Clerk Dashboard
