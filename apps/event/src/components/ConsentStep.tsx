@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Button } from '@sabaipics/uiv2/components/button';
 import { Checkbox } from '@sabaipics/uiv2/components/checkbox';
 import { Skeleton } from '@sabaipics/uiv2/components/skeleton';
@@ -11,6 +12,8 @@ interface ConsentStepProps {
   onContinue: () => void;
 }
 
+const CONSENT_STORAGE_KEY = 'pdpa_consent_accepted';
+
 export function ConsentStep({
   eventName,
   isLoading,
@@ -18,6 +21,17 @@ export function ConsentStep({
   onAcceptChange,
   onContinue,
 }: ConsentStepProps) {
+  // Check sessionStorage for existing consent in this session
+  useEffect(() => {
+    const hasConsented = sessionStorage.getItem(CONSENT_STORAGE_KEY);
+    if (hasConsented === 'true' && !accepted) {
+      onAcceptChange(true);
+      // Auto-continue after brief delay to allow UI to update
+      setTimeout(() => {
+        onContinue();
+      }, 100);
+    }
+  }, [onAcceptChange, onContinue]);
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6 py-12">
       <div className="w-full max-w-sm space-y-8">

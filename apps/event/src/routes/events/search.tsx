@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -24,6 +24,16 @@ export function SearchPage() {
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [errorType, setErrorType] = useState<ErrorType>(null);
+
+  // Check sessionStorage for existing consent in this session
+  useEffect(() => {
+    const hasConsented = sessionStorage.getItem('pdpa_consent_accepted');
+    if (hasConsented === 'true' && state === 'consent') {
+      setConsentAccepted(true);
+      // Skip to upload immediately if already consented in this session
+      setState('upload');
+    }
+  }, [state]);
 
   // Fetch event info (name)
   const eventQuery = useQuery({
@@ -62,6 +72,8 @@ export function SearchPage() {
 
   const handleConsentAccept = useCallback(() => {
     setConsentAccepted(true);
+    // Store consent in sessionStorage for this session
+    sessionStorage.setItem('pdpa_consent_accepted', 'true');
     setState('upload');
   }, []);
 
