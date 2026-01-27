@@ -1,10 +1,8 @@
-import { createBrowserRouter, Navigate } from 'react-router';
+import { createBrowserRouter, Navigate, Outlet } from 'react-router';
 import { SignedIn, SignedOut } from '@sabaipics/auth/react';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { ConsentGate } from './components/auth/ConsentGate';
 import { SignInPage } from './routes/sign-in';
 import { SignUpPage } from './routes/sign-up';
-import { OnboardingPage } from './routes/onboarding';
 import { DashboardPage } from './routes/dashboard';
 import { CreditPackagesPage } from './routes/credits/packages';
 import { CreditSuccessPage } from './routes/credits/success';
@@ -27,22 +25,12 @@ export const router = createBrowserRouter([
     element: <SignUpPage />,
   },
 
-  // Onboarding route (auth required, no consent required)
-  {
-    path: '/onboarding',
-    element: (
-      <ProtectedRoute>
-        <OnboardingPage />
-      </ProtectedRoute>
-    ),
-  },
-
-  // Credits routes (auth + consent required, no sidebar)
+  // Credits routes (auth required, no sidebar)
   {
     path: '/credits',
     element: (
       <ProtectedRoute>
-        <ConsentGate />
+        <Outlet />
       </ProtectedRoute>
     ),
     children: [
@@ -57,13 +45,11 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Protected routes (auth + consent required)
+  // Protected routes (auth required)
   {
     element: (
       <ProtectedRoute>
-        <ConsentGate>
-          <SidebarLayout />
-        </ConsentGate>
+        <SidebarLayout />
       </ProtectedRoute>
     ),
     children: [
