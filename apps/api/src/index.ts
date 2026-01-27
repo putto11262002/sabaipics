@@ -4,7 +4,6 @@ import { createClerkAuth } from '@sabaipics/auth/middleware';
 import { createDbHttp, createDbTx } from '@sabaipics/db';
 import { authRouter } from './routes/auth';
 import { webhookRouter } from './routes/webhooks';
-import { dbTestRouter } from './routes/db-test';
 import { adminRouter } from './routes/admin';
 import { consentRouter } from './routes/consent';
 import { dashboardRouter } from './routes/dashboard/route';
@@ -72,7 +71,6 @@ const app = new Hono<Env>()
   .use('/*', createClerkAuth())
   .route('/credit-packages', creditsRouter)
   .get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))
-  .route('/db-test', dbTestRouter)
   .route('/auth', authRouter)
   .route('/consent', consentRouter)
   .route('/dashboard', dashboardRouter)

@@ -3,21 +3,12 @@ import { zValidator } from '@hono/zod-validator';
 import { eq, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { events } from '@sabaipics/db';
-import { requirePhotographer, requireConsent, type PhotographerVariables } from '../../middleware';
-import type { Bindings } from '../../types';
+import { requirePhotographer, requireConsent } from '../../middleware';
+import type { Env } from '../../types';
 import { generatePngQrCode } from '@juit/qrcode';
 import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './schema';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../../lib/error';
-
-// =============================================================================
-// Types
-// =============================================================================
-
-type Env = {
-  Bindings: Bindings;
-  Variables: PhotographerVariables;
-};
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
