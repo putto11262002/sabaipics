@@ -307,24 +307,36 @@ export const eventsRouter = new Hono<Env>()
       const db = c.var.db();
       const { id } = c.req.valid('param');
 
-      // Verify event ownership
-      const [event] = await db
-        .select({
-          id: events.id,
-          slideshowConfig: events.slideshowConfig,
-        })
-        .from(events)
-        .where(and(eq(events.id, id), eq(events.photographerId, photographer.id)))
-        .limit(1);
+      return safeTry(async function* () {
+        // Verify event ownership
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({
+              id: events.id,
+              slideshowConfig: events.slideshowConfig,
+            })
+            .from(events)
+            .where(and(eq(events.id, id), eq(events.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      if (!event) {
-        return apiError(c, 'NOT_FOUND', 'Event not found');
-      }
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
 
-      // Return default config if none set
-      const config = event.slideshowConfig ?? DEFAULT_SLIDESHOW_CONFIG;
+        // Return default config if none set
+        const config = event.slideshowConfig ?? DEFAULT_SLIDESHOW_CONFIG;
 
-      return c.json({ data: config });
+        return ok({ data: config });
+      })
+        .orTee(
+          (e) => e.cause && console.error('[Events] GET /:id/slideshow-config', e.code, e.cause),
+        )
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
     },
   )
 
@@ -342,25 +354,40 @@ export const eventsRouter = new Hono<Env>()
       const { id } = c.req.valid('param');
       const config = c.req.valid('json');
 
-      // Verify event ownership
-      const [event] = await db
-        .select({ id: events.id })
-        .from(events)
-        .where(and(eq(events.id, id), eq(events.photographerId, photographer.id)))
-        .limit(1);
+      return safeTry(async function* () {
+        // Verify event ownership
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: events.id })
+            .from(events)
+            .where(and(eq(events.id, id), eq(events.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      if (!event) {
-        return apiError(c, 'NOT_FOUND', 'Event not found');
-      }
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
 
-      // Update slideshow config
-      const [updated] = await db
-        .update(events)
-        .set({ slideshowConfig: config })
-        .where(eq(events.id, id))
-        .returning({ slideshowConfig: events.slideshowConfig });
+        // Update slideshow config
+        const [updated] = yield* ResultAsync.fromPromise(
+          db
+            .update(events)
+            .set({ slideshowConfig: config })
+            .where(eq(events.id, id))
+            .returning({ slideshowConfig: events.slideshowConfig }),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      return c.json({ data: updated.slideshowConfig });
+        return ok({ data: updated.slideshowConfig });
+      })
+        .orTee(
+          (e) => e.cause && console.error('[Events] PUT /:id/slideshow-config', e.code, e.cause),
+        )
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
     },
   )
 
@@ -378,58 +405,71 @@ export const eventsRouter = new Hono<Env>()
       const { id: eventId } = c.req.valid('param');
       const { contentType, contentLength } = c.req.valid('json');
 
-      // Verify event ownership and not expired
-      const [event] = await db
-        .select({ id: events.id, expiresAt: events.expiresAt })
-        .from(events)
-        .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
-        .limit(1);
+      return safeTry(async function* () {
+        // Verify event ownership and not expired
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: events.id, expiresAt: events.expiresAt })
+            .from(events)
+            .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      if (!event) {
-        return apiError(c, 'NOT_FOUND', 'Event not found');
-      }
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
 
-      // Check if event expired
-      if (new Date(event.expiresAt) < new Date()) {
-        return apiError(c, 'GONE', 'Event has expired');
-      }
+        // Check if event expired
+        if (new Date(event.expiresAt) < new Date()) {
+          return err<never, HandlerError>({ code: 'GONE', message: 'Event has expired' });
+        }
 
-      // Generate upload ID and R2 key
-      const uploadId = crypto.randomUUID();
-      const timestamp = Date.now();
-      const r2Key = `${eventId}/logo/${uploadId}-${timestamp}`;
+        // Generate upload ID and R2 key
+        const uploadId = crypto.randomUUID();
+        const timestamp = Date.now();
+        const r2Key = `${eventId}/logo/${uploadId}-${timestamp}`;
 
-      // Generate presigned URL (5 minutes expiry)
-      const PRESIGN_EXPIRY_SECONDS = 5 * 60;
-      const expiresAt = new Date(Date.now() + PRESIGN_EXPIRY_SECONDS * 1000);
+        // Generate presigned URL (5 minutes expiry)
+        const PRESIGN_EXPIRY_SECONDS = 5 * 60;
+        const expiresAt = new Date(Date.now() + PRESIGN_EXPIRY_SECONDS * 1000);
 
-      try {
-        const { url: putUrl } = await generatePresignedPutUrl(
-          c.env.CF_ACCOUNT_ID,
-          c.env.R2_ACCESS_KEY_ID,
-          c.env.R2_SECRET_ACCESS_KEY,
-          {
-            bucket: c.env.PHOTO_BUCKET_NAME,
-            key: r2Key,
-            contentType,
-            contentLength,
-            expiresIn: PRESIGN_EXPIRY_SECONDS,
-          },
+        const { url: putUrl } = yield* ResultAsync.fromPromise(
+          generatePresignedPutUrl(
+            c.env.CF_ACCOUNT_ID,
+            c.env.R2_ACCESS_KEY_ID,
+            c.env.R2_SECRET_ACCESS_KEY,
+            {
+              bucket: c.env.PHOTO_BUCKET_NAME,
+              key: r2Key,
+              contentType,
+              contentLength,
+              expiresIn: PRESIGN_EXPIRY_SECONDS,
+            },
+          ),
+          (cause): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Failed to generate upload URL',
+            cause,
+          }),
         );
 
         // Create logo upload intent record
-        await db.insert(logoUploadIntents).values({
-          id: uploadId,
-          photographerId: photographer.id,
-          eventId,
-          r2Key,
-          contentType,
-          contentLength,
-          status: 'pending',
-          expiresAt: expiresAt.toISOString(),
-        });
+        yield* ResultAsync.fromPromise(
+          db.insert(logoUploadIntents).values({
+            id: uploadId,
+            photographerId: photographer.id,
+            eventId,
+            r2Key,
+            contentType,
+            contentLength,
+            status: 'pending',
+            expiresAt: expiresAt.toISOString(),
+          }),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-        return c.json({
+        return ok({
           data: {
             uploadId,
             putUrl,
@@ -442,10 +482,12 @@ export const eventsRouter = new Hono<Env>()
             },
           },
         });
-      } catch (error) {
-        console.error('[Logo Presign] Failed to generate presigned URL:', error);
-        return apiError(c, 'INTERNAL_ERROR', 'Failed to generate upload URL');
-      }
+      })
+        .orTee((e) => e.cause && console.error('[Events] POST /:id/logo/presign', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
     },
   )
 
@@ -463,62 +505,75 @@ export const eventsRouter = new Hono<Env>()
       const { id: eventId } = c.req.valid('param');
       const { id: uploadId } = c.req.valid('query');
 
-      // Verify event ownership
-      const [event] = await db
-        .select({ id: events.id, logoR2Key: events.logoR2Key })
-        .from(events)
-        .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
-        .limit(1);
+      return safeTry(async function* () {
+        // Verify event ownership
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: events.id, logoR2Key: events.logoR2Key })
+            .from(events)
+            .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      if (!event) {
-        return apiError(c, 'NOT_FOUND', 'Event not found');
-      }
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
 
-      // Fetch logo upload intent
-      const [intent] = await db
-        .select({
-          uploadId: logoUploadIntents.id,
-          eventId: logoUploadIntents.eventId,
-          status: logoUploadIntents.status,
-          errorCode: logoUploadIntents.errorCode,
-          errorMessage: logoUploadIntents.errorMessage,
-          uploadedAt: logoUploadIntents.uploadedAt,
-          completedAt: logoUploadIntents.completedAt,
-          expiresAt: logoUploadIntents.expiresAt,
-        })
-        .from(logoUploadIntents)
-        .where(
-          and(
-            eq(logoUploadIntents.id, uploadId),
-            eq(logoUploadIntents.eventId, eventId),
-            eq(logoUploadIntents.photographerId, photographer.id),
-          ),
-        )
-        .limit(1);
+        // Fetch logo upload intent
+        const [intent] = yield* ResultAsync.fromPromise(
+          db
+            .select({
+              uploadId: logoUploadIntents.id,
+              eventId: logoUploadIntents.eventId,
+              status: logoUploadIntents.status,
+              errorCode: logoUploadIntents.errorCode,
+              errorMessage: logoUploadIntents.errorMessage,
+              uploadedAt: logoUploadIntents.uploadedAt,
+              completedAt: logoUploadIntents.completedAt,
+              expiresAt: logoUploadIntents.expiresAt,
+            })
+            .from(logoUploadIntents)
+            .where(
+              and(
+                eq(logoUploadIntents.id, uploadId),
+                eq(logoUploadIntents.eventId, eventId),
+                eq(logoUploadIntents.photographerId, photographer.id),
+              ),
+            )
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
 
-      if (!intent) {
-        return apiError(c, 'NOT_FOUND', 'Upload not found');
-      }
+        if (!intent) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Upload not found' });
+        }
 
-      // Generate logo URL if completed
-      const logoUrl =
-        intent.status === 'completed' && event.logoR2Key
-          ? `${c.env.PHOTO_R2_BASE_URL}/${event.logoR2Key}`
-          : null;
+        // Generate logo URL if completed
+        const logoUrl =
+          intent.status === 'completed' && event.logoR2Key
+            ? `${c.env.PHOTO_R2_BASE_URL}/${event.logoR2Key}`
+            : null;
 
-      return c.json({
-        data: {
-          uploadId: intent.uploadId,
-          eventId: intent.eventId,
-          status: intent.status,
-          errorCode: intent.errorCode,
-          errorMessage: intent.errorMessage,
-          logoUrl,
-          uploadedAt: intent.uploadedAt,
-          completedAt: intent.completedAt,
-          expiresAt: intent.expiresAt,
-        },
-      });
+        return ok({
+          data: {
+            uploadId: intent.uploadId,
+            eventId: intent.eventId,
+            status: intent.status,
+            errorCode: intent.errorCode,
+            errorMessage: intent.errorMessage,
+            logoUrl,
+            uploadedAt: intent.uploadedAt,
+            completedAt: intent.completedAt,
+            expiresAt: intent.expiresAt,
+          },
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] GET /:id/logo/status', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
     },
   )
 
@@ -530,19 +585,32 @@ export const eventsRouter = new Hono<Env>()
     const db = c.var.db();
     const { id: eventId } = c.req.valid('param');
 
-    // Verify event ownership
-    const [event] = await db
-      .select({ id: events.id })
-      .from(events)
-      .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
-      .limit(1);
+    return safeTry(async function* () {
+      // Verify event ownership
+      const [event] = yield* ResultAsync.fromPromise(
+        db
+          .select({ id: events.id })
+          .from(events)
+          .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
+          .limit(1),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
 
-    if (!event) {
-      return apiError(c, 'NOT_FOUND', 'Event not found');
-    }
+      if (!event) {
+        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+      }
 
-    // Remove logo reference (actual R2 cleanup via lifecycle policy)
-    await db.update(events).set({ logoR2Key: null }).where(eq(events.id, eventId));
+      // Remove logo reference (actual R2 cleanup via lifecycle policy)
+      yield* ResultAsync.fromPromise(
+        db.update(events).set({ logoR2Key: null }).where(eq(events.id, eventId)),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
 
-    return c.json({ data: { success: true } });
+      return ok({ data: { success: true } });
+    })
+      .orTee((e) => e.cause && console.error('[Events] DELETE /:id/logo', e.code, e.cause))
+      .match(
+        (data) => c.json(data),
+        (e) => apiError(c, e),
+      );
   });
