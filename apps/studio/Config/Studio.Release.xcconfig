@@ -1,0 +1,10 @@
+// SabaiPicsStudio Release configuration
+
+// Clerk
+CLERK_PUBLISHABLE_KEY =
+
+// Sign-up URL (web app)
+SIGNUP_URL = https://sabaipics.com/sign-up
+
+// Local developer overrides (gitignored)
+#include "Studio.Local.xcconfig"

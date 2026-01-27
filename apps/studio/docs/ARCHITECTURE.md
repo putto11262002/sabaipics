@@ -90,10 +90,20 @@ API:         Triggers processing, iOS device purges local
 
 ## Subsystems
 
-| Subsystem | Purpose | Details |
-|-----------|---------|---------|
+| Subsystem     | Purpose                | Details                      |
+| ------------- | ---------------------- | ---------------------------- |
 | PTP/IP Camera | Wireless photo capture | See `PTP_IP_ARCHITECTURE.md` |
-| Cloud Sync | Auth + Events + Upload | TBD |
+| Cloud Sync    | Auth + Events + Upload | TBD                          |
+
+---
+
+## Navigation Shell
+
+Studio uses a tab-based app shell, while keeping capture as a full-screen mode.
+
+- App shell + capture mode: `IOS/APP_SHELL.md`
+- Auth details: `IOS/AUTH.md`
+- Design system: `IOS/THEME.md`
 
 ---
 
