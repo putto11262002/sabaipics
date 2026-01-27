@@ -6,6 +6,34 @@ iOS Studio architecture changes. See `ARCHITECTURE.md` for current design.
 
 ## 2026-01-26
 
+### Update 16: Design System (Theme Colors + Button Styles)
+
+**Status:** Implemented
+
+Added design system matching web shadcn/ui theme. Colors auto-adapt to light/dark mode.
+
+- Created `Color.Theme.*` namespace with 17 semantic colors
+- Created reusable button styles: `.primary`, `.secondary`, `.ghost`, `.destructive`
+- Colors synced from `packages/ui/src/styles/globals.css` (OKLCH → hex via culori)
+- ClerkTheme now uses full color mapping
+- Primary brand color: `#9f6db1` (magenta/purple)
+
+**Files:** Theme/Colors.swift, Theme/ButtonStyles.swift, Assets.xcassets/Colors/Theme\*.colorset
+
+**Docs:** IOS/THEME.md
+
+---
+
+### Update 15: Portrait Lock
+
+**Status:** Implemented
+
+Locked app to portrait orientation only (like Instagram/TikTok).
+
+**Files:** Config/SabaiPicsStudio-Info.plist
+
+---
+
 ### Update 14: ProfileView with Clerk Account Portal
 
 **Status:** Implemented
