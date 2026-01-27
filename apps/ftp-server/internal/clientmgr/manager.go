@@ -16,8 +16,6 @@ const (
 	EventAuthExpired EventType = iota
 	// EventUploadFailed indicates an upload failed (non-auth error)
 	EventUploadFailed
-	// EventRateLimited indicates client hit rate limit (429 from API)
-	EventRateLimited
 )
 
 // ClientEvent represents an event reported by upload transfers
@@ -150,12 +148,6 @@ func (m *Manager) handleEvent(event ClientEvent) {
 		// Decision: Log the failure but keep connection open
 		// Client can retry or upload other files
 		log.Warn().Emitf("ClientManager: Upload failed for client %d: %s", event.ClientID, event.Reason)
-
-	case EventRateLimited:
-		// Decision: Disconnect client when rate limited
-		// They can reconnect after cooldown
-		log.Warn().Emitf("ClientManager: Client %d rate limited, disconnecting", event.ClientID)
-		m.disconnectClient(event.ClientID, "rate limited")
 
 	default:
 		log.Warn().Emitf("ClientManager: Unknown event type %d for client %d", event.Type, event.ClientID)

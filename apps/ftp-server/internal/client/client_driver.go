@@ -1,12 +1,17 @@
 package client
 
 import (
+	"context"
+	"fmt"
+	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/clientmgr"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/config"
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/mime"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/transfer"
 	"github.com/spf13/afero"
 )
@@ -49,8 +54,54 @@ func (d *ClientDriver) OpenFile(name string, flag int, perm os.FileMode) (afero.
 		return nil, ErrDownloadNotAllowed
 	}
 
-	// Create UploadTransfer with JWT token, API client, and client manager for event reporting
-	uploadTransfer := transfer.NewUploadTransfer(d.eventID, d.jwtToken, d.clientIP, name, d.clientID, d.clientMgr, d.apiClient)
+	// Detect MIME type from filename
+	contentType := mime.FromFilename(name)
+
+	// Presign with retry on 429
+	var presignResp *apiclient.PresignResponse
+	var httpResp *http.Response
+	var err error
+
+	backoff := []time.Duration{1 * time.Second, 2 * time.Second, 4 * time.Second}
+
+	for attempt := 0; attempt <= len(backoff); attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		presignResp, httpResp, err = d.apiClient.Presign(ctx, d.jwtToken, name, contentType)
+		cancel()
+
+		if err == nil {
+			// Success
+			break
+		}
+
+		if httpResp != nil && httpResp.StatusCode == 429 && attempt < len(backoff) {
+			// Rate limited - retry with backoff
+			retryAfter := parseRetryAfter(httpResp) // Check Retry-After header
+			if retryAfter > 0 {
+				time.Sleep(retryAfter)
+			} else {
+				time.Sleep(backoff[attempt])
+			}
+			continue
+		}
+
+		// Non-429 error or exhausted retries
+		return nil, mapPresignError(err, httpResp)
+	}
+
+	// Create UploadTransfer with presigned URL
+	uploadTransfer := transfer.NewUploadTransfer(
+		d.eventID,
+		d.jwtToken,
+		d.clientIP,
+		name,
+		presignResp.PutURL,
+		presignResp.RequiredHeaders,
+		d.clientID,
+		d.clientMgr,
+		d.apiClient,
+	)
+
 	return uploadTransfer, nil
 }
 
@@ -170,9 +221,9 @@ type fakeFileInfo struct {
 	isDir bool
 }
 
-func (fi *fakeFileInfo) Name() string       { return fi.name }
-func (fi *fakeFileInfo) Size() int64        { return 0 }
-func (fi *fakeFileInfo) Mode() os.FileMode  {
+func (fi *fakeFileInfo) Name() string { return fi.name }
+func (fi *fakeFileInfo) Size() int64  { return 0 }
+func (fi *fakeFileInfo) Mode() os.FileMode {
 	if fi.isDir {
 		return os.ModeDir | 0755
 	}
@@ -197,4 +248,50 @@ func (d *ClientDriver) Symlink(oldname, newname string) error {
 // Readlink returns empty string for symlinks (no actual symlinks exist)
 func (d *ClientDriver) Readlink(name string) (string, error) {
 	return "", nil // Success, but no symlink target
+}
+
+// mapPresignError maps presign API errors to FTP errors
+func mapPresignError(err error, resp *http.Response) error {
+	if resp == nil {
+		return fmt.Errorf("presign request failed: %w", err)
+	}
+
+	switch resp.StatusCode {
+	case 401:
+		// JWT expired - return auth error
+		return fmt.Errorf("authentication expired")
+	case 402:
+		return fmt.Errorf("insufficient credits")
+	case 410:
+		return fmt.Errorf("event expired")
+	case 429:
+		// All retries exhausted
+		return fmt.Errorf("rate limited, please retry later")
+	case 500, 502, 503:
+		return fmt.Errorf("temporary server error, please retry")
+	default:
+		return fmt.Errorf("upload failed: %d", resp.StatusCode)
+	}
+}
+
+// parseRetryAfter parses the Retry-After header from HTTP response
+// Returns the duration to wait, or 0 if header is not present or invalid
+func parseRetryAfter(resp *http.Response) time.Duration {
+	if resp == nil {
+		return 0
+	}
+
+	retryAfter := resp.Header.Get("Retry-After")
+	if retryAfter == "" {
+		return 0
+	}
+
+	// Try parsing as seconds (integer)
+	if seconds, err := strconv.Atoi(retryAfter); err == nil {
+		return time.Duration(seconds) * time.Second
+	}
+
+	// Try parsing as HTTP date (not commonly used, but spec allows it)
+	// We'll skip this for simplicity - just return 0
+	return 0
 }

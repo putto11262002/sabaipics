@@ -15,26 +15,37 @@ type MockClient struct {
 	mu sync.Mutex
 
 	// Configurable responses
-	AuthResponse    *AuthResponse
-	AuthError       error
-	UploadResponse  *UploadResponse
-	UploadError     error
-	UploadHTTPStatus int // For simulating 401, 429, etc.
+	AuthResponse      *AuthResponse
+	AuthError         error
+	PresignResponse   *PresignResponse
+	PresignError      error
+	PresignHTTPStatus int // For simulating 401, 429, etc.
+	UploadError       error
+	UploadHTTPStatus  int // For simulating R2 errors
 
 	// Call tracking
-	AuthCalls   []AuthRequest
-	UploadCalls []MockUploadCall
-	authCount   atomic.Int64
-	uploadCount atomic.Int64
+	AuthCalls    []AuthRequest
+	PresignCalls []MockPresignCall
+	UploadCalls  []MockUploadCall
+	authCount    atomic.Int64
+	presignCount atomic.Int64
+	uploadCount  atomic.Int64
+}
+
+// MockPresignCall records details of a presign call
+type MockPresignCall struct {
+	Token       string
+	Filename    string
+	ContentType string
+	Time        time.Time
 }
 
 // MockUploadCall records details of an upload call
 type MockUploadCall struct {
-	Token    string
-	EventID  string
-	Filename string
-	Size     int64
-	Time     time.Time
+	PutURL  string
+	Headers map[string]string
+	Size    int64
+	Time    time.Time
 }
 
 // NewMockClient creates a new mock client with default success responses
@@ -47,25 +58,16 @@ func NewMockClient() *MockClient {
 			UploadWindowEnd:  time.Now().Add(24 * time.Hour).Format(time.RFC3339),
 			CreditsRemaining: 1000,
 		},
-		UploadResponse: &UploadResponse{
-			Data: struct {
-				ID                string `json:"id"`
-				Status            string `json:"status"`
-				Filename          string `json:"filename"`
-				SizeBytes         int64  `json:"size_bytes"`
-				UploadCompletedAt string `json:"upload_completed_at"`
-				R2Key             string `json:"r2_key"`
-			}{
-				ID:                "photo_test123",
-				Status:            "uploaded",
-				Filename:          "",
-				SizeBytes:         0,
-				UploadCompletedAt: time.Now().Format(time.RFC3339),
-				R2Key:             "",
-			},
+		PresignResponse: &PresignResponse{
+			UploadID:        "upload_test123",
+			PutURL:          "https://r2.example.com/bucket/test-key",
+			ObjectKey:       "test-key",
+			ExpiresAt:       time.Now().Add(5 * time.Minute).Format(time.RFC3339),
+			RequiredHeaders: map[string]string{"Content-Type": "image/jpeg"},
 		},
-		AuthCalls:   []AuthRequest{},
-		UploadCalls: []MockUploadCall{},
+		AuthCalls:    []AuthRequest{},
+		PresignCalls: []MockPresignCall{},
+		UploadCalls:  []MockUploadCall{},
 	}
 }
 
@@ -83,21 +85,48 @@ func (m *MockClient) Authenticate(ctx context.Context, req AuthRequest) (*AuthRe
 	return m.AuthResponse, nil
 }
 
-// UploadFormData implements APIClient.UploadFormData
-func (m *MockClient) UploadFormData(ctx context.Context, token, eventID, filename string, reader io.Reader) (*UploadResponse, *http.Response, error) {
+// Presign implements APIClient.Presign
+func (m *MockClient) Presign(ctx context.Context, token, filename, contentType string) (*PresignResponse, *http.Response, error) {
+	m.mu.Lock()
+	m.PresignCalls = append(m.PresignCalls, MockPresignCall{
+		Token:       token,
+		Filename:    filename,
+		ContentType: contentType,
+		Time:        time.Now(),
+	})
+	m.mu.Unlock()
+	m.presignCount.Add(1)
+
+	// Create mock HTTP response for status code checking
+	mockResp := &http.Response{
+		StatusCode: http.StatusCreated,
+	}
+
+	if m.PresignHTTPStatus > 0 {
+		mockResp.StatusCode = m.PresignHTTPStatus
+	}
+
+	if m.PresignError != nil {
+		return nil, mockResp, m.PresignError
+	}
+
+	return m.PresignResponse, mockResp, nil
+}
+
+// UploadToPresignedURL implements APIClient.UploadToPresignedURL
+func (m *MockClient) UploadToPresignedURL(ctx context.Context, putURL string, headers map[string]string, reader io.Reader) (*http.Response, error) {
 	// Read all data to get size
 	data, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read upload data: %w", err)
+		return nil, fmt.Errorf("failed to read upload data: %w", err)
 	}
 
 	m.mu.Lock()
 	m.UploadCalls = append(m.UploadCalls, MockUploadCall{
-		Token:    token,
-		EventID:  eventID,
-		Filename: filename,
-		Size:     int64(len(data)),
-		Time:     time.Now(),
+		PutURL:  putURL,
+		Headers: headers,
+		Size:    int64(len(data)),
+		Time:    time.Now(),
 	})
 	m.mu.Unlock()
 	m.uploadCount.Add(1)
@@ -112,16 +141,10 @@ func (m *MockClient) UploadFormData(ctx context.Context, token, eventID, filenam
 	}
 
 	if m.UploadError != nil {
-		return nil, mockResp, m.UploadError
+		return mockResp, m.UploadError
 	}
 
-	// Update response with actual filename and size
-	resp := *m.UploadResponse
-	resp.Data.Filename = filename
-	resp.Data.SizeBytes = int64(len(data))
-	resp.Data.R2Key = "events/" + eventID + "/" + filename
-
-	return &resp, mockResp, nil
+	return mockResp, nil
 }
 
 // GetAuthCallCount returns the number of auth calls (thread-safe)
@@ -129,9 +152,24 @@ func (m *MockClient) GetAuthCallCount() int {
 	return int(m.authCount.Load())
 }
 
+// GetPresignCallCount returns the number of presign calls (thread-safe)
+func (m *MockClient) GetPresignCallCount() int {
+	return int(m.presignCount.Load())
+}
+
 // GetUploadCallCount returns the number of upload calls (thread-safe)
 func (m *MockClient) GetUploadCallCount() int {
 	return int(m.uploadCount.Load())
+}
+
+// GetLastPresignCall returns the last presign call (thread-safe)
+func (m *MockClient) GetLastPresignCall() *MockPresignCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.PresignCalls) == 0 {
+		return nil
+	}
+	return &m.PresignCalls[len(m.PresignCalls)-1]
 }
 
 // GetLastUploadCall returns the last upload call (thread-safe)
@@ -149,17 +187,27 @@ func (m *MockClient) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.AuthCalls = []AuthRequest{}
+	m.PresignCalls = []MockPresignCall{}
 	m.UploadCalls = []MockUploadCall{}
 	m.AuthError = nil
+	m.PresignError = nil
+	m.PresignHTTPStatus = 0
 	m.UploadError = nil
 	m.UploadHTTPStatus = 0
 	m.authCount.Store(0)
+	m.presignCount.Store(0)
 	m.uploadCount.Store(0)
 }
 
 // SetAuthFailure configures the mock to return an auth error
 func (m *MockClient) SetAuthFailure(err error) {
 	m.AuthError = err
+}
+
+// SetPresignFailure configures the mock to return a presign error with status
+func (m *MockClient) SetPresignFailure(err error, httpStatus int) {
+	m.PresignError = err
+	m.PresignHTTPStatus = httpStatus
 }
 
 // SetUploadFailure configures the mock to return an upload error with status

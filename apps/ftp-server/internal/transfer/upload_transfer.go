@@ -3,6 +3,7 @@ package transfer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -21,13 +22,15 @@ import (
 var ErrAuthExpired = errors.New("authentication expired")
 
 // UploadTransfer implements the afero.File interface for streaming uploads
-// Uses io.Pipe to stream data to API via FormData without buffering to disk
+// Uses io.Pipe to stream data to R2 via presigned URL without buffering to disk
 // LIFETIME CONTRACT: 1:1 with uploadTransaction. Must not be reused after Close().
 type UploadTransfer struct {
 	eventID           string
 	jwtToken          string
 	clientIP          string
 	filename          string
+	presignedURL      string
+	requiredHeaders   map[string]string
 	clientID          uint32 // Client ID for event reporting
 	clientMgr         *clientmgr.Manager
 	apiClient         apiclient.APIClient
@@ -39,9 +42,9 @@ type UploadTransfer struct {
 	uploadTransaction *sentry.Span // Sentry ROOT transaction for this upload (1:1 lifetime)
 }
 
-// NewUploadTransfer creates a new upload transfer for streaming to API via FormData
+// NewUploadTransfer creates a new upload transfer for streaming to R2 via presigned URL
 // Creates a ROOT Sentry transaction for this upload (not a child span)
-func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, clientID uint32, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient) *UploadTransfer {
+func NewUploadTransfer(eventID, jwtToken, clientIP, filename, presignedURL string, requiredHeaders map[string]string, clientID uint32, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient) *UploadTransfer {
 	pr, pw := io.Pipe()
 
 	// Create ROOT Sentry transaction for this upload
@@ -72,6 +75,8 @@ func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, clientID ui
 		jwtToken:          jwtToken,
 		clientIP:          clientIP,
 		filename:          filename,
+		presignedURL:      presignedURL,
+		requiredHeaders:   requiredHeaders,
 		clientID:          clientID,
 		clientMgr:         clientMgr,
 		apiClient:         apiClient,
@@ -82,8 +87,8 @@ func NewUploadTransfer(eventID, jwtToken, clientIP, filename string, clientID ui
 		uploadTransaction: uploadTransaction,
 	}
 
-	// Start background goroutine to stream to API
-	go transfer.streamToAPI()
+	// Start background goroutine to stream to R2
+	go transfer.streamToR2()
 
 	// Log upload creation at I/O boundary
 	sentry.NewLogger(uploadTransaction.Context()).Info().Emitf("Upload started: file=%s, event=%s, client=%s",
@@ -149,53 +154,23 @@ func (t *UploadTransfer) Close() error {
 	return err
 }
 
-// streamToAPI runs in a background goroutine to stream data to API via FormData (I/O boundary)
-func (t *UploadTransfer) streamToAPI() {
+// streamToR2 runs in a background goroutine to stream data to R2 via presigned URL (I/O boundary)
+func (t *UploadTransfer) streamToR2() {
 	defer close(t.uploadDone)
 
 	ctx := t.uploadTransaction.Context()
 
-	// Upload via FormData to API
-	uploadResp, httpResp, err := t.apiClient.UploadFormData(
+	// Upload to R2 presigned URL
+	resp, err := t.apiClient.UploadToPresignedURL(
 		ctx,
-		t.jwtToken,
-		t.eventID,
-		t.filename,
+		t.presignedURL,
+		t.requiredHeaders,
 		t.pipeReader, // Stream directly from FTP client pipe
 	)
 
 	if err != nil {
-		// Check for 401 (token expired) - report to hub, hub decides action
-		if httpResp != nil && httpResp.StatusCode == http.StatusUnauthorized {
-			sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("Auth expired for file=%s, reporting to hub", t.filename)
-
-			// Report event to hub - hub decides whether to disconnect
-			t.clientMgr.SendEvent(clientmgr.ClientEvent{
-				Type:     clientmgr.EventAuthExpired,
-				ClientID: t.clientID,
-				Reason:   "401 Unauthorized from API",
-			})
-
-			t.uploadDone <- ErrAuthExpired
-			return
-		}
-
-		// Check for 429 (rate limited) - report to hub
-		if httpResp != nil && httpResp.StatusCode == http.StatusTooManyRequests {
-			sentry.NewLogger(t.uploadTransaction.Context()).Warn().Emitf("Rate limited for file=%s, reporting to hub", t.filename)
-
-			t.clientMgr.SendEvent(clientmgr.ClientEvent{
-				Type:     clientmgr.EventRateLimited,
-				ClientID: t.clientID,
-				Reason:   "429 Too Many Requests from API",
-			})
-
-			t.uploadDone <- err
-			return
-		}
-
-		// Other upload failures - report to hub (hub may log but keep connection)
-		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("API upload failed for file=%s: %v", t.filename, err)
+		// Network error during transfer
+		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("R2 upload failed for file=%s: %v", t.filename, err)
 
 		t.clientMgr.SendEvent(clientmgr.ClientEvent{
 			Type:     clientmgr.EventUploadFailed,
@@ -206,9 +181,22 @@ func (t *UploadTransfer) streamToAPI() {
 		t.uploadDone <- err
 		return
 	}
+	defer resp.Body.Close()
 
-	sentry.NewLogger(t.uploadTransaction.Context()).Info().Emitf("Upload successful: file=%s, photo_id=%s, size=%d bytes",
-		t.filename, uploadResp.Data.ID, uploadResp.Data.SizeBytes)
+	if resp.StatusCode != http.StatusOK {
+		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("R2 upload failed for file=%s: status %d", t.filename, resp.StatusCode)
+
+		t.clientMgr.SendEvent(clientmgr.ClientEvent{
+			Type:     clientmgr.EventUploadFailed,
+			ClientID: t.clientID,
+			Reason:   fmt.Sprintf("R2 upload failed: %d", resp.StatusCode),
+		})
+
+		t.uploadDone <- fmt.Errorf("R2 upload failed: %d", resp.StatusCode)
+		return
+	}
+
+	sentry.NewLogger(t.uploadTransaction.Context()).Info().Emitf("Upload successful: file=%s", t.filename)
 
 	t.uploadDone <- nil
 }
