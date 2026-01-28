@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useBlocker } from 'react-router';
 import { toast } from 'sonner';
-import { useQuery } from '@tanstack/react-query';
 import { SidebarProvider, SidebarInset } from '@sabaipics/uiv3/components/sidebar';
 import { Spinner } from '@sabaipics/uiv3/components/spinner';
 import { Alert, AlertDescription } from '@sabaipics/uiv3/components/alert';
@@ -19,7 +18,6 @@ import { AlertCircle } from 'lucide-react';
 import { PageHeader } from '../../../../components/shell/page-header';
 import { useEvent } from '../../../../hooks/events/useEvent';
 import { useSlideshowConfig, useUpdateSlideshowConfig } from '../../../../hooks/events/useSlideshowConfig';
-import { api } from '../../../../lib/api';
 import type { SlideshowConfig, SlideshowBlock, SlideshowContext } from './types';
 import { DEFAULT_CONFIG } from './lib/templates';
 import { createBlock } from './blocks/registry';
@@ -88,20 +86,8 @@ export default function EventSlideshowTab() {
   const { data: slideshowData, isLoading: isLoadingConfig, error: configError } = useSlideshowConfig(id);
   const updateConfig = useUpdateSlideshowConfig(id);
 
-  // Fetch photos once for editor preview (no polling)
-  const { data: photosData } = useQuery({
-    queryKey: ['editor-photos', id],
-    queryFn: async () => {
-      const res = await api.participant.events[':eventId'].photos.$get({
-        param: { eventId: id! },
-        query: { limit: 50 },
-      });
-      if (!res.ok) return { data: [] };
-      return await res.json();
-    },
-    enabled: !!id,
-    staleTime: Infinity, // Don't refetch, one-time load for editor
-  });
+  // Editor mode - no photo fetching, use placeholders only
+  // Live mode will fetch photos via useSlideshowPhotos in the gallery renderer
 
   const [config, setConfig] = useState<SlideshowConfig>(() => structuredClone(DEFAULT_CONFIG));
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
@@ -176,8 +162,8 @@ export default function EventSlideshowTab() {
       searchCount: 0,
       downloadCount: 0,
     },
-    photos: photosData?.data ?? [], // Pre-fetched photos for editor (no polling)
-    liveMode: false, // Editor uses pre-fetched photos, no live polling
+    photos: [], // Always empty for editor - placeholders only
+    liveMode: false, // Editor mode - no live fetching, use placeholders
   };
 
   const selectedBlock = selectedBlockId ? findBlock(config.blocks, selectedBlockId) : null;

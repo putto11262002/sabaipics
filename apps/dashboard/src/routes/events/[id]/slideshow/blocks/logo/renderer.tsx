@@ -8,24 +8,43 @@ export function LogoRenderer({
   context: SlideshowContext;
 }) {
   const props = block.props as LogoProps;
+  const logoUrl = context.event.logoUrl;
 
-  if (context.event.logoUrl) {
+  // In editor mode (not live), always show placeholder
+  if (!context.liveMode) {
     return (
-      <img
-        src={context.event.logoUrl}
-        alt={context.event.name}
-        className="object-contain"
-        style={{ width: `${props.width}vw`, height: 'auto' }}
-      />
+      <div
+        className="flex items-center justify-center rounded-lg border-2 border-border bg-muted"
+        style={{
+          width: `${props.width}vw`,
+          aspectRatio: '1', // Square (1:1 ratio)
+        }}
+      >
+        <span className="text-sm font-medium text-muted-foreground">LOGO</span>
+      </div>
     );
   }
 
-  return (
+  // Live mode - show real logo if available
+  return logoUrl ? (
+    <img
+      src={logoUrl}
+      alt="Event logo"
+      className="rounded-lg object-contain"
+      style={{
+        width: `${props.width}vw`,
+        aspectRatio: '1', // Square (1:1 ratio)
+      }}
+    />
+  ) : (
     <div
-      className="flex items-center justify-center rounded-lg bg-muted text-xs font-medium text-muted-foreground"
-      style={{ width: `${props.width}vw`, aspectRatio: '1' }}
+      className="flex items-center justify-center rounded-lg border-2 border-border bg-muted"
+      style={{
+        width: `${props.width}vw`,
+        aspectRatio: '1',
+      }}
     >
-      Logo
+      <span className="text-sm font-medium text-muted-foreground">LOGO</span>
     </div>
   );
 }
