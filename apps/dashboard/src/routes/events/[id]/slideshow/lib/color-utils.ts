@@ -138,7 +138,7 @@ export function buildThemeCssVars(primary: string, background: string): Record<s
   // --- Background-derived lightness values ---
   const fgL = isLight ? 0.145 : 0.985;
   const mutedL = clamp(bgL + dir * 0.03, 0, 1);
-  const mutedFgL = isLight ? 0.556 : 0.556; // mid-gray works for both
+  const mutedFgL = 0.556; // mid-gray works for both
   const borderL = clamp(mutedL + dir * 0.05, 0, 1);
   const ringL = (mutedFgL + borderL) / 2; // between muted-fg and border
 

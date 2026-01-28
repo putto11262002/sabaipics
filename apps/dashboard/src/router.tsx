@@ -25,7 +25,6 @@ export const router = createBrowserRouter([
     path: '/sign-up/*',
     element: <SignUpPage />,
   },
-
   // Slideshow editor (auth required, no sidebar)
   {
     path: '/events/:id/slideshow-editor',

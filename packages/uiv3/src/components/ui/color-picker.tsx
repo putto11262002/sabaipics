@@ -1,10 +1,12 @@
 import * as React from 'react';
 import { Slider as SliderPrimitive } from 'radix-ui';
-import { Button } from '@sabaipics/uiv3/components/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@sabaipics/uiv3/components/popover';
-import { Input } from '@sabaipics/uiv3/components/input';
-import { Label } from '@sabaipics/uiv3/components/label';
-import { cn } from '@sabaipics/uiv3/lib/utils';
+import { Pipette } from 'lucide-react';
+
+import { cn } from '../../lib/utils';
+import { Button } from './button';
+import { Input } from './input';
+import { Label } from './label';
+import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
 function HueSlider({
   className,
@@ -63,10 +65,7 @@ interface ColorPickerProps {
 function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   const [hsv, setHsv] = React.useState(() => hexToHsv(value));
   const [isOpen, setIsOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    setHsv(hexToHsv(value));
-  }, [value]);
+  const [isDragging, setIsDragging] = React.useState(false);
 
   const handleHueChange = (h: number[]) => {
     const newHsv = { ...hsv, h: h[0] };
@@ -74,7 +73,7 @@ function ColorPicker({ value, onChange, className }: ColorPickerProps) {
     onChange(hsvToHex(newHsv));
   };
 
-  const handleSaturationChange = (e: React.MouseEvent<HTMLDivElement>) => {
+  const updateSaturationValue = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
@@ -82,6 +81,21 @@ function ColorPicker({ value, onChange, className }: ColorPickerProps) {
     const newHsv = { ...hsv, s: x, v: 1 - y };
     setHsv(newHsv);
     onChange(hsvToHex(newHsv));
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsDragging(true);
+    updateSaturationValue(e);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isDragging) {
+      updateSaturationValue(e);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
   };
 
   const handleHexChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,9 +122,12 @@ function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className={cn('w-full justify-start gap-2', className)}>
-          <div className="size-5 rounded-sm border" style={{ backgroundColor: hexValue }} />
-          <span className="text-sm">{hexValue.toUpperCase()}</span>
+        <Button
+          variant="outline"
+          className={cn('w-full justify-between gap-2 px-2 py-2', className)}
+        >
+          <div className="size-4 rounded-sm" style={{ backgroundColor: hexValue }} />
+          <span className="text-xs font-normal">{hexValue.toUpperCase()}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80">
@@ -126,21 +143,7 @@ function ColorPicker({ value, onChange, className }: ColorPickerProps) {
                 disabled={!('EyeDropper' in window)}
                 title="Pick color from screen"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="size-4"
-                >
-                  <path d="M2 22l5.5-5.5 3.5 3.5L22 7" />
-                  <path d="M14 10l-7.5 7.5L5 16" />
-                  <path d="M16 8l5-5" />
-                  <circle cx="16" cy="8" r="3" />
-                </svg>
+                <Pipette className="size-4" />
               </Button>
             </div>
           </div>
@@ -150,20 +153,21 @@ function ColorPicker({ value, onChange, className }: ColorPickerProps) {
             style={{
               backgroundColor: `hsl(${hsv.h}, 100%, 50%)`,
             }}
-            onMouseDown={handleSaturationChange}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
           >
             <div
               className="absolute inset-0 rounded-md"
               style={{
-                background: `linear-gradient(to right, transparent, #000)`,
-                mixBlendMode: 'multiply',
+                background: `linear-gradient(to right, #fff, transparent)`,
               }}
             />
             <div
               className="absolute inset-0 rounded-md"
               style={{
-                background: `linear-gradient(to top, transparent, #fff)`,
-                mixBlendMode: 'screen',
+                background: `linear-gradient(to bottom, transparent, #000)`,
               }}
             />
             <div

@@ -1,84 +1,78 @@
 import { useState, useCallback } from 'react';
 import { useParams } from 'react-router';
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragOverlay,
-  type DragEndEvent,
-  type DragStartEvent,
-} from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
-import { Button } from '@sabaipics/uiv3/components/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@sabaipics/uiv3/components/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@sabaipics/uiv3/components/dropdown-menu';
-import { Popover, PopoverContent, PopoverTrigger } from '@sabaipics/uiv3/components/popover';
-import { Label } from '@sabaipics/uiv3/components/label';
-import {
-  Save,
-  ExternalLink,
-  Plus,
-  Type,
-  LayoutGrid,
-  QrCode,
-  BarChart3,
-  Share2,
-  Palette,
-} from 'lucide-react';
 import { toast } from 'sonner';
-import { PageHeader } from '../../../../components/shell/page-header';
-import { useEvent } from '../../../../hooks/events/useEvent';
-import type { SlideshowConfig, SlideshowBlock, BlockType } from './types';
-import { DEFAULT_CONFIG, TEMPLATES } from './defaults';
-import { CanvasBlock, BlockContent } from './canvas-block';
-import { EditorSidebar } from './editor-sidebar';
 import { SidebarProvider, SidebarInset } from '@sabaipics/uiv3/components/sidebar';
 import { ScrollArea } from '@sabaipics/uiv3/components/scroll-area';
-import { buildThemeCssVars } from './color-utils';
+import { PageHeader } from '../../../../components/shell/page-header';
+import { useEvent } from '../../../../hooks/events/useEvent';
+import type { SlideshowConfig, SlideshowBlock, SlideshowContext } from './types';
+import { DEFAULT_CONFIG, getTemplate } from './lib/templates';
+import { buildThemeCssVars } from './lib/color-utils';
+import { createBlock } from './blocks/registry';
+import { Canvas } from './components/canvas';
+import { EditorSidebar } from './components/sidebar';
+import { Toolbar } from './components/toolbar';
 
-const BLOCK_META: Record<BlockType, { label: string; icon: React.ReactNode }> = {
-  header: { label: 'Header', icon: <Type className="size-4" /> },
-  gallery: { label: 'Gallery', icon: <LayoutGrid className="size-4" /> },
-  qr: { label: 'QR Code', icon: <QrCode className="size-4" /> },
-  stats: { label: 'Statistics', icon: <BarChart3 className="size-4" /> },
-  social: { label: 'Social Links', icon: <Share2 className="size-4" /> },
-};
+// ─── Recursive helpers ────────────────────────────────────────────────────────
 
-const DEFAULT_BLOCK_PROPS: Record<BlockType, SlideshowBlock['props']> = {
-  header: { align: 'center' as const, showLogo: true, showName: true },
-  gallery: { density: 'm' as const, autoplaySpeed: 0 },
-  qr: { size: 'm' as const, label: 'Scan to find your photos' },
-  stats: { show: ['photos', 'downloads'] as ('photos' | 'downloads' | 'searches')[] },
-  social: { links: [], showIcons: true },
-};
+function findBlock(blocks: SlideshowBlock[], id: string): SlideshowBlock | null {
+  for (const block of blocks) {
+    if (block.id === id) return block;
+    if (block.children) {
+      const found = findBlock(block.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function findParentBlock(blocks: SlideshowBlock[], childId: string): SlideshowBlock | null {
+  for (const block of blocks) {
+    if (block.children?.some((c) => c.id === childId)) return block;
+  }
+  return null;
+}
+
+function updateBlockInTree(blocks: SlideshowBlock[], updated: SlideshowBlock): SlideshowBlock[] {
+  return blocks.map((b) => {
+    if (b.id === updated.id) return updated;
+    if (b.children) {
+      return { ...b, children: updateBlockInTree(b.children, updated) };
+    }
+    return b;
+  });
+}
+
+function toggleBlockInTree(blocks: SlideshowBlock[], id: string): SlideshowBlock[] {
+  return blocks.map((b) => {
+    if (b.id === id) return { ...b, enabled: !b.enabled };
+    if (b.children) {
+      return { ...b, children: toggleBlockInTree(b.children, id) };
+    }
+    return b;
+  });
+}
+
+function deleteBlockFromTree(blocks: SlideshowBlock[], id: string): SlideshowBlock[] {
+  // First try top-level removal
+  const filtered = blocks.filter((b) => b.id !== id);
+  if (filtered.length !== blocks.length) return filtered;
+  // Otherwise remove from children
+  return blocks.map((b) => {
+    if (b.children) {
+      return { ...b, children: b.children.filter((c) => c.id !== id) };
+    }
+    return b;
+  });
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function EventSlideshowTab() {
   const { id } = useParams<{ id: string }>();
   const { data } = useEvent(id);
-  const [config, setConfig] = useState<SlideshowConfig>(structuredClone(DEFAULT_CONFIG));
+  const [config, setConfig] = useState<SlideshowConfig>(() => structuredClone(DEFAULT_CONFIG));
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-  );
 
   const handleSelectBlock = useCallback((blockId: string) => {
     setSelectedBlockId((prev) => (prev === blockId ? prev : blockId));
@@ -89,54 +83,59 @@ export default function EventSlideshowTab() {
   }
 
   const event = data.data;
-  const selectedBlock = selectedBlockId
-    ? (config.layout.find((b) => b.id === selectedBlockId) ?? null)
-    : null;
 
-  const applyTemplate = (templateKey: string) => {
-    const template = TEMPLATES[templateKey];
-    if (template) {
-      setConfig(structuredClone(template));
-      setSelectedBlockId(null);
-    }
+  const context: SlideshowContext = {
+    event: {
+      id: id!,
+      name: event.name,
+      subtitle: (event as any).subtitle ?? null,
+      logoUrl: null, // TODO: wire up when logo upload is integrated
+    },
+    stats: {
+      photoCount: 0,
+      searchCount: 0,
+      downloadCount: 0,
+    },
+    photos: [],
   };
 
-  const handleSave = () => {
-    toast.success('Slideshow configuration saved');
-  };
+  const selectedBlock = selectedBlockId ? findBlock(config.blocks, selectedBlockId) : null;
+  const parentBlock = selectedBlockId ? findParentBlock(config.blocks, selectedBlockId) : null;
 
-  const handlePreview = () => {
-    window.open(`/events/${id}/slideshow/preview`, '_blank');
-  };
+  // ─── Block operations ────────────────────────────────────────────────
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveDragId(event.active.id as string);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveDragId(null);
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    setConfig((prev) => {
-      const oldIndex = prev.layout.findIndex((b) => b.id === active.id);
-      const newIndex = prev.layout.findIndex((b) => b.id === over.id);
-      return { ...prev, layout: arrayMove(prev.layout, oldIndex, newIndex) };
-    });
-  };
-
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    // Only deselect if clicking the canvas background directly
-    if (e.target === e.currentTarget) {
-      setSelectedBlockId(null);
-    }
-  };
-
-  const handleUpdateBlockProps = (props: SlideshowBlock['props']) => {
-    if (!selectedBlockId) return;
+  const handleAddBlock = (type: string) => {
+    const newBlock = createBlock(type);
     setConfig((prev) => ({
       ...prev,
-      layout: prev.layout.map((b) => (b.id === selectedBlockId ? { ...b, props } : b)),
+      blocks: [...prev.blocks, newBlock],
+    }));
+    setSelectedBlockId(newBlock.id);
+  };
+
+  const handleReorder = (blocks: SlideshowBlock[]) => {
+    setConfig((prev) => ({ ...prev, blocks }));
+  };
+
+  const handleReorderChildren = (parentId: string, newChildren: SlideshowBlock[]) => {
+    setConfig((prev) => ({
+      ...prev,
+      blocks: prev.blocks.map((b) => (b.id === parentId ? { ...b, children: newChildren } : b)),
+    }));
+  };
+
+  const handleAddPreset = (block: SlideshowBlock) => {
+    setConfig((prev) => ({
+      ...prev,
+      blocks: [...prev.blocks, block],
+    }));
+    setSelectedBlockId(block.id);
+  };
+
+  const handleUpdateBlock = (updated: SlideshowBlock) => {
+    setConfig((prev) => ({
+      ...prev,
+      blocks: updateBlockInTree(prev.blocks, updated),
     }));
   };
 
@@ -144,44 +143,39 @@ export default function EventSlideshowTab() {
     if (!selectedBlockId) return;
     setConfig((prev) => ({
       ...prev,
-      layout: prev.layout.map((b) =>
-        b.id === selectedBlockId ? { ...b, enabled: !b.enabled } : b,
-      ),
+      blocks: toggleBlockInTree(prev.blocks, selectedBlockId),
     }));
   };
 
   const handleDeleteBlock = () => {
     if (!selectedBlockId) return;
+    // If deleting a child, select the parent after deletion
+    const parent = findParentBlock(config.blocks, selectedBlockId);
     setConfig((prev) => ({
       ...prev,
-      layout: prev.layout.filter((b) => b.id !== selectedBlockId),
+      blocks: deleteBlockFromTree(prev.blocks, selectedBlockId),
     }));
-    setSelectedBlockId(null);
-  };
-
-  const handleAddBlock = (type: BlockType) => {
-    const newBlock: SlideshowBlock = {
-      id: `${type}-${Date.now()}`,
-      type,
-      enabled: true,
-      props: structuredClone(DEFAULT_BLOCK_PROPS[type]),
-    };
-    setConfig((prev) => ({
-      ...prev,
-      layout: [...prev.layout, newBlock],
-    }));
-    setSelectedBlockId(newBlock.id);
+    setSelectedBlockId(parent ? parent.id : null);
   };
 
   const handleThemeChange = (theme: SlideshowConfig['theme']) => {
     setConfig((prev) => ({ ...prev, theme }));
   };
 
-  // Find block types not currently in layout (for "Add Block" menu)
-  const existingTypes = new Set(config.layout.map((b) => b.type));
-  const addableTypes = (Object.keys(BLOCK_META) as BlockType[]).filter(
-    (t) => !existingTypes.has(t),
-  );
+  const handleApplyTemplate = (key: string) => {
+    setConfig(getTemplate(key));
+    setSelectedBlockId(null);
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      setSelectedBlockId(null);
+    }
+  };
+
+  const handleSave = () => {
+    toast.success('Slideshow configuration saved');
+  };
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -193,93 +187,12 @@ export default function EventSlideshowTab() {
           { label: 'Slideshow Editor' },
         ]}
       >
-        <Select onValueChange={applyTemplate}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Choose template" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="classic">Classic</SelectItem>
-            <SelectItem value="gallery">Gallery</SelectItem>
-            <SelectItem value="minimal">Minimal</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {addableTypes.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5">
-                <Plus className="size-4" />
-                Add Block
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {addableTypes.map((type) => (
-                <DropdownMenuItem key={type} onClick={() => handleAddBlock(type)}>
-                  {BLOCK_META[type].icon}
-                  <span className="ml-2">{BLOCK_META[type].label}</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <Palette className="size-4" />
-              <div className="flex -space-x-1">
-                <div
-                  className="size-4 rounded-full border"
-                  style={{ backgroundColor: config.theme.primary }}
-                />
-                <div
-                  className="size-4 rounded-full border"
-                  style={{ backgroundColor: config.theme.background }}
-                />
-              </div>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64" align="end">
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Theme Colors</p>
-              <div className="flex items-center gap-3">
-                <Label className="w-20 text-xs">Primary</Label>
-                <input
-                  type="color"
-                  value={config.theme.primary}
-                  onChange={(e) => handleThemeChange({ ...config.theme, primary: e.target.value })}
-                  className="h-8 w-8 cursor-pointer rounded border border-border"
-                />
-                <span className="font-mono text-xs text-muted-foreground">
-                  {config.theme.primary}
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Label className="w-20 text-xs">Background</Label>
-                <input
-                  type="color"
-                  value={config.theme.background}
-                  onChange={(e) =>
-                    handleThemeChange({ ...config.theme, background: e.target.value })
-                  }
-                  className="h-8 w-8 cursor-pointer rounded border border-border"
-                />
-                <span className="font-mono text-xs text-muted-foreground">
-                  {config.theme.background}
-                </span>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        <Button variant="outline" size="sm" onClick={handlePreview} className="gap-1.5">
-          <ExternalLink className="size-4" />
-          Preview
-        </Button>
-        <Button size="sm" onClick={handleSave} className="gap-1.5">
-          <Save className="size-4" />
-          Save
-        </Button>
+        <Toolbar
+          onApplyTemplate={handleApplyTemplate}
+          onAddBlock={handleAddBlock}
+          onAddPreset={handleAddPreset}
+          onSave={handleSave}
+        />
       </PageHeader>
 
       <SidebarProvider
@@ -289,69 +202,27 @@ export default function EventSlideshowTab() {
       >
         <SidebarInset className="min-h-0">
           <ScrollArea className="h-full">
-            {/* Canvas */}
-            <div
-              className="flex min-h-full justify-center bg-muted/50 p-8"
-              onClick={handleCanvasClick}
-            >
-              <div
-                className="w-full max-w-3xl rounded-xl border bg-background p-6 shadow-sm"
-                style={buildThemeCssVars(config.theme.primary, config.theme.background)}
-                onClick={handleCanvasClick}
-              >
-                {config.layout.length === 0 ? (
-                  <div className="flex h-64 items-center justify-center">
-                    <p className="text-sm text-muted-foreground">
-                      No blocks yet. Use &quot;Add Block&quot; to get started.
-                    </p>
-                  </div>
-                ) : (
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext
-                      items={config.layout.map((b) => b.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      <div className="space-y-1">
-                        {config.layout.map((block) => (
-                          <CanvasBlock
-                            key={block.id}
-                            block={block}
-                            isSelected={selectedBlockId === block.id}
-                            onSelect={handleSelectBlock}
-                            theme={config.theme}
-                            eventName={event.name}
-                          />
-                        ))}
-                      </div>
-                    </SortableContext>
-                    <DragOverlay>
-                      {activeDragId ? (
-                        <div className="rounded-lg border border-blue-500 bg-background px-6 py-5 opacity-80 shadow-lg">
-                          <BlockContent
-                            block={config.layout.find((b) => b.id === activeDragId)!}
-                            theme={config.theme}
-                            eventName={event.name}
-                          />
-                        </div>
-                      ) : null}
-                    </DragOverlay>
-                  </DndContext>
-                )}
-              </div>
+            <div style={buildThemeCssVars(config.theme.primary, config.theme.background)}>
+              <Canvas
+                config={config}
+                context={context}
+                selectedBlockId={selectedBlockId}
+                onSelectBlock={handleSelectBlock}
+                onReorder={handleReorder}
+                onReorderChildren={handleReorderChildren}
+                onCanvasClick={handleCanvasClick}
+              />
             </div>
           </ScrollArea>
         </SidebarInset>
 
         <EditorSidebar
           selectedBlock={selectedBlock}
-          onUpdate={handleUpdateBlockProps}
-          onToggle={handleToggleBlock}
-          onDelete={handleDeleteBlock}
+          parentBlock={parentBlock}
+          onUpdateBlock={handleUpdateBlock}
+          onToggleBlock={handleToggleBlock}
+          onDeleteBlock={handleDeleteBlock}
+          onSelectBlock={handleSelectBlock}
           theme={config.theme}
           onThemeChange={handleThemeChange}
         />
