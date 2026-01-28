@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { Button } from '@sabaipics/uiv3/components/button';
 import {
   DropdownMenu,
@@ -7,12 +8,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@sabaipics/uiv3/components/dropdown-menu';
-import { Save, Plus, Loader2 } from 'lucide-react';
+import { Save, Plus, Loader2, Eye } from 'lucide-react';
 import { blockRegistry, getTopLevelTypes } from '../blocks/registry';
 import { blockPresets } from '../lib/presets';
 import type { SlideshowBlock } from '../types';
 
 interface ToolbarProps {
+  eventId: string;
   onAddBlock: (type: string) => void;
   onAddPreset: (block: SlideshowBlock) => void;
   onSave: () => void;
@@ -20,11 +22,18 @@ interface ToolbarProps {
   isSaving?: boolean;
 }
 
-export function Toolbar({ onAddBlock, onAddPreset, onSave, disabled, isSaving }: ToolbarProps) {
+export function Toolbar({ eventId, onAddBlock, onAddPreset, onSave, disabled, isSaving }: ToolbarProps) {
   const types = getTopLevelTypes();
 
   return (
     <>
+      <Button variant="outline" size="sm" className="gap-1.5" asChild>
+        <Link to={`/events/${eventId}/slideshow-preview`} target="_blank">
+          <Eye className="size-4" />
+          Preview
+        </Link>
+      </Button>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1.5" disabled={disabled}>

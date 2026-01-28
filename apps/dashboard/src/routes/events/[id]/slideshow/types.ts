@@ -54,8 +54,10 @@ export interface SubtitleProps {
   fontSize: 'sm' | 'md' | 'lg';
 }
 
+export type GalleryDensity = 'sparse' | 'normal' | 'dense';
+
 export interface GalleryProps {
-  columns: number;
+  density: GalleryDensity; // sparse=3-4 cols, normal=4-6 cols, dense=6-8 cols
   gap: number;
   autoplaySpeed: number;
 }
@@ -94,4 +96,6 @@ export interface SlideshowContext {
     width: number;
     height: number;
   }>;
+  /** When true, gallery fetches real photos from public API */
+  liveMode?: boolean;
 }

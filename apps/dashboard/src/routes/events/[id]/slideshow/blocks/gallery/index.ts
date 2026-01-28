@@ -9,7 +9,7 @@ export const galleryBlockDef: BlockDefinition<GalleryProps> = {
   label: 'Gallery',
   icon: LayoutGrid,
   defaultProps: {
-    columns: 3,
+    density: 'normal',
     gap: 8,
     autoplaySpeed: 0,
   },

@@ -262,6 +262,7 @@ export default function EventSlideshowTab() {
         ]}
       >
         <Toolbar
+          eventId={id!}
           onAddBlock={handleAddBlock}
           onAddPreset={handleAddPreset}
           onSave={handleSave}

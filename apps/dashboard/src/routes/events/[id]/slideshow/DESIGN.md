@@ -52,8 +52,8 @@ SlideshowBlock {
 
 ### Rendering Model
 
-Each block has ONE `Renderer` component. It is the source of truth for how the block looks. Used by both:
-- **Public page**: Renders `Renderer` directly. No wrappers, no editor chrome.
+Each block has ONE `Renderer` component. It is the source of truth for how the block looks. Used by:
+- **Preview page**: Renders `Renderer` directly. No wrappers, no editor chrome. Gallery self-fetches via public API when `liveMode: true`.
 - **Editor canvas**: Wraps `Renderer` in `BlockWrapper` (top-level) or `ChildBlockWrapper` (for children inside flex blocks). Adds drag handles, selection outlines, disabled opacity.
 
 The wrappers are **layout-invisible**. They use `outline` for selection (not border - no layout impact), `opacity` for state, and `position: absolute` for drag handles. Renderers receive `context` containing real data.
@@ -71,10 +71,11 @@ SlideshowContext {
   event: { id, name, subtitle, logoUrl }
   stats: { photoCount, searchCount, downloadCount }
   photos: Array<{ id, previewUrl, width, height }>
+  liveMode?: boolean
 }
 ```
 
-In editor, context is built from event record with zeroed stats and empty photos. On public page, context is built from API response.
+In editor, context is built from event record with zeroed stats and empty photos. On preview page, `liveMode: true` signals renderers to fetch live data from public APIs.
 
 ## Editor Internals
 
@@ -162,7 +163,12 @@ Defined in `lib/spacing.ts`:
 ```
 slideshow/
   index.tsx                    # Main editor (manages config state, CRUD ops, templates)
+  preview.tsx                  # Full-screen preview (uses public APIs, liveMode)
   types.ts                     # API-aligned types, SlideshowContext, all prop interfaces
+  hooks/
+    useContainerSize.ts        # ResizeObserver-based container measurement
+    usePublicSlideshow.ts      # Fetches event info, config, stats from public API
+    useSlideshowPhotos.ts      # Fetches photo feed from public API
   lib/
     color-utils.ts          # OKLCH color pipeline, theme CSS vars generator
     templates.ts           # 3 preset factories (event-info, stats-row, social-links)
@@ -209,10 +215,7 @@ slideshow/
 
 ## Known Issues / Pending Work
 
-- No API integration yet - save button is toast, no `useSlideshowConfig` or `useUpdateSlideshowConfig` hooks exist
-- `useEvent()` hook exists but returns event data for event detail page, not slideshow config
 - Gallery block `gap` is still a raw pixel number (inconsistent with new spacing tokens)
-- Test route removed from router (cleanup)
 
 ## Design Decisions & Constraints
 

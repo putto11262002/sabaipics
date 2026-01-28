@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@sabaipics/uiv3/components/select';
-import type { SlideshowBlock, GalleryProps } from '../../types';
+import type { SlideshowBlock, GalleryProps, GalleryDensity } from '../../types';
 
 export function GallerySettings({
   block,
@@ -25,15 +25,18 @@ export function GallerySettings({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Label className="w-20 text-xs">Columns</Label>
-        <Select value={String(props.columns)} onValueChange={(v) => update({ columns: Number(v) })}>
+        <Label className="w-20 text-xs">Density</Label>
+        <Select
+          value={props.density ?? 'normal'}
+          onValueChange={(v) => update({ density: v as GalleryDensity })}
+        >
           <SelectTrigger className="h-8 flex-1">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="2">2 Columns</SelectItem>
-            <SelectItem value="3">3 Columns</SelectItem>
-            <SelectItem value="4">4 Columns</SelectItem>
+            <SelectItem value="sparse">Sparse (3-4 cols)</SelectItem>
+            <SelectItem value="normal">Normal (4-6 cols)</SelectItem>
+            <SelectItem value="dense">Dense (6-8 cols)</SelectItem>
           </SelectContent>
         </Select>
       </div>

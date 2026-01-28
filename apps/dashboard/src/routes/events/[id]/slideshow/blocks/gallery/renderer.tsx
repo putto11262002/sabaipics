@@ -1,10 +1,13 @@
-import { cn } from '@sabaipics/uiv3/lib/utils';
-import type { SlideshowBlock, SlideshowContext, GalleryProps } from '../../types';
+import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
+import type { SlideshowBlock, SlideshowContext, GalleryProps, GalleryDensity } from '../../types';
+import { useContainerSize } from '../../hooks/useContainerSize';
+import { useSlideshowPhotos } from '../../hooks/useSlideshowPhotos';
 
-const COL_CLASS: Record<number, string> = {
-  2: 'grid-cols-2',
-  3: 'grid-cols-3',
-  4: 'grid-cols-4',
+// Density presets: [minRatio, maxRatio] → controls column count
+const DENSITY_RATIOS: Record<GalleryDensity, [number, number]> = {
+  sparse: [0.25, 0.35], // 3-4 columns
+  normal: [0.16, 0.25], // 4-6 columns
+  dense: [0.12, 0.16],  // 6-8 columns
 };
 
 export function GalleryRenderer({
@@ -15,33 +18,85 @@ export function GalleryRenderer({
   context: SlideshowContext;
 }) {
   const props = block.props as GalleryProps;
-  const columns = props.columns || 3;
+  const density = props.density ?? 'normal';
   const gap = props.gap ?? 8;
 
-  const hasPhotos = context.photos.length > 0;
+  const { ref, size } = useContainerSize<HTMLDivElement>();
+  const { width, height } = size;
 
-  if (hasPhotos) {
-    return (
-      <div className={cn('grid', COL_CLASS[columns] ?? 'grid-cols-3')} style={{ gap: `${gap}px` }}>
-        {context.photos.map((photo) => (
-          <img
-            key={photo.id}
-            src={photo.previewUrl}
-            alt=""
-            className="aspect-square rounded-lg object-cover"
-          />
-        ))}
-      </div>
-    );
+  // Get ratios based on density setting
+  const [minRatio, maxRatio] = DENSITY_RATIOS[density];
+  const minCellSize = width * minRatio;
+  const maxCellSize = width * maxRatio;
+
+  // Calculate grid dimensions
+  let cols = 0;
+  let cellSize = minCellSize;
+
+  if (width > 0) {
+    // Calculate columns based on min cell size
+    cols = Math.max(1, Math.floor((width + gap) / (minCellSize + gap)));
+    cellSize = (width - (cols - 1) * gap) / cols;
+
+    // If cells are too large, add more columns
+    while (cellSize > maxCellSize && cols < 20) {
+      cols++;
+      cellSize = (width - (cols - 1) * gap) / cols;
+    }
   }
 
-  // Placeholder grid when no photos are uploaded
-  const count = columns * 2;
+  const rows = height > 0 ? Math.max(1, Math.floor((height + gap) / (cellSize + gap))) : 0;
+  const count = cols * rows;
+
+  // In live mode, fetch photos from public API
+  const { data: photosData } = useSlideshowPhotos(
+    context.liveMode ? context.event.id : undefined,
+    count,
+  );
+
+  // Use fetched photos in live mode, otherwise empty (editor shows placeholders)
+  const photos = context.liveMode ? (photosData?.data ?? []) : [];
+
+  // Grid style
+  const gridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
+    gridTemplateRows: `repeat(${rows}, ${cellSize}px)`,
+    gap: `${gap}px`,
+  };
+
+  // Still measuring - show nothing
+  if (count === 0) {
+    return <div ref={ref} className="h-full w-full flex-1" />;
+  }
+
+  // Build slots
+  const slots = Array.from({ length: count }, (_, i) => {
+    const photo = photos[i];
+    if (photo) {
+      return (
+        <img
+          key={photo.id}
+          src={photo.previewUrl}
+          alt=""
+          className="rounded-lg object-cover"
+          style={{ width: cellSize, height: cellSize }}
+        />
+      );
+    }
+    // Fill with skeleton
+    return (
+      <Skeleton
+        key={`slot-${i}`}
+        className="rounded-lg"
+        style={{ width: cellSize, height: cellSize }}
+      />
+    );
+  });
+
   return (
-    <div className={cn('grid', COL_CLASS[columns] ?? 'grid-cols-3')} style={{ gap: `${gap}px` }}>
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="aspect-square rounded-lg bg-muted" />
-      ))}
+    <div ref={ref} className="h-full w-full flex-1">
+      <div style={gridStyle}>{slots}</div>
     </div>
   );
 }
