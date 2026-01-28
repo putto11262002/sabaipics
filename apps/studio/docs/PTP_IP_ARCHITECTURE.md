@@ -279,15 +279,11 @@ TransferSession.end()
        │          │
        │          └── PTPIPSession.disconnect()
        │                     │
-       │                     ├── 1. sendCloseSession() (while connection active)
-       │                     ├── 2. eventSource.stopMonitoring()
-       │                     │          ├── 1. isMonitoring = false
-       │                     │          ├── 2. connection.cancel() ← CRITICAL: interrupts pending I/O
-       │                     │          ├── 3. task.cancel()
-       │                     │          ├── 4. await task.value ← wait for cleanup
-       │                     │          └── 5. task = nil
-       │                     ├── 3. eventSource.cleanup() ← vendor-specific cleanup
-       │                     └── 4. cancel TCP connections
+       │                     ├── 1. eventSource.cleanup() ← vendor-specific cleanup
+       │                     │          ├── stopMonitoring() ← stops polling task
+       │                     │          └── Canon: drain events + SetEventMode(0)
+       │                     ├── 2. sendCloseSession() (after vendor cleanup)
+       │                     └── 3. cancel TCP connections
        └── 2. photos.removeAll()
 ```
 

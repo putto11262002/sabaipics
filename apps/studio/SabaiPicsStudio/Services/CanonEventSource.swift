@@ -73,41 +73,72 @@ class CanonEventSource: CameraEventSource {
     }
 
     func stopMonitoring() async {
-        guard isMonitoring else { return }
-        isMonitoring = false
-
-        // Cancel connection FIRST to interrupt pending send/receive operations
-        // This prevents hanging on network calls during disconnect
-        commandConnection?.cancel()
-
-        pollingTask?.cancel()
-        // Wait for polling task to actually complete before returning
-        // This prevents race conditions where resources are cleaned up
-        // while the polling loop is still executing
-        await pollingTask?.value
-        pollingTask = nil
+        _ = await stopMonitoring(graceful: false)
     }
 
     func cleanup() async {
         // Graceful Canon disconnect (per libgphoto2 camera_exit pattern):
-        // 1. Drain pending events
-        // 2. Disable event mode
-        // 3. Stop monitoring
-        
-        // Step 1: Drain pending events before stopping
-        // This prevents race conditions and ensures camera state is clean
-        await drainPendingEvents()
-        
-        // Step 2: Disable event mode (SetEventMode(0))
-        // Tells camera we're done monitoring - camera can return to normal operation
-        await disableEventMode()
-        
-        // Step 3: Stop the polling loop
-        await stopMonitoring()
-        
+        // 1. Stop monitoring without canceling socket
+        // 2. Drain pending events
+        // 3. Disable event mode
+
+        // Step 1: Stop polling loop gracefully (do not cancel socket yet)
+        let stoppedGracefully = await stopMonitoring(graceful: true)
+
+        if stoppedGracefully {
+            // Step 2: Drain pending events before closing
+            // This prevents race conditions and ensures camera state is clean
+            await drainPendingEvents()
+
+            // Step 3: Disable event mode (SetEventMode(0))
+            // Tells camera we're done monitoring - camera can return to normal operation
+            await disableEventMode()
+        } else {
+            print("[CanonEventSource] Skipping drain/disable due to forced stop")
+        }
+
         commandConnection = nil
         transactionManager = nil
         photoOps = nil
+    }
+
+    private func stopMonitoring(graceful: Bool) async -> Bool {
+        guard isMonitoring else { return true }
+        isMonitoring = false
+
+        if graceful {
+            let finished = await waitForPollingTask(timeout: 1.0)
+            if finished {
+                pollingTask = nil
+                return true
+            }
+        }
+
+        // Force stop: cancel connection and task to avoid hanging I/O
+        commandConnection?.cancel()
+        pollingTask?.cancel()
+        await pollingTask?.value
+        pollingTask = nil
+        return false
+    }
+
+    private func waitForPollingTask(timeout: TimeInterval) async -> Bool {
+        guard let pollingTask else { return true }
+
+        return await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                _ = await pollingTask.value
+                return true
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                return false
+            }
+
+            let finished = await group.next() ?? true
+            group.cancelAll()
+            return finished
+        }
     }
     
     // MARK: - Graceful Disconnect (per libgphoto2 camera_exit)

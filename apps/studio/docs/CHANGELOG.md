@@ -4,6 +4,28 @@ iOS Studio architecture changes. See `ARCHITECTURE.md` for current design.
 
 ---
 
+## 2026-01-28
+
+### Update 19: Canon Cleanup Before Socket Cancel
+
+**Status:** Implemented (untested)
+
+Adjusted disconnect flow so `eventSource.cleanup()` runs before CloseSession and socket cancellation, allowing Canon cleanup to drain events and send `SetEventMode(0)` successfully.
+
+**Files:** Services/PTPIPSession.swift, docs/PTP_IP_ARCHITECTURE.md
+
+---
+
+### Update 18: Capture Without Event Selection
+
+**Status:** Implemented
+
+Removed the temporary event-selection gate from the Capture tab so camera capture can start without selecting an event.
+
+**Files:** Views/MainTabView.swift
+
+---
+
 ## 2026-01-27
 
 ### Update 17: Canon Graceful Disconnect (SAB-57)
