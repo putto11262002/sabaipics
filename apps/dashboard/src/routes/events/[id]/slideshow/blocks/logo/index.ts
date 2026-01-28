@@ -9,10 +9,9 @@ export const logoBlockDef: BlockDefinition<LogoProps> = {
   label: 'Logo',
   icon: Image,
   defaultProps: {
-    size: 48,
-    shape: 'circle',
+    width: 20,
   },
+  // No defaultSize - logo should size to content
   Renderer: LogoRenderer,
   SettingsPanel: LogoSettings,
-  childOnly: true,
 };

@@ -9,9 +9,10 @@ export const eventNameBlockDef: BlockDefinition<EventNameProps> = {
   label: 'Event Name',
   icon: Type,
   defaultProps: {
-    fontSize: 'md',
+    fontSize: 'xl',
+    fontWeight: 'bold',
   },
+  // No defaultSize - event name should size to content
   Renderer: EventNameRenderer,
   SettingsPanel: EventNameSettings,
-  childOnly: true,
 };

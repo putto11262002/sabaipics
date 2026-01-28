@@ -50,16 +50,17 @@ export interface FlexProps {
 }
 
 export interface LogoProps {
-  size: number; // px, e.g. 48, 64, 96
-  shape: 'circle' | 'square' | 'rounded';
+  width: number; // 10-50 (% of viewport width)
 }
 
 export interface EventNameProps {
-  fontSize: 'sm' | 'md' | 'lg' | 'xl';
+  fontSize: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
+  fontWeight: 'normal' | 'semibold' | 'bold';
 }
 
 export interface SubtitleProps {
-  fontSize: 'sm' | 'md' | 'lg';
+  fontSize: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  fontWeight: 'normal' | 'semibold' | 'bold';
 }
 
 export type GalleryDensity = 'sparse' | 'normal' | 'dense';

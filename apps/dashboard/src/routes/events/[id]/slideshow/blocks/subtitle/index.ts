@@ -10,8 +10,9 @@ export const subtitleBlockDef: BlockDefinition<SubtitleProps> = {
   icon: TextCursorInput,
   defaultProps: {
     fontSize: 'md',
+    fontWeight: 'normal',
   },
+  // No defaultSize - subtitle should size to content
   Renderer: SubtitleRenderer,
   SettingsPanel: SubtitleSettings,
-  childOnly: true,
 };
