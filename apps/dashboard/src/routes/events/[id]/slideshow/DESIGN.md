@@ -12,12 +12,15 @@ BlockDefinition {
   label          -- display name
   icon           -- toolbar icon
   defaultProps   -- initial prop values
+  defaultSize?   -- default dimensions { width: number, height: number } in viewport %
   Renderer       -- React component (renders the real thing)
   SettingsPanel  -- React component (sidebar config UI)
   acceptsChildren? -- true for layout blocks
   childOnly?       -- true for atom blocks (can't be top-level)
 }
 ```
+
+The `defaultSize` field defines default dimensions for blocks (e.g., gallery defaults to 80vw × 60vh). Without explicit size, absolutely positioned blocks collapse to their content size.
 
 Adding a new block type = one folder with 3 files (index, renderer, settings) + one `register()` call.
 
@@ -47,16 +50,28 @@ SlideshowBlock {
   enabled: boolean
   props: Record<string, any>  -- loose at wire level, typed within block defs
   children?: SlideshowBlock[]
+  position?: { x: number, y: number }  -- percentage-based (0-100) for canvas positioning
+  size?: { width: number, height: number }  -- viewport percentage (0-100) for block dimensions
 }
 ```
+
+**Canvas Positioning**: Blocks use absolute positioning with percentage-based coordinates. `x` and `y` represent the block's center point as a percentage of the canvas (0-100). Blocks are centered on this point using `transform: translate(-50%, -50%)`.
+
+**Responsive Sizing**: The `size` field uses viewport percentages (vw/vh units) to ensure blocks scale proportionally across different screen sizes. Gallery blocks default to 80vw × 60vh.
 
 ### Rendering Model
 
 Each block has ONE `Renderer` component. It is the source of truth for how the block looks. Used by:
-- **Preview page**: Renders `Renderer` directly. No wrappers, no editor chrome. Gallery self-fetches via public API when `liveMode: true`.
-- **Editor canvas**: Wraps `Renderer` in `BlockWrapper` (top-level) or `ChildBlockWrapper` (for children inside flex blocks). Adds drag handles, selection outlines, disabled opacity.
+- **Preview page (Live mode)**: Blocks positioned absolutely on canvas using `position.x` and `position.y` percentages. Gallery self-fetches via public API when `liveMode: true`.
+- **Editor canvas (Editor mode)**: Iframe embeds the preview page with `?mode=editor` query. Blocks are draggable via native pointer events. Hover shows blue outline, selection shows purple ring, dragging reduces opacity to 50%.
 
-The wrappers are **layout-invisible**. They use `outline` for selection (not border - no layout impact), `opacity` for state, and `position: absolute` for drag handles. Renderers receive `context` containing real data.
+**Canvas Layout**: All blocks use `position: absolute` with percentage-based coordinates. The canvas is `fixed inset-0` (full viewport). Blocks are centered on their position point using `transform: translate(-50%, -50%)`.
+
+**Layering**: Gallery blocks have `z-index: 0` (background layer), all other blocks have `z-index: 1` (foreground layer). This ensures photos always appear behind text, QR codes, and other UI elements.
+
+**Iframe Communication**: The editor and iframe communicate via `postMessage`:
+- Editor sends: `slideshow-config` (config + context + selectedBlockId)
+- Iframe sends: `config-updated` (after drag ends), `block-selected` (on click)
 
 ### Theme Injection
 
@@ -83,25 +98,50 @@ In editor, context is built from event record with zeroed stats and empty photos
 
 `selectedBlockId: string | null` can reference either a top-level block or a child. Block lookup is recursive (`findBlock` walks the tree). Sidebar shows "back to parent" button when a child is selected.
 
-### Nested Drag-and-Drop
+### Canvas Drag-and-Drop
 
-Two DnD layers using `@dnd-kit`:
+Blocks are dragged using **native pointer events** (not dnd-kit for canvas positioning):
 
-1. **Top-level**: `DndContext` in `Canvas` -- reorders top-level blocks (vertical list)
-2. **Child-level**: Separate `DndContext` per layout block in `BlockWrapper.LayoutBlockContent` -- reorders children within a flex container. Uses `useId()` for unique context IDs to avoid parent-child conflicts.
+**Drag Flow**:
+1. `pointerDown` → Capture pointer, store start position and canvas bounds
+2. `pointerMove` → Calculate pixel delta, convert to percentage, update position immediately via `setConfig`
+3. `pointerUp` → Release pointer, send final config to parent via postMessage
 
-Click targeting:
-- Child click: `ChildBlockWrapper` calls `e.stopPropagation()` so it doesn't bubble to parent
-- Parent selection: `LayoutBlockContent.onClick` + `stopPropagation()` selects parent flex block
-- Canvas background: deselects all
+**Key Features**:
+- **Pointer capture**: `setPointerCapture(e.pointerId)` ensures drag continues even if cursor leaves block
+- **Real-time updates**: Position updates on every pointer move (no transform delays)
+- **Percentage conversion**: `deltaX / canvasWidth * 100` converts pixel movement to responsive percentages
+- **Boundary clamping**: Position clamped to 0-100% range
+- **Functional setState**: Uses `setConfig(prev => ...)` to avoid stale closures
 
-Flex blocks switch sorting strategy between `horizontalListSortingStrategy` and `verticalListSortingStrategy` based on `direction`.
+**Visual Feedback**:
+- Hover: Blue outline (`outline-2 outline-blue-400`)
+- Selected: Purple ring (`ring-2 ring-primary`)
+- Dragging: 50% opacity, `cursor: move`
 
-### Layout Block Canvas Rendering
+**Note**: dnd-kit is still used for sortable lists (flex block children reordering) but not for canvas positioning.
 
-For layout blocks, `BlockWrapper` does NOT render the block's `Renderer`. Instead, it renders a flex container itself and wraps each child in a `ChildBlockWrapper` with nested `DndContext` + `SortableContext`.
+### Iframe-Based Editor Canvas
 
-The flex CSS classes are mirror-identical between `BlockWrapper` (which wraps top-level flex blocks) and `FlexRenderer` (used by public page). Both use shared `gapClass` and `paddingClass` maps from `lib/spacing.ts`.
+The editor embeds the preview page in an iframe with `?mode=editor` query parameter for true WYSIWYG editing:
+
+**Benefits**:
+- **Style isolation**: Editor chrome doesn't bleed into preview
+- **True preview**: What you see in the editor is exactly what displays on the TV
+- **Independent state**: Iframe can update positions optimistically without waiting for parent
+
+**Communication Flow**:
+```
+Parent Editor                    Iframe Preview
+     │                                 │
+     │─────── slideshow-config ───────>│  (config, context, selectedBlockId)
+     │                                 │
+     │<────── config-updated ──────────│  (after drag ends)
+     │                                 │
+     │<────── block-selected ──────────│  (on click/canvas click)
+```
+
+**Optimistic Updates**: The iframe updates its local config state immediately during drag (functional setState), then sends the final config to parent on drag end. This eliminates rubber band effects and provides smooth real-time feedback.
 
 ### Flex Block Props
 
@@ -175,12 +215,10 @@ slideshow/
     spacing.ts              # Gap/padding class maps to Tailwind tokens
     presets.ts              # Preset factory functions
   components/
-    canvas.tsx              # Canvas with nested DnD
-    sidebar.tsx              # Sidebar with parent selection
-    toolbar.tsx              # Toolbar with presets
+    iframe-canvas.tsx         # Iframe wrapper for preview (postMessage communication)
+    sidebar.tsx              # Sidebar with block settings
+    toolbar.tsx              # Toolbar with add block and presets
     theme-settings.tsx        # Theme colors (uses ColorPicker)
-    block-wrapper.tsx         # Top-level sortable wrapper (outline, opacity, drag)
-    child-block-wrapper.tsx  # Sortable+clickable wrapper for children
   blocks/
     registry.ts             # BlockDefinition map + helpers
     flex/
@@ -213,9 +251,25 @@ slideshow/
       settings.tsx           # Platform select + URL input
 ```
 
+## Performance Optimizations
+
+### Memoization Strategy
+- **`GalleryRenderer`**: Wrapped with `React.memo`, grid calculations memoized with `useMemo`
+- **`DraggableBlock`**: Memoized to prevent re-renders when other blocks update
+- **`BlockRenderer`**: Separate memoized component prevents unnecessary re-renders
+- **Grid calculations**: Expensive column/row math only runs when dimensions change
+- **Style objects**: Memoized to avoid object recreation on every render
+
+### ResizeObserver Batching
+`useContainerSize` hook batches size updates using `requestAnimationFrame` and ignores sub-pixel changes (< 1px tolerance) to reduce re-render frequency.
+
+### Drag Performance
+Native pointer events provide 50-60 FPS during drag (vs 8-10 FPS with dnd-kit), with position updates using functional setState to avoid stale closures.
+
 ## Known Issues / Pending Work
 
 - Gallery block `gap` is still a raw pixel number (inconsistent with new spacing tokens)
+- Z-index is hardcoded (gallery: 0, others: 1) - could be made configurable per block
 
 ## Design Decisions & Constraints
 
@@ -263,3 +317,16 @@ Currently `FlexProps.gap` is `SpacingSize`, which is required. This allows us to
 ### Color Picker Integration
 
 The theme settings panel uses a shared `ColorPicker` component from `@sabaipics/uiv3/components/color-picker`. This provides HSV controls, eye dropper, and hex input. It replaces the native color input approach from the initial implementation.
+
+### Why Native Pointer Events for Canvas Drag
+
+We use native pointer events instead of dnd-kit for canvas dragging because:
+
+1. **Direct positioning**: Absolute positioned blocks need direct `left`/`top` updates, not CSS transforms
+2. **Percentage conversion**: Easier to convert pixel deltas to percentage on every move
+3. **No transform conflicts**: Avoids compounding transforms (centering + drag)
+4. **Better performance**: 6-7x FPS improvement (60 FPS vs 8-10 FPS with dnd-kit)
+5. **Simpler code**: No library overhead, ~50 lines of vanilla JS
+6. **No rubber band**: Position updates immediately during drag, not just at end
+
+dnd-kit is still used for sortable lists (reordering flex block children) where its features (drop zones, collision detection) are beneficial.

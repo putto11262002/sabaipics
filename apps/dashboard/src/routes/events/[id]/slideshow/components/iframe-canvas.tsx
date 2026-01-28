@@ -20,7 +20,12 @@ interface BlockSelectedMessage {
   blockId: string;
 }
 
-type IframeMessage = IframeReadyMessage | BlockSelectedMessage;
+interface ConfigUpdatedMessage {
+  type: 'config-updated';
+  config: SlideshowConfig;
+}
+
+type IframeMessage = IframeReadyMessage | BlockSelectedMessage | ConfigUpdatedMessage;
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
@@ -29,6 +34,7 @@ interface IframeCanvasProps {
   context: SlideshowContext;
   selectedBlockId: string | null;
   onSelectBlock: (blockId: string | null) => void;
+  onConfigUpdate?: (config: SlideshowConfig) => void;
 }
 
 export function IframeCanvas({
@@ -36,6 +42,7 @@ export function IframeCanvas({
   context,
   selectedBlockId,
   onSelectBlock,
+  onConfigUpdate,
 }: IframeCanvasProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { id } = useParams<{ id: string }>();
@@ -46,6 +53,7 @@ export function IframeCanvas({
   const sendConfigToIframe = useCallback(() => {
     if (!iframeRef.current?.contentWindow || !isIframeReady.current) {
       // Store for when iframe is ready
+      console.log('[PARENT] Config not sent - iframe not ready, storing as pending');
       pendingConfig.current = {
         type: 'slideshow-config',
         config,
@@ -54,6 +62,11 @@ export function IframeCanvas({
       };
       return;
     }
+
+    console.log('[PARENT] Sending slideshow-config to iframe', {
+      blockCount: config.blocks.length,
+      selectedBlockId,
+    });
 
     iframeRef.current.contentWindow.postMessage(
       {
@@ -68,6 +81,7 @@ export function IframeCanvas({
 
   // Send config when it changes
   useEffect(() => {
+    console.log('[PARENT] Config changed, triggering sendConfigToIframe');
     sendConfigToIframe();
   }, [sendConfigToIframe]);
 
@@ -79,22 +93,30 @@ export function IframeCanvas({
       if (event.source !== iframeRef.current?.contentWindow) return;
 
       if (event.data.type === 'iframe-ready') {
+        console.log('[PARENT] Received iframe-ready');
         isIframeReady.current = true;
         // Send any pending config
         if (pendingConfig.current) {
+          console.log('[PARENT] Sending pending config to iframe');
           iframeRef.current?.contentWindow?.postMessage(pendingConfig.current, '*');
           pendingConfig.current = null;
         }
       }
 
       if (event.data.type === 'block-selected') {
+        console.log('[PARENT] Received block-selected:', event.data.blockId);
         onSelectBlock(event.data.blockId || null);
+      }
+
+      if (event.data.type === 'config-updated') {
+        console.log('[PARENT] Received config-updated from iframe');
+        onConfigUpdate?.(event.data.config);
       }
     };
 
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [onSelectBlock]);
+  }, [onSelectBlock, onConfigUpdate]);
 
   // Reset ready state when iframe navigates
   const handleIframeLoad = useCallback(() => {

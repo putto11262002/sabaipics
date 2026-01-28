@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
 import type { SlideshowBlock, SlideshowContext, GalleryProps, GalleryDensity } from '../../types';
 import { useContainerSize } from '../../hooks/useContainerSize';
@@ -10,7 +11,7 @@ const DENSITY_RATIOS: Record<GalleryDensity, [number, number]> = {
   dense: [0.12, 0.16],  // 6-8 columns
 };
 
-export function GalleryRenderer({
+export const GalleryRenderer = memo(function GalleryRenderer({
   block,
   context,
 }: {
@@ -26,27 +27,35 @@ export function GalleryRenderer({
 
   // Get ratios based on density setting
   const [minRatio, maxRatio] = DENSITY_RATIOS[density];
-  const minCellSize = width * minRatio;
-  const maxCellSize = width * maxRatio;
 
-  // Calculate grid dimensions
-  let cols = 0;
-  let cellSize = minCellSize;
+  // Memoize grid calculations
+  const gridDimensions = useMemo(() => {
+    const minCellSize = width * minRatio;
+    const maxCellSize = width * maxRatio;
 
-  if (width > 0) {
-    // Calculate columns based on min cell size
-    cols = Math.max(1, Math.floor((width + gap) / (minCellSize + gap)));
-    cellSize = (width - (cols - 1) * gap) / cols;
+    // Calculate grid dimensions
+    let cols = 0;
+    let cellSize = minCellSize;
 
-    // If cells are too large, add more columns
-    while (cellSize > maxCellSize && cols < 20) {
-      cols++;
+    if (width > 0) {
+      // Calculate columns based on min cell size
+      cols = Math.max(1, Math.floor((width + gap) / (minCellSize + gap)));
       cellSize = (width - (cols - 1) * gap) / cols;
-    }
-  }
 
-  const rows = height > 0 ? Math.max(1, Math.floor((height + gap) / (cellSize + gap))) : 0;
-  const count = cols * rows;
+      // If cells are too large, add more columns
+      while (cellSize > maxCellSize && cols < 20) {
+        cols++;
+        cellSize = (width - (cols - 1) * gap) / cols;
+      }
+    }
+
+    const rows = height > 0 ? Math.max(1, Math.floor((height + gap) / (cellSize + gap))) : 0;
+    const count = cols * rows;
+
+    return { cols, rows, cellSize, count };
+  }, [width, height, minRatio, maxRatio, gap]);
+
+  const { cols, rows, cellSize, count } = gridDimensions;
 
   // In live mode, fetch photos from public API
   const { data: photosData } = useSlideshowPhotos(
@@ -57,46 +66,48 @@ export function GalleryRenderer({
   // Use fetched photos in live mode, otherwise use context.photos (editor pre-fetched)
   const photos = context.liveMode ? (photosData?.data ?? []) : context.photos;
 
-  // Grid style
-  const gridStyle: React.CSSProperties = {
+  // Memoize grid style
+  const gridStyle: React.CSSProperties = useMemo(() => ({
     display: 'grid',
     gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
     gridTemplateRows: `repeat(${rows}, ${cellSize}px)`,
     gap: `${gap}px`,
-  };
+  }), [cols, rows, cellSize, gap]);
+
+  // Memoize slots to avoid rebuilding on every render
+  const slots = useMemo(() => {
+    return Array.from({ length: count }, (_, i) => {
+      const photo = photos[i];
+      if (photo) {
+        return (
+          <img
+            key={photo.id}
+            src={photo.previewUrl}
+            alt=""
+            className="rounded-lg object-cover"
+            style={{ width: cellSize, height: cellSize }}
+          />
+        );
+      }
+      // Fill with skeleton
+      return (
+        <Skeleton
+          key={`slot-${i}`}
+          className="rounded-lg"
+          style={{ width: cellSize, height: cellSize }}
+        />
+      );
+    });
+  }, [count, photos, cellSize]);
 
   // Still measuring - show nothing
   if (count === 0) {
     return <div ref={ref} className="h-full w-full flex-1" />;
   }
 
-  // Build slots
-  const slots = Array.from({ length: count }, (_, i) => {
-    const photo = photos[i];
-    if (photo) {
-      return (
-        <img
-          key={photo.id}
-          src={photo.previewUrl}
-          alt=""
-          className="rounded-lg object-cover"
-          style={{ width: cellSize, height: cellSize }}
-        />
-      );
-    }
-    // Fill with skeleton
-    return (
-      <Skeleton
-        key={`slot-${i}`}
-        className="rounded-lg"
-        style={{ width: cellSize, height: cellSize }}
-      />
-    );
-  });
-
   return (
     <div ref={ref} className="h-full w-full flex-1">
       <div style={gridStyle}>{slots}</div>
     </div>
   );
-}
+});

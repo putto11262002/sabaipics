@@ -16,6 +16,14 @@ export interface SlideshowBlock {
   enabled: boolean;
   props: Record<string, any>;
   children?: SlideshowBlock[];
+  position?: {
+    x: number; // 0-100 (percentage from left)
+    y: number; // 0-100 (percentage from top)
+  };
+  size?: {
+    width: number; // 0-100 (percentage of viewport width)
+    height: number; // 0-100 (percentage of viewport height)
+  };
 }
 
 export interface SlideshowTheme {
@@ -55,11 +63,14 @@ export interface SubtitleProps {
 }
 
 export type GalleryDensity = 'sparse' | 'normal' | 'dense';
+export type GalleryAlignY = 'start' | 'center' | 'end';
 
 export interface GalleryProps {
   density: GalleryDensity; // sparse=3-4 cols, normal=4-6 cols, dense=6-8 cols
   gap: number;
   autoplaySpeed: number;
+  maxHeight?: number | 'full'; // pixels or 'full' for 100vh
+  alignY?: GalleryAlignY; // vertical alignment when height < 100%
 }
 
 export interface QrProps {

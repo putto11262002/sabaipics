@@ -7,7 +7,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@sabaipics/uiv3/components/select';
-import type { SlideshowBlock, GalleryProps, GalleryDensity } from '../../types';
+import type { SlideshowBlock, GalleryProps, GalleryDensity, GalleryAlignY } from '../../types';
+import { Input } from '@sabaipics/uiv3/components/input';
 
 export function GallerySettings({
   block,
@@ -53,6 +54,55 @@ export function GallerySettings({
           max={24}
           step={2}
         />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Label className="w-20 text-xs">Max Height</Label>
+        <Select
+          value={props.maxHeight === 'full' ? 'full' : 'custom'}
+          onValueChange={(v) => update({ maxHeight: v === 'full' ? 'full' : props.maxHeight ?? 600 })}
+        >
+          <SelectTrigger className="h-8 flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="full">Full (100vh)</SelectItem>
+            <SelectItem value="custom">Custom</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {props.maxHeight !== 'full' && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Height (px)</Label>
+            <Input
+              type="number"
+              className="h-8 w-20 text-xs"
+              value={typeof props.maxHeight === 'number' ? props.maxHeight : 600}
+              onChange={(e) => update({ maxHeight: parseInt(e.target.value, 10) || 600 })}
+              min={100}
+              max={2000}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <Label className="w-20 text-xs">Align Y</Label>
+        <Select
+          value={props.alignY ?? 'center'}
+          onValueChange={(v) => update({ alignY: v as GalleryAlignY })}
+        >
+          <SelectTrigger className="h-8 flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="start">Top</SelectItem>
+            <SelectItem value="center">Center</SelectItem>
+            <SelectItem value="end">Bottom</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-2">

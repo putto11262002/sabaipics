@@ -150,6 +150,12 @@ export default function EventSlideshowTab() {
     setSelectedBlockId(blockId);
   }, []);
 
+  const handleConfigUpdate = useCallback((updatedConfig: SlideshowConfig) => {
+    console.log('[EDITOR] Config updated from iframe - applying to state');
+    setConfig(updatedConfig);
+    setIsDirty(true);
+  }, []);
+
   if (!data?.data) {
     return null;
   }
@@ -300,6 +306,7 @@ export default function EventSlideshowTab() {
               context={context}
               selectedBlockId={selectedBlockId}
               onSelectBlock={handleIframeSelectBlock}
+              onConfigUpdate={handleConfigUpdate}
             />
           )}
         </SidebarInset>

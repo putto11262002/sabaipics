@@ -22,6 +22,10 @@ export interface BlockDefinition<P extends Record<string, any> = Record<string, 
   }>;
   acceptsChildren?: boolean;
   childOnly?: boolean;
+  defaultSize?: {
+    width: number; // 0-100 (percentage of viewport width)
+    height: number; // 0-100 (percentage of viewport height)
+  };
 }
 
 export const blockRegistry = new Map<string, BlockDefinition>();
@@ -75,5 +79,6 @@ export function createBlock(type: string): SlideshowBlock {
     type,
     enabled: true,
     props: structuredClone(def.defaultProps),
+    ...(def.defaultSize && { size: def.defaultSize }),
   };
 }
