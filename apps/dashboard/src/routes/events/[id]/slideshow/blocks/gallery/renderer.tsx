@@ -54,8 +54,8 @@ export function GalleryRenderer({
     count,
   );
 
-  // Use fetched photos in live mode, otherwise empty (editor shows placeholders)
-  const photos = context.liveMode ? (photosData?.data ?? []) : [];
+  // Use fetched photos in live mode, otherwise use context.photos (editor pre-fetched)
+  const photos = context.liveMode ? (photosData?.data ?? []) : context.photos;
 
   // Grid style
   const gridStyle: React.CSSProperties = {

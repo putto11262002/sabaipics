@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useBlocker } from 'react-router';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 import { SidebarProvider, SidebarInset } from '@sabaipics/uiv3/components/sidebar';
-import { ScrollArea } from '@sabaipics/uiv3/components/scroll-area';
 import { Spinner } from '@sabaipics/uiv3/components/spinner';
 import { Alert, AlertDescription } from '@sabaipics/uiv3/components/alert';
 import {
@@ -19,11 +19,11 @@ import { AlertCircle } from 'lucide-react';
 import { PageHeader } from '../../../../components/shell/page-header';
 import { useEvent } from '../../../../hooks/events/useEvent';
 import { useSlideshowConfig, useUpdateSlideshowConfig } from '../../../../hooks/events/useSlideshowConfig';
+import { api } from '../../../../lib/api';
 import type { SlideshowConfig, SlideshowBlock, SlideshowContext } from './types';
 import { DEFAULT_CONFIG } from './lib/templates';
-import { buildThemeCssVars } from './lib/color-utils';
 import { createBlock } from './blocks/registry';
-import { Canvas } from './components/canvas';
+import { IframeCanvas } from './components/iframe-canvas';
 import { EditorSidebar } from './components/sidebar';
 import { Toolbar } from './components/toolbar';
 
@@ -87,6 +87,22 @@ export default function EventSlideshowTab() {
   const { data } = useEvent(id);
   const { data: slideshowData, isLoading: isLoadingConfig, error: configError } = useSlideshowConfig(id);
   const updateConfig = useUpdateSlideshowConfig(id);
+
+  // Fetch photos once for editor preview (no polling)
+  const { data: photosData } = useQuery({
+    queryKey: ['editor-photos', id],
+    queryFn: async () => {
+      const res = await api.participant.events[':eventId'].photos.$get({
+        param: { eventId: id! },
+        query: { limit: 50 },
+      });
+      if (!res.ok) return { data: [] };
+      return await res.json();
+    },
+    enabled: !!id,
+    staleTime: Infinity, // Don't refetch, one-time load for editor
+  });
+
   const [config, setConfig] = useState<SlideshowConfig>(() => structuredClone(DEFAULT_CONFIG));
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -124,8 +140,14 @@ export default function EventSlideshowTab() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty]);
 
+  // For sidebar block selection (always a valid blockId)
   const handleSelectBlock = useCallback((blockId: string) => {
     setSelectedBlockId((prev) => (prev === blockId ? prev : blockId));
+  }, []);
+
+  // For iframe block selection (can be null to deselect)
+  const handleIframeSelectBlock = useCallback((blockId: string | null) => {
+    setSelectedBlockId(blockId);
   }, []);
 
   if (!data?.data) {
@@ -148,7 +170,8 @@ export default function EventSlideshowTab() {
       searchCount: 0,
       downloadCount: 0,
     },
-    photos: [],
+    photos: photosData?.data ?? [], // Pre-fetched photos for editor (no polling)
+    liveMode: false, // Editor uses pre-fetched photos, no live polling
   };
 
   const selectedBlock = selectedBlockId ? findBlock(config.blocks, selectedBlockId) : null;
@@ -168,17 +191,6 @@ export default function EventSlideshowTab() {
       blocks: [...prev.blocks, newBlock],
     }));
     setSelectedBlockId(newBlock.id);
-  };
-
-  const handleReorder = (blocks: SlideshowBlock[]) => {
-    updateAndDirty((prev) => ({ ...prev, blocks }));
-  };
-
-  const handleReorderChildren = (parentId: string, newChildren: SlideshowBlock[]) => {
-    updateAndDirty((prev) => ({
-      ...prev,
-      blocks: prev.blocks.map((b) => (b.id === parentId ? { ...b, children: newChildren } : b)),
-    }));
   };
 
   const handleAddPreset = (block: SlideshowBlock) => {
@@ -216,12 +228,6 @@ export default function EventSlideshowTab() {
 
   const handleThemeChange = (theme: SlideshowConfig['theme']) => {
     updateAndDirty((prev) => ({ ...prev, theme }));
-  };
-
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      setSelectedBlockId(null);
-    }
   };
 
   const handleSave = () => {
@@ -278,30 +284,23 @@ export default function EventSlideshowTab() {
       >
         <SidebarInset className="min-h-0">
           {isLoading ? (
-            <div className="flex justify-center bg-muted/50 p-8">
+            <div className="flex h-full items-center justify-center bg-muted/50 p-8">
               <Spinner className="size-6" />
             </div>
           ) : hasError ? (
-            <div className="bg-muted/50 p-8">
+            <div className="flex h-full items-center justify-center bg-muted/50 p-8">
               <Alert variant="destructive">
                 <AlertCircle className="size-4" />
                 <AlertDescription>Something went wrong. Please try again.</AlertDescription>
               </Alert>
             </div>
           ) : (
-            <ScrollArea className="h-full">
-              <div style={buildThemeCssVars(config.theme.primary, config.theme.background)}>
-                <Canvas
-                  config={config}
-                  context={context}
-                  selectedBlockId={selectedBlockId}
-                  onSelectBlock={handleSelectBlock}
-                  onReorder={handleReorder}
-                  onReorderChildren={handleReorderChildren}
-                  onCanvasClick={handleCanvasClick}
-                />
-              </div>
-            </ScrollArea>
+            <IframeCanvas
+              config={config}
+              context={context}
+              selectedBlockId={selectedBlockId}
+              onSelectBlock={handleIframeSelectBlock}
+            />
           )}
         </SidebarInset>
 
