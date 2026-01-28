@@ -18,6 +18,7 @@ import type { Env, Bindings } from './types';
 import { queue as photoQueue } from './queue/photo-consumer';
 import { queue as cleanupQueue } from './queue/cleanup-consumer';
 import { queue as uploadQueue } from './queue/upload-consumer';
+import logoUploadConsumer from './queue/logo-upload-consumer';
 
 // Cron handlers
 import { scheduled } from './crons';
@@ -96,6 +97,9 @@ export default {
     }
     if (batch.queue.startsWith('upload-processing')) {
       return uploadQueue(batch as MessageBatch<any>, env, ctx);
+    }
+    if (batch.queue.startsWith('logo-processing')) {
+      return logoUploadConsumer.queue(batch as MessageBatch<any>, env);
     }
     console.error('[Queue] Unknown queue:', batch.queue);
   },

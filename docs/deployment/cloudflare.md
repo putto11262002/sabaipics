@@ -29,16 +29,19 @@ All Cloudflare infrastructure is defined in `apps/api/wrangler.jsonc` and provis
 
 ### Queues
 
-Each environment has 6 queues (3 primary + 3 DLQs):
+Staging/production have 8 queues (4 primary + 4 DLQs). Dev only provisions `r2-notification-proxy` (all other queues are locally simulated by wrangler dev).
 
-| Queue                           | Purpose                                          |
-| ------------------------------- | ------------------------------------------------ |
-| `photo-processing[-env]`        | Face detection on uploaded photos                |
-| `photo-processing-dlq[-env]`    | Dead letter queue for failed photo jobs          |
-| `rekognition-cleanup[-env]`     | Cleanup AWS Rekognition collections              |
-| `rekognition-cleanup-dlq[-env]` | Dead letter queue for failed cleanup jobs        |
-| `upload-processing[-env]`       | R2 upload notifications (triggered by R2 events) |
-| `upload-processing-dlq[-env]`   | Dead letter queue for failed upload jobs         |
+| Queue                           | Purpose                                              |
+| ------------------------------- | ---------------------------------------------------- |
+| `photo-processing[-env]`        | Face detection on uploaded photos                    |
+| `photo-processing-dlq[-env]`    | Dead letter queue for failed photo jobs              |
+| `rekognition-cleanup[-env]`     | Cleanup AWS Rekognition collections                  |
+| `rekognition-cleanup-dlq[-env]` | Dead letter queue for failed cleanup jobs            |
+| `upload-processing[-env]`       | R2 upload notifications for photos (`uploads/` prefix) |
+| `upload-processing-dlq[-env]`   | Dead letter queue for failed upload jobs             |
+| `logo-processing[-env]`         | R2 upload notifications for logos (`logos/` prefix)  |
+| `logo-processing-dlq[-env]`     | Dead letter queue for failed logo jobs               |
+| `r2-notification-proxy`         | Dev only — forwards R2 events to local dev via ngrok |
 
 ### Durable Objects
 
@@ -78,10 +81,12 @@ R2_ZONE_ID=<zone-id> bash scripts/infra/cloudflare-provision.sh production --wit
 
 ### What it creates:
 
-1. **Queues** - All 6 queues (idempotent, skips existing)
+1. **Queues** - All queues for the environment (idempotent, skips existing). Dev only creates `r2-notification-proxy`; staging/prod create 8 queues.
 2. **R2 Bucket** - Photo storage bucket
 3. **R2 CORS** - Configures CORS from `scripts/infra/r2-cors.json`
-4. **R2 Notification** - `uploads/` prefix → upload queue
+4. **R2 Notifications**:
+   - `uploads/` prefix → upload queue (dev: `r2-notification-proxy`, staging/prod: `upload-processing-{env}`)
+   - `logos/` prefix → logo queue (dev: `r2-notification-proxy`, staging/prod: `logo-processing-{env}`)
 5. **R2 Custom Domain** - (optional, with `--with-domains`)
 
 ## wrangler.jsonc Structure

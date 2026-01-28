@@ -444,7 +444,7 @@ export const eventsRouter = new Hono<Env>()
         // Generate upload ID and R2 key
         const uploadId = crypto.randomUUID();
         const timestamp = Date.now();
-        const r2Key = `${eventId}/logo/${uploadId}-${timestamp}`;
+        const r2Key = `logos/${eventId}/${uploadId}-${timestamp}`;
 
         // Generate presigned URL (5 minutes expiry)
         const PRESIGN_EXPIRY_SECONDS = 5 * 60;
