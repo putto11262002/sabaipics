@@ -656,3 +656,61 @@ Both whitelists match - no drift.
 - Add unit tests for `mime.FromFilename()` error cases
 - Add integration test: FTP STOR with `.pdf` → verify 550 response
 - Consider adding rate limiting on failed MIME validation attempts (anti-spam)
+
+---
+
+## 2025-01-29: Revealable FTP Passwords (Encrypted)
+
+**Goal:** Allow photographers to reveal FTP passwords later in the dashboard while keeping authentication secure.
+
+### Changes Made
+
+#### 1. DB Schema: Store Encrypted Password
+
+**File:** `packages/db/src/schema/ftp-credentials.ts`
+
+Added `passwordCiphertext` to persist the reversible secret (AES-GCM):
+
+```ts
+passwordCiphertext: text('password_ciphertext').notNull(),
+```
+
+#### 2. Crypto Utilities (AES-GCM)
+
+**File:** `apps/api/src/lib/crypto/secret.ts`
+
+- AES-GCM with 12-byte IV
+- Key is 32 bytes (base64) from `FTP_PASSWORD_ENCRYPTION_KEY`
+- Ciphertext stored as `base64(iv + ciphertext)`
+
+#### 3. Credential Creation Encrypts Password
+
+**File:** `apps/api/src/routes/ftp.ts`
+
+During credential creation:
+
+```ts
+const passwordCiphertext = await encryptSecret(password, c.env.FTP_PASSWORD_ENCRYPTION_KEY);
+```
+
+Stored alongside `passwordHash`.
+
+#### 4. Reveal Endpoint Added
+
+**Route:** `GET /events/:id/ftp-credentials/reveal`
+
+- Authenticated photographer only
+- Verifies event ownership
+- Decrypts stored ciphertext and returns plaintext password
+
+Response:
+
+```json
+{ "username": "evt-xxxx", "password": "..." }
+```
+
+### Security Notes
+
+- Auth still uses the hashed password; the ciphertext is only for UI reveal.
+- Key stored in Cloudflare Worker secret: `FTP_PASSWORD_ENCRYPTION_KEY`.
+- If key changes, stored passwords become unrecoverable (regenerate required).

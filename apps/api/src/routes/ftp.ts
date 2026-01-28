@@ -21,6 +21,7 @@ import { generatePresignedPutUrl } from '../lib/r2/presign';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { signFtpToken } from '../lib/ftp/jwt';
 import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
+import { encryptSecret, decryptSecret } from '../lib/crypto/secret';
 
 // =============================================================================
 // Constants
@@ -366,6 +367,15 @@ export const ftpRouter = new Hono<Env>()
           }),
         )();
 
+        const passwordCiphertext = yield* ResultAsync.fromThrowable(
+          () => encryptSecret(password, c.env.FTP_PASSWORD_ENCRYPTION_KEY),
+          (e): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Password encryption failed',
+            cause: e,
+          }),
+        )();
+
         // 6. Create credential record
         const credentialRows: any = yield* ResultAsync.fromPromise(
           db
@@ -375,6 +385,7 @@ export const ftpRouter = new Hono<Env>()
               photographerId: photographer.id,
               username,
               passwordHash,
+              passwordCiphertext,
               expiresAt: event.expiresAt,
             })
             .returning(),
@@ -455,6 +466,74 @@ export const ftpRouter = new Hono<Env>()
         });
       })
         .orTee((e) => e.cause && console.error('[ftp-credentials/get]', e.code + ':', e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+  .get(
+    '/events/:id/ftp-credentials/reveal',
+    requirePhotographer(),
+    zValidator('param', ftpCredentialsParamsSchema),
+    async (c) => {
+      return safeTry(async function* () {
+        const photographer = c.var.photographer;
+        const db = c.var.db();
+        const { id: eventId } = c.req.valid('param');
+
+        // 1. Verify event exists and is owned by photographer
+        const eventRows: any = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: events.id, photographerId: events.photographerId })
+            .from(events)
+            .where(eq(events.id, eventId))
+            .limit(1),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        const event = eventRows[0];
+        if (!event || event.photographerId !== photographer.id) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        // 2. Get FTP credentials
+        const credentialRows: any = yield* ResultAsync.fromPromise(
+          db
+            .select({
+              username: ftpCredentials.username,
+              passwordCiphertext: ftpCredentials.passwordCiphertext,
+            })
+            .from(ftpCredentials)
+            .where(eq(ftpCredentials.eventId, eventId))
+            .limit(1),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        const credential = credentialRows[0];
+        if (!credential) {
+          return err<never, HandlerError>({
+            code: 'NOT_FOUND',
+            message: 'FTP credentials not found',
+          });
+        }
+
+        // 3. Decrypt password
+        const password = yield* ResultAsync.fromThrowable(
+          () => decryptSecret(credential.passwordCiphertext, c.env.FTP_PASSWORD_ENCRYPTION_KEY),
+          (e): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Password decryption failed',
+            cause: e,
+          }),
+        )();
+
+        return ok({
+          username: credential.username,
+          password,
+        });
+      })
+        .orTee((e) => e.cause && console.error('[ftp-credentials/reveal]', e.code + ':', e.cause))
         .match(
           (data) => c.json(data),
           (e) => apiError(c, e),

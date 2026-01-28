@@ -19,6 +19,7 @@ export const ftpCredentials = pgTable(
       .references(() => photographers.id, { onDelete: 'restrict' }),
     username: text('username').notNull().unique(),
     passwordHash: text('password_hash').notNull(),
+    passwordCiphertext: text('password_ciphertext').notNull(),
     expiresAt: timestamptz('expires_at').notNull(),
     createdAt: createdAtCol(),
   },
