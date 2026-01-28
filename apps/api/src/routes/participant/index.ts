@@ -225,7 +225,11 @@ export const participantRouter = new Hono<Env>()
     const { eventId } = c.req.valid('param');
 
     const [event] = await db
-      .select({ name: events.name })
+      .select({
+        name: events.name,
+        subtitle: events.subtitle,
+        logoR2Key: events.logoR2Key,
+      })
       .from(events)
       .where(eq(events.id, eventId))
       .limit(1);
@@ -234,9 +238,13 @@ export const participantRouter = new Hono<Env>()
       return c.json({ error: { code: 'NOT_FOUND', message: 'Event not found' } }, 404);
     }
 
+    const logoUrl = event.logoR2Key ? `${c.env.PHOTO_R2_BASE_URL}/${event.logoR2Key}` : null;
+
     return c.json({
       data: {
         name: event.name,
+        subtitle: event.subtitle,
+        logoUrl,
       },
     });
   })
