@@ -1,12 +1,5 @@
 import { Button } from '@sabaipics/uiv3/components/button';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@sabaipics/uiv3/components/select';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -20,7 +13,6 @@ import { blockPresets } from '../lib/presets';
 import type { SlideshowBlock } from '../types';
 
 interface ToolbarProps {
-  onApplyTemplate: (key: string) => void;
   onAddBlock: (type: string) => void;
   onAddPreset: (block: SlideshowBlock) => void;
   onSave: () => void;
@@ -28,22 +20,11 @@ interface ToolbarProps {
   isSaving?: boolean;
 }
 
-export function Toolbar({ onApplyTemplate, onAddBlock, onAddPreset, onSave, disabled, isSaving }: ToolbarProps) {
+export function Toolbar({ onAddBlock, onAddPreset, onSave, disabled, isSaving }: ToolbarProps) {
   const types = getTopLevelTypes();
 
   return (
     <>
-      <Select onValueChange={onApplyTemplate} disabled={disabled}>
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="Choose template" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="classic">Classic</SelectItem>
-          <SelectItem value="gallery">Gallery</SelectItem>
-          <SelectItem value="minimal">Minimal</SelectItem>
-        </SelectContent>
-      </Select>
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1.5" disabled={disabled}>
@@ -51,7 +32,7 @@ export function Toolbar({ onApplyTemplate, onAddBlock, onAddPreset, onSave, disa
             Add Block
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
+        <DropdownMenuContent className="min-w-[180px]">
           <DropdownMenuLabel className="text-xs">Blocks</DropdownMenuLabel>
           {types.map((type) => {
             const def = blockRegistry.get(type)!;

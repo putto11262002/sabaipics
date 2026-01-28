@@ -45,7 +45,7 @@ export function Canvas({
   };
 
   return (
-    <div className="flex min-h-full justify-center bg-muted/50 p-8" onClick={onCanvasClick}>
+    <div className="flex min-h-full justify-center p-8" onClick={onCanvasClick}>
       <div
         className="w-full max-w-3xl rounded-xl border bg-background p-6 shadow-sm"
         onClick={onCanvasClick}

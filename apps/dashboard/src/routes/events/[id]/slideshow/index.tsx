@@ -20,7 +20,7 @@ import { PageHeader } from '../../../../components/shell/page-header';
 import { useEvent } from '../../../../hooks/events/useEvent';
 import { useSlideshowConfig, useUpdateSlideshowConfig } from '../../../../hooks/events/useSlideshowConfig';
 import type { SlideshowConfig, SlideshowBlock, SlideshowContext } from './types';
-import { DEFAULT_CONFIG, getTemplate } from './lib/templates';
+import { DEFAULT_CONFIG } from './lib/templates';
 import { buildThemeCssVars } from './lib/color-utils';
 import { createBlock } from './blocks/registry';
 import { Canvas } from './components/canvas';
@@ -141,7 +141,7 @@ export default function EventSlideshowTab() {
       id: id!,
       name: event.name,
       subtitle: (event as any).subtitle ?? null,
-      logoUrl: null, // TODO: wire up when logo upload is integrated
+      logoUrl: event.logoUrl ?? null,
     },
     stats: {
       photoCount: 0,
@@ -218,11 +218,6 @@ export default function EventSlideshowTab() {
     updateAndDirty((prev) => ({ ...prev, theme }));
   };
 
-  const handleApplyTemplate = (key: string) => {
-    updateAndDirty(getTemplate(key));
-    setSelectedBlockId(null);
-  };
-
   const handleCanvasClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       setSelectedBlockId(null);
@@ -258,6 +253,7 @@ export default function EventSlideshowTab() {
 
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       <PageHeader
+        className="border-b"
         backHref={`/events/${id}/details`}
         breadcrumbs={[
           { label: 'Events', href: '/events' },
@@ -266,7 +262,6 @@ export default function EventSlideshowTab() {
         ]}
       >
         <Toolbar
-          onApplyTemplate={handleApplyTemplate}
           onAddBlock={handleAddBlock}
           onAddPreset={handleAddPreset}
           onSave={handleSave}

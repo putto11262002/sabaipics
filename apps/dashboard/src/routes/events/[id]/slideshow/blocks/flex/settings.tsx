@@ -67,7 +67,7 @@ function SortableChild({
       </button>
       <button
         type="button"
-        className="flex-1 text-left text-xs hover:text-blue-500"
+        className="flex-1 text-left text-xs hover:text-primary"
         onClick={() => onSelect?.(child.id)}
       >
         {def?.label ?? child.type}

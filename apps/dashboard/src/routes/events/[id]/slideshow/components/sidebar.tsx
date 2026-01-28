@@ -38,7 +38,7 @@ export function EditorSidebar({
   const parentDef = parentBlock ? getBlockDef(parentBlock.type) : undefined;
 
   return (
-    <Sidebar side="right" collapsible="none" className="border-l">
+    <Sidebar side="right" collapsible="none" className="border-l bg-background">
       <SidebarHeader className="border-sidebar-border border-b px-4 py-3">
         <h3 className="text-sm font-semibold">{blockDef ? blockDef.label : 'Theme'}</h3>
       </SidebarHeader>
@@ -51,13 +51,12 @@ export function EditorSidebar({
                 {/* Back to parent button when a child is selected */}
                 {parentBlock && parentDef && (
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                    variant="outline"
+                    size="icon"
+                    className="size-7"
                     onClick={() => onSelectBlock(parentBlock.id)}
                   >
                     <ChevronLeft className="size-3" />
-                    Back to {parentDef.label}
                   </Button>
                 )}
 

@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 
+import { cn } from '@sabaipics/uiv3/lib/utils';
 import { Button } from '@sabaipics/uiv3/components/button';
 import {
   Breadcrumb,
@@ -26,11 +27,13 @@ interface PageHeaderProps {
   children?: ReactNode;
   /** Additional content to render on the left (after back button, before breadcrumbs) */
   leftContent?: ReactNode;
+  /** Additional CSS classes for the header element */
+  className?: string;
 }
 
-export function PageHeader({ breadcrumbs = [], backHref, children, leftContent }: PageHeaderProps) {
+export function PageHeader({ breadcrumbs = [], backHref, children, leftContent, className }: PageHeaderProps) {
   return (
-    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 bg-background px-4">
+    <header className={cn("sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 bg-background px-4", className)}>
       {/* Left section */}
       <div className="flex items-center gap-2">
         {/* Back button */}
