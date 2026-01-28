@@ -507,3 +507,152 @@ STOR DSC_0001.JPG
 2. **RAW file support.** Current pipeline only accepts JPEG/PNG/HEIC/HEIF/WebP. RAW files (CR2, NEF, ARW) would fail at magic byte validation. Not in scope -- cameras typically send JPEG over FTP. Can be added later by extending the consumer's validation + normalization.
 
 3. **Rate limiting on `/api/ftp/auth`.** Should add a CF rate limiter binding (e.g., 10 req/60s per IP) to prevent brute-force on FTP credentials. Low priority -- credentials are auto-generated high-entropy strings.
+
+---
+
+## 2025-01-28: MIME Type Validation Fix
+
+**Issue:** SAB-73 FTP upload flow had inconsistent MIME type validation:
+- API `/api/ftp/presign` accepted any `contentType` string (no validation)
+- Go FTP server returned fallback `application/octet-stream` for unknown extensions instead of rejecting
+
+**Risk:** Cameras could upload unsupported file types (e.g., `.pdf`, `.txt`) that would pass through FTP validation but fail later in the upload-consumer pipeline, wasting credits.
+
+### Changes Made
+
+#### 1. API - Added ContentType Whitelist Validation
+
+**File:** `apps/api/src/routes/ftp.ts:34-44`
+
+Added `ALLOWED_MIME_TYPES` constant matching the upload-consumer validation:
+
+```typescript
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/heic',
+  'image/heif',
+  'image/webp',
+] as const;
+
+const ftpPresignRequestSchema = z.object({
+  filename: z.string().min(1),
+  contentType: z.enum(ALLOWED_MIME_TYPES, {
+    errorMap: () => ({ message: `Content type must be one of: ${ALLOWED_MIME_TYPES.join(', ')}` }),
+  }),
+  contentLength: z.number().int().positive().optional(),
+});
+```
+
+**Before:** `contentType: z.string().min(1)` - accepted anything  
+**After:** Zod enum validation - rejects unsupported MIME types with clear error message
+
+#### 2. Go FTP Server - Return Error for Unknown Extensions
+
+**File:** `apps/ftp-server/internal/mime/mime.go`
+
+Changed `FromFilename()` to return `(string, error)` instead of fallback:
+
+```go
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+)
+
+var extensionToMIME = map[string]string{
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".png":  "image/png",
+	".heic": "image/heic",
+	".heif": "image/heif",
+	".webp": "image/webp",
+}
+
+// FromFilename returns MIME type from filename extension
+// Returns error if file extension is not in the whitelist
+func FromFilename(filename string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if mime, ok := extensionToMIME[ext]; ok {
+		return mime, nil
+	}
+	return "", fmt.Errorf("unsupported file type: %s", ext)
+}
+```
+
+**Before:** `return "application/octet-stream"` for unknown extensions  
+**After:** Return explicit error - `fmt.Errorf("unsupported file type: %s", ext)`
+
+#### 3. Go FTP Server - Handle Error in ClientDriver
+
+**File:** `apps/ftp-server/internal/client/client_driver.go:57-63`
+
+Updated `OpenFile()` to handle MIME detection errors:
+
+```go
+// Detect MIME type from filename
+contentType, err := mime.FromFilename(name)
+if err != nil {
+	// Log rejected upload and return error
+	fmt.Printf("WARN: Rejected upload: %s (%v)\n", name, err)
+	return nil, err
+}
+```
+
+Removed duplicate `var err error` declaration (already captured from MIME check).
+
+**FTP Error Mapping:** When `mime.FromFilename()` returns error:
+- Go returns error from `OpenFile()` → FTP library maps to `550 File type not allowed`
+- Camera receives immediate rejection before sending any data
+- Connection stays open - camera can try another file
+
+### Validation
+
+**Build Status:**
+- ✅ TypeScript API: `pnpm build` succeeded (no type errors)
+- ✅ Go FTP Server: `go build ./...` succeeded (no compilation errors)
+
+**Whitelist Consistency:**
+```
+API:  image/jpeg, image/png, image/heic, image/heif, image/webp
+Go:   .jpg/.jpeg → image/jpeg, .png → image/png, .heic → image/heic, .heif → image/heif, .webp → image/webp
+```
+
+Both whitelists match - no drift.
+
+### Expected Behavior After Changes
+
+| Scenario | Before | After |
+|----------|--------|-------|
+| Camera uploads `photo.jpg` | ✅ Go detects `.jpg` → `image/jpeg` → presign succeeds → upload succeeds | ✅ Same (no change) |
+| Camera uploads `photo.heic` | ✅ Go detects `.heic` → `image/heic` → presign succeeds → upload succeeds | ✅ Same (no change) |
+| Camera uploads `document.pdf` | ❌ Go detects `.pdf` → `application/octet-stream` → presign accepts → R2 upload succeeds → **consumer fails** (wasted credit) | ✅ Go detects `.pdf` → **returns error** → FTP 550 → camera sees immediate rejection (no upload, no credit wasted) |
+| Camera uploads `archive.zip` | ❌ Same as `.pdf` | ✅ Same as `.pdf` (immediate rejection) |
+| Client POSTs to API with `contentType: "application/pdf"` | ❌ API accepts → generates presigned URL (invalid flow) | ✅ API rejects with 400 + Zod error message |
+
+### Design Notes
+
+**Why whitelist at both API and FTP server?**
+- **API validation:** Defends against malicious API clients bypassing FTP (direct presign API calls)
+- **FTP validation:** Fail-fast at filename detection (before camera sends bytes) - better UX, no wasted bandwidth
+
+**Why not add `.CR2`, `.NEF` (RAW formats)?**
+- Upload-consumer doesn't support RAW normalization yet
+- Cameras typically send JPEG over FTP (RAW via USB/WiFi proprietary protocols)
+- Can add later when RAW support is implemented (extend both whitelists + consumer)
+
+**Error message format:**
+- Go: `unsupported file type: .pdf` (simple, logged to FTP server)
+- API: `Content type must be one of: image/jpeg, image/png, image/heic, image/heif, image/webp` (Zod error)
+
+### Related Files Modified
+
+1. `apps/api/src/routes/ftp.ts` (API validation)
+2. `apps/ftp-server/internal/mime/mime.go` (MIME detection with error)
+3. `apps/ftp-server/internal/client/client_driver.go` (error handling)
+
+### Future Improvements
+
+- Add unit tests for `mime.FromFilename()` error cases
+- Add integration test: FTP STOR with `.pdf` → verify 550 response
+- Consider adding rate limiting on failed MIME validation attempts (anti-spam)

@@ -20,12 +20,13 @@ import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { generatePresignedPutUrl } from '../lib/r2/presign';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { signFtpToken } from '../lib/ftp/jwt';
+import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
 
 // =============================================================================
 // Constants
 // =============================================================================
 
-const PRESIGN_TTL_SECONDS = 300; // 5 minutes
+const PRESIGN_TTL_SECONDS = 3600; // 1 hour
 
 // =============================================================================
 // Schemas
@@ -38,7 +39,9 @@ const ftpAuthRequestSchema = z.object({
 
 const ftpPresignRequestSchema = z.object({
   filename: z.string().min(1),
-  contentType: z.string().min(1),
+  contentType: z.enum(ALLOWED_MIME_TYPES, {
+    errorMap: () => ({ message: `Content type must be one of: ${ALLOWED_MIME_TYPES.join(', ')}` }),
+  }),
   contentLength: z.number().int().positive().optional(),
 });
 
@@ -245,9 +248,6 @@ export const ftpRouter = new Hono<Env>()
         // Only include contentLength if provided
         if (contentLength !== undefined) {
           presignOptions.contentLength = contentLength;
-        } else {
-          // Use a default for presigning purposes
-          presignOptions.contentLength = 20 * 1024 * 1024; // 20 MB default
         }
 
         const presignResult = yield* ResultAsync.fromPromise(

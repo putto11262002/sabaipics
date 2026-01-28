@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,6 +26,7 @@ var ErrAuthExpired = errors.New("authentication expired")
 // Uses io.Pipe to stream data to R2 via presigned URL without buffering to disk
 // LIFETIME CONTRACT: 1:1 with uploadTransaction. Must not be reused after Close().
 type UploadTransfer struct {
+	ctx               context.Context
 	eventID           string
 	jwtToken          string
 	clientIP          string
@@ -44,11 +46,13 @@ type UploadTransfer struct {
 
 // NewUploadTransfer creates a new upload transfer for streaming to R2 via presigned URL
 // Creates a ROOT Sentry transaction for this upload (not a child span)
-func NewUploadTransfer(eventID, jwtToken, clientIP, filename, presignedURL string, requiredHeaders map[string]string, clientID uint32, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient) *UploadTransfer {
+func NewUploadTransfer(ctx context.Context, eventID, jwtToken, clientIP, filename, presignedURL string, requiredHeaders map[string]string, clientID uint32, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient) *UploadTransfer {
 	pr, pw := io.Pipe()
 
 	// Create ROOT Sentry transaction for this upload
-	ctx := context.Background()
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	uploadTransaction := sentry.StartTransaction(ctx,
 		"ftp.upload",
 		sentry.WithTransactionSource(sentry.SourceCustom),
@@ -71,6 +75,7 @@ func NewUploadTransfer(eventID, jwtToken, clientIP, filename, presignedURL strin
 	}
 
 	transfer := &UploadTransfer{
+		ctx:               ctx,
 		eventID:           eventID,
 		jwtToken:          jwtToken,
 		clientIP:          clientIP,
@@ -158,7 +163,10 @@ func (t *UploadTransfer) Close() error {
 func (t *UploadTransfer) streamToR2() {
 	defer close(t.uploadDone)
 
-	ctx := t.uploadTransaction.Context()
+	ctx := t.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	// Upload to R2 presigned URL
 	resp, err := t.apiClient.UploadToPresignedURL(
@@ -170,15 +178,16 @@ func (t *UploadTransfer) streamToR2() {
 
 	if err != nil {
 		// Network error during transfer
-		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("R2 upload failed for file=%s: %v", t.filename, err)
+		safeErr := sanitizeUploadError(err)
+		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("R2 upload failed for file=%s: %s", t.filename, safeErr)
 
 		t.clientMgr.SendEvent(clientmgr.ClientEvent{
 			Type:     clientmgr.EventUploadFailed,
 			ClientID: t.clientID,
-			Reason:   err.Error(),
+			Reason:   safeErr,
 		})
 
-		t.uploadDone <- err
+		t.uploadDone <- fmt.Errorf("upload failed: %s", safeErr)
 		return
 	}
 	defer resp.Body.Close()
@@ -199,6 +208,22 @@ func (t *UploadTransfer) streamToR2() {
 	sentry.NewLogger(t.uploadTransaction.Context()).Info().Emitf("Upload successful: file=%s", t.filename)
 
 	t.uploadDone <- nil
+}
+
+func sanitizeUploadError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		if urlErr.Err != nil {
+			return urlErr.Err.Error()
+		}
+		return "upload failed"
+	}
+
+	return err.Error()
 }
 
 // Read is not supported (upload-only)

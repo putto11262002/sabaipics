@@ -86,7 +86,7 @@ func (m *MockClient) Authenticate(ctx context.Context, req AuthRequest) (*AuthRe
 }
 
 // Presign implements APIClient.Presign
-func (m *MockClient) Presign(ctx context.Context, token, filename, contentType string) (*PresignResponse, *http.Response, error) {
+func (m *MockClient) Presign(ctx context.Context, token, filename, contentType string) (*PresignResponse, error) {
 	m.mu.Lock()
 	m.PresignCalls = append(m.PresignCalls, MockPresignCall{
 		Token:       token,
@@ -97,20 +97,33 @@ func (m *MockClient) Presign(ctx context.Context, token, filename, contentType s
 	m.mu.Unlock()
 	m.presignCount.Add(1)
 
-	// Create mock HTTP response for status code checking
-	mockResp := &http.Response{
-		StatusCode: http.StatusCreated,
-	}
-
-	if m.PresignHTTPStatus > 0 {
-		mockResp.StatusCode = m.PresignHTTPStatus
-	}
-
 	if m.PresignError != nil {
-		return nil, mockResp, m.PresignError
+		return nil, m.PresignError
 	}
 
-	return m.PresignResponse, mockResp, nil
+	if m.PresignHTTPStatus > 0 && m.PresignHTTPStatus != http.StatusCreated {
+		switch m.PresignHTTPStatus {
+		case http.StatusUnauthorized:
+			return nil, ErrUnauthorized
+		case http.StatusPaymentRequired:
+			return nil, ErrInsufficientCredits
+		case http.StatusGone:
+			return nil, ErrEventExpired
+		case http.StatusTooManyRequests:
+			return nil, ErrRateLimited
+		case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable:
+			return nil, ErrTemporaryFailure
+		default:
+			return nil, fmt.Errorf("presign failed: %d", m.PresignHTTPStatus)
+		}
+	}
+
+	return m.PresignResponse, nil
+}
+
+// PresignWithRetry implements APIClient.PresignWithRetry
+func (m *MockClient) PresignWithRetry(ctx context.Context, token, filename, contentType string, backoff []time.Duration) (*PresignResponse, error) {
+	return m.Presign(ctx, token, filename, contentType)
 }
 
 // UploadToPresignedURL implements APIClient.UploadToPresignedURL

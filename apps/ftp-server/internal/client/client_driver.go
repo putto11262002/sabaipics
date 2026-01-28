@@ -2,10 +2,9 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
@@ -48,6 +47,7 @@ func (d *ClientDriver) Name() string {
 }
 
 // OpenFile opens a file for writing (STOR command)
+// Returning an error here causes the FTP server to reply with a 550 error before any data is sent.
 func (d *ClientDriver) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
 	// Check if this is a write operation
 	if flag&os.O_WRONLY == 0 && flag&os.O_RDWR == 0 {
@@ -55,42 +55,37 @@ func (d *ClientDriver) OpenFile(name string, flag int, perm os.FileMode) (afero.
 	}
 
 	// Detect MIME type from filename
-	contentType := mime.FromFilename(name)
+	contentType, err := mime.FromFilename(name)
+	if err != nil {
+		// Log rejected upload and return error
+		fmt.Printf("WARN: Rejected upload: %s (%v)\n", name, err)
+		return nil, err
+	}
 
-	// Presign with retry on 429
-	var presignResp *apiclient.PresignResponse
-	var httpResp *http.Response
-	var err error
+	baseCtx := context.Background()
+	if ctx, ok := d.clientMgr.GetUploadContext(d.clientID); ok {
+		baseCtx = ctx
+	}
 
-	backoff := []time.Duration{1 * time.Second, 2 * time.Second, 4 * time.Second}
+	ctx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
+	presignResp, err := d.apiClient.PresignWithRetry(ctx, d.jwtToken, name, contentType, nil)
+	cancel()
 
-	for attempt := 0; attempt <= len(backoff); attempt++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		presignResp, httpResp, err = d.apiClient.Presign(ctx, d.jwtToken, name, contentType)
-		cancel()
-
-		if err == nil {
-			// Success
-			break
+	if err != nil {
+		if errors.Is(err, apiclient.ErrUnauthorized) {
+			return nil, apiclient.ErrUnauthorized
 		}
-
-		if httpResp != nil && httpResp.StatusCode == 429 && attempt < len(backoff) {
-			// Rate limited - retry with backoff
-			retryAfter := parseRetryAfter(httpResp) // Check Retry-After header
-			if retryAfter > 0 {
-				time.Sleep(retryAfter)
-			} else {
-				time.Sleep(backoff[attempt])
-			}
-			continue
-		}
-
-		// Non-429 error or exhausted retries
-		return nil, mapPresignError(err, httpResp)
+		return nil, err
 	}
 
 	// Create UploadTransfer with presigned URL
+	uploadCtx := context.Background()
+	if ctx, ok := d.clientMgr.GetUploadContext(d.clientID); ok {
+		uploadCtx = ctx
+	}
+
 	uploadTransfer := transfer.NewUploadTransfer(
+		uploadCtx,
 		d.eventID,
 		d.jwtToken,
 		d.clientIP,
@@ -248,50 +243,4 @@ func (d *ClientDriver) Symlink(oldname, newname string) error {
 // Readlink returns empty string for symlinks (no actual symlinks exist)
 func (d *ClientDriver) Readlink(name string) (string, error) {
 	return "", nil // Success, but no symlink target
-}
-
-// mapPresignError maps presign API errors to FTP errors
-func mapPresignError(err error, resp *http.Response) error {
-	if resp == nil {
-		return fmt.Errorf("presign request failed: %w", err)
-	}
-
-	switch resp.StatusCode {
-	case 401:
-		// JWT expired - return auth error
-		return fmt.Errorf("authentication expired")
-	case 402:
-		return fmt.Errorf("insufficient credits")
-	case 410:
-		return fmt.Errorf("event expired")
-	case 429:
-		// All retries exhausted
-		return fmt.Errorf("rate limited, please retry later")
-	case 500, 502, 503:
-		return fmt.Errorf("temporary server error, please retry")
-	default:
-		return fmt.Errorf("upload failed: %d", resp.StatusCode)
-	}
-}
-
-// parseRetryAfter parses the Retry-After header from HTTP response
-// Returns the duration to wait, or 0 if header is not present or invalid
-func parseRetryAfter(resp *http.Response) time.Duration {
-	if resp == nil {
-		return 0
-	}
-
-	retryAfter := resp.Header.Get("Retry-After")
-	if retryAfter == "" {
-		return 0
-	}
-
-	// Try parsing as seconds (integer)
-	if seconds, err := strconv.Atoi(retryAfter); err == nil {
-		return time.Duration(seconds) * time.Second
-	}
-
-	// Try parsing as HTTP date (not commonly used, but spec allows it)
-	// We'll skip this for simplicity - just return 0
-	return 0
 }

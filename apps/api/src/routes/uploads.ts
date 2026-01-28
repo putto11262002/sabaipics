@@ -16,20 +16,13 @@ import type { Env } from '../types';
 import { apiError, type HandlerError } from '../lib/error';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { generatePresignedPutUrl } from '../lib/r2/presign';
+import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
 
 // =============================================================================
 // Constants
 // =============================================================================
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
-
-const ALLOWED_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/heic',
-  'image/heif',
-  'image/webp',
-] as const;
 
 const PRESIGN_TTL_SECONDS = 300; // 5 minutes
 
