@@ -15,6 +15,10 @@ export interface SlideshowBlock {
   enabled: boolean; // Toggle block visibility
   props: Record<string, any>; // Block-specific configuration properties
   children?: SlideshowBlock[]; // Optional: nested blocks for layout containers
+  position?: {
+    x: number; // 0-100 (percentage from left)
+    y: number; // 0-100 (percentage from top)
+  };
 }
 
 export interface SlideshowConfig {

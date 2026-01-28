@@ -14,6 +14,12 @@ export const slideshowBlockSchema: z.ZodType<SlideshowBlock> = z.lazy(() =>
     enabled: z.boolean(),
     props: z.record(z.any()),
     children: z.array(slideshowBlockSchema).optional(),
+    position: z
+      .object({
+        x: z.number().min(0).max(100),
+        y: z.number().min(0).max(100),
+      })
+      .optional(),
   }),
 );
 
