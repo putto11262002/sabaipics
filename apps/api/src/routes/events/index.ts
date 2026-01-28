@@ -312,6 +312,66 @@ export const eventsRouter = new Hono<Env>()
   )
 
   // =========================================================================
+  // PUT /events/:id - Update event details
+  // =========================================================================
+  .put(
+    '/:id',
+    requirePhotographer(),
+    zValidator('param', eventParamsSchema),
+    zValidator(
+      'json',
+      z.object({
+        name: z.string().min(1).max(200).optional(),
+        subtitle: z.string().max(500).nullish(),
+      }),
+    ),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id } = c.req.valid('param');
+      const body = c.req.valid('json');
+
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db.select().from(events).where(eq(events.id, id)).limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!event || event.photographerId !== photographer.id) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const updates: Partial<{ name: string; subtitle: string | null }> = {};
+        if (body.name !== undefined) updates.name = body.name;
+        if (body.subtitle !== undefined) updates.subtitle = body.subtitle ?? null;
+
+        if (Object.keys(updates).length === 0) {
+          return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'No fields to update' });
+        }
+
+        const [updated] = yield* ResultAsync.fromPromise(
+          db.update(events).set(updates).where(eq(events.id, id)).returning(),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        return ok({
+          data: {
+            id: updated.id,
+            name: updated.name,
+            subtitle: updated.subtitle,
+            logoUrl: updated.logoR2Key ? `${c.env.PHOTO_R2_BASE_URL}/${updated.logoR2Key}` : null,
+          },
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] PUT /:id', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // =========================================================================
   // GET /events/:id/slideshow-config - Get slideshow configuration
   // =========================================================================
   .get(
@@ -602,10 +662,10 @@ export const eventsRouter = new Hono<Env>()
     const { id: eventId } = c.req.valid('param');
 
     return safeTry(async function* () {
-      // Verify event ownership
+      // Verify event ownership and get current logo key
       const [event] = yield* ResultAsync.fromPromise(
         db
-          .select({ id: events.id })
+          .select({ id: events.id, logoR2Key: events.logoR2Key })
           .from(events)
           .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
           .limit(1),
@@ -616,11 +676,19 @@ export const eventsRouter = new Hono<Env>()
         return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
       }
 
-      // Remove logo reference (actual R2 cleanup via lifecycle policy)
+      // Remove logo reference from DB
       yield* ResultAsync.fromPromise(
         db.update(events).set({ logoR2Key: null }).where(eq(events.id, eventId)),
         (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
       );
+
+      // Delete from R2 if a logo existed
+      if (event.logoR2Key) {
+        yield* ResultAsync.fromPromise(
+          c.env.PHOTOS_BUCKET.delete(event.logoR2Key),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Failed to delete logo from storage', cause }),
+        );
+      }
 
       return ok({ data: { success: true } });
     })

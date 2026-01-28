@@ -20,7 +20,7 @@ export function useLogoPresign() {
         {
           param: { id: eventId },
           json: {
-            contentType: file.type,
+            contentType: file.type as 'image/jpeg' | 'image/png' | 'image/webp',
             contentLength: file.size,
           },
         },
