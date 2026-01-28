@@ -3,6 +3,3 @@
 // Copy to `apps/studio/Config/Studio.Local.xcconfig` and fill values.
 
 CLERK_PUBLISHABLE_KEY = pk_test_REPLACE_ME
-
-// Optional: Override sign-up URL for local dev
-// SIGNUP_URL = http://localhost:3000/sign-up
