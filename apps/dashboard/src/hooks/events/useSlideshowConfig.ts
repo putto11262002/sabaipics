@@ -15,9 +15,6 @@ export function useSlideshowConfig(eventId: string | undefined) {
         throw new Error('Event ID is required');
       }
 
-      // TODO: remove simulated error (for UI testing)
-      throw new Error('Failed to fetch slideshow config');
-
       const res = await getConfig(
         {
           param: { id: eventId },

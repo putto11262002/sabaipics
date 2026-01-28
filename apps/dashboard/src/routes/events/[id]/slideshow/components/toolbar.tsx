@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@sabaipics/uiv3/components/dropdown-menu';
-import { Save, Plus } from 'lucide-react';
+import { Save, Plus, Loader2 } from 'lucide-react';
 import { blockRegistry, getTopLevelTypes } from '../blocks/registry';
 import { blockPresets } from '../lib/presets';
 import type { SlideshowBlock } from '../types';
@@ -24,14 +24,16 @@ interface ToolbarProps {
   onAddBlock: (type: string) => void;
   onAddPreset: (block: SlideshowBlock) => void;
   onSave: () => void;
+  disabled?: boolean;
+  isSaving?: boolean;
 }
 
-export function Toolbar({ onApplyTemplate, onAddBlock, onAddPreset, onSave }: ToolbarProps) {
+export function Toolbar({ onApplyTemplate, onAddBlock, onAddPreset, onSave, disabled, isSaving }: ToolbarProps) {
   const types = getTopLevelTypes();
 
   return (
     <>
-      <Select onValueChange={onApplyTemplate}>
+      <Select onValueChange={onApplyTemplate} disabled={disabled}>
         <SelectTrigger className="w-[180px]">
           <SelectValue placeholder="Choose template" />
         </SelectTrigger>
@@ -44,7 +46,7 @@ export function Toolbar({ onApplyTemplate, onAddBlock, onAddPreset, onSave }: To
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-1.5">
+          <Button variant="outline" size="sm" className="gap-1.5" disabled={disabled}>
             <Plus className="size-4" />
             Add Block
           </Button>
@@ -75,9 +77,9 @@ export function Toolbar({ onApplyTemplate, onAddBlock, onAddPreset, onSave }: To
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button size="sm" onClick={onSave} className="gap-1.5">
-        <Save className="size-4" />
-        Save
+      <Button size="sm" onClick={onSave} className="gap-1.5" disabled={disabled || isSaving}>
+        {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+        {isSaving ? 'Saving...' : 'Save'}
       </Button>
     </>
   );

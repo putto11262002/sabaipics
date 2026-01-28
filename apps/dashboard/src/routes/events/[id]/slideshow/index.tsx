@@ -1,10 +1,24 @@
-import { useState, useCallback } from 'react';
-import { useParams } from 'react-router';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useParams, useBlocker } from 'react-router';
 import { toast } from 'sonner';
 import { SidebarProvider, SidebarInset } from '@sabaipics/uiv3/components/sidebar';
 import { ScrollArea } from '@sabaipics/uiv3/components/scroll-area';
+import { Spinner } from '@sabaipics/uiv3/components/spinner';
+import { Alert, AlertDescription } from '@sabaipics/uiv3/components/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@sabaipics/uiv3/components/alert-dialog';
+import { AlertCircle } from 'lucide-react';
 import { PageHeader } from '../../../../components/shell/page-header';
 import { useEvent } from '../../../../hooks/events/useEvent';
+import { useSlideshowConfig, useUpdateSlideshowConfig } from '../../../../hooks/events/useSlideshowConfig';
 import type { SlideshowConfig, SlideshowBlock, SlideshowContext } from './types';
 import { DEFAULT_CONFIG, getTemplate } from './lib/templates';
 import { buildThemeCssVars } from './lib/color-utils';
@@ -71,8 +85,44 @@ function deleteBlockFromTree(blocks: SlideshowBlock[], id: string): SlideshowBlo
 export default function EventSlideshowTab() {
   const { id } = useParams<{ id: string }>();
   const { data } = useEvent(id);
+  const { data: slideshowData, isLoading: isLoadingConfig, error: configError } = useSlideshowConfig(id);
+  const updateConfig = useUpdateSlideshowConfig(id);
   const [config, setConfig] = useState<SlideshowConfig>(() => structuredClone(DEFAULT_CONFIG));
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const hasSynced = useRef(false);
+
+  useEffect(() => {
+    if (slideshowData?.data && !hasSynced.current) {
+      hasSynced.current = true;
+      const fetched = slideshowData.data as SlideshowConfig;
+      // If no blocks configured yet, seed with the classic template
+      if (fetched.blocks.length === 0) {
+        setConfig(structuredClone(DEFAULT_CONFIG));
+      } else {
+        setConfig(structuredClone(fetched));
+      }
+    }
+  }, [slideshowData]);
+
+  // ─── Unsaved changes guards ──────────────────────────────────────────
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      isDirty && currentLocation.pathname !== nextLocation.pathname,
+  );
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
 
   const handleSelectBlock = useCallback((blockId: string) => {
     setSelectedBlockId((prev) => (prev === blockId ? prev : blockId));
@@ -82,6 +132,8 @@ export default function EventSlideshowTab() {
     return null;
   }
 
+  const isLoading = isLoadingConfig;
+  const hasError = !!configError;
   const event = data.data;
 
   const context: SlideshowContext = {
@@ -104,9 +156,14 @@ export default function EventSlideshowTab() {
 
   // ─── Block operations ────────────────────────────────────────────────
 
+  const updateAndDirty: typeof setConfig = (value) => {
+    setConfig(value);
+    setIsDirty(true);
+  };
+
   const handleAddBlock = (type: string) => {
     const newBlock = createBlock(type);
-    setConfig((prev) => ({
+    updateAndDirty((prev) => ({
       ...prev,
       blocks: [...prev.blocks, newBlock],
     }));
@@ -114,18 +171,18 @@ export default function EventSlideshowTab() {
   };
 
   const handleReorder = (blocks: SlideshowBlock[]) => {
-    setConfig((prev) => ({ ...prev, blocks }));
+    updateAndDirty((prev) => ({ ...prev, blocks }));
   };
 
   const handleReorderChildren = (parentId: string, newChildren: SlideshowBlock[]) => {
-    setConfig((prev) => ({
+    updateAndDirty((prev) => ({
       ...prev,
       blocks: prev.blocks.map((b) => (b.id === parentId ? { ...b, children: newChildren } : b)),
     }));
   };
 
   const handleAddPreset = (block: SlideshowBlock) => {
-    setConfig((prev) => ({
+    updateAndDirty((prev) => ({
       ...prev,
       blocks: [...prev.blocks, block],
     }));
@@ -133,7 +190,7 @@ export default function EventSlideshowTab() {
   };
 
   const handleUpdateBlock = (updated: SlideshowBlock) => {
-    setConfig((prev) => ({
+    updateAndDirty((prev) => ({
       ...prev,
       blocks: updateBlockInTree(prev.blocks, updated),
     }));
@@ -141,7 +198,7 @@ export default function EventSlideshowTab() {
 
   const handleToggleBlock = () => {
     if (!selectedBlockId) return;
-    setConfig((prev) => ({
+    updateAndDirty((prev) => ({
       ...prev,
       blocks: toggleBlockInTree(prev.blocks, selectedBlockId),
     }));
@@ -149,9 +206,8 @@ export default function EventSlideshowTab() {
 
   const handleDeleteBlock = () => {
     if (!selectedBlockId) return;
-    // If deleting a child, select the parent after deletion
     const parent = findParentBlock(config.blocks, selectedBlockId);
-    setConfig((prev) => ({
+    updateAndDirty((prev) => ({
       ...prev,
       blocks: deleteBlockFromTree(prev.blocks, selectedBlockId),
     }));
@@ -159,11 +215,11 @@ export default function EventSlideshowTab() {
   };
 
   const handleThemeChange = (theme: SlideshowConfig['theme']) => {
-    setConfig((prev) => ({ ...prev, theme }));
+    updateAndDirty((prev) => ({ ...prev, theme }));
   };
 
   const handleApplyTemplate = (key: string) => {
-    setConfig(getTemplate(key));
+    updateAndDirty(getTemplate(key));
     setSelectedBlockId(null);
   };
 
@@ -174,10 +230,32 @@ export default function EventSlideshowTab() {
   };
 
   const handleSave = () => {
-    toast.success('Slideshow configuration saved');
+    updateConfig.mutate(config, {
+      onSuccess: () => {
+        setIsDirty(false);
+        toast.success('Slideshow configuration saved');
+      },
+      onError: () => toast.error('Failed to save. Please try again.'),
+    });
   };
 
   return (
+    <>
+      <AlertDialog open={blocker.state === 'blocked'}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. If you leave now, your changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => blocker.reset?.()}>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={() => blocker.proceed?.()}>Leave</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       <PageHeader
         backHref={`/events/${id}/details`}
@@ -192,6 +270,8 @@ export default function EventSlideshowTab() {
           onAddBlock={handleAddBlock}
           onAddPreset={handleAddPreset}
           onSave={handleSave}
+          disabled={isLoading || hasError}
+          isSaving={updateConfig.isPending}
         />
       </PageHeader>
 
@@ -201,19 +281,32 @@ export default function EventSlideshowTab() {
         style={{ '--sidebar-width': '320px', flex: 1 } as React.CSSProperties}
       >
         <SidebarInset className="min-h-0">
-          <ScrollArea className="h-full">
-            <div style={buildThemeCssVars(config.theme.primary, config.theme.background)}>
-              <Canvas
-                config={config}
-                context={context}
-                selectedBlockId={selectedBlockId}
-                onSelectBlock={handleSelectBlock}
-                onReorder={handleReorder}
-                onReorderChildren={handleReorderChildren}
-                onCanvasClick={handleCanvasClick}
-              />
+          {isLoading ? (
+            <div className="flex justify-center bg-muted/50 p-8">
+              <Spinner className="size-6" />
             </div>
-          </ScrollArea>
+          ) : hasError ? (
+            <div className="bg-muted/50 p-8">
+              <Alert variant="destructive">
+                <AlertCircle className="size-4" />
+                <AlertDescription>Something went wrong. Please try again.</AlertDescription>
+              </Alert>
+            </div>
+          ) : (
+            <ScrollArea className="h-full">
+              <div style={buildThemeCssVars(config.theme.primary, config.theme.background)}>
+                <Canvas
+                  config={config}
+                  context={context}
+                  selectedBlockId={selectedBlockId}
+                  onSelectBlock={handleSelectBlock}
+                  onReorder={handleReorder}
+                  onReorderChildren={handleReorderChildren}
+                  onCanvasClick={handleCanvasClick}
+                />
+              </div>
+            </ScrollArea>
+          )}
         </SidebarInset>
 
         <EditorSidebar
@@ -228,5 +321,6 @@ export default function EventSlideshowTab() {
         />
       </SidebarProvider>
     </div>
+    </>
   );
 }
