@@ -279,13 +279,10 @@ TransferSession.end()
        │          │
        │          └── PTPIPSession.disconnect()
        │                     │
-       │                     ├── 1. sendCloseSession() (while connection active)
-       │                     ├── 2. eventSource.stopMonitoring()
-       │                     │          ├── 1. isMonitoring = false
-       │                     │          ├── 2. connection.cancel() ← CRITICAL: interrupts pending I/O
-       │                     │          ├── 3. task.cancel()
-       │                     │          ├── 4. await task.value ← wait for cleanup
-       │                     │          └── 5. task = nil
+       │                     ├── 1. eventSource.cleanup() ← vendor-specific cleanup
+       │                     │          ├── stopMonitoring() ← stops polling task
+       │                     │          └── Canon: drain events + SetEventMode(0)
+       │                     ├── 2. sendCloseSession() (after vendor cleanup)
        │                     └── 3. cancel TCP connections
        └── 2. photos.removeAll()
 ```
@@ -297,6 +294,30 @@ TransferSession.end()
 - Tasks awaited to ensure complete cleanup before returning
 
 **Without this pattern:** Tasks hang on `receive()` waiting for timeout, causing multiple disconnect attempts (SAB-41).
+
+### Canon Graceful Disconnect (SAB-57)
+
+Canon cameras require additional cleanup steps per gphoto2lib's `camera_exit()` pattern:
+
+```
+CanonEventSource.cleanup()
+       │
+       ├── 1. drainPendingEvents()     ← Poll GetEvent once to clear queue
+       │          └── Send Canon_EOS_GetEvent, discard response
+       │
+       ├── 2. disableEventMode()       ← Tell camera we're done monitoring
+       │          └── Send SetEventMode(0)
+       │
+       ├── 3. stopMonitoring()         ← Stop polling loop
+       │
+       └── 4. Clear references         ← Release connections
+```
+
+**Why this matters:**
+
+- Without `SetEventMode(0)`, camera may continue trying to report events
+- Without draining events, pending events may cause state inconsistency
+- Matches gphoto2lib behavior for proper PTP spec compliance
 
 ---
 

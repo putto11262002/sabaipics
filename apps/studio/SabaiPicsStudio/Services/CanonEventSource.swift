@@ -73,26 +73,131 @@ class CanonEventSource: CameraEventSource {
     }
 
     func stopMonitoring() async {
-        guard isMonitoring else { return }
-        isMonitoring = false
-
-        // Cancel connection FIRST to interrupt pending send/receive operations
-        // This prevents hanging on network calls during disconnect
-        commandConnection?.cancel()
-
-        pollingTask?.cancel()
-        // Wait for polling task to actually complete before returning
-        // This prevents race conditions where resources are cleaned up
-        // while the polling loop is still executing
-        await pollingTask?.value
-        pollingTask = nil
+        _ = await stopMonitoring(graceful: false)
     }
 
     func cleanup() async {
-        await stopMonitoring()
+        // Graceful Canon disconnect (per libgphoto2 camera_exit pattern):
+        // 1. Stop monitoring without canceling socket
+        // 2. Drain pending events
+        // 3. Disable event mode
+
+        // Step 1: Stop polling loop gracefully (do not cancel socket yet)
+        let stoppedGracefully = await stopMonitoring(graceful: true)
+
+        if stoppedGracefully {
+            // Step 2: Drain pending events before closing
+            // This prevents race conditions and ensures camera state is clean
+            await drainPendingEvents()
+
+            // Step 3: Disable event mode (SetEventMode(0))
+            // Tells camera we're done monitoring - camera can return to normal operation
+            await disableEventMode()
+        } else {
+            print("[CanonEventSource] Skipping drain/disable due to forced stop")
+        }
+
         commandConnection = nil
         transactionManager = nil
         photoOps = nil
+    }
+
+    private func stopMonitoring(graceful: Bool) async -> Bool {
+        guard isMonitoring else { return true }
+        isMonitoring = false
+
+        if graceful {
+            let finished = await waitForPollingTask(timeout: 1.0)
+            if finished {
+                pollingTask = nil
+                return true
+            }
+        }
+
+        // Force stop: cancel connection and task to avoid hanging I/O
+        commandConnection?.cancel()
+        pollingTask?.cancel()
+        await pollingTask?.value
+        pollingTask = nil
+        return false
+    }
+
+    private func waitForPollingTask(timeout: TimeInterval) async -> Bool {
+        guard let pollingTask else { return true }
+
+        return await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                _ = await pollingTask.value
+                return true
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                return false
+            }
+
+            let finished = await group.next() ?? true
+            group.cancelAll()
+            return finished
+        }
+    }
+    
+    // MARK: - Graceful Disconnect (per libgphoto2 camera_exit)
+    
+    /// Drain any pending events from the Canon event queue
+    /// From libgphoto2: ptp_check_eos_events() + while(ptp_get_one_eos_event()) loop
+    /// This ensures no events are left in the queue before closing the session
+    private func drainPendingEvents() async {
+        guard let connection = commandConnection,
+              let txManager = transactionManager else {
+            return
+        }
+        
+        print("[CanonEventSource] Draining pending events...")
+        
+        // Poll once with a short timeout to drain any pending events
+        do {
+            var command = await txManager.createCommand()
+            let getEventCmd = command.canonGetEvent()
+            let getEventData = getEventCmd.toData()
+            
+            try await sendData(connection: connection, data: getEventData)
+            _ = try await receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCmd.transactionID)
+            
+            print("[CanonEventSource] Pending events drained")
+        } catch {
+            // Non-fatal - drain can fail if camera is already disconnected
+            print("[CanonEventSource] Failed to drain events (non-fatal): \(error)")
+        }
+    }
+    
+    /// Disable Canon event mode (SetEventMode(0))
+    /// From libgphoto2: Called during camera_exit to tell camera we're done monitoring
+    /// This is the inverse of SetEventMode(1) called during initializeCanonEOS()
+    private func disableEventMode() async {
+        guard let connection = commandConnection,
+              let txManager = transactionManager else {
+            return
+        }
+        
+        print("[CanonEventSource] Disabling event mode (SetEventMode(0))...")
+        
+        do {
+            var command = await txManager.createCommand()
+            let setEventModeCmd = command.canonSetEventMode(mode: 0)  // 0 = disable
+            let eventModeData = setEventModeCmd.toData()
+            
+            try await sendData(connection: connection, data: eventModeData)
+            let response = try await receiveResponse(connection: connection, expectedTransactionID: setEventModeCmd.transactionID)
+            
+            if let responseCode = PTPResponseCode(rawValue: response.responseCode), responseCode.isSuccess {
+                print("[CanonEventSource] Event mode disabled successfully")
+            } else {
+                print("[CanonEventSource] SetEventMode(0) returned code: 0x\(String(format: "%04X", response.responseCode))")
+            }
+        } catch {
+            // Non-fatal - disable can fail if camera is already disconnected
+            print("[CanonEventSource] Failed to disable event mode (non-fatal): \(error)")
+        }
     }
 
     // MARK: - Canon Initialization

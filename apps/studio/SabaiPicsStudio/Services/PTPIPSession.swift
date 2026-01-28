@@ -358,17 +358,17 @@ class PTPIPSession: NSObject {
         print("[PTPIPSession] Disconnecting... CALLED FROM:")
         Thread.callStackSymbols.prefix(10).forEach { print("  \($0)") }
 
-        // Send CloseSession command FIRST (while session is fully active, per libgphoto2)
+        // Vendor-specific cleanup BEFORE CloseSession (per libgphoto2)
+        // cleanup() is responsible for stopping monitoring internally
+        if let source = eventSource {
+            await source.cleanup()
+        }
+
+        // Send CloseSession command after vendor cleanup
         do {
             try await sendCloseSession()
         } catch {
             // Continue with cleanup even if CloseSession fails
-        }
-
-        // Stop event monitoring AFTER CloseSession
-        if let source = eventSource {
-            await source.stopMonitoring()
-            await source.cleanup()
         }
 
         // Clean up downloader
