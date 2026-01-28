@@ -10,6 +10,11 @@ export const createEventSchema = z.object({
   endDate: z.string().datetime().nullable().optional(),
 });
 
+export const updateEventSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  subtitle: z.string().max(500).nullable().optional(),
+});
+
 export const eventParamsSchema = z.object({
   id: z.string().uuid(),
 });
@@ -84,6 +89,7 @@ export const participantSearchParamsSchema = z.object({
 // =============================================================================
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
+export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;
 export type UploadPhotoInput = z.infer<typeof uploadPhotoSchema>;
 export type ParticipantSearchInput = z.infer<typeof participantSearchSchema>;
