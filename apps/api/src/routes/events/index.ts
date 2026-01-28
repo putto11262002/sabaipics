@@ -127,13 +127,15 @@ export const eventsRouter = new Hono<Env>()
       return safeTry(async function* () {
         const offset = page * limit;
 
-        const eventsList = yield* ResultAsync.fromPromise(
+        const eventsListRaw = yield* ResultAsync.fromPromise(
           db
             .select({
               id: events.id,
               name: events.name,
+              subtitle: events.subtitle,
               startDate: events.startDate,
               endDate: events.endDate,
+              logoR2Key: events.logoR2Key,
               createdAt: events.createdAt,
               expiresAt: events.expiresAt,
             })
@@ -158,6 +160,18 @@ export const eventsRouter = new Hono<Env>()
         const totalPages = Math.ceil(totalCount / limit);
         const hasNextPage = page + 1 < totalPages;
         const hasPrevPage = page > 0;
+
+        // Map logoR2Key to logoUrl
+        const eventsList = eventsListRaw.map((event) => ({
+          id: event.id,
+          name: event.name,
+          subtitle: event.subtitle,
+          startDate: event.startDate,
+          endDate: event.endDate,
+          logoUrl: event.logoR2Key ? `${c.env.PHOTO_R2_BASE_URL}/${event.logoR2Key}` : null,
+          createdAt: event.createdAt,
+          expiresAt: event.expiresAt,
+        }));
 
         return ok({
           data: eventsList,
@@ -210,10 +224,12 @@ export const eventsRouter = new Hono<Env>()
           id: event.id,
           photographerId: event.photographerId,
           name: event.name,
+          subtitle: event.subtitle,
           startDate: event.startDate,
           endDate: event.endDate,
           qrCodeUrl: null, // Client-side generation
           rekognitionCollectionId: event.rekognitionCollectionId,
+          logoUrl: event.logoR2Key ? `${c.env.PHOTO_R2_BASE_URL}/${event.logoR2Key}` : null,
           expiresAt: event.expiresAt,
           createdAt: event.createdAt,
         });
