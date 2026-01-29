@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useApiClient } from '../../lib/api';
 import { api } from '../../lib/api';
 import { type InferResponseType } from 'hono/client';
 
@@ -7,12 +8,16 @@ const getEvent = api.events[':id'].$get;
 export type Event = InferResponseType<typeof getEvent, 200>['data'];
 
 export function useEvent(id: string | undefined) {
+  const { getToken } = useApiClient();
+
   return useQuery({
     queryKey: ['event', id],
     queryFn: async () => {
       if (!id) {
         throw new Error('Event ID is required');
       }
+
+      const token = await getToken();
 
       const res = await getEvent(
         {
@@ -21,6 +26,9 @@ export function useEvent(id: string | undefined) {
         {
           init: {
             credentials: 'include',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           },
         },
       );
