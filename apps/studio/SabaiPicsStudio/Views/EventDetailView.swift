@@ -13,7 +13,8 @@ struct EventDetailView: View {
     let eventId: String
 
     @State private var event: Event?
-    @State private var isLoading = false
+    @State private var isFirstLoad = true
+    @State private var isRefreshing = false
     @State private var error: Error?
     @State private var showCopyConfirmation = false
 
@@ -28,12 +29,15 @@ struct EventDetailView: View {
 
     var body: some View {
         Group {
-            if isLoading {
-                loadingView
+            if isFirstLoad && event == nil {
+                skeletonView
             } else if let error = error {
                 errorView(error: error)
             } else if let event = event {
-                eventContent(event: event)
+                eventContentView(event: event)
+                    .refreshable {
+                        await loadEvent(isRefresh: true)
+                    }
             } else {
                 Text("No event data")
                     .foregroundStyle(Color.Theme.mutedForeground)
@@ -54,38 +58,31 @@ struct EventDetailView: View {
         }
     }
 
-    // MARK: - Loading View
+    // MARK: - Skeleton View
 
-    private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .tint(Color.Theme.primary)
-            Text("Loading event...")
-                .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    private var skeletonView: some View {
+        eventContentView(event: .placeholder)
+            .redacted(reason: .placeholder)
+            .disabled(true)
     }
 
     // MARK: - Event Content
 
     @ViewBuilder
-    private func eventContent(event: Event) -> some View {
+    private func eventContentView(event: Event) -> some View {
         Form {
             Section("Details") {
                 LabeledContent("Name", value: event.name)
 
-                if let subtitle = event.subtitle {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Subtitle")
-                            .font(.caption)
-                            .foregroundStyle(Color.Theme.mutedForeground)
-                        Text(subtitle)
-                            .font(.body)
-                            .foregroundStyle(Color.Theme.foreground)
-                    }
-                    .padding(.vertical, 4)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Subtitle")
+                        .font(.caption)
+                        .foregroundStyle(Color.Theme.mutedForeground)
+                    Text(event.subtitle ?? "No subtitle")
+                        .font(.body)
+                        .foregroundStyle(event.subtitle != nil ? Color.Theme.foreground : Color.Theme.mutedForeground)
                 }
+                .padding(.vertical, 4)
 
                 if let startDate = event.startDate {
                     LabeledContent("Start Date", value: startDate.formattedDateTime())
@@ -155,19 +152,33 @@ struct EventDetailView: View {
 
     // MARK: - Helper Methods
 
-    private func loadEvent() async {
-        isLoading = true
+    private func loadEvent(isRefresh: Bool = false) async {
+        if !isRefresh {
+            isFirstLoad = event == nil
+        }
+
+        if isRefresh {
+            isRefreshing = true
+        }
+
         error = nil
 
+        // Concurrent operations: fetch + minimum display time
+        async let eventData = apiClient.fetchEvent(id: eventId)
+        async let minimumDelay: () = Task.sleep(nanoseconds: 300_000_000)  // 300ms
+
         do {
-            let response = try await apiClient.fetchEvent(id: eventId)
+            let response = try await eventData
+            try await minimumDelay  // Prevent skeleton flicker on fast loads
             event = response.data
         } catch {
+            try? await minimumDelay
             print("[EventDetail Error] Failed to load event \(eventId): \(error.localizedDescription)")
             self.error = error
         }
 
-        isLoading = false
+        isFirstLoad = false
+        isRefreshing = false
     }
 
     private func searchURL(for event: Event) -> String {
@@ -215,9 +226,15 @@ struct CopyConfirmationView: View {
     }
 }
 
-// MARK: - Preview
+// MARK: - Previews
 
-#Preview("Event Detail") {
+#Preview("1. Skeleton Loading") {
+    NavigationStack {
+        EventDetailSkeletonPreview()
+    }
+}
+
+#Preview("2. Loaded Event") {
     NavigationStack {
         EventDetailPreview(
             event: Event(
@@ -234,13 +251,13 @@ struct CopyConfirmationView: View {
     }
 }
 
-#Preview("Event Detail - Long Text") {
+#Preview("3. Long Subtitle (Wrapping)") {
     NavigationStack {
         EventDetailPreview(
             event: Event(
                 id: "evt_preview_2",
                 name: "Corporate Annual Meeting 2026",
-                subtitle: "This is a very long subtitle that will wrap to multiple lines to test layout",
+                subtitle: "This is a very long subtitle that will wrap to multiple lines to test layout and ensure proper text wrapping behavior in the detail view",
                 logoUrl: nil,
                 startDate: "2026-03-01T09:00:00.000+07:00",
                 endDate: "2026-03-01T17:00:00.000+07:00",
@@ -251,7 +268,60 @@ struct CopyConfirmationView: View {
     }
 }
 
-// Preview wrapper
+#Preview("4. Minimal Event (No Optional Fields)") {
+    NavigationStack {
+        EventDetailPreview(
+            event: Event(
+                id: "evt_minimal",
+                name: "Minimal Event",
+                subtitle: nil,
+                logoUrl: nil,
+                startDate: nil,
+                endDate: nil,
+                createdAt: "2026-01-20T14:15:00.000+07:00",
+                expiresAt: "2026-04-01T23:59:59.000+07:00"
+            )
+        )
+    }
+}
+
+#Preview("5. Error State") {
+    NavigationStack {
+        EventDetailErrorPreview()
+    }
+}
+
+// MARK: - Preview Helpers
+
+private struct EventDetailSkeletonPreview: View {
+    var body: some View {
+        Form {
+            Section("Details") {
+                LabeledContent("Name", value: "Loading Event Name")
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Subtitle")
+                        .font(.caption)
+                        .foregroundStyle(Color.Theme.mutedForeground)
+                    Text("Loading subtitle text here")
+                        .font(.body)
+                        .foregroundStyle(Color.Theme.foreground)
+                }
+                .padding(.vertical, 4)
+
+                LabeledContent("Start Date", value: "Jan 1, 2026 at 12:00 AM")
+                LabeledContent("End Date", value: "Jan 1, 2026 at 12:00 AM")
+                LabeledContent("Created", value: "Jan 1, 2026 at 12:00 AM")
+                LabeledContent("Expires", value: "Jan 1, 2026 at 12:00 AM")
+            }
+        }
+        .redacted(reason: .placeholder)
+        .disabled(true)
+        .navigationTitle("Event Details")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 private struct EventDetailPreview: View {
     let event: Event
 
@@ -260,17 +330,15 @@ private struct EventDetailPreview: View {
             Section("Details") {
                 LabeledContent("Name", value: event.name)
 
-                if let subtitle = event.subtitle {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Subtitle")
-                            .font(.caption)
-                            .foregroundStyle(Color.Theme.mutedForeground)
-                        Text(subtitle)
-                            .font(.body)
-                            .foregroundStyle(Color.Theme.foreground)
-                    }
-                    .padding(.vertical, 4)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Subtitle")
+                        .font(.caption)
+                        .foregroundStyle(Color.Theme.mutedForeground)
+                    Text(event.subtitle ?? "No subtitle")
+                        .font(.body)
+                        .foregroundStyle(event.subtitle != nil ? Color.Theme.foreground : Color.Theme.mutedForeground)
                 }
+                .padding(.vertical, 4)
 
                 if let startDate = event.startDate {
                     LabeledContent("Start Date", value: startDate.formattedDateTime())
@@ -301,5 +369,36 @@ private struct EventDetailPreview: View {
                 }
             }
         }
+    }
+}
+
+private struct EventDetailErrorPreview: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 48))
+                .foregroundStyle(Color.Theme.destructive)
+
+            Text("Error Loading Event")
+                .font(.headline)
+                .foregroundStyle(Color.Theme.foreground)
+
+            Text("The network connection was lost.")
+                .font(.subheadline)
+                .foregroundStyle(Color.Theme.mutedForeground)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            Button {
+                // Preview only
+            } label: {
+                Text("Retry")
+            }
+            .buttonStyle(.primary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle("Event Details")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

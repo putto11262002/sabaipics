@@ -3,14 +3,14 @@
 //  SabaiPicsStudio
 //
 //  Created: 2026-01-22
-//  Updated: 2026-01-29 - SAB-39: Events browser with list and detail view
+//  Updated: 2026-01-29 - SAB-39: Events browser with skeleton loading
 //
 
 import SwiftUI
 
 struct EventsHomeView: View {
     @State private var events: [Event] = []
-    @State private var isLoading = false
+    @State private var isFirstLoad = true
     @State private var error: Error?
     @State private var isRefreshing = false
 
@@ -25,8 +25,8 @@ struct EventsHomeView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if isLoading && events.isEmpty {
-                    loadingView
+                if isFirstLoad && events.isEmpty {
+                    skeletonListView
                 } else if let error = error, events.isEmpty {
                     errorView(error: error)
                 } else if events.isEmpty {
@@ -36,6 +36,7 @@ struct EventsHomeView: View {
                 }
             }
             .navigationTitle("Events")
+            .navigationBarTitleDisplayMode(.inline)
             .refreshable {
                 await refreshEvents()
             }
@@ -45,6 +46,24 @@ struct EventsHomeView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Skeleton View
+
+    private var skeletonListView: some View {
+        List {
+            Section {
+                ForEach(Event.placeholders) { event in
+                    EventRow(event: event)
+                }
+            } header: {
+                Text("Recent Events")
+                    .foregroundStyle(Color.Theme.mutedForeground)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .redacted(reason: .placeholder)
+        .disabled(true)
     }
 
     // MARK: - Event List
@@ -63,19 +82,6 @@ struct EventsHomeView: View {
             }
         }
         .listStyle(.insetGrouped)
-    }
-
-    // MARK: - Loading State
-
-    private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .tint(Color.Theme.primary)
-            Text("Loading events...")
-                .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Empty State
@@ -134,17 +140,23 @@ struct EventsHomeView: View {
     // MARK: - Data Loading
 
     private func loadEvents() async {
-        isLoading = true
+        isFirstLoad = events.isEmpty
         error = nil
 
+        // Concurrent operations: fetch + minimum display time
+        async let eventsData = apiClient.fetchEvents(page: 0, limit: 10)
+        async let minimumDelay: () = Task.sleep(nanoseconds: 300_000_000)  // 300ms
+
         do {
-            let response = try await apiClient.fetchEvents(page: 0, limit: 10)
+            let response = try await eventsData
+            try await minimumDelay  // Prevent skeleton flicker
             events = response.data
         } catch {
+            try? await minimumDelay
             self.error = error
         }
 
-        isLoading = false
+        isFirstLoad = false
     }
 
     private func refreshEvents() async {
@@ -159,5 +171,40 @@ struct EventsHomeView: View {
         }
 
         isRefreshing = false
+    }
+}
+
+// MARK: - Previews
+
+#Preview("1. Skeleton Loading") {
+    NavigationStack {
+        EventsHomeSkeletonPreview()
+    }
+}
+
+#Preview("2. Loaded Events") {
+    NavigationStack {
+        EventsHomeView()
+    }
+}
+
+// MARK: - Preview Helpers
+
+private struct EventsHomeSkeletonPreview: View {
+    var body: some View {
+        List {
+            Section {
+                ForEach(Event.placeholders) { event in
+                    EventRow(event: event)
+                }
+            } header: {
+                Text("Recent Events")
+                    .foregroundStyle(Color.Theme.mutedForeground)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .redacted(reason: .placeholder)
+        .disabled(true)
+        .navigationTitle("Events")
     }
 }
