@@ -111,3 +111,16 @@ export interface SlideshowContext {
   /** When true, gallery fetches real photos from public API */
   liveMode?: boolean;
 }
+
+// ─── Device preview modes (editor only) ───────────────────────────────────────
+
+/**
+ * Device preview modes for editor with exact pixel dimensions
+ */
+export type DeviceMode = 'desktop' | 'tablet' | 'mobile';
+
+export const DEVICE_DIMENSIONS: Record<DeviceMode, { width: number; height: number }> = {
+  desktop: { width: 1920, height: 1080 }, // 16:9 landscape (TV)
+  tablet: { width: 1024, height: 768 }, // 4:3 landscape
+  mobile: { width: 1080, height: 1920 }, // 9:16 portrait
+};

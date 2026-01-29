@@ -144,41 +144,35 @@ function snapBlockEdgesToGrid(
 
 /**
  * Grid overlay component - shows during drag operations
- * Displays grid lines at 5vmin intervals (creates square grid cells)
+ * Displays grid lines at 5% intervals to match the 5vmin snapping grid
  */
 function GridOverlay({ show }: { show: boolean }) {
   if (!show) return null;
 
-  // Calculate how many grid lines fit based on vmin
-  // If viewport is 1920×1080, vmin = 1080 (height is smaller)
-  // We want 5vmin intervals, so we need to calculate grid positions
-
-  // Generate grid lines at 5vmin intervals
-  // For a portrait screen (height < width), grid will be based on height
-  // For a landscape screen (width < height), grid will be based on width
-
-  const gridSize = 5; // 5vmin intervals
+  // Use percentage-based grid (5% intervals) to match the viewport-based snapping
+  // This ensures grid lines appear correctly regardless of iframe aspect ratio
+  const gridSize = 5; // 5% intervals
   const numLines = Math.floor(100 / gridSize) + 1; // 21 lines (0, 5, 10, ..., 100)
 
-  // Generate positions in vmin units
+  // Generate positions as percentages
   const gridPositions = Array.from({ length: numLines }, (_, i) => i * gridSize);
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10">
-      {/* Vertical lines - use vmin for horizontal positioning */}
+      {/* Vertical lines - percentage of width */}
       {gridPositions.map((pos) => (
         <div
           key={`v-${pos}`}
           className="absolute h-full w-px bg-primary/20"
-          style={{ left: `${pos}vmin` }}
+          style={{ left: `${pos}%` }}
         />
       ))}
-      {/* Horizontal lines - use vmin for vertical positioning */}
+      {/* Horizontal lines - percentage of height */}
       {gridPositions.map((pos) => (
         <div
           key={`h-${pos}`}
           className="absolute w-full border-t border-primary/20"
-          style={{ top: `${pos}vmin` }}
+          style={{ top: `${pos}%` }}
         />
       ))}
     </div>

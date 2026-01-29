@@ -1,6 +1,7 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useParams } from 'react-router';
-import type { SlideshowConfig, SlideshowContext } from '../types';
+import type { SlideshowConfig, SlideshowContext, DeviceMode } from '../types';
+import { DEVICE_DIMENSIONS } from '../types';
 
 // ─── Types for postMessage communication ───────────────────────────────────────
 
@@ -33,6 +34,7 @@ interface IframeCanvasProps {
   config: SlideshowConfig;
   context: SlideshowContext;
   selectedBlockId: string | null;
+  deviceMode: DeviceMode;
   onSelectBlock: (blockId: string | null) => void;
   onConfigUpdate?: (config: SlideshowConfig) => void;
 }
@@ -41,13 +43,16 @@ export function IframeCanvas({
   config,
   context,
   selectedBlockId,
+  deviceMode,
   onSelectBlock,
   onConfigUpdate,
 }: IframeCanvasProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const { id } = useParams<{ id: string }>();
   const isIframeReady = useRef(false);
   const pendingConfig = useRef<EditorConfigMessage | null>(null);
+  const [parentSize, setParentSize] = useState({ width: 0, height: 0 });
 
   // Send config to iframe
   const sendConfigToIframe = useCallback(() => {
@@ -124,15 +129,57 @@ export function IframeCanvas({
     // The ready message will trigger config send
   }, []);
 
+  // Measure parent container size
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        const { width, height } = entry.contentRect;
+        setParentSize({ width, height });
+      }
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Calculate scaled dimensions
+  const deviceDimensions = DEVICE_DIMENSIONS[deviceMode];
+  const padding = 32; // 16px on each side (p-4 = 1rem = 16px)
+  const availableWidth = parentSize.width - padding;
+  const availableHeight = parentSize.height - padding;
+
+  let scaledWidth = deviceDimensions.width;
+  let scaledHeight = deviceDimensions.height;
+
+  if (availableWidth > 0 && availableHeight > 0) {
+    const scaleX = availableWidth / deviceDimensions.width;
+    const scaleY = availableHeight / deviceDimensions.height;
+    const scale = Math.min(scaleX, scaleY, 1); // Never scale up, only down
+
+    scaledWidth = deviceDimensions.width * scale;
+    scaledHeight = deviceDimensions.height * scale;
+  }
+
   return (
-    <div className="flex h-full w-full flex-col bg-muted/50 p-4">
-      <iframe
-        ref={iframeRef}
-        src={`/events/${id}/slideshow-preview?mode=editor`}
-        className="h-full w-full rounded-lg border bg-background shadow-sm"
-        onLoad={handleIframeLoad}
-        title="Slideshow Preview"
-      />
+    <div ref={containerRef} className="flex h-full w-full items-center justify-center bg-muted/50 p-4">
+      <div
+        style={{
+          width: scaledWidth,
+          height: scaledHeight,
+        }}
+      >
+        <iframe
+          ref={iframeRef}
+          src={`/events/${id}/slideshow-preview?mode=editor`}
+          className="h-full w-full rounded-lg border bg-background shadow-sm"
+          onLoad={handleIframeLoad}
+          title="Slideshow Preview"
+        />
+      </div>
     </div>
   );
 }

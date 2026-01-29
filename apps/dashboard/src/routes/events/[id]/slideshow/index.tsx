@@ -18,7 +18,7 @@ import { AlertCircle } from 'lucide-react';
 import { PageHeader } from '../../../../components/shell/page-header';
 import { useEvent } from '../../../../hooks/events/useEvent';
 import { useSlideshowConfig, useUpdateSlideshowConfig } from '../../../../hooks/events/useSlideshowConfig';
-import type { SlideshowConfig, SlideshowBlock, SlideshowContext } from './types';
+import type { SlideshowConfig, SlideshowBlock, SlideshowContext, DeviceMode } from './types';
 import { DEFAULT_CONFIG } from './lib/templates';
 import { createBlock } from './blocks/registry';
 import { IframeCanvas } from './components/iframe-canvas';
@@ -92,6 +92,7 @@ export default function EventSlideshowTab() {
   const [config, setConfig] = useState<SlideshowConfig>(() => structuredClone(DEFAULT_CONFIG));
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
   const hasSynced = useRef(false);
 
   useEffect(() => {
@@ -261,6 +262,8 @@ export default function EventSlideshowTab() {
       >
         <Toolbar
           eventId={id!}
+          deviceMode={deviceMode}
+          onDeviceModeChange={setDeviceMode}
           onAddBlock={handleAddBlock}
           onAddPreset={handleAddPreset}
           onSave={handleSave}
@@ -291,6 +294,7 @@ export default function EventSlideshowTab() {
               config={config}
               context={context}
               selectedBlockId={selectedBlockId}
+              deviceMode={deviceMode}
               onSelectBlock={handleIframeSelectBlock}
               onConfigUpdate={handleConfigUpdate}
             />

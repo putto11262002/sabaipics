@@ -16,11 +16,11 @@ BlockDefinition {
   Renderer       -- React component (renders the real thing)
   SettingsPanel  -- React component (sidebar config UI)
   acceptsChildren? -- true for layout blocks
-  childOnly?       -- true for atom blocks (can't be top-level)
+  childOnly?       -- true for atom blocks (can only exist as children of layout blocks)
 }
 ```
 
-The `defaultSize` field defines default dimensions for blocks (e.g., gallery defaults to 80vw × 60vh). Without explicit size, absolutely positioned blocks collapse to their content size.
+The `defaultSize` field defines default dimensions for blocks (e.g., gallery defaults to 80vw × 60vh). Without explicit size, absolutely positioned blocks size to their content (logo, event-name, subtitle).
 
 Adding a new block type = one folder with 3 files (index, renderer, settings) + one `register()` call.
 
@@ -29,10 +29,10 @@ Adding a new block type = one folder with 3 files (index, renderer, settings) + 
 | Category   | Can be top-level | Has children | Examples                                |
 |------------|------------------|--------------|-----------------------------------------|
 | Layout     | Yes              | Yes          | `flex`                                  |
-| Standalone | Yes              | No           | `gallery`, `qr`                         |
-| Atom       | No (child only) | No           | `logo`, `event-name`, `subtitle`, `stat-card`, `social-icon` |
+| Standalone | Yes              | No           | `gallery`, `qr`, `logo`, `event-name`, `subtitle` |
+| Atom       | No (child only) | No           | `stat-card`, `social-icon` |
 
-**Nesting is capped at 1 level.** Layout blocks contain atom blocks. Layout blocks cannot contain other layout blocks. This is a deliberate constraint to avoid page-builder complexity.
+**Nesting is capped at 1 level.** Layout blocks can contain atom blocks or standalone blocks. Layout blocks cannot contain other layout blocks. This is a deliberate constraint to avoid page-builder complexity.
 
 ### Wire Format
 
@@ -72,6 +72,23 @@ Each block has ONE `Renderer` component. It is the source of truth for how the b
 **Iframe Communication**: The editor and iframe communicate via `postMessage`:
 - Editor sends: `slideshow-config` (config + context + selectedBlockId)
 - Iframe sends: `config-updated` (after drag ends), `block-selected` (on click)
+
+### Editor Performance Optimization
+
+**Placeholder Rendering** (`liveMode: false`):
+- **Gallery block**: Shows skeleton placeholders only (no photo fetching or image rendering)
+- **Logo block**: Shows "LOGO" text placeholder instead of loading actual logo image
+- **Context data**: Editor sets `liveMode: false` and `photos: []` to prevent expensive API calls
+
+**Why placeholders**:
+- Image loading/decoding is expensive and slows down editor responsiveness
+- Skeleton UI provides sufficient visual feedback for layout positioning
+- Real images only load on preview page (`liveMode: true`) where they're needed
+
+**Performance impact**:
+- Editor loads instantly (no network requests for images)
+- Drag operations maintain 60 FPS with no image-related overhead
+- Memory usage stays low (no image buffers in editor)
 
 ### Theme Injection
 
@@ -121,6 +138,37 @@ Blocks are dragged using **native pointer events** (not dnd-kit for canvas posit
 
 **Note**: dnd-kit is still used for sortable lists (flex block children reordering) but not for canvas positioning.
 
+### Grid Snapping System
+
+The editor provides visual grid lines and automatic edge-based snapping for precise block positioning:
+
+**Grid Configuration**:
+- **Grid size**: 5vmin intervals (21×21 grid lines covering 0-100vmin)
+- **Snap threshold**: 2vmin (blocks snap when edge is within 2vmin of any grid line)
+- **Visual feedback**: Grid overlay visible during drag (`GridOverlay` component with `bg-primary/20` lines)
+
+**Square Grid with vmin**:
+Grid uses `vmin` (minimum viewport dimension) for both axes to ensure perfectly square cells on any aspect ratio:
+- `5vmin` horizontally = `5vmin` vertically (always square)
+- Position stored as viewport percentages (0-100%) for responsive scaling
+- Coordinate conversion functions translate between viewport % and vmin % during snap
+
+**Edge-Based Snapping Algorithm** (in `preview.tsx:79-141`):
+1. Convert block center position from viewport % to vmin %
+2. Calculate all 4 edges in vmin coordinates (left, right, top, bottom)
+3. For each edge, find nearest grid line (multiple of 5vmin)
+4. If edge within 2vmin threshold, snap that edge to grid line
+5. Adjust center position based on snapped edge(s)
+6. Convert adjusted center back to viewport % for storage
+
+**Dimension Priority**:
+To snap edges correctly, algorithm needs block dimensions:
+1. **Text blocks** (event-name, subtitle): Measure DOM with `getBoundingClientRect()` during drag
+2. **Logo block**: Extract from `props.width` (square aspect ratio)
+3. **Gallery block**: Use `block.size` field (explicit dimensions)
+
+This approach eliminates center-snapping for text blocks that dynamically size to content.
+
 ### Iframe-Based Editor Canvas
 
 The editor embeds the preview page in an iframe with `?mode=editor` query parameter for true WYSIWYG editing:
@@ -161,8 +209,8 @@ FlexProps {
 ### Block Presets
 
 The "Add Block" dropdown in `toolbar.tsx` is split into two sections:
-- **Blocks**: Flex, Gallery, QR (top-level types only)
-- **Presets**: Event Info, Stats Row, Social Links
+- **Blocks**: Flex, Gallery, QR, Logo, Event Name, Subtitle (all top-level standalone blocks)
+- **Presets**: Event Info, Stats Row, Social Links (pre-built flex layouts with children)
 
 Each preset is a factory function returning a pre-built flex block with children using `createBlockWithChildren()` helper:
 
@@ -226,17 +274,17 @@ slideshow/
       renderer.tsx           # Flex container + child rendering
       settings.tsx           # Direction/align/justify/gap/padding, child list, DnD
     logo/
-      index.ts             # Logo atom definition
-      renderer.tsx           # Logo or placeholder circle
-      settings.tsx           # Size + shape controls
+      index.ts             # Logo standalone block definition
+      renderer.tsx           # Square logo or "LOGO" text placeholder
+      settings.tsx           # Size control (width only, always square)
     event-name/
-      index.ts             # Event name atom definition
-      renderer.tsx           # Text with font size
-      settings.tsx           # Font size select
+      index.ts             # Event name standalone block definition
+      renderer.tsx           # Text with font size + weight
+      settings.tsx           # Font size + weight selects
     subtitle/
-      index.ts             # Subtitle atom definition
-      renderer.tsx           # Text with font size
-      settings.tsx           # Font size select
+      index.ts             # Subtitle standalone block definition
+      renderer.tsx           # Text with font size + weight
+      settings.tsx           # Font size + weight selects
     gallery/
       index.ts, renderer.tsx, settings.tsx  # Standalone gallery block (unchanged)
     qr/
@@ -330,3 +378,10 @@ We use native pointer events instead of dnd-kit for canvas dragging because:
 6. **No rubber band**: Position updates immediately during drag, not just at end
 
 dnd-kit is still used for sortable lists (reordering flex block children) where its features (drop zones, collision detection) are beneficial.
+
+### Logo Always Square
+
+Logo blocks enforce a 1:1 aspect ratio (`aspectRatio: '1'` in CSS). The `width` prop controls the size, and height is automatically equal to width. This constraint:
+- Simplifies logo rendering (no separate height control needed)
+- Ensures consistent visual appearance across different logo uploads
+- Makes grid snapping simpler (only need to track one dimension in props)

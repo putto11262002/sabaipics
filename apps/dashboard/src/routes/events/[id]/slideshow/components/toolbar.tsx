@@ -8,13 +8,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@sabaipics/uiv3/components/dropdown-menu';
-import { Save, Plus, Loader2, Eye } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@sabaipics/uiv3/components/toggle-group';
+import { Save, Plus, Loader2, Eye, Monitor, Tablet, Smartphone } from 'lucide-react';
 import { blockRegistry, getTopLevelTypes } from '../blocks/registry';
 import { blockPresets } from '../lib/presets';
-import type { SlideshowBlock } from '../types';
+import type { SlideshowBlock, DeviceMode } from '../types';
 
 interface ToolbarProps {
   eventId: string;
+  deviceMode: DeviceMode;
+  onDeviceModeChange: (mode: DeviceMode) => void;
   onAddBlock: (type: string) => void;
   onAddPreset: (block: SlideshowBlock) => void;
   onSave: () => void;
@@ -22,7 +25,16 @@ interface ToolbarProps {
   isSaving?: boolean;
 }
 
-export function Toolbar({ eventId, onAddBlock, onAddPreset, onSave, disabled, isSaving }: ToolbarProps) {
+export function Toolbar({
+  eventId,
+  deviceMode,
+  onDeviceModeChange,
+  onAddBlock,
+  onAddPreset,
+  onSave,
+  disabled,
+  isSaving,
+}: ToolbarProps) {
   const types = getTopLevelTypes();
 
   return (
@@ -33,6 +45,23 @@ export function Toolbar({ eventId, onAddBlock, onAddPreset, onSave, disabled, is
           Preview
         </Link>
       </Button>
+
+      <ToggleGroup
+        type="single"
+        value={deviceMode}
+        onValueChange={(value) => value && onDeviceModeChange(value as DeviceMode)}
+        size="sm"
+      >
+        <ToggleGroupItem value="desktop" aria-label="Desktop view">
+          <Monitor className="size-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="tablet" aria-label="Tablet view">
+          <Tablet className="size-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="mobile" aria-label="Mobile view">
+          <Smartphone className="size-4" />
+        </ToggleGroupItem>
+      </ToggleGroup>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
