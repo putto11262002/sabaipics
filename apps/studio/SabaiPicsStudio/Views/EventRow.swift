@@ -20,7 +20,6 @@ struct EventRow: View {
                 .font(.caption)
                 .foregroundStyle(Color.Theme.mutedForeground)
         }
-        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
