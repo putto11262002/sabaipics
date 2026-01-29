@@ -35,6 +35,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ClerkPublishableKey</key>
 	<string>$(CLERK_PUBLISHABLE_KEY)</string>
+	<key>APIBaseURL</key>
+	<string>$(API_BASE_URL)</string>
+	<key>EventFrontendURL</key>
+	<string>$(EVENT_FRONTEND_URL)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>

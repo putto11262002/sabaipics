@@ -46,9 +46,10 @@ struct WelcomeWithClerkSheetView: View {
                     .frame(height: 60)
                 
                 // Logo
-                Image(systemName: "camera.fill")
-                    .font(.system(size: 72, weight: .medium))
-                    .foregroundStyle(Color.Theme.foreground)
+                Image("SabaiPicsLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 120)
                 
                 // App name
                 Text("SabaiPics Studio")

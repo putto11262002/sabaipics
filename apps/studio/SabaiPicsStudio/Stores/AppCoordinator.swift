@@ -34,6 +34,9 @@ class AppCoordinator: ObservableObject {
 
     // MARK: - App State
 
+    /// Tracks if app initialization is complete (Clerk load + minimum 2s display)
+    @Published var appInitialized = false
+
     /// Current app state (determines which view to show)
     @Published var appState: AppState = .manufacturerSelection
 
