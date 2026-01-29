@@ -20,6 +20,7 @@ struct SabaiPicsStudioApp: App {
                 .environmentObject(coordinator.connectionStore)
                 .environmentObject(coordinator.photoStore)
                 .environment(\.clerk, clerk)
+                .tint(Color.Theme.primary)
                 .task {
                     await configureAndLoadClerk()
                 }

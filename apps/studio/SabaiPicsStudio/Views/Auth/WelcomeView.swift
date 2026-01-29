@@ -25,10 +25,11 @@ struct WelcomeView: View {
                 Spacer()
                     .frame(height: 60)
                 
-                // Logo placeholder
-                Image(systemName: "camera.fill")
-                    .font(.system(size: 72, weight: .medium))
-                    .foregroundStyle(.primary)
+                // Logo
+                Image("SabaiPicsLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 120)
                 
                 // App name
                 Text("SabaiPics Studio")

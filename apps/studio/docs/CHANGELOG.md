@@ -4,6 +4,38 @@ iOS Studio architecture changes. See `ARCHITECTURE.md` for current design.
 
 ---
 
+## 2026-01-29
+
+### Update 20: Events Browser UI + Theme Refinements
+
+**Status:** Implemented
+
+Refined Events Browser UI to match iOS native patterns and updated theme to match web design system.
+
+**Events Browser Changes:**
+- Redesigned EventDetailView to match ProfileView pattern (Form with LabeledContent)
+- Removed logo display from detail page
+- Changed subtitle layout to full-width VStack for proper text wrapping
+- Moved copy actions to toolbar menu (search + slideshow links)
+- Added `.listRowBackground(Color.Theme.card)` for visible list item borders
+- Added relative time display ("2 days ago") in event list
+- Added PostgreSQL timestamp parser for API date format compatibility
+
+**Theme Updates:**
+- Applied global tint (`.tint(Color.Theme.primary)`) to root view for consistent theming
+- Updated theme colors from purple to neutral grayscale matching web design system
+- Primary: `#343434` (light) / `#DEDEDE` (dark) - neutral gray instead of purple
+- All 15 theme color assets updated to neutral palette
+
+**Files:**
+- Views: EventsHomeView.swift, EventDetailView.swift, EventRow.swift
+- Theme: SabaiPicsStudioApp.swift, Assets.xcassets/Colors/Theme*.colorset
+- Utilities: DateFormatter+Extensions.swift
+- API: EventsAPIClient.swift (MainActor.run for Clerk session access)
+- Docs: IOS/EVENTS_BROWSER.md
+
+---
+
 ## 2026-01-28
 
 ### Update 19: Canon Cleanup Before Socket Cancel

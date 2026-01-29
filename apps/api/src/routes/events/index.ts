@@ -132,6 +132,8 @@ export const eventsRouter = new Hono<Env>()
             .select({
               id: events.id,
               name: events.name,
+              subtitle: events.subtitle,
+              logoR2Key: events.logoR2Key,
               startDate: events.startDate,
               endDate: events.endDate,
               createdAt: events.createdAt,
@@ -160,7 +162,11 @@ export const eventsRouter = new Hono<Env>()
         const hasPrevPage = page > 0;
 
         return ok({
-          data: eventsList,
+          data: eventsList.map((event) => ({
+            ...event,
+            logoUrl: event.logoR2Key ? `${c.env.PHOTO_R2_BASE_URL}/${event.logoR2Key}` : null,
+            logoR2Key: undefined, // Remove raw key from response
+          })),
           pagination: {
             page,
             limit,
@@ -210,6 +216,8 @@ export const eventsRouter = new Hono<Env>()
           id: event.id,
           photographerId: event.photographerId,
           name: event.name,
+          subtitle: event.subtitle,
+          logoUrl: event.logoR2Key ? `${c.env.PHOTO_R2_BASE_URL}/${event.logoR2Key}` : null,
           startDate: event.startDate,
           endDate: event.endDate,
           qrCodeUrl: null, // Client-side generation
