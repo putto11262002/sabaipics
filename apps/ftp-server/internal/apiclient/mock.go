@@ -86,7 +86,7 @@ func (m *MockClient) Authenticate(ctx context.Context, req AuthRequest) (*AuthRe
 }
 
 // Presign implements APIClient.Presign
-func (m *MockClient) Presign(ctx context.Context, token, filename, contentType string) (*PresignResponse, error) {
+func (m *MockClient) Presign(ctx context.Context, token, filename, contentType string, contentLength *int64) (*PresignResponse, error) {
 	m.mu.Lock()
 	m.PresignCalls = append(m.PresignCalls, MockPresignCall{
 		Token:       token,
@@ -122,8 +122,8 @@ func (m *MockClient) Presign(ctx context.Context, token, filename, contentType s
 }
 
 // PresignWithRetry implements APIClient.PresignWithRetry
-func (m *MockClient) PresignWithRetry(ctx context.Context, token, filename, contentType string, backoff []time.Duration) (*PresignResponse, error) {
-	return m.Presign(ctx, token, filename, contentType)
+func (m *MockClient) PresignWithRetry(ctx context.Context, token, filename, contentType string, contentLength *int64, backoff []time.Duration) (*PresignResponse, error) {
+	return m.Presign(ctx, token, filename, contentType, contentLength)
 }
 
 // UploadToPresignedURL implements APIClient.UploadToPresignedURL

@@ -17,11 +17,13 @@ import { requirePhotographer, type PhotographerVariables } from '../middleware';
 import type { Env } from '../types';
 import { apiError, type HandlerError } from '../lib/error';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
+import { createClerkAuth } from '@sabaipics/auth/middleware';
 import { generatePresignedPutUrl } from '../lib/r2/presign';
-import { hashPassword, verifyPassword } from '../lib/password';
+import { verifyPassword } from '../lib/password';
 import { signFtpToken } from '../lib/ftp/jwt';
 import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
-import { encryptSecret, decryptSecret } from '../lib/crypto/secret';
+import { decryptSecret } from '../lib/crypto/secret';
+import { generateFtpCredentials } from '../lib/ftp/credentials';
 
 // =============================================================================
 // Constants
@@ -168,6 +170,7 @@ export const ftpRouter = new Hono<Env>()
         (e) => apiError(c, e),
       );
   })
+  .use('/events/*', createClerkAuth())
   .post(
     '/presign',
     async (c, next) => {
@@ -287,14 +290,21 @@ export const ftpRouter = new Hono<Env>()
         const intent = intentRows[0];
 
         // 6. Return presigned URL response
+        const requiredHeaders: Record<string, string> = {
+          'Content-Type': contentType,
+          'If-None-Match': '*',
+        };
+
+        if (contentLength !== undefined) {
+          requiredHeaders['Content-Length'] = contentLength.toString();
+        }
+
         return ok({
           upload_id: intent.id,
           put_url: presignResult.url,
           object_key: r2Key,
           expires_at: presignResult.expiresAt.toISOString(),
-          required_headers: {
-            'Content-Type': contentType,
-          },
+          required_headers: requiredHeaders,
         });
       })
         .orTee((e) => e.cause && console.error('[ftp/presign]', e.code + ':', e.cause))
@@ -350,28 +360,20 @@ export const ftpRouter = new Hono<Env>()
           });
         }
 
-        // 3. Generate username (auto-generated format: evt-{short-id})
-        const shortId = crypto.randomUUID().slice(0, 8);
-        const username = `evt-${shortId}`;
+        const encryptionKey = (c.env as unknown as Record<string, string>)
+          .FTP_PASSWORD_ENCRYPTION_KEY;
+        if (!encryptionKey) {
+          return err<never, HandlerError>({
+            code: 'INTERNAL_ERROR',
+            message: 'FTP password encryption key missing',
+          });
+        }
 
-        // 4. Generate high-entropy password
-        const password = crypto.randomUUID();
-
-        // 5. Hash password
-        const passwordHash = yield* ResultAsync.fromThrowable(
-          () => hashPassword(password),
+        const credentialPayload = yield* ResultAsync.fromThrowable(
+          () => generateFtpCredentials(encryptionKey),
           (e): HandlerError => ({
             code: 'INTERNAL_ERROR',
-            message: 'Password hashing failed',
-            cause: e,
-          }),
-        )();
-
-        const passwordCiphertext = yield* ResultAsync.fromThrowable(
-          () => encryptSecret(password, c.env.FTP_PASSWORD_ENCRYPTION_KEY),
-          (e): HandlerError => ({
-            code: 'INTERNAL_ERROR',
-            message: 'Password encryption failed',
+            message: 'FTP credential generation failed',
             cause: e,
           }),
         )();
@@ -383,9 +385,9 @@ export const ftpRouter = new Hono<Env>()
             .values({
               eventId,
               photographerId: photographer.id,
-              username,
-              passwordHash,
-              passwordCiphertext,
+              username: credentialPayload.username,
+              passwordHash: credentialPayload.passwordHash,
+              passwordCiphertext: credentialPayload.passwordCiphertext,
               expiresAt: event.expiresAt,
             })
             .returning(),
@@ -397,8 +399,8 @@ export const ftpRouter = new Hono<Env>()
         // 7. Return credentials (password shown only once)
         return ok({
           id: credential.id,
-          username,
-          password,
+          username: credentialPayload.username,
+          password: credentialPayload.password,
           expiresAt: credential.expiresAt,
           createdAt: credential.createdAt,
         });
@@ -519,8 +521,17 @@ export const ftpRouter = new Hono<Env>()
         }
 
         // 3. Decrypt password
+        const encryptionKey = (c.env as unknown as Record<string, string>)
+          .FTP_PASSWORD_ENCRYPTION_KEY;
+        if (!encryptionKey) {
+          return err<never, HandlerError>({
+            code: 'INTERNAL_ERROR',
+            message: 'FTP password encryption key missing',
+          });
+        }
+
         const password = yield* ResultAsync.fromThrowable(
-          () => decryptSecret(credential.passwordCiphertext, c.env.FTP_PASSWORD_ENCRYPTION_KEY),
+          () => decryptSecret(credential.passwordCiphertext, encryptionKey),
           (e): HandlerError => ({
             code: 'INTERNAL_ERROR',
             message: 'Password decryption failed',

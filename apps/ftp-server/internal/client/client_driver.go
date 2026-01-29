@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -62,40 +61,25 @@ func (d *ClientDriver) OpenFile(name string, flag int, perm os.FileMode) (afero.
 		return nil, err
 	}
 
-	baseCtx := context.Background()
-	if ctx, ok := d.clientMgr.GetUploadContext(d.clientID); ok {
-		baseCtx = ctx
-	}
-
-	ctx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
-	presignResp, err := d.apiClient.PresignWithRetry(ctx, d.jwtToken, name, contentType, nil)
-	cancel()
-
-	if err != nil {
-		if errors.Is(err, apiclient.ErrUnauthorized) {
-			return nil, apiclient.ErrUnauthorized
-		}
-		return nil, err
-	}
-
-	// Create UploadTransfer with presigned URL
 	uploadCtx := context.Background()
 	if ctx, ok := d.clientMgr.GetUploadContext(d.clientID); ok {
 		uploadCtx = ctx
 	}
 
-	uploadTransfer := transfer.NewUploadTransfer(
+	uploadTransfer, err := transfer.NewUploadTransfer(
 		uploadCtx,
 		d.eventID,
 		d.jwtToken,
 		d.clientIP,
 		name,
-		presignResp.PutURL,
-		presignResp.RequiredHeaders,
+		contentType,
 		d.clientID,
 		d.clientMgr,
 		d.apiClient,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	return uploadTransfer, nil
 }

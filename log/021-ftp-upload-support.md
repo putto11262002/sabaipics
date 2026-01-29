@@ -714,3 +714,31 @@ Response:
 - Auth still uses the hashed password; the ciphertext is only for UI reveal.
 - Key stored in Cloudflare Worker secret: `FTP_PASSWORD_ENCRYPTION_KEY`.
 - If key changes, stored passwords become unrecoverable (regenerate required).
+
+---
+
+## 2025-01-29: Auto-create FTP Credentials on Event Creation
+
+**Goal:** Remove manual credential generation; every event gets FTP credentials automatically.
+
+### Changes Made
+
+#### 1. Event Creation Creates FTP Credentials
+
+**File:** `apps/api/src/routes/events/index.ts`
+
+- Generate FTP credentials using shared helper
+- Insert FTP credentials in the same DB transaction as event creation
+
+#### 2. Shared FTP Credential Helper
+
+**File:** `apps/api/src/lib/ftp/credentials.ts`
+
+Single helper used by event creation + manual credential creation route.
+
+#### 3. Dashboard UI: Reveal Toggle
+
+**File:** `apps/dashboard/src/routes/events/[id]/details/index.tsx`
+
+- Show username by default
+- Reveal password on demand (toggle + copy)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,8 +22,8 @@ import (
 // ClientManager hub will handle disconnection when this error is reported
 var ErrAuthExpired = errors.New("authentication expired")
 
-// UploadTransfer implements the afero.File interface for streaming uploads
-// Uses io.Pipe to stream data to R2 via presigned URL without buffering to disk
+// UploadTransfer implements the afero.File interface for buffering uploads
+// Buffers to disk to determine Content-Length before uploading to R2.
 // LIFETIME CONTRACT: 1:1 with uploadTransaction. Must not be reused after Close().
 type UploadTransfer struct {
 	ctx               context.Context
@@ -31,25 +31,24 @@ type UploadTransfer struct {
 	jwtToken          string
 	clientIP          string
 	filename          string
-	presignedURL      string
-	requiredHeaders   map[string]string
+	contentType       string
 	clientID          uint32 // Client ID for event reporting
 	clientMgr         *clientmgr.Manager
 	apiClient         apiclient.APIClient
-	pipeReader        *io.PipeReader
-	pipeWriter        *io.PipeWriter
-	uploadDone        chan error
+	tempFile          *os.File
+	tempPath          string
 	bytesWritten      atomic.Int64
 	startTime         time.Time
 	uploadTransaction *sentry.Span // Sentry ROOT transaction for this upload (1:1 lifetime)
 }
 
-// NewUploadTransfer creates a new upload transfer for streaming to R2 via presigned URL
-// Creates a ROOT Sentry transaction for this upload (not a child span)
-func NewUploadTransfer(ctx context.Context, eventID, jwtToken, clientIP, filename, presignedURL string, requiredHeaders map[string]string, clientID uint32, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient) *UploadTransfer {
-	pr, pw := io.Pipe()
+// NewUploadTransfer creates a new upload transfer that buffers to disk
+func NewUploadTransfer(ctx context.Context, eventID, jwtToken, clientIP, filename, contentType string, clientID uint32, clientMgr *clientmgr.Manager, apiClient apiclient.APIClient) (*UploadTransfer, error) {
+	tempFile, err := os.CreateTemp("", "sabaipics-ftp-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
+	}
 
-	// Create ROOT Sentry transaction for this upload
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -58,16 +57,13 @@ func NewUploadTransfer(ctx context.Context, eventID, jwtToken, clientIP, filenam
 		sentry.WithTransactionSource(sentry.SourceCustom),
 	)
 
-	// Add comprehensive tags for filtering and analysis
 	uploadTransaction.SetTag("file.name", filename)
 	uploadTransaction.SetTag("event.id", eventID)
 	uploadTransaction.SetTag("client.ip", clientIP)
 
-	// Extract and tag file extension (e.g., "jpg", "png", "cr2")
 	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
 	if ext != "" {
 		uploadTransaction.SetTag("file.extension", ext)
-		// Categorize file type based on extension
 		fileType := categorizeFileType(ext)
 		if fileType != "" {
 			uploadTransaction.SetTag("file.type", fileType)
@@ -80,67 +76,64 @@ func NewUploadTransfer(ctx context.Context, eventID, jwtToken, clientIP, filenam
 		jwtToken:          jwtToken,
 		clientIP:          clientIP,
 		filename:          filename,
-		presignedURL:      presignedURL,
-		requiredHeaders:   requiredHeaders,
+		contentType:       contentType,
 		clientID:          clientID,
 		clientMgr:         clientMgr,
 		apiClient:         apiClient,
-		pipeReader:        pr,
-		pipeWriter:        pw,
-		uploadDone:        make(chan error, 1),
+		tempFile:          tempFile,
+		tempPath:          tempFile.Name(),
 		startTime:         time.Now(),
 		uploadTransaction: uploadTransaction,
 	}
 
-	// Start background goroutine to stream to R2
-	go transfer.streamToR2()
-
-	// Log upload creation at I/O boundary
 	sentry.NewLogger(uploadTransaction.Context()).Info().Emitf("Upload started: file=%s, event=%s, client=%s",
 		filename, eventID, clientIP)
 
-	return transfer
+	return transfer, nil
 }
 
 // Write implements io.Writer - receives data from FTP client
-// No logging - too verbose for per-chunk operations
 func (t *UploadTransfer) Write(p []byte) (int, error) {
-	n, err := t.pipeWriter.Write(p)
+	n, err := t.tempFile.Write(p)
 	t.bytesWritten.Add(int64(n))
 	return n, err
 }
 
-// Close signals EOF and waits for upload completion at I/O boundary
+// Close uploads the buffered file to R2
 func (t *UploadTransfer) Close() error {
-	// Signal EOF to the pipe reader
-	if err := t.pipeWriter.Close(); err != nil {
+	if err := t.tempFile.Close(); err != nil {
 		if t.uploadTransaction != nil {
 			t.uploadTransaction.Status = sentry.SpanStatusInternalError
 			t.uploadTransaction.SetTag("error", "true")
 			t.uploadTransaction.SetData("error.message", err.Error())
 			t.uploadTransaction.Finish()
 		}
-		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("Pipe close error: file=%s, error=%v", t.filename, err)
+		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("Temp file close error: file=%s, error=%v", t.filename, err)
 		return err
 	}
 
-	// Wait for background upload to complete
-	err := <-t.uploadDone
+	defer os.Remove(t.tempPath)
+
+	fileSize := t.bytesWritten.Load()
+	if fileSize < 0 {
+		fileSize = 0
+	}
+
+	uploadErr := t.uploadBufferedFile(fileSize)
 
 	duration := time.Since(t.startTime)
 	bytesTotal := t.bytesWritten.Load()
 	throughputMBps := float64(bytesTotal) / duration.Seconds() / 1024 / 1024
 
-	// Add metrics to Sentry transaction
 	if t.uploadTransaction != nil {
 		t.uploadTransaction.SetData("upload.bytes", bytesTotal)
 		t.uploadTransaction.SetData("upload.duration_ms", duration.Milliseconds())
 		t.uploadTransaction.SetData("upload.throughput_mbps", throughputMBps)
 
-		if err != nil {
+		if uploadErr != nil {
 			t.uploadTransaction.Status = sentry.SpanStatusInternalError
 			t.uploadTransaction.SetTag("error", "true")
-			t.uploadTransaction.SetData("error.message", err.Error())
+			t.uploadTransaction.SetData("error.message", uploadErr.Error())
 		} else {
 			t.uploadTransaction.Status = sentry.SpanStatusOK
 		}
@@ -148,38 +141,31 @@ func (t *UploadTransfer) Close() error {
 		t.uploadTransaction.Finish()
 	}
 
-	// Log at I/O boundary
-	if err != nil {
-		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("Upload failed: file=%s, bytes=%d, error=%v", t.filename, bytesTotal, err)
+	if uploadErr != nil {
+		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("Upload failed: file=%s, bytes=%d, error=%v", t.filename, bytesTotal, uploadErr)
 	} else {
 		sentry.NewLogger(t.uploadTransaction.Context()).Info().Emitf("Upload completed: file=%s, bytes=%d, duration=%s, throughput=%.2f MB/s",
 			t.filename, bytesTotal, duration, throughputMBps)
 	}
 
-	return err
+	return uploadErr
 }
 
-// streamToR2 runs in a background goroutine to stream data to R2 via presigned URL (I/O boundary)
-func (t *UploadTransfer) streamToR2() {
-	defer close(t.uploadDone)
+func (t *UploadTransfer) uploadBufferedFile(fileSize int64) error {
+	ctx := context.Background()
 
-	ctx := t.ctx
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	// Upload to R2 presigned URL
-	resp, err := t.apiClient.UploadToPresignedURL(
-		ctx,
-		t.presignedURL,
-		t.requiredHeaders,
-		t.pipeReader, // Stream directly from FTP client pipe
-	)
-
-	if err != nil {
-		// Network error during transfer
+	if err := t.presignAndUpload(ctx, fileSize); err != nil {
 		safeErr := sanitizeUploadError(err)
+		log.Printf("R2 upload failed for file=%s: %s", t.filename, safeErr)
 		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("R2 upload failed for file=%s: %s", t.filename, safeErr)
+
+		if errors.Is(err, apiclient.ErrUnauthorized) {
+			t.clientMgr.SendEvent(clientmgr.ClientEvent{
+				Type:     clientmgr.EventAuthExpired,
+				ClientID: t.clientID,
+				Reason:   "authentication expired",
+			})
+		}
 
 		t.clientMgr.SendEvent(clientmgr.ClientEvent{
 			Type:     clientmgr.EventUploadFailed,
@@ -187,27 +173,74 @@ func (t *UploadTransfer) streamToR2() {
 			Reason:   safeErr,
 		})
 
-		t.uploadDone <- fmt.Errorf("upload failed: %s", safeErr)
-		return
+		return fmt.Errorf("upload failed: %s", safeErr)
+	}
+
+	sentry.NewLogger(t.uploadTransaction.Context()).Info().Emitf("Upload successful: file=%s", t.filename)
+	return nil
+}
+
+func (t *UploadTransfer) presignAndUpload(ctx context.Context, fileSize int64) error {
+	contentLength := fileSize
+	if contentLength < 0 {
+		contentLength = 0
+	}
+
+	presignCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	presignResp, err := t.apiClient.PresignWithRetry(
+		presignCtx,
+		t.jwtToken,
+		t.filename,
+		t.contentType,
+		&contentLength,
+		nil,
+	)
+	cancel()
+	if err != nil {
+		return err
+	}
+
+	if presignResp == nil || presignResp.PutURL == "" {
+		return fmt.Errorf("presign response missing put_url")
+	}
+
+	file, err := os.Open(t.tempPath)
+	if err != nil {
+		return fmt.Errorf("failed to open temp file: %w", err)
+	}
+	defer file.Close()
+
+	requiredHeaders := presignResp.RequiredHeaders
+	if requiredHeaders == nil {
+		requiredHeaders = map[string]string{}
+	}
+
+	requiredHeaders["Content-Length"] = fmt.Sprintf("%d", contentLength)
+	if _, ok := requiredHeaders["Content-Type"]; !ok {
+		requiredHeaders["Content-Type"] = t.contentType
+	}
+	if _, ok := requiredHeaders["If-None-Match"]; !ok {
+		requiredHeaders["If-None-Match"] = "*"
+	}
+
+	uploadCtx, uploadCancel := context.WithTimeout(ctx, 30*time.Minute)
+	resp, err := t.apiClient.UploadToPresignedURL(
+		uploadCtx,
+		presignResp.PutURL,
+		requiredHeaders,
+		file,
+	)
+	uploadCancel()
+	if err != nil {
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("R2 upload failed for file=%s: status %d", t.filename, resp.StatusCode)
-
-		t.clientMgr.SendEvent(clientmgr.ClientEvent{
-			Type:     clientmgr.EventUploadFailed,
-			ClientID: t.clientID,
-			Reason:   fmt.Sprintf("R2 upload failed: %d", resp.StatusCode),
-		})
-
-		t.uploadDone <- fmt.Errorf("R2 upload failed: %d", resp.StatusCode)
-		return
+		return fmt.Errorf("R2 upload failed: %d", resp.StatusCode)
 	}
 
-	sentry.NewLogger(t.uploadTransaction.Context()).Info().Emitf("Upload successful: file=%s", t.filename)
-
-	t.uploadDone <- nil
+	return nil
 }
 
 func sanitizeUploadError(err error) string {
@@ -236,14 +269,14 @@ func (t *UploadTransfer) ReadAt(p []byte, off int64) (int, error) {
 	return 0, errors.New("read not supported - upload only")
 }
 
-// Seek is not supported (streaming upload)
+// Seek is not supported
 func (t *UploadTransfer) Seek(offset int64, whence int) (int64, error) {
-	return 0, errors.New("seek not supported - streaming upload")
+	return 0, errors.New("seek not supported - upload only")
 }
 
-// WriteAt is not supported (streaming upload)
+// WriteAt is not supported
 func (t *UploadTransfer) WriteAt(p []byte, off int64) (int, error) {
-	return 0, errors.New("WriteAt not supported - streaming upload")
+	return 0, errors.New("WriteAt not supported - upload only")
 }
 
 // Name returns the filename
@@ -269,7 +302,7 @@ func (t *UploadTransfer) Stat() (os.FileInfo, error) {
 	}, nil
 }
 
-// Sync is a no-op for streaming uploads
+// Sync is a no-op for buffered uploads
 func (t *UploadTransfer) Sync() error {
 	return nil
 }
@@ -287,13 +320,10 @@ func (t *UploadTransfer) WriteString(s string) (int, error) {
 // categorizeFileType returns the file type category based on extension
 func categorizeFileType(ext string) string {
 	switch ext {
-	// Standard image formats
 	case "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif":
 		return "image"
-	// RAW camera formats
 	case "cr2", "cr3", "nef", "arw", "orf", "rw2", "dng", "raf", "raw":
 		return "raw"
-	// Video formats (unlikely but possible)
 	case "mp4", "mov", "avi", "mkv":
 		return "video"
 	default:

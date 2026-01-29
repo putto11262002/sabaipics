@@ -16,8 +16,8 @@ import (
 // APIClient defines the interface for API operations (for testing)
 type APIClient interface {
 	Authenticate(ctx context.Context, req AuthRequest) (*AuthResponse, error)
-	Presign(ctx context.Context, token, filename, contentType string) (*PresignResponse, error)
-	PresignWithRetry(ctx context.Context, token, filename, contentType string, backoff []time.Duration) (*PresignResponse, error)
+	Presign(ctx context.Context, token, filename, contentType string, contentLength *int64) (*PresignResponse, error)
+	PresignWithRetry(ctx context.Context, token, filename, contentType string, contentLength *int64, backoff []time.Duration) (*PresignResponse, error)
 	UploadToPresignedURL(ctx context.Context, putURL string, headers map[string]string, reader io.Reader) (*http.Response, error)
 }
 
@@ -47,9 +47,9 @@ type AuthResponse struct {
 
 // PresignRequest represents the presign request payload
 type PresignRequest struct {
-	Filename    string `json:"filename"`
-	ContentType string `json:"content_type"`
-	// ContentLength omitted - FTP protocol doesn't guarantee size upfront
+	Filename      string `json:"filename"`
+	ContentType   string `json:"contentType"`
+	ContentLength *int64 `json:"contentLength,omitempty"`
 }
 
 // PresignResponse represents the presign response from API
@@ -128,10 +128,11 @@ func (c *Client) Authenticate(ctx context.Context, req AuthRequest) (*AuthRespon
 }
 
 // Presign requests a presigned R2 URL for upload
-func (c *Client) Presign(ctx context.Context, token, filename, contentType string) (*PresignResponse, error) {
+func (c *Client) Presign(ctx context.Context, token, filename, contentType string, contentLength *int64) (*PresignResponse, error) {
 	reqBody := PresignRequest{
-		Filename:    filename,
-		ContentType: contentType,
+		Filename:      filename,
+		ContentType:   contentType,
+		ContentLength: contentLength,
 	}
 
 	data, err := json.Marshal(reqBody)
@@ -163,18 +164,32 @@ func (c *Client) Presign(ctx context.Context, token, filename, contentType strin
 		return nil, mapPresignStatus(resp, apiErr, parsed)
 	}
 
-	var result struct {
-		Data PresignResponse `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return nil, err
 	}
 
-	return &result.Data, nil
+	var wrapped struct {
+		Data *PresignResponse `json:"data"`
+	}
+	if err := json.Unmarshal(body, &wrapped); err == nil && wrapped.Data != nil {
+		return wrapped.Data, nil
+	}
+
+	var direct PresignResponse
+	if err := json.Unmarshal(body, &direct); err != nil {
+		return nil, err
+	}
+
+	if direct.PutURL == "" {
+		return nil, fmt.Errorf("presign response missing put_url")
+	}
+
+	return &direct, nil
 }
 
 // PresignWithRetry requests a presigned URL with retry for rate limits
-func (c *Client) PresignWithRetry(ctx context.Context, token, filename, contentType string, backoff []time.Duration) (*PresignResponse, error) {
+func (c *Client) PresignWithRetry(ctx context.Context, token, filename, contentType string, contentLength *int64, backoff []time.Duration) (*PresignResponse, error) {
 	if len(backoff) == 0 {
 		backoff = []time.Duration{1 * time.Second, 2 * time.Second, 4 * time.Second}
 	}
@@ -182,7 +197,7 @@ func (c *Client) PresignWithRetry(ctx context.Context, token, filename, contentT
 	var lastErr error
 
 	for attempt := 0; attempt <= len(backoff); attempt++ {
-		presignResp, err := c.Presign(ctx, token, filename, contentType)
+		presignResp, err := c.Presign(ctx, token, filename, contentType, contentLength)
 		if err == nil {
 			return presignResp, nil
 		}
@@ -215,6 +230,12 @@ func (c *Client) UploadToPresignedURL(ctx context.Context, putURL string, header
 	// Apply required headers from presign response
 	for key, value := range headers {
 		req.Header.Set(key, value)
+	}
+
+	if lengthStr, ok := headers["Content-Length"]; ok {
+		if length, err := strconv.ParseInt(lengthStr, 10, 64); err == nil {
+			req.ContentLength = length
+		}
 	}
 
 	return c.httpClient.Do(req)
