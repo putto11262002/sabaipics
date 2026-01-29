@@ -19,16 +19,24 @@ struct RootFlowView: View {
     @State private var isInitializing = true
 
     var body: some View {
-        Group {
+        ZStack {
             if isInitializing {
                 LoadingView()
+                    .transition(.opacity)
+                    .zIndex(1)
             } else if clerk.user == nil {
                 // Experimental: branded welcome + Clerk AuthView in sheet
                 WelcomeWithClerkSheetView()
+                    .transition(.opacity)
+                    .zIndex(0)
             } else {
                 MainTabView()
+                    .transition(.opacity)
+                    .zIndex(0)
             }
         }
+        .animation(.easeInOut(duration: 0.4), value: isInitializing)
+        .animation(.easeInOut(duration: 0.3), value: clerk.user)
         .onReceive(coordinator.$appInitialized) { initialized in
             if initialized {
                 isInitializing = false
