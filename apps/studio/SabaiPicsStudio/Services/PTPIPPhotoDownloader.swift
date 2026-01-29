@@ -70,10 +70,14 @@ actor PTPIPPhotoDownloader {
             throw PTPIPPhotoDownloaderError.notConnected
         }
 
+        PTPLogger.info("Downloading object \(PTPLogger.formatHex(objectHandle))", category: PTPLogger.command)
+
         // Build GetObject command
         var command = await txManager.createCommand()
         let getObjectCommand = command.getObject(handle: objectHandle)
         let expectedTransactionID = getObjectCommand.transactionID
+
+        let startTime = Date()
 
         // Send command
         let commandData = getObjectCommand.toData()
@@ -86,10 +90,16 @@ actor PTPIPPhotoDownloader {
         let response = try await receiveResponse(connection: connection, expectedTransactionID: expectedTransactionID)
         guard let responseCode = PTPResponseCode(rawValue: response.responseCode),
               responseCode.isSuccess else {
+            PTPLogger.error("Download failed: \(PTPResponseCode(rawValue: response.responseCode)?.name ?? "Unknown")", category: PTPLogger.command)
             throw PTPIPPhotoDownloaderError.downloadFailed(
                 PTPResponseCode(rawValue: response.responseCode) ?? .generalError
             )
         }
+
+        let duration = Date().timeIntervalSince(startTime)
+        let throughput = PTPLogger.formatThroughput(bytes: photoData.count, duration: duration)
+
+        PTPLogger.info("Download complete: \(PTPLogger.formatSize(photoData.count)) in \(PTPLogger.formatDuration(duration)) (\(throughput))", category: PTPLogger.command)
 
         return photoData
     }
@@ -127,6 +137,8 @@ actor PTPIPPhotoDownloader {
                 expectedTotalLength = startPacket.totalDataLength
                 receivedStartPacket = true
 
+                PTPLogger.debug("Start data packet: expecting \(PTPLogger.formatSize(Int(expectedTotalLength)))", category: PTPLogger.command)
+
             case .dataPacket:
                 // Intermediate data packets
                 let payloadLength = Int(header.length) - 8
@@ -140,6 +152,11 @@ actor PTPIPPhotoDownloader {
                 }
 
                 accumulatedData.append(dataPacket.data)
+
+                if receivedStartPacket {
+                    let progress = Double(accumulatedData.count) / Double(expectedTotalLength) * 100.0
+                    PTPLogger.debug("Download progress: \(accumulatedData.count)/\(expectedTotalLength) bytes (\(String(format: "%.1f", progress))%)", category: PTPLogger.command)
+                }
 
             case .endDataPacket:
                 // Last packet: marks end of transfer and may contain final data chunk

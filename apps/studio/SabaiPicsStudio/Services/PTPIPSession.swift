@@ -131,6 +131,7 @@ class PTPIPSession: NSObject {
             throw PTPIPSessionError.alreadyConnected
         }
 
+        PTPLogger.info("Connecting to camera...", category: PTPLogger.session)
         print("[PTPIPSession] Connecting...")
 
         self.commandConnection = commandConnection
@@ -235,6 +236,8 @@ class PTPIPSession: NSObject {
 
         isConnected = true
         print("[PTPIPSession] Session ready")
+
+        PTPLogger.info("Session connected and ready (vendor: \(cameraVendor))", category: PTPLogger.session)
 
         delegate?.sessionDidConnect(self)
     }
@@ -390,6 +393,8 @@ class PTPIPSession: NSObject {
         isConnected = false
         print("[PTPIPSession] Disconnected")
 
+        PTPLogger.info("Session disconnected", category: PTPLogger.session)
+
         delegate?.sessionDidDisconnect(self)
     }
 
@@ -408,17 +413,29 @@ class PTPIPSession: NSObject {
         let openCommand = command.openSession()
         let commandData = openCommand.toData()
 
+        // Log command
+        let opCode = PTPOperationCode.openSession
+        PTPLogger.debug("Sending \(opCode.name) (\(PTPLogger.formatHex(sessionID))) [txID: \(openCommand.transactionID)]", category: PTPLogger.command)
+        PTPLogger.breadcrumb("SendCommand: \(opCode.name)")
+
+        let startTime = Date()
+
         // Send command
         try await sendData(connection: connection, data: commandData)
 
         // Read response
         let response = try await receiveResponse(connection: connection, expectedTransactionID: openCommand.transactionID)
 
+        let duration = Date().timeIntervalSince(startTime)
+
         // Check response code
         guard let responseCode = PTPResponseCode(rawValue: response.responseCode),
               responseCode.isSuccess else {
+            PTPLogger.error("\(opCode.name) failed: \(PTPResponseCode(rawValue: response.responseCode)?.name ?? "Unknown") (\(PTPLogger.formatHex(response.responseCode)))", category: PTPLogger.command)
             throw PTPIPSessionError.initializationFailed
         }
+
+        PTPLogger.debug("\(opCode.name) completed in \(PTPLogger.formatDuration(duration)) [code: \(responseCode.name)]", category: PTPLogger.command)
     }
 
     /// Send CloseSession command
@@ -433,11 +450,17 @@ class PTPIPSession: NSObject {
         let closeCommand = command.closeSession()
         let commandData = closeCommand.toData()
 
+        // Log command
+        let opCode = PTPOperationCode.closeSession
+        PTPLogger.debug("Sending \(opCode.name) [txID: \(closeCommand.transactionID)]", category: PTPLogger.command)
+
         // Send command
         try await sendData(connection: connection, data: commandData)
 
         // Read response (may fail if camera already disconnected)
         _ = try? await receiveResponse(connection: connection, expectedTransactionID: closeCommand.transactionID)
+
+        PTPLogger.debug("\(opCode.name) sent", category: PTPLogger.command)
     }
 
     /// Download photo by object handle
