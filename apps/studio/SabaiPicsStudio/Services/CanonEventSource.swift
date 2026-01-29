@@ -246,23 +246,31 @@ class CanonEventSource: CameraEventSource {
     /// - When no events: sleep and increase interval (up to 200ms max)
     private func pollingLoop() async {
         print("[CanonEventSource] Canon adaptive polling started (50-200ms)")
+        PTPLogger.info("Canon adaptive polling started (50-200ms)", category: PTPLogger.canon)
 
         // Reset poll interval at start
         pollInterval = minPollInterval
 
         while isMonitoring {
             do {
+                let pollStart = Date()
+
                 // Poll Canon GetEvent
                 let foundEvents = try await pollCanonEvent()
+
+                let pollLatency = Date().timeIntervalSince(pollStart)
+                PTPLogger.debug("Poll latency: \(String(format: "%.0f", pollLatency * 1000))ms", category: PTPLogger.canon)
 
                 if foundEvents {
                     // Events found - reset backoff and poll again immediately
                     pollInterval = minPollInterval
                     print("[CanonEventSource] Events found, polling immediately")
+                    PTPLogger.debug("Events found, polling immediately", category: PTPLogger.canon)
                     continue  // No sleep - immediate next poll
                 } else {
                     // No events - adaptive backoff
                     print("[CanonEventSource] No events, sleeping \(Int(pollInterval * 1000))ms")
+                    PTPLogger.debug("No events, backing off to \(Int(pollInterval * 1000))ms", category: PTPLogger.canon)
                     try await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
 
                     // Increase interval for next poll (up to max)
@@ -278,11 +286,13 @@ class CanonEventSource: CameraEventSource {
             } catch {
                 // Error - back off with max interval and retry
                 print("[CanonEventSource] Poll error: \(error), backing off \(Int(maxPollInterval * 1000))ms")
+                PTPLogger.error("Poll error: \(error), backing off", category: PTPLogger.canon)
                 try? await Task.sleep(nanoseconds: UInt64(maxPollInterval * 1_000_000_000))
             }
         }
 
         print("[CanonEventSource] Canon polling stopped")
+        PTPLogger.info("Canon polling stopped", category: PTPLogger.canon)
     }
 
     /// Poll Canon EOS GetEvent
@@ -351,13 +361,13 @@ class CanonEventSource: CameraEventSource {
 
             // Only download JPEG files
             if objectInfo.isJpegFile {
-                print("[CanonEventSource] 📷 Downloading JPEG: \(objectInfo.filename)")
+                print("[CanonEventSource] Downloading JPEG: \(objectInfo.filename)")
                 delegate?.eventSource(self, didDetectPhoto: handle)
                 let photoData = try await photoOps.downloadPhoto(objectHandle: handle)
                 print("[CanonEventSource] Photo 0x\(String(format: "%08X", handle)) downloaded (\(photoData.count) bytes)")
             } else {
                 // Unknown format - log and skip
-                print("[CanonEventSource] ⏭️ Skipping unknown format: \(objectInfo.filename) (format: 0x\(String(format: "%04X", objectInfo.objectFormat)))")
+                print("[CanonEventSource] Skipping unknown format: \(objectInfo.filename) (format: 0x\(String(format: "%04X", objectInfo.objectFormat)))")
             }
         } catch {
             print("[CanonEventSource] Failed to get object info for 0x\(String(format: "%08X", handle)): \(error)")
@@ -383,6 +393,9 @@ class CanonEventSource: CameraEventSource {
         var offset = 0
         var photosToDownload: [UInt32] = []
 
+        // Log event data
+        PTPLogger.data(data, caption: "canon/event_response", category: PTPLogger.canon)
+
         // From libgphoto2: while (curdata - data + 8 < datasize)
         while offset + 8 < data.count {
             // Canon event format: size (4 bytes) + type (4 bytes) + data...
@@ -392,8 +405,11 @@ class CanonEventSource: CameraEventSource {
             let eventType = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset + 4, as: UInt32.self) }
             let type = UInt32(littleEndian: eventType)
 
+            PTPLogger.debug("Parsing event: size=\(eventSize) type=\(PTPLogger.formatHex(type))", category: PTPLogger.canon)
+
             // Terminator check: size=8, type=0 means end of events
             if eventSize == 8 && type == 0 {
+                PTPLogger.debug("Event terminator reached", category: PTPLogger.canon)
                 break
             }
 
@@ -410,14 +426,20 @@ class CanonEventSource: CameraEventSource {
                     let objectHandle = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset + 8, as: UInt32.self) }
                     let handle = UInt32(littleEndian: objectHandle)
                     print("[CanonEventSource] Photo detected: 0x\(String(format: "%08X", handle))")
+                    PTPLogger.info("Photo detected: event type=\(PTPLogger.formatHex(type)) handle=\(PTPLogger.formatHex(handle))", category: PTPLogger.canon)
                     photosToDownload.append(handle)
                 }
 
             default:
+                PTPLogger.debug("  - Event type: \(PTPLogger.formatHex(type)) (non-photo)", category: PTPLogger.canon)
                 break
             }
 
             offset += eventSize
+        }
+
+        if !photosToDownload.isEmpty {
+            PTPLogger.info("Canon events received: \(photosToDownload.count) photos", category: PTPLogger.canon)
         }
 
         return photosToDownload

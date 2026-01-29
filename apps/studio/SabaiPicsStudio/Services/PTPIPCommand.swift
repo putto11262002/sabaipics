@@ -36,6 +36,29 @@ enum PTPOperationCode: UInt16 {
     case canonEOSGetStorageInfo = 0x9102
     case canonEOSGetObject = 0x9104
     case canonEOSRemoteRelease = 0x910F
+
+    /// Human-readable operation name for logging
+    var name: String {
+        switch self {
+        case .getDeviceInfo: return "GetDeviceInfo"
+        case .openSession: return "OpenSession"
+        case .closeSession: return "CloseSession"
+        case .getStorageIDs: return "GetStorageIDs"
+        case .getStorageInfo: return "GetStorageInfo"
+        case .getNumObjects: return "GetNumObjects"
+        case .getObjectHandles: return "GetObjectHandles"
+        case .getObjectInfo: return "GetObjectInfo"
+        case .getObject: return "GetObject"
+        case .deleteObject: return "DeleteObject"
+        case .canonEOSGetEvent: return "Canon_EOS_GetEvent"
+        case .canonEOSSetRemoteMode: return "Canon_EOS_SetRemoteMode"
+        case .canonEOSSetEventMode: return "Canon_EOS_SetEventMode"
+        case .canonEOSGetStorageIDs: return "Canon_EOS_GetStorageIDs"
+        case .canonEOSGetStorageInfo: return "Canon_EOS_GetStorageInfo"
+        case .canonEOSGetObject: return "Canon_EOS_GetObject"
+        case .canonEOSRemoteRelease: return "Canon_EOS_RemoteRelease"
+        }
+    }
 }
 
 // MARK: - PTP Response Codes
@@ -80,6 +103,27 @@ enum PTPResponseCode: UInt16 {
         case .sessionAlreadyOpen: return "Session already open"
         case .transactionCancelled: return "Transaction cancelled"
         case .specificationOfDestinationUnsupported: return "Destination unsupported"
+        }
+    }
+
+    /// Human-readable response code name for logging
+    var name: String {
+        switch self {
+        case .ok: return "OK"
+        case .generalError: return "GeneralError"
+        case .sessionNotOpen: return "SessionNotOpen"
+        case .invalidTransactionID: return "InvalidTransactionID"
+        case .operationNotSupported: return "OperationNotSupported"
+        case .parameterNotSupported: return "ParameterNotSupported"
+        case .incompleteTransfer: return "IncompleteTransfer"
+        case .invalidStorageID: return "InvalidStorageID"
+        case .invalidObjectHandle: return "InvalidObjectHandle"
+        case .deviceBusy: return "DeviceBusy"
+        case .invalidParentObject: return "InvalidParentObject"
+        case .invalidParameter: return "InvalidParameter"
+        case .sessionAlreadyOpen: return "SessionAlreadyOpen"
+        case .transactionCancelled: return "TransactionCancelled"
+        case .specificationOfDestinationUnsupported: return "DestinationUnsupported"
         }
     }
 }

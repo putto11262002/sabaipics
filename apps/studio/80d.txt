@@ -1,0 +1,1933 @@
+Sending InitCommandRequest packet
+ptpip/initcommandrequest/send:
+0000  3E 00 00 00 01 00 00 00 - CC 58 34 73 7B 47 43 3E  >........X4s{GC>
+0010  B2 38 2C 10 63 09 D5 F8 - 73 00 61 00 62 00 61 00  .8,.c...s.a.b.a.
+0020  69 00 70 00 69 00 63 00 - 73 00 2D 00 73 00 74 00  i.p.i.c.s.-.s.t.
+0030  75 00 64 00 69 00 6F 00 - 00 00 00 00 01 00        u.d.i.o.......
+Sending InitCommandRequest packet
+ptpip/initcommandrequest/send:
+0000  3E 00 00 00 01 00 00 00 - CC 58 34 73 7B 47 43 3E  >........X4s{GC>
+0010  B2 38 2C 10 63 09 D5 F8 - 73 00 61 00 62 00 61 00  .8,.c...s.a.b.a.
+0020  69 00 70 00 69 00 63 00 - 73 00 2D 00 73 00 74 00  i.p.i.c.s.-.s.t.
+0030  75 00 64 00 69 00 6F 00 - 00 00 00 00 01 00        u.d.i.o.......
+Sending InitCommandRequest packet
+ptpip/initcommandrequest/send:
+0000  3E 00 00 00 01 00 00 00 - CC 58 34 73 7B 47 43 3E  >........X4s{GC>
+0010  B2 38 2C 10 63 09 D5 F8 - 73 00 61 00 62 00 61 00  .8,.c...s.a.b.a.
+0020  69 00 70 00 69 00 63 00 - 73 00 2D 00 73 00 74 00  i.p.i.c.s.-.s.t.
+0030  75 00 64 00 69 00 6F 00 - 00 00 00 00 01 00        u.d.i.o.......
+Sending InitCommandRequest packet
+ptpip/initcommandrequest/send:
+0000  3E 00 00 00 01 00 00 00 - CC 58 34 73 7B 47 43 3E  >........X4s{GC>
+0010  B2 38 2C 10 63 09 D5 F8 - 73 00 61 00 62 00 61 00  .8,.c...s.a.b.a.
+0020  69 00 70 00 69 00 63 00 - 73 00 2D 00 73 00 74 00  i.p.i.c.s.-.s.t.
+0030  75 00 64 00 69 00 6F 00 - 00 00 00 00 01 00        u.d.i.o.......
+Sending InitCommandRequest packet
+ptpip/initcommandrequest/send:
+0000  3E 00 00 00 01 00 00 00 - CC 58 34 73 7B 47 43 3E  >........X4s{GC>
+0010  B2 38 2C 10 63 09 D5 F8 - 73 00 61 00 62 00 61 00  .8,.c...s.a.b.a.
+0020  69 00 70 00 69 00 63 00 - 73 00 2D 00 73 00 74 00  i.p.i.c.s.-.s.t.
+0030  75 00 64 00 69 00 6F 00 - 00 00 00 00 01 00        u.d.i.o.......
+Sending InitCommandRequest packet
+ptpip/initcommandrequest/send:
+0000  3E 00 00 00 01 00 00 00 - CC 58 34 73 7B 47 43 3E  >........X4s{GC>
+0010  B2 38 2C 10 63 09 D5 F8 - 73 00 61 00 62 00 61 00  .8,.c...s.a.b.a.
+0020  69 00 70 00 69 00 63 00 - 73 00 2D 00 73 00 74 00  i.p.i.c.s.-.s.t.
+0030  75 00 64 00 69 00 6F 00 - 00 00 00 00 01 00        u.d.i.o.......
+Sending InitCommandRequest packet
+ptpip/initcommandrequest/send:
+0000  3E 00 00 00 01 00 00 00 - CC 58 34 73 7B 47 43 3E  >........X4s{GC>
+0010  B2 38 2C 10 63 09 D5 F8 - 73 00 61 00 62 00 61 00  .8,.c...s.a.b.a.
+0020  69 00 70 00 69 00 63 00 - 73 00 2D 00 73 00 74 00  i.p.i.c.s.-.s.t.
+0030  75 00 64 00 69 00 6F 00 - 00 00 00 00 01 00        u.d.i.o.......
+Sending InitEventRequest packet
+ptpip/initeventrequest/send:
+0000  0C 00 00 00 03 00 00 00 - 01 00 00 00              ............
+Sending OperationRequest: OpenSession [txID: 1]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 02 10 01 00  ................
+0010  00 00 3A A7 B2 A9                                  ..:...
+Sending OpenSession (0xA9B2A73A) [txID: 1]
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 01 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 1]
+OpenSession completed in 0.011s [code: OK]
+Sending OperationRequest: Canon_EOS_SetEventMode [txID: 2]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 15 91 02 00  ................
+0010  00 00 01 00 00 00                                  ......
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 02 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 2]
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 3]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 03 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 03 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 3]
+Canon adaptive polling started (50-200ms)
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 4]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 04 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 04 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 4]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 203ms
+No events, backing off to 50ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 5]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 05 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 05 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 5]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 47ms
+No events, backing off to 100ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 6]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 06 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 06 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 6]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 207ms
+No events, backing off to 150ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 7]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 07 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 07 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 7]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 45ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 8]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 08 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 08 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 8]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 94ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 9]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 09 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 09 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 9]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - 0E D1 00 00 00 00 00 00  ................
+0010  10 00 00 00 89 C1 00 00 - 1D D1 00 00 00 00 00 00  ................
+0020  10 00 00 00 89 C1 00 00 - 0E D1 00 00 00 00 00 00  ................
+0030  10 00 00 00 89 C1 00 00 - 1D D1 00 00 00 00 00 00  ................
+0040  10 00 00 00 89 C1 00 00 - 0D D1 00 00 00 00 00 00  ................
+0050  10 00 00 00 89 C1 00 00 - 1D D1 00 00 00 00 00 00  ................
+0060  10 00 00 00 89 C1 00 00 - 0D D1 00 00 00 00 00 00  ................
+0070  10 00 00 00 89 C1 00 00 - 1D D1 00 00 00 00 00 00  ................
+0080  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0090  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 95ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 10]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0A 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0A 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 10]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  10 00 00 00 89 C1 00 00 - 02 D1 00 00 60 00 00 00  ............`...
+0020  14 00 00 00 8A C1 00 00 - 02 D1 00 00 03 00 00 00  ................
+0030  00 00 00 00 10 00 00 00 - 89 C1 00 00 01 D1 00 00  ................
+0040  20 00 00 00 08 00 00 00 - 00 00 00 00               ...........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 117ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 11]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0B 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0B 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 11]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 81ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 12]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0C 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0C 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 12]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 107ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 13]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0D 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0D 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 13]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 87ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 14]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0E 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0E 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 14]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 99ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 15]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0F 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0F 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 15]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 97ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 16]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 10 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 10 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 16]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 98ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 17]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 11 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 11 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 17]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 97ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 18]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 12 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 12 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 18]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 102ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 19]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 13 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 13 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 19]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 108ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 20]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 14 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 14 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 20]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 109ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 21]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 15 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 15 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 21]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 94ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 22]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 16 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 16 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 22]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 95ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 23]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 17 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 17 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 23]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 101ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 24]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 18 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 18 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 24]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 103ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 25]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 19 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 19 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 25]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 94ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 26]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1A 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1A 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 26]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 90ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 27]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1B 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1B 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 27]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 135ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 28]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1C 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1C 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 28]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 61ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 29]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1D 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1D 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 29]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 104ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 30]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1E 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1E 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 30]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 109ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 31]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1F 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1F 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 31]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 467ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 32]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 20 00  .............. .
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 20 00 00 00        .........  ...
+Received OperationResponse: OK [txID: 32]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 110ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 33]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 21 00  ..............!.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 21 00 00 00        ......... !...
+Received OperationResponse: OK [txID: 33]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 111ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 34]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 22 00  ..............".
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 22 00 00 00        ......... "...
+Received OperationResponse: OK [txID: 34]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 127ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 35]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 23 00  ..............#.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 23 00 00 00        ......... #...
+Received OperationResponse: OK [txID: 35]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 108ms
+No events, backing off to 200ms
+Canon polling stopped
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 36]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 24 00  ..............$.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 24 00 00 00        ......... $...
+Received OperationResponse: OK [txID: 36]
+Sending OperationRequest: Canon_EOS_SetEventMode [txID: 37]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 15 91 25 00  ..............%.
+0010  00 00 00 00 00 00                                  ......
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 25 00 00 00        ......... %...
+Received OperationResponse: OK [txID: 37]
+Sending OperationRequest: CloseSession [txID: 38]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 01 00 00 00 03 10 26 00  ..............&.
+0010  00 00                                              ..
+Sending CloseSession [txID: 38]
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 26 00 00 00        ......... &...
+Received OperationResponse: OK [txID: 38]
+CloseSession sent
+Session disconnected
+Sending InitCommandRequest packet
+ptpip/initcommandrequest/send:
+0000  3E 00 00 00 01 00 00 00 - CC 58 34 73 7B 47 43 3E  >........X4s{GC>
+0010  B2 38 2C 10 63 09 D5 F8 - 73 00 61 00 62 00 61 00  .8,.c...s.a.b.a.
+0020  69 00 70 00 69 00 63 00 - 73 00 2D 00 73 00 74 00  i.p.i.c.s.-.s.t.
+0030  75 00 64 00 69 00 6F 00 - 00 00 00 00 01 00        u.d.i.o.......
+Sending InitEventRequest packet
+ptpip/initeventrequest/send:
+0000  0C 00 00 00 03 00 00 00 - 01 00 00 00              ............
+Sending OperationRequest: OpenSession [txID: 1]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 02 10 01 00  ................
+0010  00 00 74 94 F4 D9                                  ..t...
+Sending OpenSession (0xD9F49474) [txID: 1]
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 01 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 1]
+OpenSession completed in 0.012s [code: OK]
+Sending OperationRequest: Canon_EOS_SetEventMode [txID: 2]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 15 91 02 00  ................
+0010  00 00 01 00 00 00                                  ......
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 02 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 2]
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 3]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 03 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 03 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 3]
+Canon adaptive polling started (50-200ms)
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 4]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 04 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 04 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 4]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 25ms
+No events, backing off to 50ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 5]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 05 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 05 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 5]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 51ms
+No events, backing off to 100ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 6]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 06 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 06 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 6]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 95ms
+No events, backing off to 150ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 7]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 07 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 07 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 7]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 50ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 8]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 08 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 08 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 8]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 97ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 9]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 09 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 09 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 9]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - 0E D1 00 00 00 00 00 00  ................
+0010  10 00 00 00 89 C1 00 00 - 1D D1 00 00 00 00 00 00  ................
+0020  10 00 00 00 89 C1 00 00 - 0E D1 00 00 00 00 00 00  ................
+0030  10 00 00 00 89 C1 00 00 - 1D D1 00 00 00 00 00 00  ................
+0040  10 00 00 00 89 C1 00 00 - 0D D1 00 00 00 00 00 00  ................
+0050  10 00 00 00 89 C1 00 00 - 1D D1 00 00 00 00 00 00  ................
+0060  10 00 00 00 89 C1 00 00 - 0D D1 00 00 00 00 00 00  ................
+0070  10 00 00 00 89 C1 00 00 - 1D D1 00 00 00 00 00 00  ................
+0080  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0090  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 208ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 10]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0A 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0A 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 10]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 89ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 11]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0B 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0B 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 11]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 95ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 12]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0C 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0C 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 12]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  10 00 00 00 89 C1 00 00 - 02 D1 00 00 60 00 00 00  ............`...
+0020  14 00 00 00 8A C1 00 00 - 02 D1 00 00 03 00 00 00  ................
+0030  00 00 00 00 10 00 00 00 - 89 C1 00 00 01 D1 00 00  ................
+0040  20 00 00 00 08 00 00 00 - 00 00 00 00               ...........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 107ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 13]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0D 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0D 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 13]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 95ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 14]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0E 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0E 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 14]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 99ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 15]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 0F 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 0F 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 15]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 315ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 16]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 10 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 10 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 16]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 100ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 17]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 11 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 11 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 17]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 197ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 18]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 12 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 12 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 18]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 104ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 19]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 13 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 13 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 19]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 93ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 20]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 14 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 14 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 20]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 107ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 21]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 15 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 15 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 21]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 97ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 22]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 16 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 16 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 22]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 16ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 23]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 17 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 17 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 23]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 186ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 24]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 18 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 18 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 24]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 100ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 25]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 19 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 19 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 25]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 103ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 26]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1A 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1A 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 26]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 98ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 27]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1B 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1B 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 27]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - B1 D1 00 00 01 00 00 00  ................
+0010  10 00 00 00 89 C1 00 00 - BC D1 00 00 01 00 00 00  ................
+0020  10 00 00 00 89 C1 00 00 - C2 D1 00 00 00 00 00 00  ................
+0030  60 00 00 00 8A C1 00 00 - 04 D1 00 00 03 00 00 00  `...............
+0040  13 00 00 00 E8 00 00 00 - EB 00 00 00 ED 00 00 00  ................
+0050  F0 00 00 00 F3 00 00 00 - F5 00 00 00 F8 00 00 00  ................
+0060  FB 00 00 00 FD 00 00 00 - 00 00 00 00 03 00 00 00  ................
+0070  05 00 00 00 08 00 00 00 - 0B 00 00 00 0D 00 00 00  ................
+0080  10 00 00 00 13 00 00 00 - 15 00 00 00 18 00 00 00  ................
+0090  14 00 00 00 8A C1 00 00 - 3D D1 00 00 07 00 00 00  ........=.......
+00A0  00 00 00 00 3C 00 00 00 - 8A C1 00 00 D9 D1 00 00  ....<...........
+00B0  03 00 00 00 0A 00 00 00 - 00 00 00 00 03 00 00 00  ................
+00C0  05 00 00 00 08 00 00 00 - 0B 00 00 00 0D 00 00 00  ................
+00D0  10 00 00 00 13 00 00 00 - 15 00 00 00 18 00 00 00  ................
+00E0  74 00 00 00 8A C1 00 00 - 03 D1 00 00 03 00 00 00  t...............
+00F0  17 00 00 00 00 00 00 00 - 48 00 00 00 4B 00 00 00  ........H...K...
+0100  4D 00 00 00 50 00 00 00 - 53 00 00 00 55 00 00 00  M...P...S...U...
+0110  58 00 00 00 5B 00 00 00 - 5D 00 00 00 60 00 00 00  X...[...]...`...
+0120  63 00 00 00 65 00 00 00 - 68 00 00 00 6B 00 00 00  c...e...h...k...
+0130  6D 00 00 00 70 00 00 00 - 73 00 00 00 75 00 00 00  m...p...s...u...
+0140  78 00 00 00 7B 00 00 00 - 7D 00 00 00 80 00 00 00  x...{...}.......
+0150  00 00 00 00 20 00 00 00 - 8A C1 00 00 BC D1 00 00  .... ...........
+0160  03 00 00 00 03 00 00 00 - 01 00 00 00 00 00 00 00  ................
+0170  03 00 00 00 20 00 00 00 - 8A C1 00 00 BA D1 00 00  .... ...........
+0180  03 00 00 00 03 00 00 00 - 02 00 00 00 03 00 00 00  ................
+0190  01 00 00 00 24 00 00 00 - 8A C1 00 00 78 D1 00 00  ....$.......x...
+01A0  03 00 00 00 04 00 00 00 - 03 00 00 00 01 00 00 00  ................
+01B0  00 00 00 00 02 00 00 00 - 14 00 00 00 8A C1 00 00  ................
+01C0  79 D1 00 00 03 00 00 00 - 00 00 00 00 1C 00 00 00  y...............
+01D0  8A C1 00 00 C9 D1 00 00 - 03 00 00 00 02 00 00 00  ................
+01E0  01 00 00 00 00 00 00 00 - 24 00 00 00 8A C1 00 00  ........$.......
+01F0  07 D1 00 00 03 00 00 00 - 04 00 00 00 03 00 00 00  ................
+0200  04 00 00 00 01 00 00 00 - 05 00 00 00 28 00 00 00  ............(...
+0210  8A C1 00 00 06 D1 00 00 - 03 00 00 00 05 00 00 00  ................
+0220  00 00 00 00 04 00 00 00 - 05 00 00 00 10 00 00 00  ................
+0230  11 00 00 00 14 00 00 00 - 8A C1 00 00 01 D1 00 00  ................
+0240  03 00 00 00 00 00 00 00 - 14 00 00 00 8A C1 00 00  ................
+0250  02 D1 00 00 03 00 00 00 - 00 00 00 00 14 00 00 00  ................
+0260  8A C1 00 00 CD D1 00 00 - 03 00 00 00 00 00 00 00  ................
+0270  20 00 00 00 8A C1 00 00 - BC D1 00 00 03 00 00 00   ...............
+0280  03 00 00 00 01 00 00 00 - 00 00 00 00 03 00 00 00  ................
+0290  14 00 00 00 8A C1 00 00 - 3A D1 00 00 03 00 00 00  ........:.......
+02A0  00 00 00 00 14 00 00 00 - 8A C1 00 00 B8 D1 00 00  ................
+02B0  03 00 00 00 00 00 00 00 - 1C 00 00 00 8A C1 00 00  ................
+02C0  08 D1 00 00 03 00 00 00 - 02 00 00 00 00 00 00 00  ................
+02D0  01 00 00 00 14 00 00 00 - 8A C1 00 00 C5 D1 00 00  ................
+02E0  03 00 00 00 00 00 00 00 - 14 00 00 00 8A C1 00 00  ................
+02F0  95 D1 00 00 03 00 00 00 - 00 00 00 00 14 00 00 00  ................
+0300  8A C1 00 00 96 D1 00 00 - 01 00 00 00 00 00 00 00  ................
+0310  14 00 00 00 8A C1 00 00 - 97 D1 00 00 03 00 00 00  ................
+0320  00 00 00 00 3C 00 00 00 - 8A C1 00 00 09 D1 00 00  ....<...........
+0330  03 00 00 00 0A 00 00 00 - 00 00 00 00 17 00 00 00  ................
+0340  01 00 00 00 08 00 00 00 - 02 00 00 00 03 00 00 00  ................
+0350  04 00 00 00 05 00 00 00 - 06 00 00 00 09 00 00 00  ................
+0360  1C 00 00 00 8A C1 00 00 - B1 D1 00 00 03 00 00 00  ................
+0370  02 00 00 00 01 00 00 00 - 00 00 00 00 24 00 00 00  ............$...
+0380  8A C1 00 00 94 D1 00 00 - 03 00 00 00 04 00 00 00  ................
+0390  00 00 00 00 02 00 00 00 - 07 00 00 00 01 00 00 00  ................
+03A0  14 00 00 00 8A C1 00 00 - 7B D1 00 00 03 00 00 00  ........{.......
+03B0  00 00 00 00 60 00 00 00 - 8A C1 00 00 04 D1 00 00  ....`...........
+03C0  03 00 00 00 13 00 00 00 - E8 00 00 00 EB 00 00 00  ................
+03D0  ED 00 00 00 F0 00 00 00 - F3 00 00 00 F5 00 00 00  ................
+03E0  F8 00 00 00 FB 00 00 00 - FD 00 00 00 00 00 00 00  ................
+03F0  03 00 00 00 05 00 00 00 - 08 00 00 00 0B 00 00 00  ................
+... (showing first 1024 of 8676 bytes)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=96 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=60 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=116 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=32 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=32 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=40 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=32 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=60 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=96 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=60 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=116 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=32 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=32 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=40 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=32 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=60 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=240 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=40 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=96 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=60 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=116 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=1104 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=1104 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=1104 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=96 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=96 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=60 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=64 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=64 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=32 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=32 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=52 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=52 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=52 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=52 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=52 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=52 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=52 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=52 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=56 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=56 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=56 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=56 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=56 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=56 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=24 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C184
+  - Event type: 0x0000C184 (non-photo)
+Parsing event: size=16 type=0x0000C184
+  - Event type: 0x0000C184 (non-photo)
+Parsing event: size=16 type=0x0000C184
+  - Event type: 0x0000C184 (non-photo)
+Parsing event: size=16 type=0x0000C184
+  - Event type: 0x0000C184 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=48 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=240 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=116 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=96 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 349ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 28]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1C 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1C 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 28]
+canon/event_response:
+0000  24 01 00 00 89 C1 00 00 - A0 D1 00 00 18 01 00 00  $...............
+0010  01 00 00 00 03 00 00 00 - 0C 01 00 00 10 00 00 00  ................
+0020  02 05 00 00 01 00 00 00 - 02 00 00 00 18 05 00 00  ................
+0030  01 00 00 00 00 00 00 00 - 04 05 00 00 01 00 00 00  ................
+0040  00 00 00 00 19 05 00 00 - 01 00 00 00 00 00 00 00  ................
+0050  1A 05 00 00 01 00 00 00 - 00 00 00 00 0E 05 00 00  ................
+0060  01 00 00 00 00 00 00 00 - 05 05 00 00 01 00 00 00  ................
+0070  00 00 00 00 12 05 00 00 - 02 00 00 00 00 00 00 00  ................
+0080  47 00 00 00 1B 05 00 00 - 01 00 00 00 00 00 00 00  G...............
+0090  16 05 00 00 01 00 00 00 - 00 00 00 00 1E 05 00 00  ................
+00A0  01 00 00 00 02 00 00 00 - 1C 05 00 00 01 00 00 00  ................
+00B0  00 00 00 00 13 05 00 00 - 01 00 00 00 00 00 00 00  ................
+00C0  0C 05 00 00 01 00 00 00 - 00 00 00 00 1D 05 00 00  ................
+00D0  02 00 00 00 00 00 00 00 - 00 00 00 00 07 05 00 00  ................
+00E0  10 00 00 00 00 00 00 00 - 00 00 00 00 00 00 00 00  ................
+00F0  00 00 00 00 00 00 00 00 - 00 00 00 00 00 00 00 00  ................
+0100  00 00 00 00 00 00 00 00 - 00 00 00 00 00 00 00 00  ................
+0110  00 00 00 00 00 00 00 00 - 00 00 00 00 00 00 00 00  ................
+0120  00 00 00 00 10 00 00 00 - 89 C1 00 00 B1 D1 00 00  ................
+0130  01 00 00 00 10 00 00 00 - 89 C1 00 00 B1 D1 00 00  ................
+0140  01 00 00 00 10 00 00 00 - 89 C1 00 00 B8 D1 00 00  ................
+0150  00 00 00 00 14 00 00 00 - 8A C1 00 00 CD D1 00 00  ................
+0160  03 00 00 00 00 00 00 00 - 90 00 00 00 8A C1 00 00  ................
+0170  04 D1 00 00 03 00 00 00 - 1F 00 00 00 D8 00 00 00  ................
+0180  DB 00 00 00 DD 00 00 00 - E0 00 00 00 E3 00 00 00  ................
+0190  E5 00 00 00 E8 00 00 00 - EB 00 00 00 ED 00 00 00  ................
+01A0  F0 00 00 00 F3 00 00 00 - F5 00 00 00 F8 00 00 00  ................
+01B0  FB 00 00 00 FD 00 00 00 - 00 00 00 00 03 00 00 00  ................
+01C0  05 00 00 00 08 00 00 00 - 0B 00 00 00 0D 00 00 00  ................
+01D0  10 00 00 00 13 00 00 00 - 15 00 00 00 18 00 00 00  ................
+01E0  1B 00 00 00 1D 00 00 00 - 20 00 00 00 23 00 00 00  ........ ...#...
+01F0  25 00 00 00 28 00 00 00 - 20 00 00 00 8A C1 00 00  %...(... .......
+0200  BA D1 00 00 03 00 00 00 - 03 00 00 00 02 00 00 00  ................
+0210  03 00 00 00 01 00 00 00 - 24 00 00 00 8A C1 00 00  ........$.......
+0220  07 D1 00 00 03 00 00 00 - 04 00 00 00 03 00 00 00  ................
+0230  04 00 00 00 01 00 00 00 - 05 00 00 00 F0 00 00 00  ................
+0240  8A C1 00 00 02 D1 00 00 - 03 00 00 00 37 00 00 00  ............7...
+0250  10 00 00 00 13 00 00 00 - 15 00 00 00 18 00 00 00  ................
+0260  1B 00 00 00 1D 00 00 00 - 20 00 00 00 23 00 00 00  ........ ...#...
+0270  25 00 00 00 28 00 00 00 - 2B 00 00 00 2D 00 00 00  %...(...+...-...
+0280  30 00 00 00 33 00 00 00 - 35 00 00 00 38 00 00 00  0...3...5...8...
+0290  3B 00 00 00 3D 00 00 00 - 40 00 00 00 43 00 00 00  ;...=...@...C...
+02A0  45 00 00 00 48 00 00 00 - 4B 00 00 00 4D 00 00 00  E...H...K...M...
+02B0  50 00 00 00 53 00 00 00 - 55 00 00 00 58 00 00 00  P...S...U...X...
+02C0  5B 00 00 00 5D 00 00 00 - 60 00 00 00 63 00 00 00  [...]...`...c...
+02D0  65 00 00 00 68 00 00 00 - 6B 00 00 00 6D 00 00 00  e...h...k...m...
+02E0  70 00 00 00 73 00 00 00 - 75 00 00 00 78 00 00 00  p...s...u...x...
+02F0  7B 00 00 00 7D 00 00 00 - 80 00 00 00 83 00 00 00  {...}...........
+0300  85 00 00 00 88 00 00 00 - 8B 00 00 00 8D 00 00 00  ................
+0310  90 00 00 00 93 00 00 00 - 95 00 00 00 98 00 00 00  ................
+0320  9B 00 00 00 9D 00 00 00 - A0 00 00 00 14 00 00 00  ................
+0330  8A C1 00 00 01 D1 00 00 - 03 00 00 00 00 00 00 00  ................
+0340  60 00 00 00 8A C1 00 00 - 0C D1 00 00 03 00 00 00  `...............
+0350  13 00 00 00 F7 FF FF FF - F8 FF FF FF F9 FF FF FF  ................
+0360  FA FF FF FF FB FF FF FF - FC FF FF FF FD FF FF FF  ................
+0370  FE FF FF FF FF FF FF FF - 00 00 00 00 01 00 00 00  ................
+0380  02 00 00 00 03 00 00 00 - 04 00 00 00 05 00 00 00  ................
+0390  06 00 00 00 07 00 00 00 - 08 00 00 00 09 00 00 00  ................
+03A0  60 00 00 00 8A C1 00 00 - 0B D1 00 00 03 00 00 00  `...............
+03B0  13 00 00 00 F7 FF FF FF - F8 FF FF FF F9 FF FF FF  ................
+03C0  FA FF FF FF FB FF FF FF - FC FF FF FF FD FF FF FF  ................
+03D0  FE FF FF FF FF FF FF FF - 00 00 00 00 01 00 00 00  ................
+03E0  02 00 00 00 03 00 00 00 - 04 00 00 00 05 00 00 00  ................
+03F0  06 00 00 00 07 00 00 00 - 08 00 00 00 09 00 00 00  ................
+... (showing first 1024 of 9830 bytes)
+Parsing event: size=292 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=144 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=32 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=240 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=96 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=96 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=48 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=1104 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=1104 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=1104 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=144 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=32 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=240 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=96 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=96 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=20 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=48 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=28 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=1104 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=1104 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=1104 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=36 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=144 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=48 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=48 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=48 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=120 type=0x0000C18A
+  - Event type: 0x0000C18A (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=36 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=14 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=36 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=32 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 73ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 29]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1D 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1D 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 29]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 97ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 30]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1E 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1E 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 30]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  10 00 00 00 89 C1 00 00 - 01 D1 00 00 35 00 00 00  ............5...
+0020  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 77ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 31]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 1F 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 1F 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 31]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 91ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 32]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 20 00  .............. .
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 20 00 00 00        .........  ...
+Received OperationResponse: OK [txID: 32]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - 01 D1 00 00 38 00 00 00  ............8...
+0010  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 95ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 33]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 21 00  ..............!.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 21 00 00 00        ......... !...
+Received OperationResponse: OK [txID: 33]
+canon/event_response:
+0000  0C 00 00 00 8B C1 00 00 - 01 00 00 00 10 00 00 00  ................
+0010  89 C1 00 00 C3 D1 00 00 - 00 00 00 00 0C 00 00 00  ................
+0020  85 C1 00 00 01 00 02 00 - 10 00 00 00 89 C1 00 00  ................
+0030  1B D1 00 00 B3 49 00 00 - 08 00 00 00 00 00 00 00  .....I..........
+Parsing event: size=12 type=0x0000C18B
+  - Event type: 0x0000C18B (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=12 type=0x0000C185
+  - Event type: 0x0000C185 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 101ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 34]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 22 00  ..............".
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 22 00 00 00        ......... "...
+Received OperationResponse: OK [txID: 34]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0010  10 00 00 00 89 C1 00 00 - 01 D1 00 00 35 00 00 00  ............5...
+0020  0C 00 00 00 85 C1 00 00 - 01 00 02 00 10 00 00 00  ................
+0030  89 C1 00 00 C3 D1 00 00 - 00 00 00 00 10 00 00 00  ................
+0040  89 C1 00 00 1B D1 00 00 - B2 49 00 00 08 00 00 00  .........I......
+0050  00 00 00 00                                        ....
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=12 type=0x0000C185
+  - Event type: 0x0000C185 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 97ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 35]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 23 00  ..............#.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 23 00 00 00        ......... #...
+Received OperationResponse: OK [txID: 35]
+canon/event_response:
+0000  0C 00 00 00 85 C1 00 00 - 01 00 02 00 40 00 00 00  ............@...
+0010  A7 C1 00 00 D2 1A 91 91 - 01 00 02 00 01 38 00 00  .............8..
+0020  00 00 00 00 20 00 00 00 - 58 10 1F 00 00 00 00 00  .... ...X.......
+0030  00 00 90 91 D0 1A 91 91 - 49 4D 47 5F 34 35 32 35  ........IMG_4525
+0040  2E 4A 50 47 00 00 00 00 - 0C F8 7B 69 10 00 00 00  .JPG......{i....
+0050  89 C1 00 00 C3 D1 00 00 - 00 00 00 00 10 00 00 00  ................
+0060  89 C1 00 00 C3 D1 00 00 - 00 00 00 00 0C 00 00 00  ................
+0070  85 C1 00 00 01 00 02 00 - 08 00 00 00 00 00 00 00  ................
+Parsing event: size=12 type=0x0000C185
+  - Event type: 0x0000C185 (non-photo)
+Parsing event: size=64 type=0x0000C1A7
+Photo detected: event type=0x0000C1A7 handle=0x91911AD2
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=12 type=0x0000C185
+  - Event type: 0x0000C185 (non-photo)
+Canon events received: 1 photos
+Sending OperationRequest: GetObjectInfo [txID: 36]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 08 10 24 00  ..............$.
+0010  00 00 D2 1A 91 91                                  ......
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 24 00 00 00        ......... $...
+Received OperationResponse: OK [txID: 36]
+Downloading object 0x91911AD2
+Sending OperationRequest: GetObject [txID: 37]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 09 10 25 00  ..............%.
+0010  00 00 D2 1A 91 91                                  ......
+Start data packet: expecting 2035800 = 0x1F1058 bytes
+Download progress: 655360/2035800 bytes (32.2%)
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 25 00 00 00        ......... %...
+Received OperationResponse: OK [txID: 37]
+Download complete: 2035800 = 0x1F1058 bytes in 0.804s (2473.8 KB/s)
+Poll latency: 1034ms
+Events found, polling immediately
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 38]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 26 00  ..............&.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 26 00 00 00        ......... &...
+Received OperationResponse: OK [txID: 38]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - 1B D1 00 00 B1 49 00 00  .............I..
+0010  0C 00 00 00 85 C1 00 00 - 01 00 02 00 10 00 00 00  ................
+0020  89 C1 00 00 1B D1 00 00 - B2 49 00 00 10 00 00 00  .........I......
+0030  89 C1 00 00 C3 D1 00 00 - 00 00 00 00 40 00 00 00  ............@...
+0040  A7 C1 00 00 E2 1A 91 91 - 01 00 02 00 01 38 00 00  .............8..
+0050  00 00 00 00 20 00 00 00 - 2D 19 1F 00 00 00 00 00  .... ...-.......
+0060  00 00 90 91 E0 1A 91 91 - 49 4D 47 5F 34 35 32 36  ........IMG_4526
+0070  2E 4A 50 47 00 00 00 00 - 0C F8 7B 69 0C 00 00 00  .JPG......{i....
+0080  85 C1 00 00 01 00 02 00 - 40 00 00 00 A7 C1 00 00  ........@.......
+0090  F2 1A 91 91 01 00 02 00 - 01 38 00 00 00 00 00 00  .........8......
+00A0  20 00 00 00 73 DD 1E 00 - 00 00 00 00 00 00 90 91   ...s...........
+00B0  F0 1A 91 91 49 4D 47 5F - 34 35 32 37 2E 4A 50 47  ....IMG_4527.JPG
+00C0  00 00 00 00 0C F8 7B 69 - 0C 00 00 00 85 C1 00 00  ......{i........
+00D0  01 00 02 00 0C 00 00 00 - 8B C1 00 00 00 00 00 00  ................
+00E0  10 00 00 00 89 C1 00 00 - 01 D1 00 00 33 00 00 00  ............3...
+00F0  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=12 type=0x0000C185
+  - Event type: 0x0000C185 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=64 type=0x0000C1A7
+Photo detected: event type=0x0000C1A7 handle=0x91911AE2
+Parsing event: size=12 type=0x0000C185
+  - Event type: 0x0000C185 (non-photo)
+Parsing event: size=64 type=0x0000C1A7
+Photo detected: event type=0x0000C1A7 handle=0x91911AF2
+Parsing event: size=12 type=0x0000C185
+  - Event type: 0x0000C185 (non-photo)
+Parsing event: size=12 type=0x0000C18B
+  - Event type: 0x0000C18B (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Canon events received: 2 photos
+Sending OperationRequest: GetObjectInfo [txID: 39]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 08 10 27 00  ..............'.
+0010  00 00 E2 1A 91 91                                  ......
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 27 00 00 00        ......... '...
+Received OperationResponse: OK [txID: 39]
+Downloading object 0x91911AE2
+Sending OperationRequest: GetObject [txID: 40]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 09 10 28 00  ..............(.
+0010  00 00 E2 1A 91 91                                  ......
+Start data packet: expecting 2038061 = 0x1F192D bytes
+Download progress: 1048576/2038061 bytes (51.4%)
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 28 00 00 00        ......... (...
+Received OperationResponse: OK [txID: 40]
+Download complete: 2038061 = 0x1F192D bytes in 0.781s (2548.6 KB/s)
+Sending OperationRequest: GetObjectInfo [txID: 41]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 08 10 29 00  ..............).
+0010  00 00 F2 1A 91 91                                  ......
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 29 00 00 00        ......... )...
+Received OperationResponse: OK [txID: 41]
+Downloading object 0x91911AF2
+Sending OperationRequest: GetObject [txID: 42]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 09 10 2A 00  ..............*.
+0010  00 00 F2 1A 91 91                                  ......
+Start data packet: expecting 2022771 = 0x1EDD73 bytes
+Download progress: 1048576/2022771 bytes (51.8%)
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 2A 00 00 00        ......... *...
+Received OperationResponse: OK [txID: 42]
+Download complete: 2022771 = 0x1EDD73 bytes in 0.766s (2577.3 KB/s)
+Poll latency: 1705ms
+Events found, polling immediately
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 43]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 2B 00  ..............+.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 2B 00 00 00        ......... +...
+Received OperationResponse: OK [txID: 43]
+canon/event_response:
+0000  10 00 00 00 89 C1 00 00 - 01 D1 00 00 35 00 00 00  ............5...
+0010  10 00 00 00 89 C1 00 00 - C3 D1 00 00 00 00 00 00  ................
+0020  10 00 00 00 89 C1 00 00 - 01 D1 00 00 00 00 00 00  ................
+0030  08 00 00 00 00 00 00 00 -                            ........
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Parsing event: size=16 type=0x0000C189
+  - Event type: 0x0000C189 (non-photo)
+Poll latency: 45ms
+No events, backing off to 50ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 44]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 2C 00  ..............,.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 2C 00 00 00        ......... ,...
+Received OperationResponse: OK [txID: 44]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 36ms
+No events, backing off to 100ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 45]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 2D 00  ..............-.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 2D 00 00 00        ......... -...
+Received OperationResponse: OK [txID: 45]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 10ms
+No events, backing off to 150ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 46]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 2E 00  ................
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 2E 00 00 00        ......... ....
+Received OperationResponse: OK [txID: 46]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 7ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 47]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 2F 00  ............../.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 2F 00 00 00        ......... /...
+Received OperationResponse: OK [txID: 47]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 9ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 48]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 30 00  ..............0.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 30 00 00 00        ......... 0...
+Received OperationResponse: OK [txID: 48]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 10ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 49]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 31 00  ..............1.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 31 00 00 00        ......... 1...
+Received OperationResponse: OK [txID: 49]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 8ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 50]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 32 00  ..............2.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 32 00 00 00        ......... 2...
+Received OperationResponse: OK [txID: 50]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 8ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 51]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 33 00  ..............3.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 33 00 00 00        ......... 3...
+Received OperationResponse: OK [txID: 51]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 10ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 52]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 34 00  ..............4.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 34 00 00 00        ......... 4...
+Received OperationResponse: OK [txID: 52]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 9ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 53]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 35 00  ..............5.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 35 00 00 00        ......... 5...
+Received OperationResponse: OK [txID: 53]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 13ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 54]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 36 00  ..............6.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 36 00 00 00        ......... 6...
+Received OperationResponse: OK [txID: 54]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 7ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 55]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 37 00  ..............7.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 37 00 00 00        ......... 7...
+Received OperationResponse: OK [txID: 55]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 10ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 56]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 38 00  ..............8.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 38 00 00 00        ......... 8...
+Received OperationResponse: OK [txID: 56]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 10ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 57]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 39 00  ..............9.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 39 00 00 00        ......... 9...
+Received OperationResponse: OK [txID: 57]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 8ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 58]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 3A 00  ..............:.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 3A 00 00 00        ......... :...
+Received OperationResponse: OK [txID: 58]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 9ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 59]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 3B 00  ..............;.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 3B 00 00 00        ......... ;...
+Received OperationResponse: OK [txID: 59]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 37ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 60]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 3C 00  ..............<.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 3C 00 00 00        ......... <...
+Received OperationResponse: OK [txID: 60]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 200ms
+No events, backing off to 200ms
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 61]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 3D 00  ..............=.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 3D 00 00 00        ......... =...
+Received OperationResponse: OK [txID: 61]
+canon/event_response:
+0000  08 00 00 00 00 00 00 00 -                            ........
+Poll latency: 75ms
+No events, backing off to 200ms
+Canon polling stopped
+Sending OperationRequest: Canon_EOS_GetEvent [txID: 62]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 02 00 00 00 16 91 3E 00  ..............>.
+0010  00 00                                              ..
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 3E 00 00 00        ......... >...
+Received OperationResponse: OK [txID: 62]
+Sending OperationRequest: Canon_EOS_SetEventMode [txID: 63]
+ptpip/operationrequest/send:
+0000  16 00 00 00 06 00 00 00 - 01 00 00 00 15 91 3F 00  ..............?.
+0010  00 00 00 00 00 00                                  ......
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 3F 00 00 00        ......... ?...
+Received OperationResponse: OK [txID: 63]
+Sending OperationRequest: CloseSession [txID: 64]
+ptpip/operationrequest/send:
+0000  12 00 00 00 06 00 00 00 - 01 00 00 00 03 10 40 00  ..............@.
+0010  00 00                                              ..
+Sending CloseSession [txID: 64]
+ptpip/operationresponse/receive:
+0000  0E 00 00 00 07 00 00 00 - 01 20 40 00 00 00        ......... @...
+Received OperationResponse: OK [txID: 64]
+CloseSession sent
+Session disconnected

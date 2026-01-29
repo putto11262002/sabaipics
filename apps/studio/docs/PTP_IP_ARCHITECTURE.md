@@ -450,6 +450,47 @@ iPad                                          Camera
    iPad → CloseSession
 ```
 
+### Protocol Constants
+
+**Canon-specific operation codes:**
+- `0x9115` - Canon_EOS_SetEventMode (enables event polling)
+- `0x9116` - Canon_EOS_GetEvent (polls for new photos)
+
+**Standard PTP operations:**
+- `0x1002` - OpenSession
+- `0x1003` - CloseSession
+- `0x1008` - GetObjectInfo (metadata query)
+- `0x1009` - GetObject (photo download)
+
+**Event codes:**
+- `0xC1A7` - Photo capture event (ObjectAdded)
+
+**Response codes:**
+- `0x2001` - OK
+
+### Canon Compatibility
+
+**Protocol Standardization (SAB-82):**
+
+Validated Canon PTP/IP protocol using Canon EOS 80D (2016) vs R6 Mark II (2022). **Result: Byte-for-byte identical** protocol despite 6-year gap and different architectures (DSLR vs mirrorless).
+
+**Key findings:**
+- Same operation codes (0x9115, 0x9116)
+- Same photo detection event (0xC1A7, 64-byte structure)
+- Same response codes (0x2001 OK)
+- Identical download flow
+
+**Compatibility:**
+
+All Canon cameras supporting "EOS Utility WiFi connection" use this standardized protocol:
+- R-series (15 models): R1, R3, R5, R5 II, R6 III, R6 II, R6, R7, R8, R10, R50, R100, RP
+- DSLRs with WiFi (18+ models): 90D, 80D, 77D, 70D, 6D Mark II, 6D, 5D Mark IV
+- M-series (10 models): M6 II, M50 II, M50, M200, M100, M10, M5, M6, M3
+
+See `CANON_COMPATIBILITY.md` for complete list and validation status.
+
+**Reference:** [Canon EOS Utility Compatible Cameras](https://cam.start.canon/en/S003/manual/html/UG-00_Before_0050.html)
+
 ---
 
 ## Threading Model
@@ -527,3 +568,6 @@ SabaiPicsStudio/
 | @MainActor protocol delegate              | Safe UI updates from callbacks          |
 | CameraEventSource protocol                | Multi-vendor support (Canon/Nikon/Sony) |
 | PhotoOperationsProvider protocol          | Decouples event detection from download |
+
+---
+
