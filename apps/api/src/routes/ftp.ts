@@ -23,7 +23,7 @@ import { verifyPassword } from '../lib/password';
 import { signFtpToken } from '../lib/ftp/jwt';
 import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
 import { decryptSecret } from '../lib/crypto/secret';
-import { generateFtpCredentials } from '../lib/ftp/credentials';
+import { createFtpCredentialsWithRetry } from '../lib/ftp/credentials';
 
 // =============================================================================
 // Constants
@@ -369,38 +369,34 @@ export const ftpRouter = new Hono<Env>()
           });
         }
 
-        const credentialPayload = yield* ResultAsync.fromThrowable(
-          () => generateFtpCredentials(encryptionKey),
+        const credentialResult = yield* ResultAsync.fromPromise(
+          createFtpCredentialsWithRetry(encryptionKey, (payload) =>
+            db
+              .insert(ftpCredentials)
+              .values({
+                eventId,
+                photographerId: photographer.id,
+                username: payload.username,
+                passwordHash: payload.passwordHash,
+                passwordCiphertext: payload.passwordCiphertext,
+                expiresAt: event.expiresAt,
+              })
+              .returning(),
+          ),
           (e): HandlerError => ({
             code: 'INTERNAL_ERROR',
-            message: 'FTP credential generation failed',
+            message: 'Failed to create FTP credentials',
             cause: e,
           }),
-        )();
-
-        // 6. Create credential record
-        const credentialRows: any = yield* ResultAsync.fromPromise(
-          db
-            .insert(ftpCredentials)
-            .values({
-              eventId,
-              photographerId: photographer.id,
-              username: credentialPayload.username,
-              passwordHash: credentialPayload.passwordHash,
-              passwordCiphertext: credentialPayload.passwordCiphertext,
-              expiresAt: event.expiresAt,
-            })
-            .returning(),
-          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 
-        const credential = credentialRows[0];
+        const credential = credentialResult.result[0];
 
         // 7. Return credentials (password shown only once)
         return ok({
           id: credential.id,
-          username: credentialPayload.username,
-          password: credentialPayload.password,
+          username: credentialResult.payload.username,
+          password: credentialResult.payload.password,
           expiresAt: credential.expiresAt,
           createdAt: credential.createdAt,
         });

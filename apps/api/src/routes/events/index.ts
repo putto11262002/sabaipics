@@ -12,7 +12,7 @@ import { logoPresignSchema, logoStatusQuerySchema } from './logo-schema';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../../lib/error';
 import { generatePresignedPutUrl } from '../../lib/r2/presign';
-import { generateFtpCredentials } from '../../lib/ftp/credentials';
+import { createFtpCredentialsWithRetry } from '../../lib/ftp/credentials';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -86,15 +86,6 @@ export const eventsRouter = new Hono<Env>()
           });
         }
 
-        const credentialPayload = yield* ResultAsync.fromThrowable(
-          () => generateFtpCredentials(encryptionKey),
-          (cause): HandlerError => ({
-            code: 'INTERNAL_ERROR',
-            message: 'FTP credential generation failed',
-            cause,
-          }),
-        )();
-
         const created = yield* ResultAsync.fromPromise(
           (async () => {
             const dbTx = c.var.dbTx();
@@ -113,14 +104,16 @@ export const eventsRouter = new Hono<Env>()
                 })
                 .returning();
 
-              await tx.insert(ftpCredentials).values({
-                eventId: event.id,
-                photographerId: photographer.id,
-                username: credentialPayload.username,
-                passwordHash: credentialPayload.passwordHash,
-                passwordCiphertext: credentialPayload.passwordCiphertext,
-                expiresAt: event.expiresAt,
-              });
+              await createFtpCredentialsWithRetry(encryptionKey, (payload) =>
+                tx.insert(ftpCredentials).values({
+                  eventId: event.id,
+                  photographerId: photographer.id,
+                  username: payload.username,
+                  passwordHash: payload.passwordHash,
+                  passwordCiphertext: payload.passwordCiphertext,
+                  expiresAt: event.expiresAt,
+                }),
+              );
 
               return event;
             });
