@@ -10,7 +10,7 @@ export interface FtpCredentialsPayload {
 
 const USERNAME_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const PASSWORD_DIGITS = 6;
-const USERNAME_SUFFIX_LENGTH = 6;
+const USERNAME_SUFFIX_LENGTH = 5;
 
 function randomBase32(length: number): string {
   const bytes = new Uint8Array(length);
@@ -36,8 +36,7 @@ function randomNumericCode(length: number): string {
 export async function generateFtpCredentials(
   encryptionKey: string,
 ): Promise<FtpCredentialsPayload> {
-  const suffix = randomBase32(USERNAME_SUFFIX_LENGTH);
-  const username = `evt-${suffix}`;
+  const username = randomBase32(USERNAME_SUFFIX_LENGTH);
   const password = randomNumericCode(PASSWORD_DIGITS);
   const passwordHash = await hashPassword(password);
   const passwordCiphertext = await encryptSecret(password, encryptionKey);
