@@ -125,7 +125,9 @@ function createTestApp(options: {
       PHOTOS_BUCKET: R2Bucket;
       FTP_PASSWORD_ENCRYPTION_KEY: string;
     };
-    Variables: PhotographerVariables;
+    Variables: PhotographerVariables & {
+      dbTx: () => Database;
+    };
   };
 
   const app = new Hono<Env>()
@@ -139,6 +141,7 @@ function createTestApp(options: {
     // Mock DB
     .use('/*', (c, next) => {
       c.set('db', () => mockDb as unknown as Database);
+      c.set('dbTx', () => mockDb as unknown as Database);
       return next();
     })
     // Mock photographer lookup for requirePhotographer middleware
