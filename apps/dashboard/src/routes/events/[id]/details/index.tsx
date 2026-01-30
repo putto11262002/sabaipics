@@ -19,19 +19,25 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@sabaipics/uiv3/components/dropdown-menu';
-import { Copy, ExternalLink, Download } from 'lucide-react';
+import { Copy, ExternalLink, Download, Eye, EyeOff } from 'lucide-react';
 
+import { useState } from 'react';
 import { useParams } from 'react-router';
 import QRCodeSVG from 'react-qr-code';
 import { useEvent } from '../../../../hooks/events/useEvent';
 import { useCopyToClipboard } from '../../../../hooks/use-copy-to-clipboard';
 import { useDownloadQR } from '../../../../hooks/events/useDownloadQR';
+import { useFtpCredentials, useRevealFtpCredentials } from '../../../../hooks/events/useFtpCredentials';
 
 export default function EventDetailsTab() {
   const { id } = useParams<{ id: string }>();
   const { data } = useEvent(id);
   const { copyToClipboard } = useCopyToClipboard();
   const downloadQR = useDownloadQR();
+  const ftpCredentials = useFtpCredentials(id);
+  const revealCredentials = useRevealFtpCredentials(id);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
 
   if (!data?.data) {
     return null;
@@ -43,6 +49,23 @@ export default function EventDetailsTab() {
 
   const handleCopyLink = (eventId: string) => {
     copyToClipboard(`${window.location.origin}/participant/events/${eventId}/search`);
+  };
+
+  const handleRevealPassword = async () => {
+    if (!isPasswordVisible) {
+      const result = await revealCredentials.mutateAsync();
+      setRevealedPassword(result.password);
+      setIsPasswordVisible(true);
+      return;
+    }
+
+    setIsPasswordVisible(false);
+  };
+
+  const handleCopyPassword = () => {
+    if (revealedPassword) {
+      copyToClipboard(revealedPassword);
+    }
   };
 
   return (
@@ -133,19 +156,26 @@ export default function EventDetailsTab() {
         <Card>
           <CardHeader>
             <CardTitle>FTP credentials</CardTitle>
-            <CardDescription>Credentials will appear once enabled.</CardDescription>
+            <CardDescription>Use these credentials to upload photos via FTP.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Username</p>
               <InputGroup>
-                <InputGroupInput readOnly placeholder="Coming soon" />
+                <InputGroupInput
+                  readOnly
+                  value={ftpCredentials.data?.username ?? 'Not available'}
+                />
                 <InputGroupAddon align="inline-end">
                   <InputGroupButton
                     aria-label="Copy username"
                     title="Copy username"
                     size="icon-xs"
-                    disabled
+                    onClick={() =>
+                      ftpCredentials.data?.username &&
+                      copyToClipboard(ftpCredentials.data.username)
+                    }
+                    disabled={!ftpCredentials.data?.username}
                   >
                     <Copy />
                   </InputGroupButton>
@@ -155,13 +185,32 @@ export default function EventDetailsTab() {
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Password</p>
               <InputGroup>
-                <InputGroupInput readOnly placeholder="Coming soon" />
+                <InputGroupInput
+                  readOnly
+                  value={
+                    isPasswordVisible
+                      ? revealedPassword ?? 'Loading...'
+                      : revealedPassword
+                        ? '••••••••••••'
+                        : 'Hidden'
+                  }
+                />
                 <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    aria-label={isPasswordVisible ? 'Hide password' : 'Reveal password'}
+                    title={isPasswordVisible ? 'Hide password' : 'Reveal password'}
+                    size="icon-xs"
+                    onClick={handleRevealPassword}
+                    disabled={!ftpCredentials.data?.username || revealCredentials.isPending}
+                  >
+                    {isPasswordVisible ? <EyeOff /> : <Eye />}
+                  </InputGroupButton>
                   <InputGroupButton
                     aria-label="Copy password"
                     title="Copy password"
                     size="icon-xs"
-                    disabled
+                    onClick={handleCopyPassword}
+                    disabled={!revealedPassword}
                   >
                     <Copy />
                   </InputGroupButton>

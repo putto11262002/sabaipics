@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { events, DEFAULT_SLIDESHOW_CONFIG, logoUploadIntents } from '@sabaipics/db';
+import { events, DEFAULT_SLIDESHOW_CONFIG, logoUploadIntents, ftpCredentials } from '@sabaipics/db';
 import { requirePhotographer } from '../../middleware';
 import type { Env } from '../../types';
 import { generatePngQrCode } from '@juit/qrcode';
@@ -12,6 +12,7 @@ import { logoPresignSchema, logoStatusQuerySchema } from './logo-schema';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../../lib/error';
 import { generatePresignedPutUrl } from '../../lib/r2/presign';
+import { generateFtpCredentials } from '../../lib/ftp/credentials';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -76,20 +77,54 @@ export const eventsRouter = new Hono<Env>()
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30);
 
-        // Insert event record (QR code generated client-side, not stored)
-        const [created] = yield* ResultAsync.fromPromise(
-          db
-            .insert(events)
-            .values({
-              photographerId: photographer.id,
-              name: body.name,
-              startDate: body.startDate,
-              endDate: body.endDate,
-              qrCodeR2Key: null, // No longer storing QR codes
-              rekognitionCollectionId: null,
-              expiresAt: expiresAt.toISOString(),
-            })
-            .returning(),
+        const encryptionKey = (c.env as unknown as Record<string, string>)
+          .FTP_PASSWORD_ENCRYPTION_KEY;
+        if (!encryptionKey) {
+          return err<never, HandlerError>({
+            code: 'INTERNAL_ERROR',
+            message: 'FTP password encryption key missing',
+          });
+        }
+
+        const credentialPayload = yield* ResultAsync.fromThrowable(
+          () => generateFtpCredentials(encryptionKey),
+          (cause): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'FTP credential generation failed',
+            cause,
+          }),
+        )();
+
+        const created = yield* ResultAsync.fromPromise(
+          (async () => {
+            const dbTx = c.var.dbTx();
+
+            return await dbTx.transaction(async (tx) => {
+              const [event] = await tx
+                .insert(events)
+                .values({
+                  photographerId: photographer.id,
+                  name: body.name,
+                  startDate: body.startDate,
+                  endDate: body.endDate,
+                  qrCodeR2Key: null, // No longer storing QR codes
+                  rekognitionCollectionId: null,
+                  expiresAt: expiresAt.toISOString(),
+                })
+                .returning();
+
+              await tx.insert(ftpCredentials).values({
+                eventId: event.id,
+                photographerId: photographer.id,
+                username: credentialPayload.username,
+                passwordHash: credentialPayload.passwordHash,
+                passwordCiphertext: credentialPayload.passwordCiphertext,
+                expiresAt: event.expiresAt,
+              });
+
+              return event;
+            });
+          })(),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
 

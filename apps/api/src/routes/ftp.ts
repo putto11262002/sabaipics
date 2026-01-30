@@ -17,15 +17,19 @@ import { requirePhotographer, type PhotographerVariables } from '../middleware';
 import type { Env } from '../types';
 import { apiError, type HandlerError } from '../lib/error';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
+import { createClerkAuth } from '@sabaipics/auth/middleware';
 import { generatePresignedPutUrl } from '../lib/r2/presign';
-import { hashPassword, verifyPassword } from '../lib/password';
+import { verifyPassword } from '../lib/password';
 import { signFtpToken } from '../lib/ftp/jwt';
+import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
+import { decryptSecret } from '../lib/crypto/secret';
+import { generateFtpCredentials } from '../lib/ftp/credentials';
 
 // =============================================================================
 // Constants
 // =============================================================================
 
-const PRESIGN_TTL_SECONDS = 300; // 5 minutes
+const PRESIGN_TTL_SECONDS = 3600; // 1 hour
 
 // =============================================================================
 // Schemas
@@ -38,7 +42,9 @@ const ftpAuthRequestSchema = z.object({
 
 const ftpPresignRequestSchema = z.object({
   filename: z.string().min(1),
-  contentType: z.string().min(1),
+  contentType: z.enum(ALLOWED_MIME_TYPES, {
+    errorMap: () => ({ message: `Content type must be one of: ${ALLOWED_MIME_TYPES.join(', ')}` }),
+  }),
   contentLength: z.number().int().positive().optional(),
 });
 
@@ -164,6 +170,7 @@ export const ftpRouter = new Hono<Env>()
         (e) => apiError(c, e),
       );
   })
+  .use('/events/*', createClerkAuth())
   .post(
     '/presign',
     async (c, next) => {
@@ -245,9 +252,6 @@ export const ftpRouter = new Hono<Env>()
         // Only include contentLength if provided
         if (contentLength !== undefined) {
           presignOptions.contentLength = contentLength;
-        } else {
-          // Use a default for presigning purposes
-          presignOptions.contentLength = 20 * 1024 * 1024; // 20 MB default
         }
 
         const presignResult = yield* ResultAsync.fromPromise(
@@ -286,14 +290,21 @@ export const ftpRouter = new Hono<Env>()
         const intent = intentRows[0];
 
         // 6. Return presigned URL response
+        const requiredHeaders: Record<string, string> = {
+          'Content-Type': contentType,
+          'If-None-Match': '*',
+        };
+
+        if (contentLength !== undefined) {
+          requiredHeaders['Content-Length'] = contentLength.toString();
+        }
+
         return ok({
           upload_id: intent.id,
           put_url: presignResult.url,
           object_key: r2Key,
           expires_at: presignResult.expiresAt.toISOString(),
-          required_headers: {
-            'Content-Type': contentType,
-          },
+          required_headers: requiredHeaders,
         });
       })
         .orTee((e) => e.cause && console.error('[ftp/presign]', e.code + ':', e.cause))
@@ -349,19 +360,20 @@ export const ftpRouter = new Hono<Env>()
           });
         }
 
-        // 3. Generate username (auto-generated format: evt-{short-id})
-        const shortId = crypto.randomUUID().slice(0, 8);
-        const username = `evt-${shortId}`;
+        const encryptionKey = (c.env as unknown as Record<string, string>)
+          .FTP_PASSWORD_ENCRYPTION_KEY;
+        if (!encryptionKey) {
+          return err<never, HandlerError>({
+            code: 'INTERNAL_ERROR',
+            message: 'FTP password encryption key missing',
+          });
+        }
 
-        // 4. Generate high-entropy password
-        const password = crypto.randomUUID();
-
-        // 5. Hash password
-        const passwordHash = yield* ResultAsync.fromThrowable(
-          () => hashPassword(password),
+        const credentialPayload = yield* ResultAsync.fromThrowable(
+          () => generateFtpCredentials(encryptionKey),
           (e): HandlerError => ({
             code: 'INTERNAL_ERROR',
-            message: 'Password hashing failed',
+            message: 'FTP credential generation failed',
             cause: e,
           }),
         )();
@@ -373,8 +385,9 @@ export const ftpRouter = new Hono<Env>()
             .values({
               eventId,
               photographerId: photographer.id,
-              username,
-              passwordHash,
+              username: credentialPayload.username,
+              passwordHash: credentialPayload.passwordHash,
+              passwordCiphertext: credentialPayload.passwordCiphertext,
               expiresAt: event.expiresAt,
             })
             .returning(),
@@ -386,8 +399,8 @@ export const ftpRouter = new Hono<Env>()
         // 7. Return credentials (password shown only once)
         return ok({
           id: credential.id,
-          username,
-          password,
+          username: credentialPayload.username,
+          password: credentialPayload.password,
           expiresAt: credential.expiresAt,
           createdAt: credential.createdAt,
         });
@@ -455,6 +468,83 @@ export const ftpRouter = new Hono<Env>()
         });
       })
         .orTee((e) => e.cause && console.error('[ftp-credentials/get]', e.code + ':', e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+  .get(
+    '/events/:id/ftp-credentials/reveal',
+    requirePhotographer(),
+    zValidator('param', ftpCredentialsParamsSchema),
+    async (c) => {
+      return safeTry(async function* () {
+        const photographer = c.var.photographer;
+        const db = c.var.db();
+        const { id: eventId } = c.req.valid('param');
+
+        // 1. Verify event exists and is owned by photographer
+        const eventRows: any = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: events.id, photographerId: events.photographerId })
+            .from(events)
+            .where(eq(events.id, eventId))
+            .limit(1),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        const event = eventRows[0];
+        if (!event || event.photographerId !== photographer.id) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        // 2. Get FTP credentials
+        const credentialRows: any = yield* ResultAsync.fromPromise(
+          db
+            .select({
+              username: ftpCredentials.username,
+              passwordCiphertext: ftpCredentials.passwordCiphertext,
+            })
+            .from(ftpCredentials)
+            .where(eq(ftpCredentials.eventId, eventId))
+            .limit(1),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        const credential = credentialRows[0];
+        if (!credential) {
+          return err<never, HandlerError>({
+            code: 'NOT_FOUND',
+            message: 'FTP credentials not found',
+          });
+        }
+
+        // 3. Decrypt password
+        const encryptionKey = (c.env as unknown as Record<string, string>)
+          .FTP_PASSWORD_ENCRYPTION_KEY;
+        if (!encryptionKey) {
+          return err<never, HandlerError>({
+            code: 'INTERNAL_ERROR',
+            message: 'FTP password encryption key missing',
+          });
+        }
+
+        const password = yield* ResultAsync.fromThrowable(
+          () => decryptSecret(credential.passwordCiphertext, encryptionKey),
+          (e): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Password decryption failed',
+            cause: e,
+          }),
+        )();
+
+        return ok({
+          username: credential.username,
+          password,
+        });
+      })
+        .orTee((e) => e.cause && console.error('[ftp-credentials/reveal]', e.code + ':', e.cause))
         .match(
           (data) => c.json(data),
           (e) => apiError(c, e),

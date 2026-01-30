@@ -113,6 +113,7 @@ All secrets are stored in GitHub repository settings under Environments (`stagin
 | `R2_SECRET_ACCESS_KEY`         | API                   | R2 S3-compatible secret  |
 | `ADMIN_API_KEY`                | API                   | Internal admin endpoints |
 | `FTP_JWT_SECRET`               | API                   | FTP token signing key    |
+| `FTP_PASSWORD_ENCRYPTION_KEY`  | API                   | FTP password encryption  |
 
 ### Optional Secrets
 

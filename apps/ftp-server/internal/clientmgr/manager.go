@@ -16,8 +16,6 @@ const (
 	EventAuthExpired EventType = iota
 	// EventUploadFailed indicates an upload failed (non-auth error)
 	EventUploadFailed
-	// EventRateLimited indicates client hit rate limit (429 from API)
-	EventRateLimited
 )
 
 // ClientEvent represents an event reported by upload transfers
@@ -30,9 +28,11 @@ type ClientEvent struct {
 
 // ManagedClient holds the client context and metadata
 type ManagedClient struct {
-	ID       uint32
-	Context  ftpserver.ClientContext
-	ClientIP string
+	ID           uint32
+	Context      ftpserver.ClientContext
+	ClientIP     string
+	UploadCtx    context.Context
+	UploadCancel context.CancelFunc
 }
 
 // Manager centralizes client management and decision-making
@@ -74,10 +74,14 @@ func (m *Manager) RegisterClient(cc ftpserver.ClientContext) {
 	m.clientsMu.Lock()
 	defer m.clientsMu.Unlock()
 
+	uploadCtx, uploadCancel := context.WithCancel(m.ctx)
+
 	client := &ManagedClient{
-		ID:       cc.ID(),
-		Context:  cc,
-		ClientIP: cc.RemoteAddr().String(),
+		ID:           cc.ID(),
+		Context:      cc,
+		ClientIP:     cc.RemoteAddr().String(),
+		UploadCtx:    uploadCtx,
+		UploadCancel: uploadCancel,
 	}
 	m.clients[cc.ID()] = client
 
@@ -91,10 +95,24 @@ func (m *Manager) UnregisterClient(clientID uint32) {
 	defer m.clientsMu.Unlock()
 
 	if client, exists := m.clients[clientID]; exists {
+		client.UploadCancel()
 		sentry.NewLogger(context.Background()).Info().Emitf(
 			"ClientManager: Unregistered client %d (%s)", clientID, client.ClientIP)
 		delete(m.clients, clientID)
 	}
+}
+
+// GetUploadContext returns the upload context for a client
+func (m *Manager) GetUploadContext(clientID uint32) (context.Context, bool) {
+	m.clientsMu.RLock()
+	defer m.clientsMu.RUnlock()
+
+	client, exists := m.clients[clientID]
+	if !exists {
+		return nil, false
+	}
+
+	return client.UploadCtx, true
 }
 
 // SendEvent sends an event to the manager for processing
@@ -150,12 +168,6 @@ func (m *Manager) handleEvent(event ClientEvent) {
 		// Decision: Log the failure but keep connection open
 		// Client can retry or upload other files
 		log.Warn().Emitf("ClientManager: Upload failed for client %d: %s", event.ClientID, event.Reason)
-
-	case EventRateLimited:
-		// Decision: Disconnect client when rate limited
-		// They can reconnect after cooldown
-		log.Warn().Emitf("ClientManager: Client %d rate limited, disconnecting", event.ClientID)
-		m.disconnectClient(event.ClientID, "rate limited")
 
 	default:
 		log.Warn().Emitf("ClientManager: Unknown event type %d for client %d", event.Type, event.ClientID)
