@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, useApiClient, withAuth } from '../../lib/api';
 
 interface DownloadPhotosParams {
   eventId: string;
@@ -7,6 +7,8 @@ interface DownloadPhotosParams {
 }
 
 export function useDownloadPhotos() {
+  const { getToken } = useApiClient();
+
   return useMutation({
     mutationFn: async ({ eventId, photoIds }: DownloadPhotosParams) => {
       const response = await api.events[':eventId'].photos.download.$post(
@@ -14,11 +16,7 @@ export function useDownloadPhotos() {
           param: { eventId },
           json: { photoIds },
         },
-        {
-          init: {
-            credentials: 'include',
-          },
-        },
+        await withAuth(getToken)
       );
 
       if (!response.ok) {

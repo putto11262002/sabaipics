@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, useApiClient, withAuth } from '../../lib/api';
 import type { InferResponseType } from 'hono';
 
 const getStatus = api.photos.status.$get;
@@ -16,14 +16,19 @@ export function usePhotosStatus(
     refetchInterval?: number | false;
   },
 ) {
+  const { getToken } = useApiClient();
+
   return useQuery({
     queryKey: ['photos', 'status', photoIds],
     queryFn: async (): Promise<PhotoStatus[]> => {
       if (photoIds.length === 0) return [];
 
-      const response = await getStatus({
-        query: { ids: photoIds.join(',') },
-      });
+      const response = await getStatus(
+        {
+          query: { ids: photoIds.join(',') },
+        },
+        await withAuth(getToken)
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch photo statuses');

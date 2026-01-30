@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, useApiClient, withAuth } from '../../lib/api';
 import { type InferResponseType } from 'hono/client';
 
 const listPhotos = api.events[':eventId'].photos.$post;
@@ -14,6 +14,8 @@ export function usePhotos({
   eventId: string | undefined;
   status?: PhotoStatus[];
 }) {
+  const { getToken } = useApiClient();
+
   return useInfiniteQuery({
     queryKey: ['event', eventId, 'photos', status],
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
@@ -21,13 +23,16 @@ export function usePhotos({
         throw new Error('eventId is required');
       }
 
-      const res = await listPhotos({
-        param: { eventId },
-        json: {
-          ...(pageParam ? { cursor: pageParam } : {}),
-          ...(status ? { status } : {}),
+      const res = await listPhotos(
+        {
+          param: { eventId },
+          json: {
+            ...(pageParam ? { cursor: pageParam } : {}),
+            ...(status ? { status } : {}),
+          },
         },
-      });
+        await withAuth(getToken)
+      );
 
       if (!res.ok) {
         throw new Error(`Failed to fetch photos: ${res.status}`);
