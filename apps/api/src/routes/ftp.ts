@@ -292,7 +292,6 @@ export const ftpRouter = new Hono<Env>()
         // 6. Return presigned URL response
         const requiredHeaders: Record<string, string> = {
           'Content-Type': contentType,
-          'If-None-Match': '*',
         };
 
         if (contentLength !== undefined) {
