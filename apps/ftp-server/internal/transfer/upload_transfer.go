@@ -219,9 +219,6 @@ func (t *UploadTransfer) presignAndUpload(ctx context.Context, fileSize int64) e
 	if _, ok := requiredHeaders["Content-Type"]; !ok {
 		requiredHeaders["Content-Type"] = t.contentType
 	}
-	if _, ok := requiredHeaders["If-None-Match"]; !ok {
-		requiredHeaders["If-None-Match"] = "*"
-	}
 
 	uploadCtx, uploadCancel := context.WithTimeout(ctx, 30*time.Minute)
 	resp, err := t.apiClient.UploadToPresignedURL(
