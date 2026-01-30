@@ -20,18 +20,13 @@ struct LiveCaptureView: View {
     /// Callback for navigation after disconnect (navigation only, not business logic)
     let onDisconnected: () -> Void
 
-    /// Local alert state - no cleanup needed, dies with view
-    @State private var showDisconnectAlert = false
-
-    /// Event name for display (placeholder for now)
-    private var eventName: String {
-        "Photo Session"
-    }
+    /// Capture flow coordinator for cleanup registration
+    @EnvironmentObject var captureFlow: CaptureFlowCoordinator
 
     var body: some View {
         VStack(spacing: 0.0) {
             Divider()
-                .background(Color(UIColor.separator))
+                .background(Color.Theme.border)
 
             // RAW file skip warning banner
             if session.skippedRawCount > 0 && session.showRawSkipBanner {
@@ -61,24 +56,46 @@ struct LiveCaptureView: View {
         }
         .toolbar(content: toolbarContent)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color(UIColor.systemBackground), for: .navigationBar)
-        .alert("Disconnect from camera?", isPresented: $showDisconnectAlert) {
-            Button("Cancel", role: .cancel) {
-                print("[LiveCaptureView] \u{1F50C} Disconnect cancelled")
-            }
-            Button("Disconnect", role: .destructive) {
-                print("[LiveCaptureView] \u{1F50C} Disconnect confirmed")
-                Task {
-                    await session.end()
-                    print("[LiveCaptureView] \u{1F50C} Session ended, calling onDisconnected")
-                    onDisconnected()
-                }
-            }
-        } message: {
-            Text("Photos will be cleared. Make sure you've saved what you need.")
-        }
         .onChange(of: session.photos.count) { newCount in
             print("[LiveCaptureView] \u{1F4F8} Photo count changed to: \(newCount)")
+        }
+        .onAppear {
+            captureFlow.registerCleanup { [weak session] in
+                await session?.end()
+            }
+        }
+        .onDisappear {
+            captureFlow.unregisterCleanup()
+        }
+        .overlay {
+            if session.isDisconnecting {
+                disconnectingOverlay
+            }
+        }
+    }
+
+    // MARK: - Disconnecting Overlay
+
+    /// Overlay shown while disconnecting (waiting for in-progress downloads)
+    private var disconnectingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                ProgressView()
+                    .scaleEffect(1.2)
+                    .tint(Color.white)
+
+                Text("Disconnecting...")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            .padding(32)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.black.opacity(0.8))
+            )
         }
     }
 
@@ -86,33 +103,11 @@ struct LiveCaptureView: View {
 
     @ToolbarContentBuilder
     private func toolbarContent() -> some ToolbarContent {
-        // Principal: Event name + camera name with status
+        // Principal: Camera name only
         ToolbarItem(placement: .principal) {
-            VStack(spacing: 2) {
-                Text(eventName)
-                    .font(.headline)
-                    .lineLimit(1)
-
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(session.isCameraConnected ? Color.green : Color.gray)
-                        .frame(width: 8, height: 8)
-                    Text(session.cameraName)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-        }
-
-        // Trailing: Disconnect button
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button(action: {
-                print("[LiveCaptureView] \u{1F50C} Disconnect button tapped")
-                showDisconnectAlert = true
-            }) {
-                Text("Disconnect")
-                    .foregroundColor(.red)
-            }
+            Text(session.cameraName)
+                .font(.headline)
+                .foregroundColor(Color.Theme.foreground)
         }
     }
 
@@ -125,16 +120,17 @@ struct LiveCaptureView: View {
 
             Image(systemName: "camera.viewfinder")
                 .font(.system(size: 60))
-                .foregroundColor(.secondary)
+                .foregroundColor(Color.Theme.mutedForeground)
 
             VStack(spacing: 8) {
                 Text("Ready to Capture")
                     .font(.title2)
                     .fontWeight(.semibold)
+                    .foregroundColor(Color.Theme.foreground)
 
                 Text("Take photos with your camera.\nThey'll appear here automatically.")
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Color.Theme.mutedForeground)
                     .multilineTextAlignment(.center)
             }
 
@@ -154,7 +150,7 @@ struct LiveCaptureView: View {
 
             Text("\(session.skippedRawCount) RAW file\(session.skippedRawCount == 1 ? "" : "s") skipped")
                 .font(.subheadline)
-                .foregroundColor(.primary)
+                .foregroundColor(Color.Theme.foreground)
 
             Spacer()
 
@@ -165,20 +161,19 @@ struct LiveCaptureView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Color.Theme.mutedForeground)
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
         .background(Color.orange.opacity(0.15))
     }
 }
 
 /// Photo list row with metadata
 struct PhotoListRow: View {
-    let photo: CapturedPhoto
+    @ObservedObject var photo: CapturedPhoto
 
     var body: some View {
         HStack(spacing: 12) {
@@ -192,7 +187,7 @@ struct PhotoListRow: View {
                     .cornerRadius(8)
             } else {
                 Rectangle()
-                    .fill(Color.gray.opacity(0.3))
+                    .fill(Color.Theme.muted)
                     .frame(width: 60, height: 60)
                     .cornerRadius(8)
                     .overlay(
@@ -204,22 +199,45 @@ struct PhotoListRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(photo.name)
                     .font(.headline)
+                    .foregroundColor(Color.Theme.foreground)
                     .lineLimit(1)
 
-                Text("\(formatFileSize(photo.data.count)) · \(formatRelativeTime(photo.captureDate))")
+                // Show file size from metadata (available immediately)
+                // or actual data size after download completes
+                let displaySize = photo.data.isEmpty ? photo.fileSize : photo.data.count
+                Text("\(formatFileSize(displaySize)) · \(formatRelativeTime(photo.captureDate))")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Color.Theme.mutedForeground)
             }
 
             Spacer()
 
-            // Right: Download status
-            if photo.isDownloading {
-                ProgressView()
-            } else {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
+            // Right: Download status with enhanced states
+            downloadStatusView
+        }
+    }
+
+    /// Download status indicator
+    @ViewBuilder
+    private var downloadStatusView: some View {
+        switch photo.status {
+        case .downloading:
+            ProgressView()
+                .scaleEffect(0.8)
+
+        case .completed:
+            Image(systemName: "arrow.down.circle.fill")
+                .foregroundColor(Color.Theme.primary)
+                .font(.title3)
+
+        case .failed(let error):
+            VStack(alignment: .trailing, spacing: 2) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundColor(Color.Theme.destructive)
                     .font(.title3)
+                Text("Failed")
+                    .font(.caption2)
+                    .foregroundColor(Color.Theme.destructive)
             }
         }
     }
@@ -257,12 +275,3 @@ struct PhotoListRow: View {
         }
     }
 }
-
-// Preview requires a mock session - skip for now since TransferSession requires ActiveCamera
-// #Preview {
-//     NavigationView {
-//         LiveCaptureView(session: ...) {
-//             print("Disconnected")
-//         }
-//     }
-// }

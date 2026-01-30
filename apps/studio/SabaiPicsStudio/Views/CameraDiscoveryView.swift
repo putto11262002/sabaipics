@@ -13,7 +13,7 @@ import SwiftUI
 
 /// Camera discovery view - unified layout with always-visible camera list
 struct CameraDiscoveryView: View {
-    @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var captureFlow: CaptureFlowCoordinator  // CHANGED
     @StateObject private var scanner = NetworkScannerService()
 
     /// Whether to show the back confirmation dialog
@@ -42,20 +42,10 @@ struct CameraDiscoveryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Status bar
-            statusBar
-                .padding(.horizontal)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
-
-            Divider()
-
             // Main content - camera list or empty state
             mainContent
 
-            Divider()
-
-            // Footer with manual IP entry
+            // Footer with manual IP entry (no divider)
             footerView
                 .padding(.vertical, 16)
         }
@@ -65,23 +55,30 @@ struct CameraDiscoveryView: View {
         .toolbar(content: toolbarContent)
         .onAppear {
             print("[CameraDiscoveryView] View appeared, starting scan")
+
+            // Register cleanup for this stage
+            captureFlow.registerCleanup { [weak scanner] in
+                print("[CameraDiscoveryView] Running registered cleanup")
+                await scanner?.cleanup()
+            }
+
             startScanWithTimeout()
         }
         .onDisappear {
             timeoutTask?.cancel()
+            captureFlow.unregisterCleanup()
         }
         .onChange(of: scanner.discoveredCameras) { newCameras in
             print("[CameraDiscoveryView] Cameras updated: \(newCameras.count) found")
-            coordinator.updateDiscoveredCameras(newCameras)
+            captureFlow.updateDiscoveredCameras(newCameras)  // CHANGED
         }
-        .customConfirmationDialog(
-            isPresented: $showBackConfirmation,
-            title: "Stop scanning?",
-            message: "Go back to manufacturer selection?",
-            confirmLabel: "Go Back",
-            isDestructive: false
-        ) {
-            handleBack()
+        .alert("Stop scanning?", isPresented: $showBackConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Go Back", role: .destructive) {
+                handleBack()
+            }
+        } message: {
+            Text("Go back to manufacturer selection?")
         }
     }
 
@@ -97,58 +94,8 @@ struct CameraDiscoveryView: View {
                     Image(systemName: "chevron.left")
                     Text("Back")
                 }
+                .foregroundColor(Color.Theme.primary)
             }
-        }
-    }
-
-    // MARK: - Status Bar
-
-    private var statusBar: some View {
-        HStack {
-            // Status indicator
-            HStack(spacing: 8) {
-                if isScanning {
-                    // Scanning indicator
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Scanning...")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                } else if !scanner.discoveredCameras.isEmpty {
-                    // Found cameras indicator (subtle)
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .font(.subheadline)
-                    Text("Found \(scanner.discoveredCameras.count)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                } else if isEmptyAfterScan {
-                    // No cameras found
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundColor(.orange)
-                        .font(.subheadline)
-                    Text("No cameras found")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Spacer()
-
-            // Rescan button
-            Button(action: {
-                print("[CameraDiscoveryView] Rescan tapped")
-                startScanWithTimeout()
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Rescan")
-                }
-                .font(.subheadline)
-                .foregroundColor(.accentColor)
-            }
-            .disabled(isScanning)
-            .opacity(isScanning ? 0.5 : 1.0)
         }
     }
 
@@ -196,7 +143,7 @@ struct CameraDiscoveryView: View {
 
             Image(systemName: "camera.viewfinder")
                 .font(.system(size: 50))
-                .foregroundColor(.secondary.opacity(0.6))
+                .foregroundColor(Color.Theme.mutedForeground.opacity(0.6))
 
             VStack(spacing: 12) {
                 Text("Looking for cameras...")
@@ -205,7 +152,7 @@ struct CameraDiscoveryView: View {
 
                 Text("Make sure your camera is connected to the Personal Hotspot and WiFi transfer mode is enabled.")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Color.Theme.mutedForeground)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
@@ -221,7 +168,7 @@ struct CameraDiscoveryView: View {
 
             Image(systemName: "camera.badge.ellipsis")
                 .font(.system(size: 50))
-                .foregroundColor(.secondary.opacity(0.6))
+                .foregroundColor(Color.Theme.mutedForeground.opacity(0.6))
 
             VStack(spacing: 12) {
                 Text("No cameras found")
@@ -230,24 +177,18 @@ struct CameraDiscoveryView: View {
 
                 Text("Check that your camera is connected to the Personal Hotspot and WiFi transfer mode is enabled.")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Color.Theme.mutedForeground)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
 
-            // Try again button
-            Button(action: {
-                print("[CameraDiscoveryView] Try Again tapped")
+            // Rescan button
+            Button("Rescan") {
+                print("[CameraDiscoveryView] Rescan tapped")
                 startScanWithTimeout()
-            }) {
-                Text("Try Again")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(width: 200)
-                    .padding(.vertical, 14)
-                    .background(Color.accentColor)
-                    .cornerRadius(12)
             }
+            .buttonStyle(.primary)
+            .padding(.horizontal, 40)
             .padding(.top, 8)
 
             Spacer()
@@ -257,17 +198,19 @@ struct CameraDiscoveryView: View {
     // MARK: - Footer
 
     private var footerView: some View {
-        Button(action: {
+        Button("Enter IP Manually") {
             print("[CameraDiscoveryView] Enter IP Manually tapped")
-            // Cancel timeout and stop scan before navigating
+            // Cancel timeout task
             timeoutTask?.cancel()
-            scanner.stopScan()
-            coordinator.skipToManualEntry()
-        }) {
-            Text("Enter IP Manually")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+
+            // Call registered cleanup then navigate
+            Task {
+                await captureFlow.cleanup()  // Stops scan AND disconnects cameras
+                captureFlow.skipToManualEntry()
+            }
         }
+        .font(.subheadline)
+        .foregroundColor(Color.Theme.mutedForeground)
     }
 
     // MARK: - Actions
@@ -300,7 +243,7 @@ struct CameraDiscoveryView: View {
 
         // 3. Tell coordinator to handle selection
         // Coordinator will: extract session, disconnect OTHER cameras, start transfer
-        coordinator.selectDiscoveredCamera(camera)
+        captureFlow.selectDiscoveredCamera(camera)  // CHANGED
         print("[CameraDiscoveryView]    Passed to coordinator")
     }
 
@@ -309,17 +252,15 @@ struct CameraDiscoveryView: View {
     private func handleBack() {
         print("[CameraDiscoveryView] handleBack()")
 
-        // 1. Cancel timeout task
+        // Cancel timeout task
         timeoutTask?.cancel()
         print("[CameraDiscoveryView]    Timeout cancelled")
 
-        // 2. Cleanup scanner (stops scan AND disconnects all cameras)
-        scanner.cleanup()
-        print("[CameraDiscoveryView]    Scanner cleanup called")
-
-        // 3. Navigate back
-        coordinator.backToManufacturerSelection()
-        print("[CameraDiscoveryView]    Navigating back")
+        // Call registered cleanup then navigate
+        Task {
+            await captureFlow.cleanup()  // Uses registered cleanup
+            captureFlow.backToManufacturerSelection()
+        }
     }
 }
 
@@ -337,15 +278,15 @@ struct CameraRow: View {
                 // Camera icon
                 Image(systemName: "camera.fill")
                     .font(.title2)
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(Color.Theme.primary)
                     .frame(width: 50, height: 50)
-                    .background(Color.accentColor.opacity(0.1))
+                    .background(Color.Theme.primary.opacity(0.1))
                     .cornerRadius(10)
 
                 // Camera name
                 Text(camera.name)
                     .font(.headline)
-                    .foregroundColor(.primary)
+                    .foregroundColor(Color.Theme.foreground)
 
                 Spacer()
 
@@ -357,12 +298,12 @@ struct CameraRow: View {
                 }
 
                 Image(systemName: "chevron.right")
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Color.Theme.mutedForeground)
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                    .stroke(Color.Theme.border, lineWidth: 1)
             )
         }
     }

@@ -14,10 +14,28 @@ import Network
 
 /// Delegate for camera event notifications
 /// Used by PTPIPSession to receive events from any vendor implementation
+///
+/// Two-phase download callbacks for progressive UI:
+/// 1. `didDetectPhoto` - Called immediately after ObjectInfo, before download starts
+/// 2. `didCompleteDownload` - Called after download finishes
 @MainActor
 protocol CameraEventSourceDelegate: AnyObject {
-    /// Called when a photo is detected and ready to download
-    func eventSource(_ source: CameraEventSource, didDetectPhoto objectHandle: UInt32)
+    /// Called immediately when photo is detected (before download)
+    /// Provides metadata from GetObjectInfo for showing placeholder UI
+    func eventSource(
+        _ source: CameraEventSource,
+        didDetectPhoto objectHandle: UInt32,
+        filename: String,
+        captureDate: Date,
+        fileSize: Int
+    )
+
+    /// Called when photo download completes
+    func eventSource(
+        _ source: CameraEventSource,
+        didCompleteDownload objectHandle: UInt32,
+        data: Data
+    )
 
     /// Called when a RAW file is skipped (not downloaded)
     func eventSource(_ source: CameraEventSource, didSkipRawFile filename: String)

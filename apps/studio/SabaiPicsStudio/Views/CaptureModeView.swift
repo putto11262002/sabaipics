@@ -14,46 +14,52 @@ struct CaptureModeView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var coordinator: AppCoordinator
 
+    // NEW: Create isolated capture flow state
+    @StateObject private var captureFlow = CaptureFlowCoordinator()
+
     @State private var showExitConfirm = false
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
+        NavigationStack {
             ContentView()
-
-            Button {
-                showExitConfirm = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("Close")
-                        .font(.system(size: 14, weight: .semibold))
+                .environmentObject(captureFlow)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            showExitConfirm = true
+                        } label: {
+                            Image(systemName: "xmark.circle")
+                                .foregroundStyle(Color.Theme.primary)
+                        }
+                    }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
-                .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 4)
-            }
-            .padding(.leading, 14)
-            .padding(.top, 12)
+                .alert("Exit capture?", isPresented: $showExitConfirm) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Exit", role: .destructive) {
+                        Task { await exitCapture() }
+                    }
+                } message: {
+                    Text("This will end the current capture session and return to the main menu.")
+                }
         }
-        .alert("Exit capture?", isPresented: $showExitConfirm) {
-            Button("Cancel", role: .cancel) {}
-            Button("Exit", role: .destructive) {
-                Task { await exitCapture() }
-            }
-        } message: {
-            Text("This will end the current capture session and return to the main menu.")
+        .onAppear {
+            // NEW: Link to global coordinator for transferSession
+            captureFlow.appCoordinator = coordinator
         }
     }
 
     private func exitCapture() async {
+        // Clean up current stage (scanner, connections, etc.)
+        await captureFlow.cleanup()
+
+        // Clean up transfer session if exists
         if let session = coordinator.transferSession {
             await session.end()
             coordinator.transferSession = nil
         }
-        coordinator.backToManufacturerSelection()
+
+        // Reset capture flow state
+        captureFlow.state = .manufacturerSelection
         dismiss()
     }
 }

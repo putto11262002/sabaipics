@@ -14,7 +14,7 @@ import SwiftUI
 /// View showing Personal Hotspot setup instructions
 /// Displayed when hotspot is not detected before camera discovery
 struct HotspotSetupView: View {
-    @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var captureFlow: CaptureFlowCoordinator  // CHANGED
 
     /// Whether to show the back confirmation dialog
     @State private var showBackConfirmation = false
@@ -26,47 +26,58 @@ struct HotspotSetupView: View {
             // WiFi icon
             Image(systemName: "wifi.circle.fill")
                 .font(.system(size: 80))
-                .foregroundColor(.blue)
+                .foregroundColor(Color.Theme.primary)
 
             // Title
             Text("Enable Personal Hotspot")
-                .font(.title)
+                .font(.title2)
                 .fontWeight(.bold)
+                .foregroundColor(Color.Theme.foreground)
 
             // Instructions
             VStack(alignment: .leading, spacing: 16) {
-                HotspotInstructionRow(number: 1, text: "Open Settings app")
-                HotspotInstructionRow(number: 2, text: "Tap \"Personal Hotspot\"")
-                HotspotInstructionRow(number: 3, text: "Turn on \"Allow Others to Join\"")
-                HotspotInstructionRow(number: 4, text: "Connect your camera to this hotspot")
+                HotspotInstructionRow(
+                    number: 1,
+                    parts: [
+                        .muted("Open "),
+                        .prominent("Settings"),
+                        .muted(" app")
+                    ]
+                )
+                HotspotInstructionRow(
+                    number: 2,
+                    parts: [
+                        .muted("Tap "),
+                        .prominent("Personal Hotspot")
+                    ]
+                )
+                HotspotInstructionRow(
+                    number: 3,
+                    parts: [
+                        .muted("Turn on "),
+                        .prominent("Allow Others to Join")
+                    ]
+                )
+                HotspotInstructionRow(
+                    number: 4,
+                    parts: [
+                        .muted("Connect your "),
+                        .prominent("camera"),
+                        .muted(" to this hotspot")
+                    ]
+                )
             }
             .padding(.horizontal, 32)
 
             Spacer()
 
             // Next button
-            Button(action: {
-                coordinator.proceedToDiscovery()
-            }) {
-                Text("Next")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor)
-                    .cornerRadius(12)
+            Button("Next") {
+                captureFlow.proceedToDiscovery()
             }
+            .buttonStyle(.primary)
             .padding(.horizontal, 40)
-
-            // Skip button (for testing or manual IP entry)
-            Button(action: {
-                coordinator.skipToManualEntry()
-            }) {
-                Text("Enter IP Manually")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.bottom, 20)
+            .padding(.bottom, 40)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -77,45 +88,60 @@ struct HotspotSetupView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .medium))
                         Text("Back")
                     }
+                    .foregroundColor(Color.Theme.primary)
                 }
             }
         }
-        .customConfirmationDialog(
-            isPresented: $showBackConfirmation,
-            title: "Go back?",
-            message: "Return to manufacturer selection?",
-            confirmLabel: "Go Back",
-            isDestructive: false
-        ) {
-            coordinator.backToManufacturerSelection()
+        .alert("Go back?", isPresented: $showBackConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Go Back", role: .destructive) {
+                captureFlow.backToManufacturerSelection()
+            }
+        } message: {
+            Text("Return to manufacturer selection?")
         }
     }
 }
 
 /// Single instruction row with number (Hotspot setup version)
 struct HotspotInstructionRow: View {
+    enum TextPart {
+        case muted(String)
+        case prominent(String)
+    }
+
     let number: Int
-    let text: String
+    let parts: [TextPart]
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            // Number circle
-            Text("\(number)")
-                .font(.headline)
-                .foregroundColor(.white)
-                .frame(width: 28, height: 28)
-                .background(Color.accentColor)
-                .clipShape(Circle())
-
-            // Instruction text
-            Text(text)
+            // Number with period
+            Text("\(number).")
                 .font(.body)
-                .foregroundColor(.primary)
+                .foregroundColor(Color.Theme.mutedForeground)
+
+            // Instruction text with mixed emphasis
+            buildInstructionText()
+                .font(.body)
 
             Spacer()
         }
+    }
+
+    private func buildInstructionText() -> Text {
+        var result = Text("")
+        for part in parts {
+            switch part {
+            case .muted(let str):
+                result = result + Text(str).foregroundColor(Color.Theme.mutedForeground)
+            case .prominent(let str):
+                result = result + Text(str).foregroundColor(Color.Theme.foreground)
+            }
+        }
+        return result
     }
 }
 

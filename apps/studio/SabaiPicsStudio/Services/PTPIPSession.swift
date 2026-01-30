@@ -16,15 +16,35 @@ import Combine
 
 /// Delegate for PTP/IP session notifications
 /// Marked @MainActor since all delegates update UI state
+///
+/// Two-phase download callbacks for progressive UI:
+/// 1. `didDetectPhoto` - Called immediately after ObjectInfo, before download starts
+/// 2. `didCompleteDownload` - Called after download finishes
+/// 3. `didDownloadPhoto` - Legacy single-phase callback (kept for compatibility)
 @MainActor
 protocol PTPIPSessionDelegate: AnyObject {
     /// Called when session successfully connects
     func sessionDidConnect(_ session: PTPIPSession)
 
-    /// Called when a new photo is detected (ObjectAdded event)
-    func session(_ session: PTPIPSession, didDetectPhoto objectHandle: UInt32)
+    /// Called immediately when photo is detected (before download)
+    /// Provides metadata from GetObjectInfo for showing placeholder UI
+    func session(
+        _ session: PTPIPSession,
+        didDetectPhoto objectHandle: UInt32,
+        filename: String,
+        captureDate: Date,
+        fileSize: Int
+    )
 
     /// Called when photo download completes
+    func session(
+        _ session: PTPIPSession,
+        didCompleteDownload objectHandle: UInt32,
+        data: Data
+    )
+
+    /// Called when photo download completes (legacy single-phase callback)
+    /// Kept for backward compatibility - new code should use didDetectPhoto + didCompleteDownload
     func session(_ session: PTPIPSession, didDownloadPhoto data: Data, objectHandle: UInt32)
 
     /// Called when a RAW file is skipped (not downloaded)
@@ -476,8 +496,9 @@ class PTPIPSession: NSObject {
 
         let photoData = try await downloader.downloadPhoto(objectHandle: objectHandle)
 
-        // Notify delegate
-        delegate?.session(self, didDownloadPhoto: photoData, objectHandle: objectHandle)
+        // NOTE: We no longer call the legacy didDownloadPhoto delegate here
+        // Event sources use the two-phase flow (didDetectPhoto + didCompleteDownload)
+        // which provides better UX with immediate placeholders
 
         return photoData
     }
@@ -782,9 +803,32 @@ extension PTPIPSession: PhotoOperationsProvider {
 // MARK: - Camera Event Source Delegate
 
 extension PTPIPSession: CameraEventSourceDelegate {
-    func eventSource(_ source: CameraEventSource, didDetectPhoto objectHandle: UInt32) {
-        print("[PTPIPSession] Event source detected photo: 0x\(String(format: "%08X", objectHandle))")
-        delegate?.session(self, didDetectPhoto: objectHandle)
+    /// Phase 1: Photo detected with metadata (before download)
+    func eventSource(
+        _ source: CameraEventSource,
+        didDetectPhoto objectHandle: UInt32,
+        filename: String,
+        captureDate: Date,
+        fileSize: Int
+    ) {
+        print("[PTPIPSession] Event source detected photo: \(filename)")
+        delegate?.session(
+            self,
+            didDetectPhoto: objectHandle,
+            filename: filename,
+            captureDate: captureDate,
+            fileSize: fileSize
+        )
+    }
+
+    /// Phase 2: Download completed
+    func eventSource(
+        _ source: CameraEventSource,
+        didCompleteDownload objectHandle: UInt32,
+        data: Data
+    ) {
+        print("[PTPIPSession] Event source completed download: 0x\(String(format: "%08X", objectHandle)) (\(data.count) bytes)")
+        delegate?.session(self, didCompleteDownload: objectHandle, data: data)
     }
 
     func eventSource(_ source: CameraEventSource, didSkipRawFile filename: String) {

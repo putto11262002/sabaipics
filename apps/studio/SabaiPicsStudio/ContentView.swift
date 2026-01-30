@@ -10,66 +10,61 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var captureFlow: CaptureFlowCoordinator  // NEW
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                // Background color
-                Color(.systemBackground)
-                    .ignoresSafeArea()
+        ZStack {
+            // Background color
+            Color(.systemBackground)
+                .ignoresSafeArea()
 
-                // Content based on app state
-                switch coordinator.appState {
-                case .manufacturerSelection:
-                    ManufacturerSelectionView()
-                        .transition(.opacity)
-                        .id("manufacturer-selection")
+            // Content based on capture flow state (CHANGED)
+            switch captureFlow.state {
+            case .manufacturerSelection:
+                ManufacturerSelectionView()
+                    .transition(.opacity)
+                    .id("manufacturer-selection")
 
-                case .hotspotSetup:
-                    HotspotSetupView()
-                        .transition(.opacity)
-                        .id("hotspot-setup")
+            case .hotspotSetup:
+                HotspotSetupView()
+                    .transition(.opacity)
+                    .id("hotspot-setup")
 
-                case .discovering:
-                    CameraDiscoveryView()
-                        .transition(.opacity)
-                        .id("camera-discovery")
+            case .discovering:
+                CameraDiscoveryView()
+                    .transition(.opacity)
+                    .id("camera-discovery")
 
-                case .manualIPEntry:
-                    // Manual IP entry (fallback from discovery)
-                    WiFiSetupView()
-                        .transition(.opacity)
-                        .id("manual-ip-entry")
+            case .manualIPEntry:
+                // Manual IP entry (fallback from discovery)
+                ManualIPEntryView()
+                    .transition(.opacity)
+                    .id("manual-ip-entry")
 
-                case .connecting(let ip):
-                    // Connecting view with IP display
-                    ConnectingView(ipAddress: ip)
-                        .transition(.opacity)
-                        .id("connecting-\(ip)")
+            case .connecting(let ip):
+                // Connecting view with IP display
+                ConnectingView(ipAddress: ip)
+                    .transition(.opacity)
+                    .id("connecting-\(ip)")
 
-                case .transferring:
-                    // Live capture view - pass session directly for proper observation
-                    if let session = coordinator.transferSession {
-                        LiveCaptureView(session: session) {
-                            // Navigation callback - only change state, session.end() already called
-                            coordinator.appState = .manufacturerSelection
-                            coordinator.transferSession = nil
-                        }
-                        .transition(.opacity)
-                        .id("transferring")
+            case .transferring:
+                // IMPORTANT: Keep coordinator.transferSession reference (global state)
+                if let session = coordinator.transferSession {
+                    LiveCaptureView(session: session) {
+                        // Navigation callback
+                        captureFlow.state = .manufacturerSelection
+                        coordinator.transferSession = nil
                     }
-
-                case .error(let message):
-                    ConnectionErrorView(errorMessage: message)
-                        .transition(.opacity)
-                        .id("error")
+                    .transition(.opacity)
+                    .id("transferring")
                 }
+
+            case .error(let message):
+                ConnectionErrorView(errorMessage: message)
+                    .transition(.opacity)
+                    .id("error")
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
         }
-        .navigationViewStyle(.stack)
-        // Note: Disconnect alert is now local to LiveCaptureView (no global state needed)
     }
 }
 

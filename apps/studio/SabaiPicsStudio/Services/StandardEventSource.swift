@@ -76,17 +76,47 @@ extension StandardEventSource: PTPIPEventMonitorDelegate {
         Task { @MainActor in
             print("[StandardEventSource] Photo detected: 0x\(String(format: "%08X", objectHandle))")
 
-            // Notify delegate
-            delegate?.eventSource(self, didDetectPhoto: objectHandle)
-
-            // Auto-download photo when detected
-            // TODO: Add RAW filtering like CanonEventSource for consistency
-            // For now, download everything (matching original behavior)
             guard let photoOps = photoOps else { return }
 
             do {
-                let photoData = try await photoOps.downloadPhoto(objectHandle: objectHandle)
-                print("[StandardEventSource] Photo 0x\(String(format: "%08X", objectHandle)) downloaded (\(photoData.count) bytes)")
+                // Get object info to check file type and metadata
+                let objectInfo = try await photoOps.getObjectInfo(objectHandle: objectHandle)
+
+                // Skip RAW files (matching Canon behavior)
+                if objectInfo.isRawFile {
+                    print("[StandardEventSource] Skipping RAW file: \(objectInfo.filename)")
+                    delegate?.eventSource(self, didSkipRawFile: objectInfo.filename)
+                    return
+                }
+
+                // Only download JPEG files
+                if objectInfo.isJpegFile {
+                    print("[StandardEventSource] Downloading JPEG: \(objectInfo.filename)")
+
+                    // Phase 1: Notify photo detected with metadata (before download)
+                    // Note: PTP captureDate is a string, use current time as approximation
+                    delegate?.eventSource(
+                        self,
+                        didDetectPhoto: objectHandle,
+                        filename: objectInfo.filename,
+                        captureDate: Date(), // Use current time since PTP date is string format
+                        fileSize: Int(objectInfo.objectCompressedSize)
+                    )
+
+                    // Phase 2: Download photo
+                    let photoData = try await photoOps.downloadPhoto(objectHandle: objectHandle)
+                    print("[StandardEventSource] Photo 0x\(String(format: "%08X", objectHandle)) downloaded (\(photoData.count) bytes)")
+
+                    // Phase 3: Notify download complete
+                    delegate?.eventSource(
+                        self,
+                        didCompleteDownload: objectHandle,
+                        data: photoData
+                    )
+                } else {
+                    // Unknown format - log and skip
+                    print("[StandardEventSource] Skipping unknown format: \(objectInfo.filename)")
+                }
             } catch {
                 print("[StandardEventSource] Photo download failed: \(error)")
                 delegate?.eventSource(self, didFailWithError: error)

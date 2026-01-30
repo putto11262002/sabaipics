@@ -16,39 +16,36 @@ import SwiftUI
 /// Shows three manufacturer options: Canon (active), Nikon (active), Sony (grayed)
 /// User taps manufacturer to start camera discovery flow
 struct ManufacturerSelectionView: View {
-    @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var captureFlow: CaptureFlowCoordinator  // CHANGED
 
     var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                Spacer()
+        VStack(spacing: 24) {
+            Spacer()
 
-                // Title
-                Text("Select your camera")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-                    .padding(.bottom, 32)
+            // Title
+            Text("Select your camera")
+                .font(.title3)
+                .foregroundColor(Color.Theme.mutedForeground)
+                .padding(.bottom, 32)
 
-                // Manufacturer buttons
-                VStack(spacing: 16) {
-                    ForEach(CameraManufacturer.allCases, id: \.self) { manufacturer in
-                        ManufacturerButton(
-                            manufacturer: manufacturer,
-                            isEnabled: manufacturer.isSupported
-                        ) {
-                            handleManufacturerSelection(manufacturer)
-                        }
+            // Manufacturer buttons
+            VStack(spacing: 16) {
+                ForEach(CameraManufacturer.allCases, id: \.self) { manufacturer in
+                    ManufacturerButton(
+                        manufacturer: manufacturer,
+                        isEnabled: manufacturer.isSupported
+                    ) {
+                        handleManufacturerSelection(manufacturer)
                     }
                 }
-                .padding(.horizontal, 40)
-
-                Spacer()
-                Spacer()
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
+            .padding(.horizontal, 40)
+
+            Spacer()
+            Spacer()
         }
-        .navigationViewStyle(.stack)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     /// Handle manufacturer selection
@@ -59,10 +56,7 @@ struct ManufacturerSelectionView: View {
         }
 
         print("[ManufacturerSelectionView] Selected: \(manufacturer.rawValue)")
-
-        // TODO: Navigate to CameraDiscoveryView
-        // For now, transition to .idle (will be updated in Phase 2)
-        coordinator.selectManufacturer(manufacturer)
+        captureFlow.selectManufacturer(manufacturer)  // CHANGED
     }
 }
 
@@ -84,24 +78,15 @@ struct ManufacturerButton: View {
                     .fontWeight(.semibold)
 
                 Spacer()
-
-                if !isEnabled {
-                    Text("Coming Soon")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.secondary.opacity(0.2))
-                        .cornerRadius(12)
-                }
             }
             .padding()
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isEnabled ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: 2)
+                    .stroke(isEnabled ? Color.Theme.primary : Color.Theme.border, lineWidth: 2)
             )
-            .foregroundColor(isEnabled ? .primary : .secondary)
+            .foregroundColor(isEnabled ? Color.Theme.foreground : Color.Theme.mutedForeground)
+            .opacity(isEnabled ? 1.0 : 0.6)
         }
         .disabled(!isEnabled)
     }

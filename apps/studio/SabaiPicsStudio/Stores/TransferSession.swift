@@ -66,6 +66,9 @@ class TransferSession: ObservableObject {
     /// Whether to show the RAW skip banner (user can dismiss)
     @Published var showRawSkipBanner: Bool = true
 
+    /// Whether session is currently disconnecting
+    @Published var isDisconnecting: Bool = false
+
     // MARK: - Private Properties
 
     /// The active camera (guaranteed to have open session)
@@ -73,6 +76,9 @@ class TransferSession: ObservableObject {
 
     /// Combine cancellables
     private var cancellables = Set<AnyCancellable>()
+
+    /// Track pending downloads for two-phase updates (objectHandle -> photo)
+    private var pendingDownloads: [UInt32: CapturedPhoto] = [:]
 
     // MARK: - Initialization
 
@@ -102,9 +108,10 @@ class TransferSession: ObservableObject {
 
         print("[TransferSession] Ending session...")
 
+        isDisconnecting = true
         isActive = false
 
-        // Disconnect camera
+        // Disconnect camera (can take 5-10+ seconds during burst shooting)
         if let camera = camera {
             await camera.disconnect()
         }
@@ -113,6 +120,7 @@ class TransferSession: ObservableObject {
         // Clear photos
         photos.removeAll()
 
+        isDisconnecting = false
         print("[TransferSession] Session ended")
     }
 
@@ -142,20 +150,65 @@ extension TransferSession: PTPIPSessionDelegate {
         // Already connected when TransferSession is created
     }
 
-    func session(_ session: PTPIPSession, didDetectPhoto objectHandle: UInt32) {
-        print("[TransferSession] Photo detected: 0x\(String(format: "%08X", objectHandle))")
-        // Photo will be downloaded automatically by PTPIPSession
-    }
+    /// Phase 1: Photo detected with metadata (before download)
+    /// Create placeholder immediately for better UX
+    func session(
+        _ session: PTPIPSession,
+        didDetectPhoto objectHandle: UInt32,
+        filename: String,
+        captureDate: Date,
+        fileSize: Int
+    ) {
+        print("[TransferSession] 📋 Photo detected: \(filename) (\(fileSize) bytes)")
 
-    func session(_ session: PTPIPSession, didDownloadPhoto data: Data, objectHandle: UInt32) {
-        // Create CapturedPhoto from downloaded data
-        let filename = "IMG_\(String(format: "%08X", objectHandle)).jpg"
-        let photo = CapturedPhoto(name: filename, data: data)
+        // Create placeholder photo with metadata
+        let photo = CapturedPhoto(
+            id: String(format: "%08X", objectHandle),
+            name: filename,
+            captureDate: captureDate,
+            fileSize: fileSize,
+            isDownloading: true
+        )
 
-        // Add to beginning of array (newest first)
+        // Add to UI immediately (newest first)
         photos.insert(photo, at: 0)
 
-        print("[TransferSession] Photo added: \(filename) (\(data.count) bytes)")
+        // Track for later update when download completes
+        pendingDownloads[objectHandle] = photo
+
+        print("[TransferSession] 📋 Added placeholder: \(filename)")
+    }
+
+    /// Phase 2: Download completed
+    /// Update the existing placeholder with actual image data
+    func session(_ session: PTPIPSession, didCompleteDownload objectHandle: UInt32, data: Data) {
+        guard let photo = pendingDownloads[objectHandle] else {
+            print("[TransferSession] ⚠️ No placeholder found for handle 0x\(String(format: "%08X", objectHandle))")
+            return
+        }
+
+        // Update photo with actual data
+        photo.data = data
+        photo.image = UIImage(data: data)
+        photo.status = .completed
+        photo.isDownloading = false
+
+        // Clean up tracking
+        pendingDownloads.removeValue(forKey: objectHandle)
+
+        print("[TransferSession] ✅ Download complete: \(photo.name) (\(data.count) bytes)")
+    }
+
+    /// Legacy method for backward compatibility (not used with two-phase flow)
+    func session(_ session: PTPIPSession, didDownloadPhoto data: Data, objectHandle: UInt32) {
+        // This method is kept for backward compatibility but should not be called
+        // when using the two-phase didDetectPhoto/didCompleteDownload flow
+        print("[TransferSession] ⚠️ Legacy didDownloadPhoto called - should use two-phase flow")
+
+        // Fallback: create photo directly if somehow called
+        let filename = "IMG_\(String(format: "%08X", objectHandle)).jpg"
+        let photo = CapturedPhoto(name: filename, data: data)
+        photos.insert(photo, at: 0)
     }
 
     func session(_ session: PTPIPSession, didFailWithError error: Error) {
