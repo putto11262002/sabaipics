@@ -172,7 +172,7 @@ function createTestApp(options: {
 const MOCK_ENV = (mockBucket: R2Bucket) => ({
   EVENT_FRONTEND_URL: 'https://event.sabaipics.com',
   PHOTOS_BUCKET: mockBucket,
-  FTP_PASSWORD_ENCRYPTION_KEY: 'dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItdGVzdHMxMjM0NTY3ODkw',
+  FTP_PASSWORD_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
 });
 
 // =============================================================================
