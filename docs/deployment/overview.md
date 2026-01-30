@@ -60,6 +60,7 @@ SabaiPics runs on Cloudflare's edge infrastructure with Neon PostgreSQL as the d
 | **Auth**             | Clerk                    | User authentication                     |
 | **Payments**         | Stripe                   | Credit purchases                        |
 | **Face Recognition** | AWS Rekognition          | Photo-to-face matching                  |
+| **FTP Server**       | DigitalOcean (Docker)    | Camera uploads via FTPS                 |
 
 ## Environments
 
@@ -71,14 +72,15 @@ SabaiPics runs on Cloudflare's edge infrastructure with Neon PostgreSQL as the d
 
 ## Domains
 
-| Environment | API                       | Dashboard                 | Event                       | Photos                       |
-| ----------- | ------------------------- | ------------------------- | --------------------------- | ---------------------------- |
-| Development | localhost:8081            | localhost:5173            | localhost:5174              | devphotos.sabaipics.com      |
-| Staging     | api-staging.sabaipics.com | app-staging.sabaipics.com | event-staging.sabaipics.com | photos-staging.sabaipics.com |
-| Production  | api.sabaipics.com         | app.sabaipics.com         | event.sabaipics.com         | photo.sabaipics.com          |
+| Environment | API                       | Dashboard                 | Event                       | Photos                       | FTP                          |
+| ----------- | ------------------------- | ------------------------- | --------------------------- | ---------------------------- | ---------------------------- |
+| Development | localhost:8081            | localhost:5173            | localhost:5174              | devphotos.sabaipics.com      | localhost:2121 / 990         |
+| Staging     | api-staging.sabaipics.com | app-staging.sabaipics.com | event-staging.sabaipics.com | photos-staging.sabaipics.com | ftp-staging.sabaipics.com    |
+| Production  | api.sabaipics.com         | app.sabaipics.com         | event.sabaipics.com         | photo.sabaipics.com          | ftp.sabaipics.com            |
 
 ## Related Docs
 
 - [CI/CD Workflows](./cicd.md) - GitHub Actions pipeline details
 - [Cloudflare Resources](./cloudflare.md) - Workers, Pages, R2, Queues setup
 - [Deployment Checklist](./checklist.md) - Step-by-step deployment guide
+- [FTP VPS Setup](./ftp/vps_setup.md) - DigitalOcean droplet bootstrap
