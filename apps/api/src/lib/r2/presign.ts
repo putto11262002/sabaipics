@@ -57,6 +57,7 @@ export async function generatePresignedPutUrl(
   // Sign the request with required headers
   const headers: Record<string, string> = {
     'Content-Type': options.contentType,
+    'If-None-Match': '*',
   };
 
   if (options.contentLength !== undefined) {
