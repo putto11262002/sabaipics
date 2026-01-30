@@ -319,6 +319,41 @@ CanonEventSource.cleanup()
 - Without draining events, pending events may cause state inconsistency
 - Matches gphoto2lib behavior for proper PTP spec compliance
 
+### Disconnect Timing & Photo Completion
+
+**Behavior when user disconnects during active photo transfer:**
+
+When disconnect is initiated (user clicks Close), the current poll batch completes before cleanup finishes.
+
+**Timeline:**
+
+1. **Graceful timeout: 1 second** - `stopMonitoring(graceful: true)` waits up to 1s for polling task to finish
+2. **Force cancel fallback** - After 1s timeout, sends cancel signal via `pollingTask?.cancel()`
+3. **Task still awaited** - Even after cancel, `await pollingTask?.value` waits for task completion
+4. **Current batch completes** - Photos detected in the current `Canon_GetEvent` poll finish downloading sequentially
+
+**Expected duration:**
+
+| Scenario                          | Duration        |
+| --------------------------------- | --------------- |
+| Idle (no photos downloading)      | ~200-600ms      |
+| Single photo in progress          | ~500ms-2s       |
+| Burst (10-20 photos in one poll)  | 5-10+ seconds   |
+
+**Why this happens:**
+
+- Downloads run sequentially: `for handle in photosToDownload { await processPhotoHandle(handle) }`
+- No `Task.checkCancellation()` in the download loop (cooperative cancellation not implemented)
+- Once a poll finds photos, all photos from that batch download before the task exits
+- This ensures photos aren't left in inconsistent state on camera
+
+**User experience:**
+
+- Disconnect can take several seconds during burst shooting
+- Photos continue appearing in UI after Close button clicked
+- Sheet doesn't close until all in-progress downloads complete
+- Consider showing "Disconnecting..." state for waits >1 second
+
 ---
 
 ## Photo Transfer

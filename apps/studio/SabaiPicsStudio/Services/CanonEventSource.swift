@@ -362,24 +362,34 @@ class CanonEventSource: CameraEventSource {
             // Only download JPEG files
             if objectInfo.isJpegFile {
                 print("[CanonEventSource] Downloading JPEG: \(objectInfo.filename)")
-                delegate?.eventSource(self, didDetectPhoto: handle)
+
+                // Phase 1: Notify photo detected with metadata (before download)
+                // Note: PTP captureDate is a string, use current time as approximation
+                delegate?.eventSource(
+                    self,
+                    didDetectPhoto: handle,
+                    filename: objectInfo.filename,
+                    captureDate: Date(), // Use current time since PTP date is string format
+                    fileSize: Int(objectInfo.objectCompressedSize)
+                )
+
+                // Phase 2: Download photo
                 let photoData = try await photoOps.downloadPhoto(objectHandle: handle)
                 print("[CanonEventSource] Photo 0x\(String(format: "%08X", handle)) downloaded (\(photoData.count) bytes)")
+
+                // Phase 3: Notify download complete
+                delegate?.eventSource(
+                    self,
+                    didCompleteDownload: handle,
+                    data: photoData
+                )
             } else {
                 // Unknown format - log and skip
                 print("[CanonEventSource] Skipping unknown format: \(objectInfo.filename) (format: 0x\(String(format: "%04X", objectInfo.objectFormat)))")
             }
         } catch {
             print("[CanonEventSource] Failed to get object info for 0x\(String(format: "%08X", handle)): \(error)")
-            // Fall back to downloading anyway if we can't determine the type
-            delegate?.eventSource(self, didDetectPhoto: handle)
-            do {
-                let photoData = try await photoOps.downloadPhoto(objectHandle: handle)
-                print("[CanonEventSource] Photo 0x\(String(format: "%08X", handle)) downloaded (\(photoData.count) bytes)")
-            } catch {
-                print("[CanonEventSource] Photo download failed: \(error)")
-                delegate?.eventSource(self, didFailWithError: error)
-            }
+            delegate?.eventSource(self, didFailWithError: error)
         }
     }
 

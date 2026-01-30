@@ -468,15 +468,36 @@ extension WiFiCameraService: PTPIPSessionDelegate {
         self.connectionError = nil
     }
 
-    func session(_ session: PTPIPSession, didDetectPhoto objectHandle: UInt32) {
-        // Photo will be auto-downloaded by PTPIPSession
+    /// Phase 1: Photo detected with metadata (before download)
+    func session(
+        _ session: PTPIPSession,
+        didDetectPhoto objectHandle: UInt32,
+        filename: String,
+        captureDate: Date,
+        fileSize: Int
+    ) {
+        // WiFiCameraService doesn't need placeholder tracking
+        // Only TransferSession uses progressive UI
+        print("[WiFiCameraService] Photo detected: \(filename)")
     }
 
-    func session(_ session: PTPIPSession, didDownloadPhoto data: Data, objectHandle: UInt32) {
+    /// Phase 2: Download completed
+    func session(
+        _ session: PTPIPSession,
+        didCompleteDownload objectHandle: UInt32,
+        data: Data
+    ) {
         // Generate filename from object handle
         let filename = "PTP_\(String(format: "%08X", objectHandle)).jpg"
 
         // Add to downloaded photos array
+        self.downloadedPhotos.append((filename: filename, data: data))
+    }
+
+    /// Legacy single-phase callback (kept for compatibility)
+    func session(_ session: PTPIPSession, didDownloadPhoto data: Data, objectHandle: UInt32) {
+        // Fallback if legacy path is used
+        let filename = "PTP_\(String(format: "%08X", objectHandle)).jpg"
         self.downloadedPhotos.append((filename: filename, data: data))
     }
 

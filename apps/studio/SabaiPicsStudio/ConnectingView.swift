@@ -11,65 +11,52 @@ import SwiftUI
 
 /// Searching/connecting screen with animated spinner
 struct ConnectingView: View {
-    /// IP address being connected to (passed from AppState.connecting)
+    @EnvironmentObject var captureFlow: CaptureFlowCoordinator
+
+    /// IP address being connected to (not displayed to user)
     var ipAddress: String? = nil
 
-    /// Legacy: connection store (for backward compatibility)
-    @EnvironmentObject var connectionStore: ConnectionStore
-
-    /// Display IP - prefer passed parameter, fall back to connectionStore
-    private var displayIP: String {
-        ipAddress ?? connectionStore.connectedIP ?? "..."
-    }
-
     var body: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: 24) {
             Spacer()
 
             // Animated spinner
             ProgressView()
                 .scaleEffect(1.5)
-                .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                .tint(Color.Theme.primary)
 
-            VStack(spacing: 8) {
-                Text("Connecting to camera...")
-                    .font(.title3)
-                    .fontWeight(.medium)
-
-                Text(displayIP)
-                    .font(.body)
-                    .foregroundColor(.secondary)
-
-                if connectionStore.retryCount > 0 {
-                    Text("Attempt \(connectionStore.retryCount + 1) of 3")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                        .padding(.top, 8)
-                }
-            }
+            Text("Connecting...")
+                .font(.title3)
+                .fontWeight(.medium)
+                .foregroundColor(Color.Theme.foreground)
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color.Theme.background)
+        .onAppear {
+            print("[ConnectingView] View appeared, registering cleanup")
+
+            // Register cleanup to cancel connection if user closes
+            captureFlow.registerCleanup { [weak captureFlow] in
+                print("[ConnectingView] Running registered cleanup (cancel connection)")
+                captureFlow?.cancelConnection()
+            }
+        }
+        .onDisappear {
+            captureFlow.unregisterCleanup()
+        }
     }
 }
 
-#Preview {
-    let mockService = MockCameraService()
-    let coordinator = AppCoordinator(cameraService: mockService)
-    coordinator.connectionStore.connectedIP = "172.20.10.2"
-
-    return ConnectingView(ipAddress: "172.20.10.2")
-        .environmentObject(coordinator.connectionStore)
+#Preview("Connecting to Camera") {
+    ConnectingView(ipAddress: "172.20.10.2")
+        .environmentObject(CaptureFlowCoordinator())
+        .preferredColorScheme(.light)
 }
 
-#Preview("Retrying") {
-    let mockService = MockCameraService()
-    let coordinator = AppCoordinator(cameraService: mockService)
-    coordinator.connectionStore.connectedIP = "172.20.10.2"
-    coordinator.connectionStore.retryCount = 1
-
-    return ConnectingView()
-        .environmentObject(coordinator.connectionStore)
+#Preview("Connecting (Dark Mode)") {
+    ConnectingView(ipAddress: "192.168.1.1")
+        .environmentObject(CaptureFlowCoordinator())
+        .preferredColorScheme(.dark)
 }
