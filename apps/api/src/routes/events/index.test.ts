@@ -101,6 +101,7 @@ function createMockDb() {
     returning: vi.fn().mockResolvedValue([mockEvent]),
     update: vi.fn().mockReturnThis(),
     set: vi.fn().mockReturnThis(),
+    transaction: vi.fn().mockImplementation(async (fn: (tx: any) => Promise<any>) => fn(mockDb)),
   };
   return mockDb;
 }
