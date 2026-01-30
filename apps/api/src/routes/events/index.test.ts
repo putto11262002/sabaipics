@@ -123,6 +123,7 @@ function createTestApp(options: {
     Bindings: {
       EVENT_FRONTEND_URL: string;
       PHOTOS_BUCKET: R2Bucket;
+      FTP_PASSWORD_ENCRYPTION_KEY: string;
     };
     Variables: PhotographerVariables;
   };
@@ -171,6 +172,7 @@ function createTestApp(options: {
 const MOCK_ENV = (mockBucket: R2Bucket) => ({
   EVENT_FRONTEND_URL: 'https://event.sabaipics.com',
   PHOTOS_BUCKET: mockBucket,
+  FTP_PASSWORD_ENCRYPTION_KEY: 'dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItdGVzdHMxMjM0NTY3ODkw',
 });
 
 // =============================================================================
