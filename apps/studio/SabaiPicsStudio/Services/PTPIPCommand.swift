@@ -177,6 +177,8 @@ enum PTPEventCode: UInt16 {
     case sonyObjectAdded = 0xC201
     case sonyObjectRemoved = 0xC202
     case sonyPropertyChanged = 0xC203
+    case sonyUnknown1 = 0xC204
+    case sonyUnknown2 = 0xC205
     case sonyUnknown3 = 0xC206
     case sonyUnknown4 = 0xC207
     case sonyUnknown5 = 0xC20C

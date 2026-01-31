@@ -58,6 +58,9 @@ class PTPLogger {
     /// Canon-specific operations (GetEvent polling, event parsing)
     static let canon = OSLog(subsystem: subsystem, category: "canon")
 
+    /// Sony-specific operations (SDIO, device props, in-memory capture)
+    static let sony = OSLog(subsystem: subsystem, category: "ptpip.sony")
+
     // MARK: - Breadcrumb Trail
 
     private static let breadcrumbLock = NSLock()
