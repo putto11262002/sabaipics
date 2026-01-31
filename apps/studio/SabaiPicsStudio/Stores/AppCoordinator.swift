@@ -104,8 +104,13 @@ class AppCoordinator: ObservableObject {
         let host = NWEndpoint.Host(ip)
         let port = NWEndpoint.Port(rawValue: 15740)!
 
+        // Camera PTP/IP is expected to be reachable on WiFi.
+        // Using requiredInterfaceType avoids accidental cellular routing attempts.
+        let params = NWParameters.tcp
+        params.requiredInterfaceType = .wifi
+
         // Create command connection
-        let commandConnection = NWConnection(host: host, port: port, using: .tcp)
+        let commandConnection = NWConnection(host: host, port: port, using: params)
         commandConnection.start(queue: .main)
 
         // Wait for connection
@@ -146,7 +151,7 @@ class AppCoordinator: ObservableObject {
         print("[AppCoordinator] Connected to: \(cameraName)")
 
         // Create event connection
-        let eventConnection = NWConnection(host: host, port: port, using: .tcp)
+        let eventConnection = NWConnection(host: host, port: port, using: params)
         eventConnection.start(queue: .main)
         try await waitForConnection(eventConnection, timeout: 5.0)
 
@@ -191,6 +196,10 @@ class AppCoordinator: ObservableObject {
     /// Both discovery and manual IP paths converge here
     func startTransferSession(with camera: ActiveCamera) {
         print("[AppCoordinator] Starting transfer session with: \(camera.name)")
+
+        if SonyAPDiscovery.isSonyCameraName(camera.name) {
+            SonyAPConnectionCache.shared.saveCurrentNetwork(ip: camera.ipAddress, cameraName: camera.name)
+        }
 
         // Create transfer session
         let session = TransferSession(camera: camera)

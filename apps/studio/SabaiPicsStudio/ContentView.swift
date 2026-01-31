@@ -25,15 +25,32 @@ struct ContentView: View {
                     .transition(.opacity)
                     .id("manufacturer-selection")
 
-            case .hotspotSetup:
-                HotspotSetupView()
+            case .sonyEntry:
+                SonyAPEntryView()
                     .transition(.opacity)
-                    .id("hotspot-setup")
+                    .id("sony-entry")
+
+            case .hotspotSetup:
+                if captureFlow.selectedManufacturer == .sony {
+                    SonyAPSetupView()
+                        .transition(.opacity)
+                        .id("sony-ap-setup")
+                } else {
+                    HotspotSetupView()
+                        .transition(.opacity)
+                        .id("hotspot-setup")
+                }
 
             case .discovering:
-                CameraDiscoveryView()
-                    .transition(.opacity)
-                    .id("camera-discovery")
+                if captureFlow.selectedManufacturer == .sony {
+                    SonyAPDiscoveryView()
+                        .transition(.opacity)
+                        .id("sony-ap-discovery")
+                } else {
+                    CameraDiscoveryView()
+                        .transition(.opacity)
+                        .id("camera-discovery")
+                }
 
             case .manualIPEntry:
                 // Manual IP entry (fallback from discovery)
