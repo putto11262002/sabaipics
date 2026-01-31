@@ -13,7 +13,7 @@ import SwiftUI
 
 /// Manufacturer selection view - entry point for camera connection
 ///
-/// Shows three manufacturer options: Canon (active), Nikon (active), Sony (grayed)
+/// Shows three manufacturer options: Canon, Nikon, Sony
 /// User taps manufacturer to start camera discovery flow
 struct ManufacturerSelectionView: View {
     @EnvironmentObject var captureFlow: CaptureFlowCoordinator  // CHANGED

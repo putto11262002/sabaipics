@@ -121,6 +121,7 @@ class PTPIPSession: NSObject {
 
     // Camera detection
     private var cameraVendor: CameraVendor = .unknown
+    private var isSonyPTPIP = false
 
     // Configuration
     private let hostName: String
@@ -291,6 +292,8 @@ class PTPIPSession: NSObject {
         cameraVendor = detectCameraVendor(from: cameraName)
         print("[PTPIPSession] Camera: \(cameraName) (vendor: \(cameraVendor))")
 
+        isSonyPTPIP = isSonyCamera(named: cameraName)
+
         // Initialize transaction manager
         self.transactionManager = PTPTransactionManager(sessionID: sessionID)
         print("[PTPIPSession] Transaction manager initialized with sessionID: \(sessionID)")
@@ -299,6 +302,12 @@ class PTPIPSession: NSObject {
         print("[PTPIPSession] Sending OpenSession...")
         try await sendOpenSession()
         print("[PTPIPSession] OpenSession successful")
+
+        if isSonyCamera(named: cameraName) {
+            print("[PTPIPSession] Initializing Sony SDIO... ")
+            try await initializeSonySDIO()
+            print("[PTPIPSession] Sony SDIO init complete")
+        }
 
         // Initialize photo downloader (but don't start event monitoring yet)
         self.photoDownloader = PTPIPPhotoDownloader()
@@ -494,6 +503,14 @@ class PTPIPSession: NSObject {
             throw PTPIPSessionError.notConnected
         }
 
+        if isSonyPTPIP {
+            // Sony PTP/IP often fails storage enumeration; prefer partial object transfer.
+            let info = try await getObjectInfo(objectHandle: objectHandle)
+            let maxBytes = info.objectCompressedSize
+            let photoData = try await downloader.downloadPartialObject(objectHandle: objectHandle, offset: 0, maxBytes: maxBytes)
+            return photoData
+        }
+
         let photoData = try await downloader.downloadPhoto(objectHandle: objectHandle)
 
         // NOTE: We no longer call the legacy didDownloadPhoto delegate here
@@ -501,6 +518,24 @@ class PTPIPSession: NSObject {
         // which provides better UX with immediate placeholders
 
         return photoData
+    }
+
+    /// Download photo when object size is already known
+    /// This avoids re-fetching ObjectInfo (Sony path).
+    func downloadPhoto(objectHandle: UInt32, maxBytes: UInt32) async throws -> Data {
+        guard isConnected else {
+            throw PTPIPSessionError.notConnected
+        }
+
+        guard let downloader = photoDownloader else {
+            throw PTPIPSessionError.notConnected
+        }
+
+        if isSonyPTPIP {
+            return try await downloader.downloadPartialObject(objectHandle: objectHandle, offset: 0, maxBytes: maxBytes)
+        }
+
+        return try await downloader.downloadPhoto(objectHandle: objectHandle)
     }
 
     /// Get object info by handle
@@ -522,7 +557,7 @@ class PTPIPSession: NSObject {
         try await sendData(connection: connection, data: commandData)
 
         // Receive response with data (ObjectInfo is returned as data)
-        let response = try await receiveObjectInfoResponse(
+        let response = try await receiveDataResponse(
             connection: connection,
             expectedTransactionID: getObjectInfoCmd.transactionID
         )
@@ -538,8 +573,149 @@ class PTPIPSession: NSObject {
         return objectInfo
     }
 
-    /// Receive GetObjectInfo response (handles data packets + response)
-    private func receiveObjectInfoResponse(connection: NWConnection, expectedTransactionID: UInt32) async throws -> (data: Data?, response: PTPIPOperationResponse) {
+    /// Get storage IDs
+    /// Uses PTP GetStorageIDs command to retrieve available storage handles
+    func getStorageIDs() async throws -> [UInt32] {
+        guard let connection = commandConnection,
+              let txManager = transactionManager else {
+            throw PTPIPSessionError.notConnected
+        }
+
+        var command = await txManager.createCommand()
+        let getStorageIDsCmd = command.getStorageIDs()
+        let commandData = getStorageIDsCmd.toData()
+
+        try await sendData(connection: connection, data: commandData)
+
+        let response = try await receiveDataResponse(
+            connection: connection,
+            expectedTransactionID: getStorageIDsCmd.transactionID
+        )
+
+        if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
+            print("[PTPIPSession] GetStorageIDs failed: \(responseCode.name) (0x\(String(format: "%04X", response.response.responseCode)))")
+            return []
+        }
+
+        guard let data = response.data else {
+            print("[PTPIPSession] GetStorageIDs returned no data")
+            return []
+        }
+
+        print("[PTPIPSession] GetStorageIDs raw: \(formatHexBytes(data, limit: 64))")
+        let storageIDs = parseUInt32List(data)
+        print("[PTPIPSession] GetStorageIDs -> count=\(storageIDs.count) ids=\(storageIDs.map { String(format: "0x%08X", $0) }.joined(separator: ", "))")
+
+        for storageID in storageIDs {
+            await logStorageInfo(storageID: storageID)
+        }
+        return storageIDs
+    }
+
+    /// Get storage info (raw data)
+    private func getStorageInfo(storageID: UInt32) async throws -> (data: Data?, response: PTPIPOperationResponse) {
+        guard let connection = commandConnection,
+              let txManager = transactionManager else {
+            throw PTPIPSessionError.notConnected
+        }
+
+        var command = await txManager.createCommand()
+        let getStorageInfoCmd = command.getStorageInfo(storageID: storageID)
+        let commandData = getStorageInfoCmd.toData()
+
+        try await sendData(connection: connection, data: commandData)
+
+        return try await receiveDataResponse(
+            connection: connection,
+            expectedTransactionID: getStorageInfoCmd.transactionID
+        )
+    }
+
+    /// Get object handles for a storage ID
+    /// Uses PTP GetObjectHandles command to list object handles
+    func getObjectHandles(storageID: UInt32) async throws -> [UInt32] {
+        guard let connection = commandConnection,
+              let txManager = transactionManager else {
+            throw PTPIPSessionError.notConnected
+        }
+
+        var command = await txManager.createCommand()
+        let getHandlesCmd = command.getObjectHandles(storageID: storageID, associationObject: 0xFFFFFFFF)
+        print("[PTPIPSession] GetObjectHandles storageID=0x\(String(format: "%08X", storageID)) parent=0xFFFFFFFF")
+        let commandData = getHandlesCmd.toData()
+
+        try await sendData(connection: connection, data: commandData)
+
+        let response = try await receiveDataResponse(
+            connection: connection,
+            expectedTransactionID: getHandlesCmd.transactionID
+        )
+
+        if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
+            print("[PTPIPSession] GetObjectHandles failed: \(responseCode.name) (0x\(String(format: "%04X", response.response.responseCode)))")
+
+            if responseCode == .storeNotAvailable {
+                let adjustedStorageID = storageID | 0x00000001
+                if adjustedStorageID != storageID {
+                    print("[PTPIPSession] Retrying GetObjectHandles with storageID=0x\(String(format: "%08X", adjustedStorageID))")
+                    var adjustedCommand = await txManager.createCommand()
+                    let adjusted = adjustedCommand.getObjectHandles(storageID: adjustedStorageID, associationObject: 0xFFFFFFFF)
+                    let adjustedData = adjusted.toData()
+                    try await sendData(connection: connection, data: adjustedData)
+
+                    let adjustedResponse = try await receiveDataResponse(
+                        connection: connection,
+                        expectedTransactionID: adjusted.transactionID
+                    )
+
+                    if let adjustedCode = PTPResponseCode(rawValue: adjustedResponse.response.responseCode), !adjustedCode.isSuccess {
+                        print("[PTPIPSession] Adjusted GetObjectHandles failed: \(adjustedCode.name) (0x\(String(format: "%04X", adjustedResponse.response.responseCode)))")
+                    } else if let data = adjustedResponse.data {
+                        let handles = parseUInt32List(data)
+                        print("[PTPIPSession] Adjusted GetObjectHandles -> count=\(handles.count)")
+                        return handles
+                    }
+                }
+
+                print("[PTPIPSession] Retrying GetObjectHandles with storageID=0x00000000")
+                var fallbackCommand = await txManager.createCommand()
+                let fallback = fallbackCommand.getObjectHandles(storageID: 0x00000000, associationObject: 0xFFFFFFFF)
+                let fallbackData = fallback.toData()
+                try await sendData(connection: connection, data: fallbackData)
+
+                let fallbackResponse = try await receiveDataResponse(
+                    connection: connection,
+                    expectedTransactionID: fallback.transactionID
+                )
+
+                if let fallbackCode = PTPResponseCode(rawValue: fallbackResponse.response.responseCode), !fallbackCode.isSuccess {
+                    print("[PTPIPSession] Fallback GetObjectHandles failed: \(fallbackCode.name) (0x\(String(format: "%04X", fallbackResponse.response.responseCode)))")
+                    return []
+                }
+
+                if let data = fallbackResponse.data {
+                    let handles = parseUInt32List(data)
+                    print("[PTPIPSession] Fallback GetObjectHandles -> count=\(handles.count)")
+                    return handles
+                }
+                return []
+            }
+
+            return []
+        }
+
+        guard let data = response.data else {
+            print("[PTPIPSession] GetObjectHandles returned no data")
+            return []
+        }
+
+        let handles = parseUInt32List(data)
+        print("[PTPIPSession] GetObjectHandles -> count=\(handles.count)")
+        return handles
+    }
+
+    /// Receive response with data packets (Start/Data/End) followed by OperationResponse
+    private func receiveDataResponse(connection: NWConnection, expectedTransactionID: UInt32) async throws -> (data: Data?, response: PTPIPOperationResponse) {
         var accumulatedData = Data()
 
         // Read packets until we get OperationResponse
@@ -617,6 +793,88 @@ class PTPIPSession: NSObject {
                     continuation.resume()
                 }
             })
+        }
+    }
+
+    private func initializeSonySDIO() async throws {
+        guard let connection = commandConnection,
+              let txManager = transactionManager else {
+            throw PTPIPSessionError.notConnected
+        }
+
+        var command = await txManager.createCommand()
+
+        // libgphoto2 sequence for Sony PTP/IP mode:
+        // 1) SDIOConnect(1)
+        // 2) SDIOConnect(2)
+        // 3) GetSDIOGetExtDeviceInfo(0xC8)
+        // 4) SDIOConnect(3)
+
+        for step in [UInt32(1), UInt32(2)] {
+            let sdioCommand = command.sonySDIOConnect(p1: step)
+            let commandData = sdioCommand.toData()
+
+            print("[PTPIPSession] Sony SDIOConnect step=\(step)")
+            try await sendData(connection: connection, data: commandData)
+
+            let response = try await receiveDataResponse(
+                connection: connection,
+                expectedTransactionID: sdioCommand.transactionID
+            )
+
+            let code = response.response.responseCode
+            if let responseCode = PTPResponseCode(rawValue: code), !responseCode.isSuccess {
+                print("[PTPIPSession] Sony SDIOConnect step=\(step) failed: \(responseCode.name) (0x\(String(format: "%04X", code)))")
+            } else if code != PTPResponseCode.ok.rawValue {
+                print("[PTPIPSession] Sony SDIOConnect step=\(step) returned: 0x\(String(format: "%04X", code))")
+            }
+        }
+
+        do {
+            let extInfoCmd = command.sonyGetSDIOGetExtDeviceInfo(param: 0x000000C8)
+            let extInfoData = extInfoCmd.toData()
+
+            print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo (0xC8)")
+            try await sendData(connection: connection, data: extInfoData)
+
+            let extResponse = try await receiveDataResponse(
+                connection: connection,
+                expectedTransactionID: extInfoCmd.transactionID
+            )
+
+            let code = extResponse.response.responseCode
+            if let responseCode = PTPResponseCode(rawValue: code), !responseCode.isSuccess {
+                print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo failed: \(responseCode.name) (0x\(String(format: "%04X", code)))")
+            } else if code != PTPResponseCode.ok.rawValue {
+                print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo returned: 0x\(String(format: "%04X", code))")
+            }
+
+            if let data = extResponse.data {
+                print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo data: \(data.count) bytes")
+            } else {
+                print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo data: (none)")
+            }
+        }
+
+        // Finalize SDIO
+        do {
+            let sdioCommand = command.sonySDIOConnect(p1: 3)
+            let commandData = sdioCommand.toData()
+
+            print("[PTPIPSession] Sony SDIOConnect step=3")
+            try await sendData(connection: connection, data: commandData)
+
+            let response = try await receiveDataResponse(
+                connection: connection,
+                expectedTransactionID: sdioCommand.transactionID
+            )
+
+            let code = response.response.responseCode
+            if let responseCode = PTPResponseCode(rawValue: code), !responseCode.isSuccess {
+                print("[PTPIPSession] Sony SDIOConnect step=3 failed: \(responseCode.name) (0x\(String(format: "%04X", code)))")
+            } else if code != PTPResponseCode.ok.rawValue {
+                print("[PTPIPSession] Sony SDIOConnect step=3 returned: 0x\(String(format: "%04X", code))")
+            }
         }
     }
 
@@ -727,6 +985,65 @@ class PTPIPSession: NSObject {
         }
     }
 
+    /// Parse a PTP uint32 list (count + values)
+    private func parseUInt32List(_ data: Data) -> [UInt32] {
+        guard data.count >= 4 else {
+            return []
+        }
+
+        let countValue = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 0, as: UInt32.self) }
+        let count = Int(UInt32(littleEndian: countValue))
+        var values: [UInt32] = []
+        values.reserveCapacity(count)
+
+        var offset = 4
+        for _ in 0..<count {
+            guard offset + 4 <= data.count else { break }
+            let value = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self) }
+            values.append(UInt32(littleEndian: value))
+            offset += 4
+        }
+
+        return values
+    }
+
+    private func logStorageInfo(storageID: UInt32) async {
+        do {
+            let response = try await getStorageInfo(storageID: storageID)
+
+            if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
+                print("[PTPIPSession] GetStorageInfo 0x\(String(format: "%08X", storageID)) failed: \(responseCode.name) (0x\(String(format: "%04X", response.response.responseCode)))")
+                return
+            }
+
+            guard let data = response.data else {
+                print("[PTPIPSession] GetStorageInfo 0x\(String(format: "%08X", storageID)) returned no data")
+                return
+            }
+
+            print("[PTPIPSession] GetStorageInfo 0x\(String(format: "%08X", storageID)) raw: \(formatHexBytes(data, limit: 96))")
+
+            if data.count >= 6 {
+                let storageTypeRaw = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 0, as: UInt16.self) }
+                let fsTypeRaw = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 2, as: UInt16.self) }
+                let accessRaw = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4, as: UInt16.self) }
+
+                let storageType = UInt16(littleEndian: storageTypeRaw)
+                let fsType = UInt16(littleEndian: fsTypeRaw)
+                let access = UInt16(littleEndian: accessRaw)
+
+                print("[PTPIPSession] GetStorageInfo 0x\(String(format: "%08X", storageID)) type=0x\(String(format: "%04X", storageType)) fs=0x\(String(format: "%04X", fsType)) access=0x\(String(format: "%04X", access))")
+            }
+        } catch {
+            print("[PTPIPSession] GetStorageInfo 0x\(String(format: "%08X", storageID)) error: \(error)")
+        }
+    }
+
+    private func formatHexBytes(_ data: Data, limit: Int) -> String {
+        let slice = data.prefix(limit)
+        return slice.map { String(format: "%02X", $0) }.joined(separator: " ")
+    }
+
     // MARK: - Camera Vendor Detection
 
     /// Detect camera vendor from camera name
@@ -754,6 +1071,11 @@ class PTPIPSession: NSObject {
         return .standard
     }
 
+    private func isSonyCamera(named cameraName: String) -> Bool {
+        let name = cameraName.lowercased()
+        return name.contains("sony") || name.contains("ilce") || name.contains("dsc")
+    }
+
     // MARK: - Event Source Factory
 
     /// Create appropriate event source for camera vendor
@@ -775,7 +1097,8 @@ class PTPIPSession: NSObject {
         case .standard, .unknown:
             return StandardEventSource(
                 eventConnection: eventConnection,
-                photoOps: self
+                photoOps: self,
+                allowPolling: !isSonyPTPIP
             )
         }
     }

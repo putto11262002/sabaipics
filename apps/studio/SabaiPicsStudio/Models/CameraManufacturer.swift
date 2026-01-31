@@ -22,7 +22,7 @@ enum CameraManufacturer: String, CaseIterable {
         case .canon, .nikon:
             return true
         case .sony:
-            return false  // Sony support coming soon (separate project)
+            return true
         }
     }
 }
