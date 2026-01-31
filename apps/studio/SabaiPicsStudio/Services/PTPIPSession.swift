@@ -16,15 +16,35 @@ import Combine
 
 /// Delegate for PTP/IP session notifications
 /// Marked @MainActor since all delegates update UI state
+///
+/// Two-phase download callbacks for progressive UI:
+/// 1. `didDetectPhoto` - Called immediately after ObjectInfo, before download starts
+/// 2. `didCompleteDownload` - Called after download finishes
+/// 3. `didDownloadPhoto` - Legacy single-phase callback (kept for compatibility)
 @MainActor
 protocol PTPIPSessionDelegate: AnyObject {
     /// Called when session successfully connects
     func sessionDidConnect(_ session: PTPIPSession)
 
-    /// Called when a new photo is detected (ObjectAdded event)
-    func session(_ session: PTPIPSession, didDetectPhoto objectHandle: UInt32)
+    /// Called immediately when photo is detected (before download)
+    /// Provides metadata from GetObjectInfo for showing placeholder UI
+    func session(
+        _ session: PTPIPSession,
+        didDetectPhoto objectHandle: UInt32,
+        filename: String,
+        captureDate: Date,
+        fileSize: Int
+    )
 
     /// Called when photo download completes
+    func session(
+        _ session: PTPIPSession,
+        didCompleteDownload objectHandle: UInt32,
+        data: Data
+    )
+
+    /// Called when photo download completes (legacy single-phase callback)
+    /// Kept for backward compatibility - new code should use didDetectPhoto + didCompleteDownload
     func session(_ session: PTPIPSession, didDownloadPhoto data: Data, objectHandle: UInt32)
 
     /// Called when a RAW file is skipped (not downloaded)
@@ -131,6 +151,7 @@ class PTPIPSession: NSObject {
             throw PTPIPSessionError.alreadyConnected
         }
 
+        PTPLogger.info("Connecting to camera...", category: PTPLogger.session)
         print("[PTPIPSession] Connecting...")
 
         self.commandConnection = commandConnection
@@ -235,6 +256,8 @@ class PTPIPSession: NSObject {
 
         isConnected = true
         print("[PTPIPSession] Session ready")
+
+        PTPLogger.info("Session connected and ready (vendor: \(cameraVendor))", category: PTPLogger.session)
 
         delegate?.sessionDidConnect(self)
     }
@@ -358,17 +381,17 @@ class PTPIPSession: NSObject {
         print("[PTPIPSession] Disconnecting... CALLED FROM:")
         Thread.callStackSymbols.prefix(10).forEach { print("  \($0)") }
 
-        // Send CloseSession command FIRST (while session is fully active, per libgphoto2)
+        // Vendor-specific cleanup BEFORE CloseSession (per libgphoto2)
+        // cleanup() is responsible for stopping monitoring internally
+        if let source = eventSource {
+            await source.cleanup()
+        }
+
+        // Send CloseSession command after vendor cleanup
         do {
             try await sendCloseSession()
         } catch {
             // Continue with cleanup even if CloseSession fails
-        }
-
-        // Stop event monitoring AFTER CloseSession
-        if let source = eventSource {
-            await source.stopMonitoring()
-            await source.cleanup()
         }
 
         // Clean up downloader
@@ -390,6 +413,8 @@ class PTPIPSession: NSObject {
         isConnected = false
         print("[PTPIPSession] Disconnected")
 
+        PTPLogger.info("Session disconnected", category: PTPLogger.session)
+
         delegate?.sessionDidDisconnect(self)
     }
 
@@ -408,17 +433,29 @@ class PTPIPSession: NSObject {
         let openCommand = command.openSession()
         let commandData = openCommand.toData()
 
+        // Log command
+        let opCode = PTPOperationCode.openSession
+        PTPLogger.debug("Sending \(opCode.name) (\(PTPLogger.formatHex(sessionID))) [txID: \(openCommand.transactionID)]", category: PTPLogger.command)
+        PTPLogger.breadcrumb("SendCommand: \(opCode.name)")
+
+        let startTime = Date()
+
         // Send command
         try await sendData(connection: connection, data: commandData)
 
         // Read response
         let response = try await receiveResponse(connection: connection, expectedTransactionID: openCommand.transactionID)
 
+        let duration = Date().timeIntervalSince(startTime)
+
         // Check response code
         guard let responseCode = PTPResponseCode(rawValue: response.responseCode),
               responseCode.isSuccess else {
+            PTPLogger.error("\(opCode.name) failed: \(PTPResponseCode(rawValue: response.responseCode)?.name ?? "Unknown") (\(PTPLogger.formatHex(response.responseCode)))", category: PTPLogger.command)
             throw PTPIPSessionError.initializationFailed
         }
+
+        PTPLogger.debug("\(opCode.name) completed in \(PTPLogger.formatDuration(duration)) [code: \(responseCode.name)]", category: PTPLogger.command)
     }
 
     /// Send CloseSession command
@@ -433,11 +470,17 @@ class PTPIPSession: NSObject {
         let closeCommand = command.closeSession()
         let commandData = closeCommand.toData()
 
+        // Log command
+        let opCode = PTPOperationCode.closeSession
+        PTPLogger.debug("Sending \(opCode.name) [txID: \(closeCommand.transactionID)]", category: PTPLogger.command)
+
         // Send command
         try await sendData(connection: connection, data: commandData)
 
         // Read response (may fail if camera already disconnected)
         _ = try? await receiveResponse(connection: connection, expectedTransactionID: closeCommand.transactionID)
+
+        PTPLogger.debug("\(opCode.name) sent", category: PTPLogger.command)
     }
 
     /// Download photo by object handle
@@ -453,8 +496,9 @@ class PTPIPSession: NSObject {
 
         let photoData = try await downloader.downloadPhoto(objectHandle: objectHandle)
 
-        // Notify delegate
-        delegate?.session(self, didDownloadPhoto: photoData, objectHandle: objectHandle)
+        // NOTE: We no longer call the legacy didDownloadPhoto delegate here
+        // Event sources use the two-phase flow (didDetectPhoto + didCompleteDownload)
+        // which provides better UX with immediate placeholders
 
         return photoData
     }
@@ -759,9 +803,32 @@ extension PTPIPSession: PhotoOperationsProvider {
 // MARK: - Camera Event Source Delegate
 
 extension PTPIPSession: CameraEventSourceDelegate {
-    func eventSource(_ source: CameraEventSource, didDetectPhoto objectHandle: UInt32) {
-        print("[PTPIPSession] Event source detected photo: 0x\(String(format: "%08X", objectHandle))")
-        delegate?.session(self, didDetectPhoto: objectHandle)
+    /// Phase 1: Photo detected with metadata (before download)
+    func eventSource(
+        _ source: CameraEventSource,
+        didDetectPhoto objectHandle: UInt32,
+        filename: String,
+        captureDate: Date,
+        fileSize: Int
+    ) {
+        print("[PTPIPSession] Event source detected photo: \(filename)")
+        delegate?.session(
+            self,
+            didDetectPhoto: objectHandle,
+            filename: filename,
+            captureDate: captureDate,
+            fileSize: fileSize
+        )
+    }
+
+    /// Phase 2: Download completed
+    func eventSource(
+        _ source: CameraEventSource,
+        didCompleteDownload objectHandle: UInt32,
+        data: Data
+    ) {
+        print("[PTPIPSession] Event source completed download: 0x\(String(format: "%08X", objectHandle)) (\(data.count) bytes)")
+        delegate?.session(self, didCompleteDownload: objectHandle, data: data)
     }
 
     func eventSource(_ source: CameraEventSource, didSkipRawFile filename: String) {

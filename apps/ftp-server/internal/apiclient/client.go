@@ -4,18 +4,21 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
 // APIClient defines the interface for API operations (for testing)
 type APIClient interface {
 	Authenticate(ctx context.Context, req AuthRequest) (*AuthResponse, error)
-	UploadFormData(ctx context.Context, token, eventID, filename string, reader io.Reader) (*UploadResponse, *http.Response, error)
+	Presign(ctx context.Context, token, filename, contentType string, contentLength *int64) (*PresignResponse, error)
+	PresignWithRetry(ctx context.Context, token, filename, contentType string, contentLength *int64, backoff []time.Duration) (*PresignResponse, error)
+	UploadToPresignedURL(ctx context.Context, putURL string, headers map[string]string, reader io.Reader) (*http.Response, error)
 }
 
 // Client is the HTTP client for communicating with the SabaiPics API
@@ -42,16 +45,20 @@ type AuthResponse struct {
 	CreditsRemaining int    `json:"credits_remaining"`
 }
 
-// UploadResponse represents the FTP upload response
-type UploadResponse struct {
-	Data struct {
-		ID                string `json:"id"`
-		Status            string `json:"status"`
-		Filename          string `json:"filename"`
-		SizeBytes         int64  `json:"size_bytes"`
-		UploadCompletedAt string `json:"upload_completed_at"`
-		R2Key             string `json:"r2_key"`
-	} `json:"data"`
+// PresignRequest represents the presign request payload
+type PresignRequest struct {
+	Filename      string `json:"filename"`
+	ContentType   string `json:"contentType"`
+	ContentLength *int64 `json:"contentLength,omitempty"`
+}
+
+// PresignResponse represents the presign response from API
+type PresignResponse struct {
+	UploadID        string            `json:"upload_id"`
+	PutURL          string            `json:"put_url"`
+	ObjectKey       string            `json:"object_key"`
+	ExpiresAt       string            `json:"expires_at"`
+	RequiredHeaders map[string]string `json:"required_headers"`
 }
 
 // APIError represents an error response from the API
@@ -61,6 +68,14 @@ type APIError struct {
 		Message string `json:"message"`
 	} `json:"error"`
 }
+
+var (
+	ErrUnauthorized        = fmt.Errorf("authentication expired")
+	ErrInsufficientCredits = fmt.Errorf("insufficient credits")
+	ErrEventExpired        = fmt.Errorf("event expired")
+	ErrRateLimited         = fmt.Errorf("rate limited")
+	ErrTemporaryFailure    = fmt.Errorf("temporary server error")
+)
 
 // NewClient creates a new API client
 func NewClient(baseURL string) *Client {
@@ -112,80 +127,229 @@ func (c *Client) Authenticate(ctx context.Context, req AuthRequest) (*AuthRespon
 	return &authResp, nil
 }
 
-// UploadFormData uploads a file via FormData to the API
-// Returns: uploadResponse, httpResponse (for status code checking), error
-func (c *Client) UploadFormData(ctx context.Context, token, eventID, filename string, reader io.Reader) (*UploadResponse, *http.Response, error) {
-	// Create pipe for streaming multipart writer
-	pipeReader, pipeWriter := io.Pipe()
+// Presign requests a presigned R2 URL for upload
+func (c *Client) Presign(ctx context.Context, token, filename, contentType string, contentLength *int64) (*PresignResponse, error) {
+	reqBody := PresignRequest{
+		Filename:      filename,
+		ContentType:   contentType,
+		ContentLength: contentLength,
+	}
 
-	// Create multipart writer
-	writer := multipart.NewWriter(pipeWriter)
-
-	// Write FormData fields in background goroutine
-	go func() {
-		defer pipeWriter.Close()
-		defer writer.Close()
-
-		// Write eventId field first
-		if err := writer.WriteField("eventId", eventID); err != nil {
-			pipeWriter.CloseWithError(fmt.Errorf("failed to write eventId field: %w", err))
-			return
-		}
-
-		// Write file field
-		part, err := writer.CreateFormFile("file", filename)
-		if err != nil {
-			pipeWriter.CloseWithError(fmt.Errorf("failed to create form file: %w", err))
-			return
-		}
-
-		// Stream file data from reader to part
-		if _, err := io.Copy(part, reader); err != nil {
-			pipeWriter.CloseWithError(fmt.Errorf("failed to copy file data: %w", err))
-			return
-		}
-	}()
-
-	// Create HTTP request with streaming body
-	uploadURL, err := url.JoinPath(c.baseURL, "/api/ftp/upload")
+	data, err := json.Marshal(reqBody)
 	if err != nil {
-		pipeReader.Close()
-		return nil, nil, fmt.Errorf("failed to construct upload URL: %w", err)
+		return nil, err
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", uploadURL, pipeReader)
+	presignURL, err := url.JoinPath(c.baseURL, "/api/ftp/presign")
 	if err != nil {
-		pipeReader.Close()
-		return nil, nil, fmt.Errorf("failed to create upload request: %w", err)
+		return nil, fmt.Errorf("failed to construct presign URL: %w", err)
 	}
-	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
-	httpReq.Header.Set("Authorization", "Bearer "+token)
 
-	// Execute request
-	resp, err := c.httpClient.Do(httpReq)
+	req, err := http.NewRequestWithContext(ctx, "POST", presignURL, bytes.NewReader(data))
 	if err != nil {
-		return nil, nil, fmt.Errorf("upload request failed: %w", err)
+		return nil, err
 	}
 
-	// Handle non-200 responses
-	if resp.StatusCode != 200 {
-		// Parse error response
-		var apiErr APIError
-		if err := json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
-			resp.Body.Close()
-			return nil, resp, fmt.Errorf("upload failed with status %d", resp.StatusCode)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		apiErr, parsed := parseAPIError(resp)
+		return nil, mapPresignStatus(resp, apiErr, parsed)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var wrapped struct {
+		Data *PresignResponse `json:"data"`
+	}
+	if err := json.Unmarshal(body, &wrapped); err == nil && wrapped.Data != nil {
+		return wrapped.Data, nil
+	}
+
+	var direct PresignResponse
+	if err := json.Unmarshal(body, &direct); err != nil {
+		return nil, err
+	}
+
+	if direct.PutURL == "" {
+		return nil, fmt.Errorf("presign response missing put_url")
+	}
+
+	return &direct, nil
+}
+
+// PresignWithRetry requests a presigned URL with retry for rate limits
+func (c *Client) PresignWithRetry(ctx context.Context, token, filename, contentType string, contentLength *int64, backoff []time.Duration) (*PresignResponse, error) {
+	if len(backoff) == 0 {
+		backoff = []time.Duration{1 * time.Second, 2 * time.Second, 4 * time.Second}
+	}
+
+	var lastErr error
+
+	for attempt := 0; attempt <= len(backoff); attempt++ {
+		presignResp, err := c.Presign(ctx, token, filename, contentType, contentLength)
+		if err == nil {
+			return presignResp, nil
 		}
-		resp.Body.Close()
-		return nil, resp, fmt.Errorf("upload failed (%d): %s", resp.StatusCode, apiErr.Error.Message)
+
+		lastErr = err
+
+		if !errors.Is(err, ErrRateLimited) || attempt >= len(backoff) {
+			return nil, err
+		}
+
+		retryAfter := parseRetryAfter(err)
+		if retryAfter > 0 {
+			time.Sleep(retryAfter)
+			continue
+		}
+
+		time.Sleep(backoff[attempt])
 	}
 
-	// Parse success response
-	var uploadResp UploadResponse
-	if err := json.NewDecoder(resp.Body).Decode(&uploadResp); err != nil {
-		resp.Body.Close()
-		return nil, resp, fmt.Errorf("failed to decode upload response: %w", err)
-	}
-	resp.Body.Close()
+	return nil, lastErr
+}
 
-	return &uploadResp, resp, nil
+// UploadToPresignedURL performs HTTP PUT to R2 presigned URL
+func (c *Client) UploadToPresignedURL(ctx context.Context, putURL string, headers map[string]string, reader io.Reader) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, "PUT", putURL, reader)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply required headers from presign response
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	if lengthStr, ok := headers["Content-Length"]; ok {
+		if length, err := strconv.ParseInt(lengthStr, 10, 64); err == nil {
+			req.ContentLength = length
+		}
+	}
+
+	return c.httpClient.Do(req)
+}
+
+// parseAPIError parses an error response from the API
+func parseAPIError(resp *http.Response) (*APIError, bool) {
+	if resp == nil {
+		return nil, false
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, false
+	}
+
+	var apiErr APIError
+	if err := json.Unmarshal(body, &apiErr); err != nil {
+		return nil, false
+	}
+
+	if apiErr.Error.Code == "" {
+		return nil, false
+	}
+
+	return &apiErr, true
+}
+
+func mapPresignStatus(resp *http.Response, apiErr *APIError, parsed bool) error {
+	if resp == nil {
+		return fmt.Errorf("presign request failed")
+	}
+
+	if parsed && apiErr != nil {
+		switch apiErr.Error.Code {
+		case "UNAUTHORIZED", "UNAUTHENTICATED":
+			return ErrUnauthorized
+		case "PAYMENT_REQUIRED":
+			return ErrInsufficientCredits
+		case "GONE":
+			return ErrEventExpired
+		case "RATE_LIMITED":
+			return parseRateLimitError(resp)
+		case "BAD_REQUEST", "UNPROCESSABLE":
+			return fmt.Errorf(apiErr.Error.Message)
+		}
+	}
+
+	switch resp.StatusCode {
+	case http.StatusUnauthorized:
+		return ErrUnauthorized
+	case http.StatusPaymentRequired:
+		return ErrInsufficientCredits
+	case http.StatusGone:
+		return ErrEventExpired
+	case http.StatusTooManyRequests:
+		return parseRateLimitError(resp)
+	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable:
+		return ErrTemporaryFailure
+	default:
+		if parsed && apiErr != nil && apiErr.Error.Message != "" {
+			return fmt.Errorf("%s", apiErr.Error.Message)
+		}
+		return fmt.Errorf("presign failed: %d", resp.StatusCode)
+	}
+}
+
+func parseRateLimitError(resp *http.Response) error {
+	if resp == nil {
+		return ErrRateLimited
+	}
+
+	return rateLimitError{
+		retryAfter: parseRetryAfterHeader(resp),
+	}
+}
+
+type rateLimitError struct {
+	retryAfter time.Duration
+}
+
+func (e rateLimitError) Error() string {
+	return ErrRateLimited.Error()
+}
+
+func (e rateLimitError) Is(target error) bool {
+	return target == ErrRateLimited
+}
+
+func (e rateLimitError) RetryAfter() time.Duration {
+	return e.retryAfter
+}
+
+func parseRetryAfter(err error) time.Duration {
+	var rateErr rateLimitError
+	if errors.As(err, &rateErr) {
+		return rateErr.retryAfter
+	}
+	return 0
+}
+
+func parseRetryAfterHeader(resp *http.Response) time.Duration {
+	if resp == nil {
+		return 0
+	}
+
+	retryAfter := resp.Header.Get("Retry-After")
+	if retryAfter == "" {
+		return 0
+	}
+
+	if seconds, err := strconv.Atoi(retryAfter); err == nil {
+		return time.Duration(seconds) * time.Second
+	}
+
+	return 0
 }

@@ -14,7 +14,7 @@ export interface PresignOptions {
   bucket: string;
   key: string;
   contentType: string;
-  contentLength: number;
+  contentLength?: number;
   expiresIn: number; // seconds
 }
 
@@ -55,14 +55,19 @@ export async function generatePresignedPutUrl(
   const urlWithExpiry = `${objectUrl}?X-Amz-Expires=${options.expiresIn}`;
 
   // Sign the request with required headers
+  const headers: Record<string, string> = {
+    'Content-Type': options.contentType,
+    'If-None-Match': '*',
+  };
+
+  if (options.contentLength !== undefined) {
+    headers['Content-Length'] = options.contentLength.toString();
+  }
+
   const signedRequest = await client.sign(
     new Request(urlWithExpiry, {
       method: 'PUT',
-      headers: {
-        'Content-Type': options.contentType,
-        'Content-Length': options.contentLength.toString(),
-        'If-None-Match': '*',
-      },
+      headers,
     }),
     { aws: { signQuery: true } },
   );

@@ -29,6 +29,26 @@ enum PTPIPPacketType: UInt32 {
     case endDataPacket = 0x0000000C
     case ping = 0x0000000D
     case pong = 0x0000000E
+
+    /// Human-readable packet type name for logging
+    var name: String {
+        switch self {
+        case .initCommandRequest: return "InitCommandRequest"
+        case .initCommandAck: return "InitCommandAck"
+        case .initEventRequest: return "InitEventRequest"
+        case .initEventAck: return "InitEventAck"
+        case .initFail: return "InitFail"
+        case .operationRequest: return "OperationRequest"
+        case .operationResponse: return "OperationResponse"
+        case .event: return "Event"
+        case .startDataPacket: return "StartDataPacket"
+        case .dataPacket: return "DataPacket"
+        case .cancelTransaction: return "CancelTransaction"
+        case .endDataPacket: return "EndDataPacket"
+        case .ping: return "Ping"
+        case .pong: return "Pong"
+        }
+    }
 }
 
 // MARK: - PTP/IP Packet Header
@@ -119,6 +139,11 @@ struct PTPIPInitCommandRequest {
 
         var packet = header.toData()
         packet.append(payload)
+
+        // Log packet send
+        PTPLogger.debug("Sending InitCommandRequest packet", category: PTPLogger.network)
+        PTPLogger.data(packet, caption: "ptpip/initcommandrequest/send", category: PTPLogger.network)
+
         return packet
     }
 }
@@ -139,6 +164,11 @@ struct PTPIPInitEventRequest {
 
         var packet = header.toData()
         packet.append(payload)
+
+        // Log packet send
+        PTPLogger.debug("Sending InitEventRequest packet", category: PTPLogger.network)
+        PTPLogger.data(packet, caption: "ptpip/initeventrequest/send", category: PTPLogger.network)
+
         return packet
     }
 }
@@ -175,6 +205,15 @@ struct PTPIPOperationRequest {
 
         var packet = header.toData()
         packet.append(payload)
+
+        // Log packet send with operation code
+        if let opCode = PTPOperationCode(rawValue: operationCode) {
+            PTPLogger.debug("Sending OperationRequest: \(opCode.name) [txID: \(transactionID)]", category: PTPLogger.network)
+        } else {
+            PTPLogger.debug("Sending OperationRequest: 0x\(String(format: "%04X", operationCode)) [txID: \(transactionID)]", category: PTPLogger.network)
+        }
+        PTPLogger.data(packet, caption: "ptpip/operationrequest/send", category: PTPLogger.network)
+
         return packet
     }
 }
@@ -189,6 +228,9 @@ struct PTPIPOperationResponse {
 
     static func from(_ data: Data) -> PTPIPOperationResponse? {
         guard data.count >= 8 else { return nil }
+
+        // Log packet receive
+        PTPLogger.data(data, caption: "ptpip/operationresponse/receive", category: PTPLogger.network)
 
         // Parse header
         guard let header = PTPIPHeader.from(data),
@@ -210,11 +252,20 @@ struct PTPIPOperationResponse {
             offset += 4
         }
 
-        return PTPIPOperationResponse(
+        let response = PTPIPOperationResponse(
             responseCode: UInt16(littleEndian: responseCode),
             transactionID: UInt32(littleEndian: transactionID),
             parameters: parameters
         )
+
+        // Log response code
+        if let respCode = PTPResponseCode(rawValue: response.responseCode) {
+            PTPLogger.debug("Received OperationResponse: \(respCode.name) [txID: \(response.transactionID)]", category: PTPLogger.network)
+        } else {
+            PTPLogger.debug("Received OperationResponse: 0x\(String(format: "%04X", response.responseCode)) [txID: \(response.transactionID)]", category: PTPLogger.network)
+        }
+
+        return response
     }
 }
 

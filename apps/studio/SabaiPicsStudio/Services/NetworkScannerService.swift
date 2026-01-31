@@ -219,7 +219,7 @@ class NetworkScannerService: ObservableObject {
 
     /// Close all connections and reset state
     /// Call this when completely leaving the discovery flow
-    func cleanup() {
+    func cleanup() async {
         print("[NetworkScannerService] cleanup() - full reset")
 
         // Stop scanning first
@@ -231,13 +231,17 @@ class NetworkScannerService: ObservableObject {
         state = .idle
 
         if !camerasToCleanup.isEmpty {
-            Task {
+            // Disconnect all cameras in parallel (like Promise.all)
+            await withTaskGroup(of: Void.self) { group in
                 for camera in camerasToCleanup {
-                    print("[NetworkScannerService]    Cleanup disconnecting: \(camera.name)")
-                    await camera.disconnect()
+                    group.addTask {
+                        print("[NetworkScannerService]    Cleanup disconnecting: \(camera.name)")
+                        await camera.disconnect()
+                    }
                 }
-                print("[NetworkScannerService]    Cleanup complete")
+                // Implicitly waits for all tasks to complete
             }
+            print("[NetworkScannerService]    Cleanup complete")
         } else {
             print("[NetworkScannerService]    No cameras to cleanup")
         }

@@ -1,12 +1,15 @@
 package client
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/clientmgr"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/config"
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/mime"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/transfer"
 	"github.com/spf13/afero"
 )
@@ -43,14 +46,41 @@ func (d *ClientDriver) Name() string {
 }
 
 // OpenFile opens a file for writing (STOR command)
+// Returning an error here causes the FTP server to reply with a 550 error before any data is sent.
 func (d *ClientDriver) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
 	// Check if this is a write operation
 	if flag&os.O_WRONLY == 0 && flag&os.O_RDWR == 0 {
 		return nil, ErrDownloadNotAllowed
 	}
 
-	// Create UploadTransfer with JWT token, API client, and client manager for event reporting
-	uploadTransfer := transfer.NewUploadTransfer(d.eventID, d.jwtToken, d.clientIP, name, d.clientID, d.clientMgr, d.apiClient)
+	// Detect MIME type from filename
+	contentType, err := mime.FromFilename(name)
+	if err != nil {
+		// Log rejected upload and return error
+		fmt.Printf("WARN: Rejected upload: %s (%v)\n", name, err)
+		return nil, err
+	}
+
+	uploadCtx := context.Background()
+	if ctx, ok := d.clientMgr.GetUploadContext(d.clientID); ok {
+		uploadCtx = ctx
+	}
+
+	uploadTransfer, err := transfer.NewUploadTransfer(
+		uploadCtx,
+		d.eventID,
+		d.jwtToken,
+		d.clientIP,
+		name,
+		contentType,
+		d.clientID,
+		d.clientMgr,
+		d.apiClient,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	return uploadTransfer, nil
 }
 
@@ -170,9 +200,9 @@ type fakeFileInfo struct {
 	isDir bool
 }
 
-func (fi *fakeFileInfo) Name() string       { return fi.name }
-func (fi *fakeFileInfo) Size() int64        { return 0 }
-func (fi *fakeFileInfo) Mode() os.FileMode  {
+func (fi *fakeFileInfo) Name() string { return fi.name }
+func (fi *fakeFileInfo) Size() int64  { return 0 }
+func (fi *fakeFileInfo) Mode() os.FileMode {
 	if fi.isDir {
 		return os.ModeDir | 0755
 	}

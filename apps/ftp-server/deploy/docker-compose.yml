@@ -1,0 +1,13 @@
+services:
+  ftp-server:
+    image: ghcr.io/putto11262002/sabaipics-ftp-server:latest
+    container_name: sabaipics-ftp-server
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "21:21"
+      - "990:990"
+      - "60000-60100:60000-60100"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro

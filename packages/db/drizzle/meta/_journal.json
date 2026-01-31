@@ -15,6 +15,20 @@
       "when": 1769504020314,
       "tag": "0001_material_vulture",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769511151851,
+      "tag": "0002_foamy_blizzard",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1769623614719,
+      "tag": "0003_solid_mephisto",
+      "breakpoints": true
     }
   ]
 }

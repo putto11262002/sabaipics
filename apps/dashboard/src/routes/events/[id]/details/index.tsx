@@ -28,7 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@sabaipics/uiv3/components/dropdown-menu';
-import { Copy, ExternalLink, Download, Save, Upload, X, Image as ImageIcon, Info, Loader2 } from 'lucide-react';
+import { Copy, ExternalLink, Download, Save, Upload, X, Image as ImageIcon, Info, Loader2, Eye, EyeOff } from 'lucide-react';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router';
@@ -41,6 +41,7 @@ import { useUpdateEvent } from '../../../../hooks/events/useUpdateEvent';
 import { useLogoPresign } from '../../../../hooks/events/useLogoPresign';
 import { useLogoStatus } from '../../../../hooks/events/useLogoStatus';
 import { useDeleteLogo } from '../../../../hooks/events/useDeleteLogo';
+import { useFtpCredentials, useRevealFtpCredentials } from '../../../../hooks/events/useFtpCredentials';
 import { updateEventFormSchema, type UpdateEventFormData } from '../../../../lib/event-form-schema';
 import { toast } from 'sonner';
 
@@ -54,15 +55,24 @@ export default function EventDetailsTab() {
   const downloadQR = useDownloadQR();
   const queryClient = useQueryClient();
 
+  // Logo upload state
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
   const [uploadId, setUploadId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // FTP credentials state
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
+
+  // Hooks
   const presign = useLogoPresign();
   const deleteLogo = useDeleteLogo();
   const logoStatus = useLogoStatus({ eventId: id!, uploadId });
+  const ftpCredentials = useFtpCredentials(id);
+  const revealCredentials = useRevealFtpCredentials(id);
+  const updateEvent = useUpdateEvent();
 
   // Sync logoPreviewUrl from server data when it changes
   const event = data?.data;
@@ -151,6 +161,23 @@ export default function EventDetailsTab() {
     });
   }, [id, deleteLogo]);
 
+  const handleRevealPassword = async () => {
+    if (!isPasswordVisible) {
+      const result = await revealCredentials.mutateAsync();
+      setRevealedPassword(result.password);
+      setIsPasswordVisible(true);
+      return;
+    }
+
+    setIsPasswordVisible(false);
+  };
+
+  const handleCopyPassword = () => {
+    if (revealedPassword) {
+      copyToClipboard(revealedPassword);
+    }
+  };
+
   if (!event) {
     return null;
   }
@@ -162,8 +189,6 @@ export default function EventDetailsTab() {
       subtitle: event.subtitle || '',
     },
   });
-
-  const updateEvent = useUpdateEvent();
 
   const logoLoading = isUploading || deleteLogo.isPending;
 
@@ -401,19 +426,26 @@ export default function EventDetailsTab() {
         <Card>
           <CardHeader>
             <CardTitle>FTP credentials</CardTitle>
-            <CardDescription>Credentials will appear once enabled.</CardDescription>
+            <CardDescription>Use these credentials to upload photos via FTP.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Username</p>
               <InputGroup>
-                <InputGroupInput readOnly placeholder="Coming soon" />
+                <InputGroupInput
+                  readOnly
+                  value={ftpCredentials.data?.username ?? 'Not available'}
+                />
                 <InputGroupAddon align="inline-end">
                   <InputGroupButton
                     aria-label="Copy username"
                     title="Copy username"
                     size="icon-xs"
-                    disabled
+                    onClick={() =>
+                      ftpCredentials.data?.username &&
+                      copyToClipboard(ftpCredentials.data.username)
+                    }
+                    disabled={!ftpCredentials.data?.username}
                   >
                     <Copy />
                   </InputGroupButton>
@@ -423,13 +455,32 @@ export default function EventDetailsTab() {
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Password</p>
               <InputGroup>
-                <InputGroupInput readOnly placeholder="Coming soon" />
+                <InputGroupInput
+                  readOnly
+                  value={
+                    isPasswordVisible
+                      ? revealedPassword ?? 'Loading...'
+                      : revealedPassword
+                        ? '••••••••••••'
+                        : 'Hidden'
+                  }
+                />
                 <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    aria-label={isPasswordVisible ? 'Hide password' : 'Reveal password'}
+                    title={isPasswordVisible ? 'Hide password' : 'Reveal password'}
+                    size="icon-xs"
+                    onClick={handleRevealPassword}
+                    disabled={!ftpCredentials.data?.username || revealCredentials.isPending}
+                  >
+                    {isPasswordVisible ? <EyeOff /> : <Eye />}
+                  </InputGroupButton>
                   <InputGroupButton
                     aria-label="Copy password"
                     title="Copy password"
                     size="icon-xs"
-                    disabled
+                    onClick={handleCopyPassword}
+                    disabled={!revealedPassword}
                   >
                     <Copy />
                   </InputGroupButton>

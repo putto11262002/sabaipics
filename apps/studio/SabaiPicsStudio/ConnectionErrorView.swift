@@ -11,7 +11,7 @@ import SwiftUI
 
 /// Connection failed screen with "Try Again" button
 struct ConnectionErrorView: View {
-    @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var captureFlow: CaptureFlowCoordinator
     let errorMessage: String
 
     var body: some View {
@@ -21,50 +21,58 @@ struct ConnectionErrorView: View {
             // Error icon
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 60))
-                .foregroundColor(.red)
+                .foregroundColor(Color.Theme.destructive)
 
             VStack(spacing: 8) {
                 Text("Connection Failed")
                     .font(.title2)
-                    .fontWeight(.bold)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.Theme.foreground)
 
                 Text(errorMessage)
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Color.Theme.mutedForeground)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
 
             Spacer()
 
-            // Try Again button - returns to manufacturer selection
+            // Try Again button - full reset back to manufacturer selection
             Button(action: {
                 withAnimation {
-                    coordinator.backToManufacturerSelection()
+                    captureFlow.backToManufacturerSelection()
                 }
             }) {
                 Text("Try Again")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .cornerRadius(12)
             }
+            .buttonStyle(.primary)
             .padding(.horizontal, 32)
             .padding(.bottom, 32)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color.Theme.background)
     }
 }
 
-#Preview {
-    let coordinator = AppCoordinator()
-    coordinator.appState = .error("Connection failed after 3 attempts. Please check camera WiFi settings.")
+#Preview("Connection Error") {
+    let captureFlow = CaptureFlowCoordinator()
+    captureFlow.state = .error("Unable to connect to camera. Please check that:\n\n• Camera WiFi is enabled\n• iPad is connected to camera's hotspot\n• IP address is correct")
 
     return ConnectionErrorView(
-        errorMessage: "Connection failed after 3 attempts. Please check camera WiFi settings."
+        errorMessage: "Unable to connect to camera. Please check that:\n\n• Camera WiFi is enabled\n• iPad is connected to camera's hotspot\n• IP address is correct"
     )
-    .environmentObject(coordinator)
+    .environmentObject(captureFlow)
+    .preferredColorScheme(.light)
+}
+
+#Preview("Connection Error (Dark)") {
+    let captureFlow = CaptureFlowCoordinator()
+    captureFlow.state = .error("Connection timeout. Camera did not respond.")
+
+    return ConnectionErrorView(
+        errorMessage: "Connection timeout. Camera did not respond."
+    )
+    .environmentObject(captureFlow)
+    .preferredColorScheme(.dark)
 }

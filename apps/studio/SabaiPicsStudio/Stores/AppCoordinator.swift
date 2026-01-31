@@ -34,14 +34,8 @@ class AppCoordinator: ObservableObject {
 
     // MARK: - App State
 
-    /// Current app state (determines which view to show)
-    @Published var appState: AppState = .manufacturerSelection
-
-    /// Selected camera manufacturer
-    @Published var selectedManufacturer: CameraManufacturer? = nil
-
-    /// Discovered cameras from network scan
-    @Published var discoveredCameras: [DiscoveredCamera] = []
+    /// Tracks if app initialization is complete (Clerk load + minimum 2s display)
+    @Published var appInitialized = false
 
     // MARK: - Transfer Session
 
@@ -101,139 +95,12 @@ class AppCoordinator: ObservableObject {
         print("[AppCoordinator] Initialized with custom service: \(type(of: cameraService))")
     }
 
-    // MARK: - Navigation Actions
-
-    /// Select camera manufacturer
-    /// Checks hotspot status and navigates accordingly
-    func selectManufacturer(_ manufacturer: CameraManufacturer) {
-        print("[AppCoordinator] Manufacturer selected: \(manufacturer.rawValue)")
-        selectedManufacturer = manufacturer
-
-        if NetworkScannerService.isHotspotActive() {
-            print("[AppCoordinator] Hotspot detected, proceeding to discovery")
-            appState = .discovering
-        } else {
-            print("[AppCoordinator] No hotspot detected, showing setup instructions")
-            appState = .hotspotSetup
-        }
-    }
-
-    /// Proceed from hotspot setup to camera discovery
-    func proceedToDiscovery() {
-        print("[AppCoordinator] Proceeding to camera discovery")
-        appState = .discovering
-    }
-
-    /// Skip to manual IP entry
-    func skipToManualEntry() {
-        print("[AppCoordinator] Skipping to manual IP entry")
-        appState = .manualIPEntry
-    }
-
-    /// Go back to manufacturer selection
-    /// Note: Scanner cleanup (disconnect all cameras) should be called by the view BEFORE this
-    func backToManufacturerSelection() {
-        print("[AppCoordinator] ⬅️ backToManufacturerSelection()")
-
-        // Clear coordinator's reference to discovered cameras
-        // (Scanner already disconnected them via cleanup())
-        if !discoveredCameras.isEmpty {
-            print("[AppCoordinator]    Clearing \(discoveredCameras.count) camera references")
-        }
-        discoveredCameras = []
-        selectedManufacturer = nil
-
-        appState = .manufacturerSelection
-        print("[AppCoordinator]    ✓ State → .manufacturerSelection")
-    }
-
-    // MARK: - Discovery Path
-
-    /// Update discovered cameras list
-    func updateDiscoveredCameras(_ cameras: [DiscoveredCamera]) {
-        print("[AppCoordinator] 📋 updateDiscoveredCameras() count=\(cameras.count)")
-        discoveredCameras = cameras
-    }
-
-    /// Select a discovered camera and start transfer session
-    /// This is Path 1: Auto-discovery → ActiveCamera → TransferSession
-    ///
-    /// Flow:
-    /// 1. Extract session from selected camera
-    /// 2. Disconnect OTHER cameras (not the selected one)
-    /// 3. Create ActiveCamera → TransferSession
-    /// 4. Start monitoring for photos
-    func selectDiscoveredCamera(_ camera: DiscoveredCamera) {
-        print("[AppCoordinator] ═══════════════════════════════════════════")
-        print("[AppCoordinator] 📸 selectDiscoveredCamera: \(camera.name) @ \(camera.ipAddress)")
-        print("[AppCoordinator]    Total discovered: \(discoveredCameras.count)")
-
-        // 1. Extract session from discovered camera
-        guard let session = camera.extractSession() else {
-            print("[AppCoordinator] ❌ No session in camera object!")
-            appState = .error("Camera session not ready. Please try scanning again.")
-            return
-        }
-
-        guard session.connected else {
-            print("[AppCoordinator] ❌ Session exists but not connected!")
-            appState = .error("Camera disconnected. Please try scanning again.")
-            return
-        }
-
-        print("[AppCoordinator]    ✓ Session extracted, connected=true")
-
-        // 2. Create ActiveCamera with extracted session
-        let activeCamera = ActiveCamera(
-            name: camera.name,
-            ipAddress: camera.ipAddress,
-            session: session
-        )
-        print("[AppCoordinator]    ✓ ActiveCamera created")
-
-        // 3. Disconnect OTHER discovered cameras (not the selected one)
-        let otherCameras = discoveredCameras.filter { $0.ipAddress != camera.ipAddress }
-        if !otherCameras.isEmpty {
-            print("[AppCoordinator]    🔌 Disconnecting \(otherCameras.count) other camera(s)...")
-            Task {
-                for otherCamera in otherCameras {
-                    print("[AppCoordinator]       - \(otherCamera.name)")
-                    await otherCamera.disconnect()
-                }
-                print("[AppCoordinator]    ✓ Other cameras disconnected")
-            }
-        } else {
-            print("[AppCoordinator]    ✓ No other cameras to disconnect")
-        }
-        discoveredCameras = []
-
-        // 4. Create TransferSession (starts monitoring automatically)
-        print("[AppCoordinator]    🚀 Starting transfer session...")
-        startTransferSession(with: activeCamera)
-        print("[AppCoordinator] ═══════════════════════════════════════════")
-    }
-
     // MARK: - Manual IP Path
 
-    /// Connect via manual IP address
-    /// This is Path 2: Manual IP → connecting → ActiveCamera → TransferSession
-    func connectManualIP(_ ip: String) {
-        print("[AppCoordinator] Connecting to manual IP: \(ip)")
-        appState = .connecting(ip: ip)
 
-        Task {
-            do {
-                let activeCamera = try await createSession(ip: ip)
-                startTransferSession(with: activeCamera)
-            } catch {
-                print("[AppCoordinator] Manual connection failed: \(error.localizedDescription)")
-                appState = .error(error.localizedDescription)
-            }
-        }
-    }
-
-    /// Create PTP/IP session from scratch (for manual IP path)
-    private func createSession(ip: String) async throws -> ActiveCamera {
+    /// Create PTP/IP session from manual IP (public for CaptureFlowCoordinator)
+    /// Throws error if connection fails - caller handles state transitions
+    func createManualSession(ip: String) async throws -> ActiveCamera {
         let host = NWEndpoint.Host(ip)
         let port = NWEndpoint.Port(rawValue: 15740)!
 
@@ -322,7 +189,7 @@ class AppCoordinator: ObservableObject {
 
     /// Start transfer session with active camera
     /// Both discovery and manual IP paths converge here
-    private func startTransferSession(with camera: ActiveCamera) {
+    func startTransferSession(with camera: ActiveCamera) {
         print("[AppCoordinator] Starting transfer session with: \(camera.name)")
 
         // Create transfer session
@@ -333,9 +200,6 @@ class AppCoordinator: ObservableObject {
         connectionStore.cameraName = camera.name
         connectionStore.connectedIP = camera.ipAddress
         connectionStore.connectionState = .connected
-
-        // Transition to transferring state
-        appState = .transferring
 
         print("[AppCoordinator] Transfer session active")
     }

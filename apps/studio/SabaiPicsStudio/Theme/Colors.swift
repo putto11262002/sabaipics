@@ -14,8 +14,8 @@ extension Color {
     /// Theme namespace for design system colors (matching shadcn/ui)
     enum Theme {
         // MARK: - Backgrounds
-        
-        /// Main background color (#f8f8f8 light, #0a0a0a dark)
+
+        /// Main background color (white in light mode, dark gray in dark mode)
         static let background = Color("ThemeBackground")
         
         /// Card background
@@ -45,10 +45,10 @@ extension Color {
         static let accentForeground = Color("ThemeAccentForeground")
         
         // MARK: - Brand
-        
-        /// Primary brand color (#9f6db1 magenta/purple)
+
+        /// Primary color (neutral dark gray in light mode, light gray in dark mode)
         static let primary = Color("ThemePrimary")
-        
+
         /// Text on primary background
         static let primaryForeground = Color("ThemePrimaryForeground")
         

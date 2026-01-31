@@ -1,0 +1,1 @@
+ALTER TABLE "ftp_credentials" ADD COLUMN "password_ciphertext" text NOT NULL;

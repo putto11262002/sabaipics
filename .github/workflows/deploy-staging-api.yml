@@ -51,6 +51,8 @@ jobs:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          FTP_JWT_SECRET: ${{ secrets.FTP_JWT_SECRET }}
+          FTP_PASSWORD_ENCRYPTION_KEY: ${{ secrets.FTP_PASSWORD_ENCRYPTION_KEY }}
         run: |
           set -euo pipefail
           required=(
@@ -66,6 +68,8 @@ jobs:
             R2_ACCESS_KEY_ID
             R2_SECRET_ACCESS_KEY
             ADMIN_API_KEY
+            FTP_JWT_SECRET
+            FTP_PASSWORD_ENCRYPTION_KEY
           )
           # LINE secrets are optional until LINE integration is enabled
           optional=(
@@ -101,6 +105,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          FTP_JWT_SECRET: ${{ secrets.FTP_JWT_SECRET }}
+          FTP_PASSWORD_ENCRYPTION_KEY: ${{ secrets.FTP_PASSWORD_ENCRYPTION_KEY }}
         run: |
           echo "${{ secrets.DATABASE_URL }}" | pnpm wrangler secret put DATABASE_URL --env staging
           echo "${{ secrets.CLERK_SECRET_KEY }}" | pnpm wrangler secret put CLERK_SECRET_KEY --env staging
@@ -114,6 +120,8 @@ jobs:
           echo "${{ secrets.R2_ACCESS_KEY_ID }}" | pnpm wrangler secret put R2_ACCESS_KEY_ID --env staging
           echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | pnpm wrangler secret put R2_SECRET_ACCESS_KEY --env staging
           echo "${{ secrets.ADMIN_API_KEY }}" | pnpm wrangler secret put ADMIN_API_KEY --env staging
+          echo "${{ secrets.FTP_JWT_SECRET }}" | pnpm wrangler secret put FTP_JWT_SECRET --env staging
+          echo "${{ secrets.FTP_PASSWORD_ENCRYPTION_KEY }}" | pnpm wrangler secret put FTP_PASSWORD_ENCRYPTION_KEY --env staging
           # Optional LINE secrets
           if [[ -n "$LINE_CHANNEL_SECRET" ]]; then
             echo "$LINE_CHANNEL_SECRET" | pnpm wrangler secret put LINE_CHANNEL_SECRET --env staging

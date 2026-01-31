@@ -3,8 +3,9 @@
 // Clerk
 CLERK_PUBLISHABLE_KEY =
 
-// Sign-up URL (web app)
-SIGNUP_URL = https://sabaipics.com/sign-up
+// API Configuration
+API_BASE_URL = https:/$()/dev-api.sabaipics.com
+EVENT_FRONTEND_URL = https:/$()/dev.sabaipics.com
 
 // Local developer overrides (gitignored)
 #include "Studio.Local.xcconfig"

@@ -55,7 +55,7 @@ func Load() (*Config, error) {
 		TLSKeyPath:  getEnv("TLS_KEY_PATH", ""),
 
 		// Implicit FTPS (optional)
-		ImplicitFTPSEnabled: getEnvBool("IMPLICIT_FTPS_ENABLED", false),
+		ImplicitFTPSEnabled: getEnvBool("IMPLICIT_FTPS_ENABLED", true),
 		ImplicitFTPSPort:    getEnv("IMPLICIT_FTPS_PORT", "0.0.0.0:990"),
 
 		// API settings

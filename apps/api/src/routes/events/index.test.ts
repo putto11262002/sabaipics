@@ -101,6 +101,7 @@ function createMockDb() {
     returning: vi.fn().mockResolvedValue([mockEvent]),
     update: vi.fn().mockReturnThis(),
     set: vi.fn().mockReturnThis(),
+    transaction: vi.fn().mockImplementation(async (fn: (tx: any) => Promise<any>) => fn(mockDb)),
   };
   return mockDb;
 }
@@ -123,8 +124,11 @@ function createTestApp(options: {
     Bindings: {
       EVENT_FRONTEND_URL: string;
       PHOTOS_BUCKET: R2Bucket;
+      FTP_PASSWORD_ENCRYPTION_KEY: string;
     };
-    Variables: PhotographerVariables;
+    Variables: PhotographerVariables & {
+      dbTx: () => Database;
+    };
   };
 
   const app = new Hono<Env>()
@@ -138,6 +142,7 @@ function createTestApp(options: {
     // Mock DB
     .use('/*', (c, next) => {
       c.set('db', () => mockDb as unknown as Database);
+      c.set('dbTx', () => mockDb as unknown as Database);
       return next();
     })
     // Mock photographer lookup for requirePhotographer middleware
@@ -171,6 +176,7 @@ function createTestApp(options: {
 const MOCK_ENV = (mockBucket: R2Bucket) => ({
   EVENT_FRONTEND_URL: 'https://event.sabaipics.com',
   PHOTOS_BUCKET: mockBucket,
+  FTP_PASSWORD_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
 });
 
 // =============================================================================

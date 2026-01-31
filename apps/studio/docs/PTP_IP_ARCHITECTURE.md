@@ -279,13 +279,10 @@ TransferSession.end()
        │          │
        │          └── PTPIPSession.disconnect()
        │                     │
-       │                     ├── 1. sendCloseSession() (while connection active)
-       │                     ├── 2. eventSource.stopMonitoring()
-       │                     │          ├── 1. isMonitoring = false
-       │                     │          ├── 2. connection.cancel() ← CRITICAL: interrupts pending I/O
-       │                     │          ├── 3. task.cancel()
-       │                     │          ├── 4. await task.value ← wait for cleanup
-       │                     │          └── 5. task = nil
+       │                     ├── 1. eventSource.cleanup() ← vendor-specific cleanup
+       │                     │          ├── stopMonitoring() ← stops polling task
+       │                     │          └── Canon: drain events + SetEventMode(0)
+       │                     ├── 2. sendCloseSession() (after vendor cleanup)
        │                     └── 3. cancel TCP connections
        └── 2. photos.removeAll()
 ```
@@ -297,6 +294,65 @@ TransferSession.end()
 - Tasks awaited to ensure complete cleanup before returning
 
 **Without this pattern:** Tasks hang on `receive()` waiting for timeout, causing multiple disconnect attempts (SAB-41).
+
+### Canon Graceful Disconnect (SAB-57)
+
+Canon cameras require additional cleanup steps per gphoto2lib's `camera_exit()` pattern:
+
+```
+CanonEventSource.cleanup()
+       │
+       ├── 1. drainPendingEvents()     ← Poll GetEvent once to clear queue
+       │          └── Send Canon_EOS_GetEvent, discard response
+       │
+       ├── 2. disableEventMode()       ← Tell camera we're done monitoring
+       │          └── Send SetEventMode(0)
+       │
+       ├── 3. stopMonitoring()         ← Stop polling loop
+       │
+       └── 4. Clear references         ← Release connections
+```
+
+**Why this matters:**
+
+- Without `SetEventMode(0)`, camera may continue trying to report events
+- Without draining events, pending events may cause state inconsistency
+- Matches gphoto2lib behavior for proper PTP spec compliance
+
+### Disconnect Timing & Photo Completion
+
+**Behavior when user disconnects during active photo transfer:**
+
+When disconnect is initiated (user clicks Close), the current poll batch completes before cleanup finishes.
+
+**Timeline:**
+
+1. **Graceful timeout: 1 second** - `stopMonitoring(graceful: true)` waits up to 1s for polling task to finish
+2. **Force cancel fallback** - After 1s timeout, sends cancel signal via `pollingTask?.cancel()`
+3. **Task still awaited** - Even after cancel, `await pollingTask?.value` waits for task completion
+4. **Current batch completes** - Photos detected in the current `Canon_GetEvent` poll finish downloading sequentially
+
+**Expected duration:**
+
+| Scenario                          | Duration        |
+| --------------------------------- | --------------- |
+| Idle (no photos downloading)      | ~200-600ms      |
+| Single photo in progress          | ~500ms-2s       |
+| Burst (10-20 photos in one poll)  | 5-10+ seconds   |
+
+**Why this happens:**
+
+- Downloads run sequentially: `for handle in photosToDownload { await processPhotoHandle(handle) }`
+- No `Task.checkCancellation()` in the download loop (cooperative cancellation not implemented)
+- Once a poll finds photos, all photos from that batch download before the task exits
+- This ensures photos aren't left in inconsistent state on camera
+
+**User experience:**
+
+- Disconnect can take several seconds during burst shooting
+- Photos continue appearing in UI after Close button clicked
+- Sheet doesn't close until all in-progress downloads complete
+- Consider showing "Disconnecting..." state for waits >1 second
 
 ---
 
@@ -429,6 +485,47 @@ iPad                                          Camera
    iPad → CloseSession
 ```
 
+### Protocol Constants
+
+**Canon-specific operation codes:**
+- `0x9115` - Canon_EOS_SetEventMode (enables event polling)
+- `0x9116` - Canon_EOS_GetEvent (polls for new photos)
+
+**Standard PTP operations:**
+- `0x1002` - OpenSession
+- `0x1003` - CloseSession
+- `0x1008` - GetObjectInfo (metadata query)
+- `0x1009` - GetObject (photo download)
+
+**Event codes:**
+- `0xC1A7` - Photo capture event (ObjectAdded)
+
+**Response codes:**
+- `0x2001` - OK
+
+### Canon Compatibility
+
+**Protocol Standardization (SAB-82):**
+
+Validated Canon PTP/IP protocol using Canon EOS 80D (2016) vs R6 Mark II (2022). **Result: Byte-for-byte identical** protocol despite 6-year gap and different architectures (DSLR vs mirrorless).
+
+**Key findings:**
+- Same operation codes (0x9115, 0x9116)
+- Same photo detection event (0xC1A7, 64-byte structure)
+- Same response codes (0x2001 OK)
+- Identical download flow
+
+**Compatibility:**
+
+All Canon cameras supporting "EOS Utility WiFi connection" use this standardized protocol:
+- R-series (15 models): R1, R3, R5, R5 II, R6 III, R6 II, R6, R7, R8, R10, R50, R100, RP
+- DSLRs with WiFi (18+ models): 90D, 80D, 77D, 70D, 6D Mark II, 6D, 5D Mark IV
+- M-series (10 models): M6 II, M50 II, M50, M200, M100, M10, M5, M6, M3
+
+See `CANON_COMPATIBILITY.md` for complete list and validation status.
+
+**Reference:** [Canon EOS Utility Compatible Cameras](https://cam.start.canon/en/S003/manual/html/UG-00_Before_0050.html)
+
 ---
 
 ## Threading Model
@@ -506,3 +603,6 @@ SabaiPicsStudio/
 | @MainActor protocol delegate              | Safe UI updates from callbacks          |
 | CameraEventSource protocol                | Multi-vendor support (Canon/Nikon/Sony) |
 | PhotoOperationsProvider protocol          | Decouples event detection from download |
+
+---
+

@@ -1,8 +1,9 @@
 // Local developer overrides (do not commit secrets)
 //
 // Copy to `apps/studio/Config/Studio.Local.xcconfig` and fill values.
+//
+// Note: Use https:/$()/domain.com format to prevent // from being treated as comments
 
 CLERK_PUBLISHABLE_KEY = pk_test_REPLACE_ME
-
-// Optional: Override sign-up URL for local dev
-// SIGNUP_URL = http://localhost:3000/sign-up
+API_BASE_URL = https:/$()/localhost:8787
+EVENT_FRONTEND_URL = https:/$()/localhost:3000
