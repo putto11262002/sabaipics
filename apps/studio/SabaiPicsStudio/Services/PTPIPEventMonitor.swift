@@ -116,17 +116,35 @@ actor PTPIPEventMonitor {
         while isMonitoring {
             do {
                 // Read event packet with timeout (like libgphoto2's select)
-                guard let eventData = try await receiveEventPacket() else {
+                guard let packet = try await receiveEventPacket() else {
                     // Timeout - continue loop (normal behavior)
                     continue
                 }
 
-                // Parse and handle event
-                try await handleEventPacket(eventData)
+                // Handle packet types (event channel can include ping/pong/cancel)
+                if let packetType = packet.packetType {
+                    if packetType == .event {
+                        // Parse and handle event
+                        try await handleEventPacket(packet.data)
+                    } else {
+                        print("[PTPIPEventMonitor] Ignoring non-event packet: \(packetType.name) (0x\(String(format: "%08X", packetType.rawValue)))")
+                    }
+                } else {
+                    print("[PTPIPEventMonitor] Ignoring unknown packet type: 0x\(String(format: "%08X", packet.rawType))")
+                }
 
             } catch {
+                if !isMonitoring || Task.isCancelled {
+                    break
+                }
+
                 print("[PTPIPEventMonitor] Event monitoring error: \(error)")
-                notifyError(error)
+
+                if let monitorError = error as? PTPIPEventMonitorError, monitorError == .connectionLost {
+                    notifyDisconnect()
+                } else {
+                    notifyError(error)
+                }
                 break
             }
         }
@@ -136,7 +154,7 @@ actor PTPIPEventMonitor {
 
     /// Receive event packet with timeout
     /// Based on libgphoto2's ptpip_read_with_timeout pattern
-    private func receiveEventPacket() async throws -> Data? {
+    private func receiveEventPacket() async throws -> (packetType: PTPIPPacketType?, rawType: UInt32, data: Data)? {
         guard let connection = eventConnection else {
             throw PTPIPEventMonitorError.notConnected
         }
@@ -144,12 +162,14 @@ actor PTPIPEventMonitor {
         do {
             // First, read header (8 bytes)
             let headerData = try await receiveData(connection: connection, minimumLength: 8, maximumLength: 8)
-            guard let header = PTPIPHeader.from(headerData) else {
-                throw PTPIPEventMonitorError.invalidPacket
-            }
+
+            let lengthValue = headerData.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 0, as: UInt32.self) }
+            let typeValue = headerData.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4, as: UInt32.self) }
+            let totalLength = UInt32(littleEndian: lengthValue)
+            let rawType = UInt32(littleEndian: typeValue)
 
             // Read remaining payload
-            let payloadLength = Int(header.length) - 8
+            let payloadLength = Int(totalLength) - 8
             guard payloadLength >= 0 else {
                 throw PTPIPEventMonitorError.invalidPacket
             }
@@ -158,9 +178,9 @@ actor PTPIPEventMonitor {
                 let payloadData = try await receiveData(connection: connection, minimumLength: payloadLength, maximumLength: payloadLength)
                 var fullPacket = headerData
                 fullPacket.append(payloadData)
-                return fullPacket
+                return (PTPIPPacketType(rawValue: rawType), rawType, fullPacket)
             } else {
-                return headerData
+                return (PTPIPPacketType(rawValue: rawType), rawType, headerData)
             }
         } catch PTPIPEventMonitorError.timeout {
             // Timeout is normal - no events received in 30s, just keep waiting
@@ -240,7 +260,7 @@ actor PTPIPEventMonitor {
         print("[PTPIPEventMonitor] Received event: \(eventCode) (0x\(String(format: "%04X", event.eventCode))) (txID: \(event.transactionID))")
 
         switch eventCode {
-        case .objectAdded, .canonEOSObjectAddedEx:
+        case .objectAdded, .canonEOSObjectAddedEx, .sonyObjectAdded:
             // ObjectAdded: parameter[0] is the object handle
             if let objectHandle = event.parameters.first {
                 print("[PTPIPEventMonitor] ObjectAdded: handle=0x\(String(format: "%08X", objectHandle))")
@@ -253,7 +273,7 @@ actor PTPIPEventMonitor {
         case .storeFull:
             print("[PTPIPEventMonitor] Storage full")
 
-        case .devicePropChanged, .canonEOSPropValueChanged:
+        case .devicePropChanged, .canonEOSPropValueChanged, .sonyPropertyChanged:
             print("[PTPIPEventMonitor] Property changed")
 
         default:

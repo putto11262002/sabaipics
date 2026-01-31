@@ -26,6 +26,7 @@ enum PTPOperationCode: UInt16 {
     case getObjectHandles = 0x1007
     case getObjectInfo = 0x1008
     case getObject = 0x1009
+    case getPartialObject = 0x101B
     case deleteObject = 0x100B
 
     // Canon EOS Extensions (for Canon cameras)
@@ -36,6 +37,10 @@ enum PTPOperationCode: UInt16 {
     case canonEOSGetStorageInfo = 0x9102
     case canonEOSGetObject = 0x9104
     case canonEOSRemoteRelease = 0x910F
+
+    // Sony Extensions
+    case sonySDIOConnect = 0x9201
+    case sonyGetSDIOGetExtDeviceInfo = 0x9202
 
     /// Human-readable operation name for logging
     var name: String {
@@ -49,6 +54,7 @@ enum PTPOperationCode: UInt16 {
         case .getObjectHandles: return "GetObjectHandles"
         case .getObjectInfo: return "GetObjectInfo"
         case .getObject: return "GetObject"
+        case .getPartialObject: return "GetPartialObject"
         case .deleteObject: return "DeleteObject"
         case .canonEOSGetEvent: return "Canon_EOS_GetEvent"
         case .canonEOSSetRemoteMode: return "Canon_EOS_SetRemoteMode"
@@ -57,6 +63,8 @@ enum PTPOperationCode: UInt16 {
         case .canonEOSGetStorageInfo: return "Canon_EOS_GetStorageInfo"
         case .canonEOSGetObject: return "Canon_EOS_GetObject"
         case .canonEOSRemoteRelease: return "Canon_EOS_RemoteRelease"
+        case .sonySDIOConnect: return "Sony_SDIOConnect"
+        case .sonyGetSDIOGetExtDeviceInfo: return "Sony_GetSDIOGetExtDeviceInfo"
         }
     }
 }
@@ -81,6 +89,7 @@ enum PTPResponseCode: UInt16 {
     case sessionAlreadyOpen = 0x201E
     case transactionCancelled = 0x201F
     case specificationOfDestinationUnsupported = 0x2020
+    case storeNotAvailable = 0x2013
 
     var isSuccess: Bool {
         return self == .ok
@@ -103,6 +112,7 @@ enum PTPResponseCode: UInt16 {
         case .sessionAlreadyOpen: return "Session already open"
         case .transactionCancelled: return "Transaction cancelled"
         case .specificationOfDestinationUnsupported: return "Destination unsupported"
+        case .storeNotAvailable: return "Store not available"
         }
     }
 
@@ -124,6 +134,7 @@ enum PTPResponseCode: UInt16 {
         case .sessionAlreadyOpen: return "SessionAlreadyOpen"
         case .transactionCancelled: return "TransactionCancelled"
         case .specificationOfDestinationUnsupported: return "DestinationUnsupported"
+        case .storeNotAvailable: return "StoreNotAvailable"
         }
     }
 }
@@ -152,6 +163,15 @@ enum PTPEventCode: UInt16 {
     case canonEOSObjectAddedEx = 0xC181
     case canonEOSPropValueChanged = 0xC189
     case canonEOSRequestGetEvent = 0xC101
+
+    // Sony PTP/IP Events (observed on ILCE models)
+    // Based on Rocc's Sony mapping and device logs
+    case sonyObjectAdded = 0xC201
+    case sonyObjectRemoved = 0xC202
+    case sonyPropertyChanged = 0xC203
+    case sonyUnknown3 = 0xC206
+    case sonyUnknown4 = 0xC207
+    case sonyUnknown5 = 0xC20C
 }
 
 // MARK: - PTP Command Builder
@@ -184,6 +204,17 @@ struct PTPCommand {
             operationCode: PTPOperationCode.getObject.rawValue,
             transactionID: nextTransactionID(),
             parameters: [handle]
+        )
+    }
+
+    /// Build GetPartialObject command
+    /// PTP GetPartialObject: handle + offset + maxBytes
+    mutating func getPartialObject(handle: UInt32, offset: UInt32, maxBytes: UInt32) -> PTPIPOperationRequest {
+        return PTPIPOperationRequest(
+            dataPhaseInfo: 1,  // Receive data from camera
+            operationCode: PTPOperationCode.getPartialObject.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: [handle, offset, maxBytes]
         )
     }
 
@@ -232,6 +263,38 @@ struct PTPCommand {
         )
     }
 
+    /// Build GetStorageInfo command
+    /// - Parameter storageID: Storage ID to query
+    /// - Returns: PTPIPOperationRequest packet
+    mutating func getStorageInfo(storageID: UInt32) -> PTPIPOperationRequest {
+        return PTPIPOperationRequest(
+            dataPhaseInfo: 1,  // 1 = receive or no data, 2 = send data (per libgphoto2)
+            operationCode: PTPOperationCode.getStorageInfo.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: [storageID]
+        )
+    }
+
+    /// Build GetObjectHandles command
+    /// - Parameters:
+    ///   - storageID: Storage ID to query (0x00000000 for all)
+    ///   - objectFormat: Object format code (0x0000 for all)
+    ///   - associationObject: Parent handle (0xFFFFFFFF for root)
+    /// - Returns: PTPIPOperationRequest packet
+    mutating func getObjectHandles(
+        storageID: UInt32,
+        objectFormat: UInt16 = 0x0000,
+        associationObject: UInt32 = 0xFFFFFFFF
+    ) -> PTPIPOperationRequest {
+        let objectFormatParam = UInt32(objectFormat)
+        return PTPIPOperationRequest(
+            dataPhaseInfo: 1,  // 1 = receive or no data, 2 = send data (per libgphoto2)
+            operationCode: PTPOperationCode.getObjectHandles.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: [storageID, objectFormatParam, associationObject]
+        )
+    }
+
     /// Build Canon EOS GetEvent command (for polling events)
     /// - Returns: PTPIPOperationRequest packet
     mutating func canonGetEvent() -> PTPIPOperationRequest {
@@ -240,6 +303,34 @@ struct PTPCommand {
             operationCode: PTPOperationCode.canonEOSGetEvent.rawValue,
             transactionID: nextTransactionID(),
             parameters: []
+        )
+    }
+
+    /// Build Sony SDIOConnect command
+    /// - Parameters:
+    ///   - p1: Phase (1/2/3)
+    ///   - p2: Optional value (usually 0)
+    ///   - p3: Optional value (usually 0)
+    /// - Returns: PTPIPOperationRequest packet
+    mutating func sonySDIOConnect(p1: UInt32, p2: UInt32 = 0, p3: UInt32 = 0) -> PTPIPOperationRequest {
+        return PTPIPOperationRequest(
+            // libgphoto2 uses PTP_DP_GETDATA for this opcode
+            dataPhaseInfo: 2,
+            operationCode: PTPOperationCode.sonySDIOConnect.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: [p1, p2, p3]
+        )
+    }
+
+    /// Build Sony GetSDIOGetExtDeviceInfo command
+    /// From libgphoto2: PTP_OC_SONY_GetSDIOGetExtDeviceInfo (0x9202) param 0xC8
+    mutating func sonyGetSDIOGetExtDeviceInfo(param: UInt32 = 0x000000C8) -> PTPIPOperationRequest {
+        return PTPIPOperationRequest(
+            // This opcode returns data (vendor prop/ops/event codes)
+            dataPhaseInfo: 2,
+            operationCode: PTPOperationCode.sonyGetSDIOGetExtDeviceInfo.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: [param]
         )
     }
 
@@ -307,16 +398,22 @@ actor PTPTransactionManager {
         self.sessionID = sessionID
     }
 
-    /// Get next transaction ID
-    func next() -> UInt32 {
-        let id = nextID
-        nextID = (nextID == UInt32.max) ? 1 : nextID + 1
-        return id
-    }
-
     /// Create a command builder with current state
-    func createCommand() async -> PTPCommand {
-        let txID = await next()
-        return PTPCommand(sessionID: sessionID, initialTransactionID: txID)
+    ///
+    /// Note: `PTPCommand` can generate multiple transaction IDs internally.
+    /// To prevent collisions between concurrent command builders, we reserve
+    /// a block of IDs per builder.
+    func createCommand(reserve count: UInt32 = 32) async -> PTPCommand {
+        let start = nextID
+        let increment = max(count, 1)
+
+        // Reserve a block; wrap to 1 (avoid 0)
+        if nextID >= UInt32.max - increment {
+            nextID = 1
+        } else {
+            nextID += increment
+        }
+
+        return PTPCommand(sessionID: sessionID, initialTransactionID: start)
     }
 }

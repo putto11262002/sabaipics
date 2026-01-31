@@ -21,6 +21,8 @@ import Network
 protocol PhotoOperationsProvider: AnyObject {
     func getObjectInfo(objectHandle: UInt32) async throws -> PTPObjectInfo
     func downloadPhoto(objectHandle: UInt32) async throws -> Data
+    func getStorageIDs() async throws -> [UInt32]
+    func getObjectHandles(storageID: UInt32) async throws -> [UInt32]
 }
 
 // MARK: - Canon Event Source

@@ -104,6 +104,47 @@ actor PTPIPPhotoDownloader {
         return photoData
     }
 
+    /// Download a partial object range (Sony-friendly)
+    /// Uses PTP GetPartialObject(handle, offset, maxBytes)
+    func downloadPartialObject(objectHandle: UInt32, offset: UInt32 = 0, maxBytes: UInt32) async throws -> Data {
+        guard let connection = commandConnection,
+              let txManager = transactionManager else {
+            throw PTPIPPhotoDownloaderError.notConnected
+        }
+
+        PTPLogger.info(
+            "Downloading partial object \(PTPLogger.formatHex(objectHandle)) offset=\(offset) maxBytes=\(maxBytes)",
+            category: PTPLogger.command
+        )
+
+        var command = await txManager.createCommand()
+        let request = command.getPartialObject(handle: objectHandle, offset: offset, maxBytes: maxBytes)
+        let expectedTransactionID = request.transactionID
+        let startTime = Date()
+
+        let commandData = request.toData()
+        try await sendData(connection: connection, data: commandData)
+
+        let objectData = try await receiveDataPackets(connection: connection)
+
+        let response = try await receiveResponse(connection: connection, expectedTransactionID: expectedTransactionID)
+        guard let responseCode = PTPResponseCode(rawValue: response.responseCode),
+              responseCode.isSuccess else {
+            throw PTPIPPhotoDownloaderError.downloadFailed(
+                PTPResponseCode(rawValue: response.responseCode) ?? .generalError
+            )
+        }
+
+        let duration = Date().timeIntervalSince(startTime)
+        let throughput = PTPLogger.formatThroughput(bytes: objectData.count, duration: duration)
+        PTPLogger.info(
+            "Partial download complete: \(PTPLogger.formatSize(objectData.count)) in \(PTPLogger.formatDuration(duration)) (\(throughput))",
+            category: PTPLogger.command
+        )
+
+        return objectData
+    }
+
     /// Receive data packets and reassemble
     /// Based on libgphoto2's chunked data transfer pattern:
     /// PTPIP_START_DATA_PACKET -> multiple PTPIP_DATA_PACKET -> PTPIP_END_DATA_PACKET
