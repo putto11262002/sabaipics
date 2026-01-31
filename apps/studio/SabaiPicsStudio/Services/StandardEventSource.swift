@@ -181,6 +181,14 @@ private extension StandardEventSource {
     func processSingleSonyInMemoryCapture() async {
         guard let photoOps = photoOps else { return }
 
+        if let session = photoOps as? PTPIPSession {
+            let ready = await waitForSonyObjectInMemoryReady(session)
+            guard ready else {
+                print("[StandardEventSource] Sony objectInMemory gate not satisfied; skipping trigger")
+                return
+            }
+        }
+
         // Sony sends bursts of ObjectAdded events for the same in-memory handle.
         // We need to wait until ObjectInfo changes (filename/size) before treating it as a new capture.
         let maxAttempts = 20
@@ -258,6 +266,28 @@ private extension StandardEventSource {
             // Do not fail the entire session for Sony event bursts; log and keep going.
             print("[StandardEventSource] Sony in-memory download failed: \(error)")
         }
+    }
+
+    func waitForSonyObjectInMemoryReady(_ session: PTPIPSession) async -> Bool {
+        let deadline = Date().addingTimeInterval(35.0)
+        let delayNs: UInt64 = 200_000_000 // 200ms
+
+        while isMonitoring && Date() < deadline {
+            do {
+                if let value = try await session.getSonyObjectInMemoryValue() {
+                    // Rocc/libgphoto2: only safe when >= 0x8000; value can become 1 and downloading then can crash firmware.
+                    if value >= 0x8000 {
+                        return true
+                    }
+                }
+            } catch {
+                // Ignore transient failures and retry.
+            }
+
+            try? await Task.sleep(nanoseconds: delayNs)
+        }
+
+        return false
     }
 }
 
