@@ -71,25 +71,28 @@ class NetworkScannerService: ObservableObject {
     private let hotspotSubnet = "172.20.10"
 
     /// IP range to scan (cameras typically get low IPs)
-    private let scanRange = 2...20
+    private let hotspotScanRange = 2...20
+
+    /// Current scan targets (IP addresses)
+    private var scanTargets: [String] = []
 
     /// PTP/IP port
     private let ptpipPort: UInt16 = 15740
 
     /// Timeout for each IP scan (fast timeout for non-responsive IPs)
-    private let perIPTimeout: TimeInterval = 2.0
+    private var perIPTimeout: TimeInterval = 2.0
 
     /// Maximum scan waves (for late-joining cameras)
-    private let maxScanWaves = 3
+    private var maxScanWaves = 3
 
     /// Delay between scan waves
-    private let waveDelay: TimeInterval = 3.0
+    private var waveDelay: TimeInterval = 3.0
 
     /// Maximum retry attempts per IP for TCP connection
-    private let maxRetryAttempts = 3
+    private var maxRetryAttempts = 3
 
     /// Delay between retries
-    private let retryDelay: TimeInterval = 0.5
+    private var retryDelay: TimeInterval = 0.5
 
     /// Background queue for network operations (avoids main thread deadlock)
     private let networkQueue = DispatchQueue(label: "com.sabaipics.scanner.network", qos: .userInitiated)
@@ -160,6 +163,39 @@ class NetworkScannerService: ObservableObject {
         // Clear previous results
         discoveredCameras = []
         state = .scanning(progress: 0.0)
+
+        // Default scan targets: Personal Hotspot range
+        scanTargets = hotspotScanRange.map { "\(hotspotSubnet).\($0)" }
+        perIPTimeout = 2.0
+        maxScanWaves = 3
+        waveDelay = 3.0
+        maxRetryAttempts = 3
+        retryDelay = 0.5
+
+        scanTask = Task {
+            await performScan()
+        }
+    }
+
+    /// Start scanning a small, explicit candidate set of IPs.
+    /// Used for Sony AP-mode where broad LAN scanning isn't appropriate.
+    func startScan(candidateIPs: [String], perIPTimeout: TimeInterval = 1.0) {
+        // Cancel any existing scan
+        stopScan()
+
+        // Clear previous results
+        discoveredCameras = []
+        state = .scanning(progress: 0.0)
+
+        // Explicit candidate targets
+        scanTargets = Array(NSOrderedSet(array: candidateIPs)).compactMap { $0 as? String }
+        self.perIPTimeout = perIPTimeout
+
+        // For small candidate sets, do a single wave and minimal retry.
+        maxScanWaves = 1
+        waveDelay = 0.0
+        maxRetryAttempts = 2
+        retryDelay = 0.2
 
         scanTask = Task {
             await performScan()
@@ -260,11 +296,23 @@ class NetworkScannerService: ObservableObject {
     /// Layer 1: Up to 3 scan waves (handles cameras joining network late)
     /// Layer 2: Per-IP retry within scanIP() (handles slow PTP/IP startup)
     private func performScan() async {
-        let totalIPs = scanRange.count
+        let totalIPs = scanTargets.count
         let scanStart = Date()
+
+        guard totalIPs > 0 else {
+            state = .error("No scan targets")
+            return
+        }
         print("[\(ts())] [Scanner] ========================================")
         print("[\(ts())] [Scanner] Starting wave-based scan")
-        print("[\(ts())] [Scanner]   IP range: \(hotspotSubnet).2-20 (\(totalIPs) IPs)")
+        if scanTargets.isEmpty {
+            print("[\(ts())] [Scanner]   IP range: (none)")
+        } else if scanTargets.count == hotspotScanRange.count,
+                  scanTargets.first?.hasPrefix("\(hotspotSubnet).") == true {
+            print("[\(ts())] [Scanner]   IP range: \(hotspotSubnet).2-20 (\(totalIPs) IPs)")
+        } else {
+            print("[\(ts())] [Scanner]   Targets: \(totalIPs) IP(s)")
+        }
         print("[\(ts())] [Scanner]   Max waves: \(maxScanWaves), Wave delay: \(waveDelay)s")
         print("[\(ts())] [Scanner]   Per-IP timeout: \(perIPTimeout)s, Retries: \(maxRetryAttempts), Retry delay: \(retryDelay)s")
         print("[\(ts())] [Scanner] ========================================")
@@ -291,9 +339,7 @@ class NetworkScannerService: ObservableObject {
             // Scan ALL IPs in parallel using TaskGroup
             await withTaskGroup(of: DiscoveredCamera?.self) { group in
                 // Launch all scans simultaneously
-                for lastOctet in scanRange {
-                    let ip = "\(hotspotSubnet).\(lastOctet)"
-
+                for ip in scanTargets {
                     group.addTask {
                         // Check for cancellation before each IP scan
                         guard !Task.isCancelled else { return nil }

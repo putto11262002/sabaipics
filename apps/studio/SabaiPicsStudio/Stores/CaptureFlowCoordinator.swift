@@ -18,6 +18,7 @@ class CaptureFlowCoordinator: ObservableObject {
 
     enum State: Equatable {
         case manufacturerSelection
+        case sonyEntry
         case hotspotSetup
         case discovering
         case manualIPEntry
@@ -30,6 +31,7 @@ class CaptureFlowCoordinator: ObservableObject {
         static func == (lhs: State, rhs: State) -> Bool {
             switch (lhs, rhs) {
             case (.manufacturerSelection, .manufacturerSelection),
+                 (.sonyEntry, .sonyEntry),
                  (.hotspotSetup, .hotspotSetup),
                  (.discovering, .discovering),
                  (.manualIPEntry, .manualIPEntry),
@@ -52,6 +54,9 @@ class CaptureFlowCoordinator: ObservableObject {
     var selectedManufacturer: CameraManufacturer?
     var discoveredCameras: [DiscoveredCamera] = []
 
+    // Sony: user-selected previous record to prioritize
+    @Published var preferredSonyRecordID: String?
+
     // MARK: - Active Tasks (for cancellation)
 
     /// Active connection task (stored for cancellation)
@@ -67,6 +72,12 @@ class CaptureFlowCoordinator: ObservableObject {
         print("[CaptureFlowCoordinator] Manufacturer selected: \(manufacturer.rawValue)")
         selectedManufacturer = manufacturer
 
+        if manufacturer == .sony {
+            print("[CaptureFlowCoordinator] Sony: showing entry screen")
+            state = .sonyEntry
+            return
+        }
+
         if NetworkScannerService.isHotspotActive() {
             print("[CaptureFlowCoordinator] Hotspot detected, proceeding to discovery")
             state = .discovering
@@ -78,7 +89,19 @@ class CaptureFlowCoordinator: ObservableObject {
 
     func proceedToDiscovery() {
         print("[CaptureFlowCoordinator] Proceeding to camera discovery")
+        preferredSonyRecordID = nil
         state = .discovering
+    }
+
+    func connectToSonyRecord(id: String) {
+        preferredSonyRecordID = id
+        state = .discovering
+    }
+
+    func startSonySetup() {
+        print("[CaptureFlowCoordinator] Sony: starting setup wizard")
+        preferredSonyRecordID = nil
+        state = .hotspotSetup
     }
 
     func skipToManualEntry() {
@@ -95,6 +118,7 @@ class CaptureFlowCoordinator: ObservableObject {
         }
         discoveredCameras = []
         selectedManufacturer = nil
+        preferredSonyRecordID = nil
 
         state = .manufacturerSelection
         print("[CaptureFlowCoordinator]    ✓ State → .manufacturerSelection")
