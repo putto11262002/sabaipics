@@ -127,7 +127,18 @@ actor PTPIPEventMonitor {
                         // Parse and handle event
                         try await handleEventPacket(packet.data)
                     } else {
-                        print("[PTPIPEventMonitor] Ignoring non-event packet: \(packetType.name) (0x\(String(format: "%08X", packetType.rawValue)))")
+                        switch packetType {
+                        case .ping:
+                            print("[PTPIPEventMonitor] Received Ping, replying with Pong")
+                            if let connection = eventConnection {
+                                await sendPong(connection: connection)
+                            }
+                        case .pong:
+                            // Keepalive response; no action needed.
+                            print("[PTPIPEventMonitor] Received Pong")
+                        default:
+                            print("[PTPIPEventMonitor] Ignoring non-event packet: \(packetType.name) (0x\(String(format: "%08X", packetType.rawValue)))")
+                        }
                     }
                 } else {
                     print("[PTPIPEventMonitor] Ignoring unknown packet type: 0x\(String(format: "%08X", packet.rawType))")
@@ -186,6 +197,19 @@ actor PTPIPEventMonitor {
             // Timeout is normal - no events received in 30s, just keep waiting
             print("[PTPIPEventMonitor] No events received (timeout), continuing to monitor...")
             return nil
+        }
+    }
+
+    private func sendPong(connection: NWConnection) async {
+        let packet = PTPIPHeader(length: 8, type: .pong).toData()
+        await sendData(connection: connection, data: packet)
+    }
+
+    private func sendData(connection: NWConnection, data: Data) async {
+        await withCheckedContinuation { continuation in
+            connection.send(content: data, completion: .contentProcessed { _ in
+                continuation.resume()
+            })
         }
     }
 
