@@ -538,6 +538,22 @@ class PTPIPSession: NSObject {
         return try await downloader.downloadPhoto(objectHandle: objectHandle)
     }
 
+    /// Sony-only: read ObjectInMemory device property (0xD215).
+    ///
+    /// Rocc/libgphoto2 gate downloads on `value >= 0x8000` for the in-memory handle (0xFFFFC001).
+    func getSonyObjectInMemoryValue() async throws -> UInt16? {
+        guard isSonyPTPIP else {
+            return nil
+        }
+
+        let value = try await getDevicePropDescCurrentValue(propCode: 0xD215)
+        guard let value else {
+            return nil
+        }
+
+        return UInt16(truncatingIfNeeded: value)
+    }
+
     /// Get object info by handle
     /// Uses PTP GetObjectInfo command to retrieve metadata about an object
     /// - Parameter objectHandle: Object handle to get info for
@@ -1042,6 +1058,93 @@ class PTPIPSession: NSObject {
     private func formatHexBytes(_ data: Data, limit: Int) -> String {
         let slice = data.prefix(limit)
         return slice.map { String(format: "%02X", $0) }.joined(separator: " ")
+    }
+
+    private func getDevicePropDescCurrentValue(propCode: UInt16) async throws -> UInt32? {
+        guard let connection = commandConnection,
+              let txManager = transactionManager else {
+            throw PTPIPSessionError.notConnected
+        }
+
+        var command = await txManager.createCommand()
+        let request = command.getDevicePropDesc(propCode: propCode)
+        let requestData = request.toData()
+
+        try await sendData(connection: connection, data: requestData)
+
+        let response = try await receiveDataResponse(
+            connection: connection,
+            expectedTransactionID: request.transactionID
+        )
+
+        if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
+            print("[PTPIPSession] GetDevicePropDesc 0x\(String(format: "%04X", propCode)) failed: \(responseCode.name) (0x\(String(format: "%04X", response.response.responseCode)))")
+            return nil
+        }
+
+        guard let data = response.data else {
+            print("[PTPIPSession] GetDevicePropDesc 0x\(String(format: "%04X", propCode)) returned no data")
+            return nil
+        }
+
+        return parseDevicePropDescCurrentValue(data, expectedPropCode: propCode)
+    }
+
+    private func parseDevicePropDescCurrentValue(_ data: Data, expectedPropCode: UInt16) -> UInt32? {
+        // PTP DevicePropDesc:
+        // u16 propCode, u16 dataType, u8 getSet, factoryDefault (type), currentValue (type), formFlag...
+        guard data.count >= 5 else {
+            return nil
+        }
+
+        let propCodeRaw = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 0, as: UInt16.self) }
+        let dataTypeRaw = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 2, as: UInt16.self) }
+        let propCode = UInt16(littleEndian: propCodeRaw)
+        let dataType = UInt16(littleEndian: dataTypeRaw)
+
+        if propCode != expectedPropCode {
+            print("[PTPIPSession] GetDevicePropDesc mismatch: expected=0x\(String(format: "%04X", expectedPropCode)) got=0x\(String(format: "%04X", propCode))")
+        }
+
+        // Offset 4 is getSet (1 byte)
+        var offset = 5
+
+        func readUInt8() -> UInt32? {
+            guard offset + 1 <= data.count else { return nil }
+            let v = data[offset]
+            offset += 1
+            return UInt32(v)
+        }
+
+        func readUInt16() -> UInt32? {
+            guard offset + 2 <= data.count else { return nil }
+            let raw = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt16.self) }
+            offset += 2
+            return UInt32(UInt16(littleEndian: raw))
+        }
+
+        func readUInt32() -> UInt32? {
+            guard offset + 4 <= data.count else { return nil }
+            let raw = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self) }
+            offset += 4
+            return UInt32(littleEndian: raw)
+        }
+
+        // Only need factory + current value.
+        // Data type codes (PTP spec): UINT8=0x0002, UINT16=0x0004, UINT32=0x0006.
+        let readValue: () -> UInt32? = {
+            switch dataType {
+            case 0x0002: return readUInt8()
+            case 0x0004: return readUInt16()
+            case 0x0006: return readUInt32()
+            default:
+                return nil
+            }
+        }
+
+        _ = readValue() // factory default
+        let current = readValue()
+        return current
     }
 
     // MARK: - Camera Vendor Detection

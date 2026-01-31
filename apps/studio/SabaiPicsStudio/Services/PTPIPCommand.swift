@@ -28,6 +28,7 @@ enum PTPOperationCode: UInt16 {
     case getObject = 0x1009
     case getPartialObject = 0x101B
     case deleteObject = 0x100B
+    case getDevicePropDesc = 0x1014
 
     // Canon EOS Extensions (for Canon cameras)
     case canonEOSGetEvent = 0x9116
@@ -56,6 +57,7 @@ enum PTPOperationCode: UInt16 {
         case .getObject: return "GetObject"
         case .getPartialObject: return "GetPartialObject"
         case .deleteObject: return "DeleteObject"
+        case .getDevicePropDesc: return "GetDevicePropDesc"
         case .canonEOSGetEvent: return "Canon_EOS_GetEvent"
         case .canonEOSSetRemoteMode: return "Canon_EOS_SetRemoteMode"
         case .canonEOSSetEventMode: return "Canon_EOS_SetEventMode"
@@ -292,6 +294,17 @@ struct PTPCommand {
             operationCode: PTPOperationCode.getObjectHandles.rawValue,
             transactionID: nextTransactionID(),
             parameters: [storageID, objectFormatParam, associationObject]
+        )
+    }
+
+    /// Build GetDevicePropDesc command
+    /// PTP GetDevicePropDesc: propCode
+    mutating func getDevicePropDesc(propCode: UInt16) -> PTPIPOperationRequest {
+        return PTPIPOperationRequest(
+            dataPhaseInfo: 1,
+            operationCode: PTPOperationCode.getDevicePropDesc.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: [UInt32(propCode)]
         )
     }
 
