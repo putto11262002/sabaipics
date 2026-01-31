@@ -5,66 +5,42 @@
 //
 
 import SwiftUI
+import Foundation
 #if canImport(UIKit)
 import UIKit
 #endif
+#if canImport(NetworkExtension)
+import NetworkExtension
+#endif
+
 
 struct SonyAPEntryView: View {
     @EnvironmentObject var captureFlow: CaptureFlowCoordinator
-    @Environment(\.openURL) private var openURL
+    // Intentionally unused on this screen (no Settings shortcut here).
 
-    @State private var showHiddenDebug = false
+    @State private var selectedRecord: SonyAPConnectionRecord?
+    @State private var showRecordActions = false
 
-    private var wifiInfo: WiFiIPv4Info? {
-        WiFiNetworkInfo.currentWiFiIPv4()
+    @State private var records: [SonyAPConnectionRecord] = []
+
+    private var currentNetworkKey: String? {
+        SonyAPConnectionCache.shared.currentNetworkKey()
     }
 
+    // Keep WiFi utilities off this entry screen.
+
     var body: some View {
-        VStack(spacing: 18) {
-            Spacer()
-
-            Image(systemName: "camera.fill")
-                .font(.system(size: 64))
-                .foregroundColor(Color.Theme.primary)
-
-            Text("Sony Cameras")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(Color.Theme.foreground)
-                .onLongPressGesture {
-                    showHiddenDebug = true
-                }
-
+        VStack(spacing: 0) {
             cameraList
-                .padding(.horizontal, 12)
 
-            Spacer()
-
-            VStack(spacing: 10) {
-                Button("Set up a New Camera") {
-                    captureFlow.startSonySetup()
-                }
-                .buttonStyle(.secondary)
-
-                Button("Enter IP Manually") {
-                    captureFlow.skipToManualEntry()
-                }
-                .font(.subheadline)
-                .foregroundColor(Color.Theme.mutedForeground)
-
-                Button("Open Settings") {
-                    #if canImport(UIKit)
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        openURL(url)
-                    }
-                    #endif
-                }
-                .font(.subheadline)
-                .foregroundColor(Color.Theme.mutedForeground)
+            Button("New camera") {
+                captureFlow.startSonySetup()
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 40)
+            .buttonStyle(PrimaryButtonStyle())
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
         }
+        .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -79,94 +55,95 @@ struct SonyAPEntryView: View {
                 }
             }
         }
-        .sheet(isPresented: $showHiddenDebug) {
-            SonyHiddenNetworkDebugSheet(wifiInfo: wifiInfo)
+        .confirmationDialog(
+            "",
+            isPresented: $showRecordActions,
+            titleVisibility: .hidden
+        ) {
+            if let record = selectedRecord {
+                let isOnSameNetwork = (currentNetworkKey != nil && currentNetworkKey == record.networkKey)
+
+                if !isOnSameNetwork {
+                    let ssidHint = record.ssid ?? "DIRECT-..."
+                    Text("Join WiFi \"\(ssidHint)\" to connect.")
+                        .font(.footnote)
+                        .foregroundColor(Color.Theme.mutedForeground)
+                }
+
+                Button("Connect") {
+                    captureFlow.connectToSonyRecord(id: record.id)
+                }
+                .disabled(!isOnSameNetwork)
+
+                Button("Copy IP Address") {
+                    #if canImport(UIKit)
+                    UIPasteboard.general.string = record.lastKnownCameraIP
+                    #endif
+                }
+
+                Button("Copy Subnet") {
+                    #if canImport(UIKit)
+                    let wifiMask = WiFiNetworkInfo.currentWiFiIPv4()?.netmaskString
+                    let fallbackMask: String? = {
+                        guard let key = record.networkKey else { return nil }
+                        // key: "subnet:192.168.122.0/255.255.255.0"
+                        return key.split(separator: "/").last.map(String.init)
+                    }()
+                    UIPasteboard.general.string = wifiMask ?? fallbackMask
+                    #endif
+                }
+
+                Button("Remove", role: .destructive) {
+                    Task { @MainActor in
+                        // Optimistically update UI immediately.
+                        records.removeAll(where: { $0.id == record.id })
+                        SonyAPConnectionCache.shared.deleteRecord(id: record.id)
+                    }
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        }
+        .onAppear {
+            records = SonyAPConnectionCache.shared.listRecords()
         }
     }
 
     private var cameraList: some View {
-        let records = SonyAPConnectionCache.shared.listRecords()
-        return Group {
-            if records.isEmpty {
-                Text("No saved cameras yet")
-                    .font(.subheadline)
-                    .foregroundColor(Color.Theme.mutedForeground)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-            } else {
-                List {
-                    ForEach(records) { record in
-                        Text(record.cameraName)
-                            .foregroundColor(Color.Theme.foreground)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                captureFlow.connectToSonyRecord(id: record.id)
-                            }
-                            .swipeActions {
-                                Button(role: .destructive) {
-                                    Task { @MainActor in
-                                        SonyAPConnectionCache.shared.deleteRecord(id: record.id)
-                                    }
-                                } label: {
-                                    Text("Remove")
-                                }
-                            }
-                    }
-                }
-                .listStyle(.plain)
-                .frame(maxWidth: .infinity)
-                .frame(height: min(CGFloat(records.count) * 54.0 + 20.0, 360.0))
-            }
-        }
-    }
-}
-
-private struct SonyHiddenNetworkDebugSheet: View {
-    @Environment(\.dismiss) var dismiss
-    let wifiInfo: WiFiIPv4Info?
-
-    @State private var didCopyIP = false
-    @State private var didCopyMask = false
-
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 14) {
-                Text("Copy Network Values")
-                    .font(.headline)
-
-                if let wifiInfo {
-                    Button(didCopyIP ? "Copied IP" : "Copy WiFi IP") {
-                        #if canImport(UIKit)
-                        UIPasteboard.general.string = wifiInfo.ipString
-                        #endif
-                        didCopyIP = true
-                    }
-                    .buttonStyle(.secondary)
-
-                    Button(didCopyMask ? "Copied Subnet" : "Copy Subnet Mask") {
-                        #if canImport(UIKit)
-                        UIPasteboard.general.string = wifiInfo.netmaskString
-                        #endif
-                        didCopyMask = true
-                    }
-                    .buttonStyle(.secondary)
-                } else {
-                    Text("WiFi not detected")
-                        .font(.subheadline)
+        return List {
+            Section {
+                if records.isEmpty {
+                    Text("No saved cameras")
                         .foregroundColor(Color.Theme.mutedForeground)
-                }
+                } else {
+                    ForEach(records) { record in
+                        HStack(spacing: 10) {
+                            Text(record.cameraName)
+                                .foregroundColor(Color.Theme.foreground)
 
-                Spacer()
-            }
-            .padding(20)
-            .navigationTitle("Debug")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .foregroundColor(Color.Theme.primary)
+                            Spacer(minLength: 0)
+
+                            if let currentNetworkKey, currentNetworkKey == record.networkKey {
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 8, height: 8)
+                            } else {
+                                Circle()
+                                    .fill(Color.Theme.border)
+                                    .frame(width: 8, height: 8)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedRecord = record
+                            showRecordActions = true
+                        }
+                    }
                 }
+            } header: {
+                Text("Saved")
             }
         }
+        .listStyle(.insetGrouped)
     }
 }
