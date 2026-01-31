@@ -157,6 +157,13 @@ struct SonyAPSetupView: View {
             .foregroundColor(Color.Theme.mutedForeground)
             .padding(.top, 6)
 
+            Button("Enter IP Manually") {
+                captureFlow.skipToManualEntry()
+            }
+            .font(.subheadline)
+            .foregroundColor(Color.Theme.mutedForeground)
+            .padding(.top, 4)
+
             Button("Open Settings") {
                 #if canImport(UIKit)
                 if let url = URL(string: UIApplication.openSettingsURLString) {
