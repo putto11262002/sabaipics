@@ -4,6 +4,42 @@ iOS Studio architecture changes. See `ARCHITECTURE.md` for current design.
 
 ---
 
+## 2026-01-31
+
+### Update 22: Sony PTP/IP (ILCE) In-Memory Capture Support
+
+**Status:** Implemented and validated on ILCE-7RM4
+
+Implemented a Sony-specific PTP/IP strategy aligned with Rocc (and validated against the vendored GPhoto2Example app). Sony ILCE cameras often report new captures via vendor events and a fixed in-memory object handle, rather than storage enumeration.
+
+**Key behaviors (Sony):**
+
+- Recognize Sony vendor events (notably `0xC201` as ObjectAdded) and route into the existing capture/download pipeline
+- Handle the in-memory object handle `0xFFFFC001` by generating per-capture logical IDs for UI tracking
+- Serialize Sony capture processing to avoid overlapping command-channel operations during event bursts (prevents `invalidResponse`)
+- Download via `GetPartialObject (0x101B)` using `compressedSize` from `GetObjectInfo`
+
+**Object-in-memory gating (Sony robustness):**
+
+- Implemented the `objectInMemory (0xD215)` gate (only proceed when `>= 0x8000`)
+- Prefer Sony `GetAllDevicePropData (0x9209)` to avoid stale/cached values; fallback to `Sony_GetDevicePropDesc (0x9203)` / standard `GetDevicePropDesc (0x1014)`
+- Added command-channel read timeout to prevent the gating phase from hanging indefinitely
+
+**Sony handshake / protocol alignment:**
+
+- Added Sony extra handshake `0x920D` after SDIO init (matches Rocc sequencing)
+- Switched transaction ID allocation to contiguous defaults (avoids Sony silently ignoring gapped txIDs)
+
+**Validation harness:**
+
+- Updated vendored `GPhoto2Example` to default to Sony PTP/IP and download detected photos to iOS Documents for quick field validation
+
+**Docs:**
+
+- Added `discovery.md` (root) capturing Sony PTP/IP findings and a Sony-specific connection UX plan
+
+---
+
 ## 2026-01-29
 
 ### Update 21: Canon Protocol Validation + PTP/IP Debug Logging (SAB-82)
@@ -24,6 +60,7 @@ Added structured logging infrastructure for protocol debugging and field trouble
 - Added `LogExporter.swift` for production log export via OSLogStore API
 
 **Logging Coverage:**
+
 - Network packets: send/receive with hexdumps (PTPIPPacket.swift)
 - Command execution: operation codes, response codes, timing (PTPIPSession.swift)
 - Canon polling: intervals, latency, event parsing (CanonEventSource.swift)
@@ -35,6 +72,7 @@ Added structured logging infrastructure for protocol debugging and field trouble
 Compared Canon EOS 80D (2016 DSLR) vs R6 Mark II (2022 mirrorless) protocol logs:
 
 **Key Findings:**
+
 - Protocols are byte-for-byte identical (despite 6-year gap, DSLR → mirrorless)
 - Photo detection event: `0xC1A7` (ObjectAdded) - identical structure, 64 bytes
 - Operation codes: `0x9115` (SetEventMode), `0x9116` (GetEvent) - identical
@@ -45,11 +83,13 @@ Compared Canon EOS 80D (2016 DSLR) vs R6 Mark II (2022 mirrorless) protocol logs
 **Conclusion:** All Canon EOS cameras supporting EOS Utility WiFi connection use standardized PTP/IP protocol. This invalidates SAB-34's claim that "R-series uses CCAPI only" - R-series supports BOTH CCAPI and PTP/IP.
 
 **Market Impact:**
+
 - Canon addressable market: 31.5% (was incorrectly estimated at 6.75%)
 - Total addressable market: 77% (was 52%)
 - Market opportunity: 4.7x larger than previously documented
 
 **Files:**
+
 - Logging: PTPLogger.swift, LogExporter.swift, PTPIPPacket.swift, PTPIPSession.swift, CanonEventSource.swift, PTPIPPhotoDownloader.swift, PTPIPCommand.swift
 - Validation: 80d.txt (80D logs), r6.txt (R6 Mark II logs)
 - Docs: SAB-82_LOGGING_STRATEGY.md, SAB-82_IMPLEMENTATION_SUMMARY.md
@@ -63,6 +103,7 @@ Compared Canon EOS 80D (2016 DSLR) vs R6 Mark II (2022 mirrorless) protocol logs
 Refined Events Browser UI to match iOS native patterns and updated theme to match web design system.
 
 **Events Browser Changes:**
+
 - Redesigned EventDetailView to match ProfileView pattern (Form with LabeledContent)
 - Removed logo display from detail page
 - Changed subtitle layout to full-width VStack for proper text wrapping
@@ -72,14 +113,16 @@ Refined Events Browser UI to match iOS native patterns and updated theme to matc
 - Added PostgreSQL timestamp parser for API date format compatibility
 
 **Theme Updates:**
+
 - Applied global tint (`.tint(Color.Theme.primary)`) to root view for consistent theming
 - Updated theme colors from purple to neutral grayscale matching web design system
 - Primary: `#343434` (light) / `#DEDEDE` (dark) - neutral gray instead of purple
 - All 15 theme color assets updated to neutral palette
 
 **Files:**
+
 - Views: EventsHomeView.swift, EventDetailView.swift, EventRow.swift
-- Theme: SabaiPicsStudioApp.swift, Assets.xcassets/Colors/Theme*.colorset
+- Theme: SabaiPicsStudioApp.swift, Assets.xcassets/Colors/Theme\*.colorset
 - Utilities: DateFormatter+Extensions.swift
 - API: EventsAPIClient.swift (MainActor.run for Clerk session access)
 - Docs: IOS/EVENTS_BROWSER.md

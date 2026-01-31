@@ -272,9 +272,17 @@ private extension StandardEventSource {
         let deadline = Date().addingTimeInterval(35.0)
         let delayNs: UInt64 = 200_000_000 // 200ms
 
+        var lastLoggedValue: UInt16?
+        var attempt = 0
+
         while isMonitoring && Date() < deadline {
+            attempt += 1
             do {
                 if let value = try await session.getSonyObjectInMemoryValue() {
+                    if value != lastLoggedValue {
+                        print("[StandardEventSource] Sony objectInMemory=0x\(String(format: "%04X", value)) (attempt \(attempt))")
+                        lastLoggedValue = value
+                    }
                     // Rocc/libgphoto2: only safe when >= 0x8000; value can become 1 and downloading then can crash firmware.
                     if value >= 0x8000 {
                         return true
