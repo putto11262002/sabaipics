@@ -42,6 +42,9 @@ enum PTPOperationCode: UInt16 {
     // Sony Extensions
     case sonySDIOConnect = 0x9201
     case sonyGetSDIOGetExtDeviceInfo = 0x9202
+    case sonyGetDevicePropDesc = 0x9203
+    case sonyGetAllDevicePropData = 0x9209
+    case sonyUnknownHandshakeRequest = 0x920D
 
     /// Human-readable operation name for logging
     var name: String {
@@ -67,6 +70,9 @@ enum PTPOperationCode: UInt16 {
         case .canonEOSRemoteRelease: return "Canon_EOS_RemoteRelease"
         case .sonySDIOConnect: return "Sony_SDIOConnect"
         case .sonyGetSDIOGetExtDeviceInfo: return "Sony_GetSDIOGetExtDeviceInfo"
+        case .sonyGetDevicePropDesc: return "Sony_GetDevicePropDesc"
+        case .sonyGetAllDevicePropData: return "Sony_GetAllDevicePropData"
+        case .sonyUnknownHandshakeRequest: return "Sony_UnknownHandshakeRequest"
         }
     }
 }
@@ -339,11 +345,45 @@ struct PTPCommand {
     /// From libgphoto2: PTP_OC_SONY_GetSDIOGetExtDeviceInfo (0x9202) param 0xC8
     mutating func sonyGetSDIOGetExtDeviceInfo(param: UInt32 = 0x000000C8) -> PTPIPOperationRequest {
         return PTPIPOperationRequest(
-            // This opcode returns data (vendor prop/ops/event codes)
-            dataPhaseInfo: 2,
+            // Read op (camera -> host data)
+            dataPhaseInfo: 1,
             operationCode: PTPOperationCode.sonyGetSDIOGetExtDeviceInfo.rawValue,
             transactionID: nextTransactionID(),
             parameters: [param]
+        )
+    }
+
+    /// Build Sony GetDevicePropDesc command
+    /// Sony vendor variant of GetDevicePropDesc (0x9203)
+    mutating func sonyGetDevicePropDesc(propCode: UInt16) -> PTPIPOperationRequest {
+        return PTPIPOperationRequest(
+            // Read op (camera -> host data)
+            dataPhaseInfo: 1,
+            operationCode: PTPOperationCode.sonyGetDevicePropDesc.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: [UInt32(propCode)]
+        )
+    }
+
+    /// Build Sony GetAllDevicePropData command
+    /// - Parameter partial: 1 = only changed props, 0 = full
+    mutating func sonyGetAllDevicePropData(partial: Bool) -> PTPIPOperationRequest {
+        return PTPIPOperationRequest(
+            dataPhaseInfo: 1,
+            operationCode: PTPOperationCode.sonyGetAllDevicePropData.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: [partial ? 1 : 0]
+        )
+    }
+
+    /// Build Sony unknown handshake request (0x920D)
+    /// Rocc sends this after SDIO init.
+    mutating func sonyUnknownHandshakeRequest() -> PTPIPOperationRequest {
+        return PTPIPOperationRequest(
+            dataPhaseInfo: 1,
+            operationCode: PTPOperationCode.sonyUnknownHandshakeRequest.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: []
         )
     }
 
@@ -416,7 +456,7 @@ actor PTPTransactionManager {
     /// Note: `PTPCommand` can generate multiple transaction IDs internally.
     /// To prevent collisions between concurrent command builders, we reserve
     /// a block of IDs per builder.
-    func createCommand(reserve count: UInt32 = 32) async -> PTPCommand {
+    func createCommand(reserve count: UInt32 = 1) async -> PTPCommand {
         let start = nextID
         let increment = max(count, 1)
 
