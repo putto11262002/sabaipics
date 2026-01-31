@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, useApiClient, withAuth } from '../../lib/api';
 
 type QRSize = 'small' | 'medium' | 'large';
 
@@ -10,6 +10,8 @@ interface DownloadQRParams {
 }
 
 export function useDownloadQR() {
+  const { getToken } = useApiClient();
+
   return useMutation({
     mutationFn: async ({ eventId, eventName, size = 'medium' }: DownloadQRParams) => {
       const response = await api.events[':id']['qr-download'].$get(
@@ -17,11 +19,7 @@ export function useDownloadQR() {
           param: { id: eventId },
           query: { size },
         },
-        {
-          init: {
-            credentials: 'include',
-          },
-        },
+        await withAuth(getToken)
       );
 
       if (!response.ok) {

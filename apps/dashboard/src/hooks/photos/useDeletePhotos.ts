@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, useApiClient, withAuth } from '../../lib/api';
 import { type InferResponseType } from 'hono/client';
 
 const deletePhotos = api.events[':eventId'].photos.delete.$post;
@@ -13,6 +13,7 @@ interface DeletePhotosParams {
 
 export function useDeletePhotos() {
   const queryClient = useQueryClient();
+  const { getToken } = useApiClient();
 
   return useMutation({
     mutationFn: async ({ eventId, photoIds }: DeletePhotosParams) => {
@@ -21,11 +22,7 @@ export function useDeletePhotos() {
           param: { eventId },
           json: { photoIds },
         },
-        {
-          init: {
-            credentials: 'include',
-          },
-        },
+        await withAuth(getToken)
       );
 
       if (!res.ok) {
