@@ -472,3 +472,33 @@ actor PTPTransactionManager {
         return PTPCommand(sessionID: sessionID, initialTransactionID: start)
     }
 }
+
+// MARK: - Command Queue
+// Serializes command-channel send/receive transactions
+
+/// Serializes PTP/IP command-channel wire transactions to prevent interleaved
+/// send/receive operations on the shared PTP/IP command socket.
+///
+/// IMPORTANT:
+/// - Only wrap the actual wire transaction (send + receive).
+/// - Do not call other queued operations from inside a queued block.
+actor PTPIPCommandQueue {
+    private var tail: Task<Void, Never>?
+
+    func run<T>(_ operation: @escaping () async throws -> T) async throws -> T {
+        let previous = tail
+
+        let task = Task<T, Error> {
+            if let previous {
+                await previous.value
+            }
+            return try await operation()
+        }
+
+        tail = Task<Void, Never> {
+            _ = try? await task.value
+        }
+
+        return try await task.value
+    }
+}
