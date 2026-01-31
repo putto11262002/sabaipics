@@ -130,6 +130,8 @@ class PTPIPSession: NSObject {
     private let hostName: String
     private let guid: UUID
 
+    private let commandQueue = PTPIPCommandQueue()
+
     private let commandTimeout: TimeInterval = 10.0
 
     /// Initialize session
@@ -253,7 +255,7 @@ class PTPIPSession: NSObject {
 
         // Configure downloader
         if let downloader = photoDownloader, let txManager = transactionManager {
-            await downloader.configure(connection: commandConnection, transactionManager: txManager)
+            await downloader.configure(connection: commandConnection, transactionManager: txManager, commandQueue: commandQueue)
         }
 
         // Create and start appropriate event source based on camera vendor
@@ -326,7 +328,7 @@ class PTPIPSession: NSObject {
 
         // Configure downloader
         if let downloader = photoDownloader, let txManager = transactionManager {
-            await downloader.configure(connection: commandConnection, transactionManager: txManager)
+            await downloader.configure(connection: commandConnection, transactionManager: txManager, commandQueue: commandQueue)
         }
 
         // Create event source (but don't start monitoring yet)
@@ -459,15 +461,18 @@ class PTPIPSession: NSObject {
         PTPLogger.debug("Sending \(opCode.name) (\(PTPLogger.formatHex(sessionID))) [txID: \(openCommand.transactionID)]", category: PTPLogger.command)
         PTPLogger.breadcrumb("SendCommand: \(opCode.name)")
 
-        let startTime = Date()
+        let (response, duration) = try await commandQueue.run { [self] in
+            let startTime = Date()
 
-        // Send command
-        try await sendData(connection: connection, data: commandData)
+            // Send command
+            try await sendData(connection: connection, data: commandData)
 
-        // Read response
-        let response = try await receiveResponse(connection: connection, expectedTransactionID: openCommand.transactionID)
+            // Read response
+            let response = try await receiveResponse(connection: connection, expectedTransactionID: openCommand.transactionID)
 
-        let duration = Date().timeIntervalSince(startTime)
+            let duration = Date().timeIntervalSince(startTime)
+            return (response, duration)
+        }
 
         // Check response code
         guard let responseCode = PTPResponseCode(rawValue: response.responseCode),
@@ -495,11 +500,13 @@ class PTPIPSession: NSObject {
         let opCode = PTPOperationCode.closeSession
         PTPLogger.debug("Sending \(opCode.name) [txID: \(closeCommand.transactionID)]", category: PTPLogger.command)
 
-        // Send command
-        try await sendData(connection: connection, data: commandData)
+        try await commandQueue.run { [self] in
+            // Send command
+            try await sendData(connection: connection, data: commandData)
 
-        // Read response (may fail if camera already disconnected)
-        _ = try? await receiveResponse(connection: connection, expectedTransactionID: closeCommand.transactionID)
+            // Read response (may fail if camera already disconnected)
+            _ = try? await receiveResponse(connection: connection, expectedTransactionID: closeCommand.transactionID)
+        }
 
         PTPLogger.debug("\(opCode.name) sent", category: PTPLogger.command)
     }
@@ -578,26 +585,28 @@ class PTPIPSession: NSObject {
             return nil
         }
 
-        var command = await txManager.createCommand()
-        let request = command.sonyGetAllDevicePropData(partial: false)
-        let requestData = request.toData()
+        return try await commandQueue.run { [self] in
+            var command = await txManager.createCommand()
+            let request = command.sonyGetAllDevicePropData(partial: false)
+            let requestData = request.toData()
 
-        try await sendData(connection: connection, data: requestData)
+            try await sendData(connection: connection, data: requestData)
 
-        let response = try await receiveDataResponse(
-            connection: connection,
-            expectedTransactionID: request.transactionID
-        )
+            let response = try await receiveDataResponse(
+                connection: connection,
+                expectedTransactionID: request.transactionID
+            )
 
-        if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
-            return nil
+            if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
+                return nil
+            }
+
+            guard let data = response.data else {
+                return nil
+            }
+
+            return parseSonyAllDevicePropDataCurrentValue(data, targetPropCode: propCode)
         }
-
-        guard let data = response.data else {
-            return nil
-        }
-
-        return parseSonyAllDevicePropDataCurrentValue(data, targetPropCode: propCode)
     }
 
     private func parseSonyAllDevicePropDataCurrentValue(_ data: Data, targetPropCode: UInt16) -> UInt16? {
@@ -740,29 +749,32 @@ class PTPIPSession: NSObject {
             throw PTPIPSessionError.notConnected
         }
 
-        // Create GetObjectInfo command
-        var command = await txManager.createCommand()
-        let getObjectInfoCmd = command.getObjectInfo(handle: objectHandle)
-        let commandData = getObjectInfoCmd.toData()
+        return try await commandQueue.run { [self] in
 
-        // Send command
-        try await sendData(connection: connection, data: commandData)
+            // Create GetObjectInfo command
+            var command = await txManager.createCommand()
+            let getObjectInfoCmd = command.getObjectInfo(handle: objectHandle)
+            let commandData = getObjectInfoCmd.toData()
 
-        // Receive response with data (ObjectInfo is returned as data)
-        let response = try await receiveDataResponse(
-            connection: connection,
-            expectedTransactionID: getObjectInfoCmd.transactionID
-        )
+            // Send command
+            try await sendData(connection: connection, data: commandData)
 
-        guard let objectInfoData = response.data else {
-            throw PTPIPSessionError.invalidResponse
+            // Receive response with data (ObjectInfo is returned as data)
+            let response = try await receiveDataResponse(
+                connection: connection,
+                expectedTransactionID: getObjectInfoCmd.transactionID
+            )
+
+            guard let objectInfoData = response.data else {
+                throw PTPIPSessionError.invalidResponse
+            }
+
+            guard let objectInfo = PTPObjectInfo.from(objectInfoData) else {
+                throw PTPIPSessionError.invalidResponse
+            }
+
+            return objectInfo
         }
-
-        guard let objectInfo = PTPObjectInfo.from(objectInfoData) else {
-            throw PTPIPSessionError.invalidResponse
-        }
-
-        return objectInfo
     }
 
     /// Get storage IDs
@@ -773,29 +785,32 @@ class PTPIPSession: NSObject {
             throw PTPIPSessionError.notConnected
         }
 
-        var command = await txManager.createCommand()
-        let getStorageIDsCmd = command.getStorageIDs()
-        let commandData = getStorageIDsCmd.toData()
+        let storageIDs: [UInt32] = try await commandQueue.run { [self] in
+            var command = await txManager.createCommand()
+            let getStorageIDsCmd = command.getStorageIDs()
+            let commandData = getStorageIDsCmd.toData()
 
-        try await sendData(connection: connection, data: commandData)
+            try await sendData(connection: connection, data: commandData)
 
-        let response = try await receiveDataResponse(
-            connection: connection,
-            expectedTransactionID: getStorageIDsCmd.transactionID
-        )
+            let response = try await receiveDataResponse(
+                connection: connection,
+                expectedTransactionID: getStorageIDsCmd.transactionID
+            )
 
-        if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
-            print("[PTPIPSession] GetStorageIDs failed: \(responseCode.name) (0x\(String(format: "%04X", response.response.responseCode)))")
-            return []
+            if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
+                print("[PTPIPSession] GetStorageIDs failed: \(responseCode.name) (0x\(String(format: "%04X", response.response.responseCode)))")
+                return [UInt32]()
+            }
+
+            guard let data = response.data else {
+                print("[PTPIPSession] GetStorageIDs returned no data")
+                return [UInt32]()
+            }
+
+            print("[PTPIPSession] GetStorageIDs raw: \(formatHexBytes(data, limit: 64))")
+            return parseUInt32List(data)
         }
 
-        guard let data = response.data else {
-            print("[PTPIPSession] GetStorageIDs returned no data")
-            return []
-        }
-
-        print("[PTPIPSession] GetStorageIDs raw: \(formatHexBytes(data, limit: 64))")
-        let storageIDs = parseUInt32List(data)
         print("[PTPIPSession] GetStorageIDs -> count=\(storageIDs.count) ids=\(storageIDs.map { String(format: "0x%08X", $0) }.joined(separator: ", "))")
 
         for storageID in storageIDs {
@@ -811,16 +826,18 @@ class PTPIPSession: NSObject {
             throw PTPIPSessionError.notConnected
         }
 
-        var command = await txManager.createCommand()
-        let getStorageInfoCmd = command.getStorageInfo(storageID: storageID)
-        let commandData = getStorageInfoCmd.toData()
+        return try await commandQueue.run { [self] in
+            var command = await txManager.createCommand()
+            let getStorageInfoCmd = command.getStorageInfo(storageID: storageID)
+            let commandData = getStorageInfoCmd.toData()
 
-        try await sendData(connection: connection, data: commandData)
+            try await sendData(connection: connection, data: commandData)
 
-        return try await receiveDataResponse(
-            connection: connection,
-            expectedTransactionID: getStorageInfoCmd.transactionID
-        )
+            return try await receiveDataResponse(
+                connection: connection,
+                expectedTransactionID: getStorageInfoCmd.transactionID
+            )
+        }
     }
 
     /// Get object handles for a storage ID
@@ -831,79 +848,81 @@ class PTPIPSession: NSObject {
             throw PTPIPSessionError.notConnected
         }
 
-        var command = await txManager.createCommand()
-        let getHandlesCmd = command.getObjectHandles(storageID: storageID, associationObject: 0xFFFFFFFF)
-        print("[PTPIPSession] GetObjectHandles storageID=0x\(String(format: "%08X", storageID)) parent=0xFFFFFFFF")
-        let commandData = getHandlesCmd.toData()
+        return try await commandQueue.run { [self] in
+            var command = await txManager.createCommand()
+            let getHandlesCmd = command.getObjectHandles(storageID: storageID, associationObject: 0xFFFFFFFF)
+            print("[PTPIPSession] GetObjectHandles storageID=0x\(String(format: "%08X", storageID)) parent=0xFFFFFFFF")
+            let commandData = getHandlesCmd.toData()
 
-        try await sendData(connection: connection, data: commandData)
+            try await sendData(connection: connection, data: commandData)
 
-        let response = try await receiveDataResponse(
-            connection: connection,
-            expectedTransactionID: getHandlesCmd.transactionID
-        )
+            let response = try await receiveDataResponse(
+                connection: connection,
+                expectedTransactionID: getHandlesCmd.transactionID
+            )
 
-        if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
-            print("[PTPIPSession] GetObjectHandles failed: \(responseCode.name) (0x\(String(format: "%04X", response.response.responseCode)))")
+            if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
+                print("[PTPIPSession] GetObjectHandles failed: \(responseCode.name) (0x\(String(format: "%04X", response.response.responseCode)))")
 
-            if responseCode == .storeNotAvailable {
-                let adjustedStorageID = storageID | 0x00000001
-                if adjustedStorageID != storageID {
-                    print("[PTPIPSession] Retrying GetObjectHandles with storageID=0x\(String(format: "%08X", adjustedStorageID))")
-                    var adjustedCommand = await txManager.createCommand()
-                    let adjusted = adjustedCommand.getObjectHandles(storageID: adjustedStorageID, associationObject: 0xFFFFFFFF)
-                    let adjustedData = adjusted.toData()
-                    try await sendData(connection: connection, data: adjustedData)
+                if responseCode == .storeNotAvailable {
+                    let adjustedStorageID = storageID | 0x00000001
+                    if adjustedStorageID != storageID {
+                        print("[PTPIPSession] Retrying GetObjectHandles with storageID=0x\(String(format: "%08X", adjustedStorageID))")
+                        var adjustedCommand = await txManager.createCommand()
+                        let adjusted = adjustedCommand.getObjectHandles(storageID: adjustedStorageID, associationObject: 0xFFFFFFFF)
+                        let adjustedData = adjusted.toData()
+                        try await sendData(connection: connection, data: adjustedData)
 
-                    let adjustedResponse = try await receiveDataResponse(
+                        let adjustedResponse = try await receiveDataResponse(
+                            connection: connection,
+                            expectedTransactionID: adjusted.transactionID
+                        )
+
+                        if let adjustedCode = PTPResponseCode(rawValue: adjustedResponse.response.responseCode), !adjustedCode.isSuccess {
+                            print("[PTPIPSession] Adjusted GetObjectHandles failed: \(adjustedCode.name) (0x\(String(format: "%04X", adjustedResponse.response.responseCode)))")
+                        } else if let data = adjustedResponse.data {
+                            let handles = parseUInt32List(data)
+                            print("[PTPIPSession] Adjusted GetObjectHandles -> count=\(handles.count)")
+                            return handles
+                        }
+                    }
+
+                    print("[PTPIPSession] Retrying GetObjectHandles with storageID=0x00000000")
+                    var fallbackCommand = await txManager.createCommand()
+                    let fallback = fallbackCommand.getObjectHandles(storageID: 0x00000000, associationObject: 0xFFFFFFFF)
+                    let fallbackData = fallback.toData()
+                    try await sendData(connection: connection, data: fallbackData)
+
+                    let fallbackResponse = try await receiveDataResponse(
                         connection: connection,
-                        expectedTransactionID: adjusted.transactionID
+                        expectedTransactionID: fallback.transactionID
                     )
 
-                    if let adjustedCode = PTPResponseCode(rawValue: adjustedResponse.response.responseCode), !adjustedCode.isSuccess {
-                        print("[PTPIPSession] Adjusted GetObjectHandles failed: \(adjustedCode.name) (0x\(String(format: "%04X", adjustedResponse.response.responseCode)))")
-                    } else if let data = adjustedResponse.data {
+                    if let fallbackCode = PTPResponseCode(rawValue: fallbackResponse.response.responseCode), !fallbackCode.isSuccess {
+                        print("[PTPIPSession] Fallback GetObjectHandles failed: \(fallbackCode.name) (0x\(String(format: "%04X", fallbackResponse.response.responseCode)))")
+                        return []
+                    }
+
+                    if let data = fallbackResponse.data {
                         let handles = parseUInt32List(data)
-                        print("[PTPIPSession] Adjusted GetObjectHandles -> count=\(handles.count)")
+                        print("[PTPIPSession] Fallback GetObjectHandles -> count=\(handles.count)")
                         return handles
                     }
-                }
-
-                print("[PTPIPSession] Retrying GetObjectHandles with storageID=0x00000000")
-                var fallbackCommand = await txManager.createCommand()
-                let fallback = fallbackCommand.getObjectHandles(storageID: 0x00000000, associationObject: 0xFFFFFFFF)
-                let fallbackData = fallback.toData()
-                try await sendData(connection: connection, data: fallbackData)
-
-                let fallbackResponse = try await receiveDataResponse(
-                    connection: connection,
-                    expectedTransactionID: fallback.transactionID
-                )
-
-                if let fallbackCode = PTPResponseCode(rawValue: fallbackResponse.response.responseCode), !fallbackCode.isSuccess {
-                    print("[PTPIPSession] Fallback GetObjectHandles failed: \(fallbackCode.name) (0x\(String(format: "%04X", fallbackResponse.response.responseCode)))")
                     return []
                 }
 
-                if let data = fallbackResponse.data {
-                    let handles = parseUInt32List(data)
-                    print("[PTPIPSession] Fallback GetObjectHandles -> count=\(handles.count)")
-                    return handles
-                }
                 return []
             }
 
-            return []
-        }
+            guard let data = response.data else {
+                print("[PTPIPSession] GetObjectHandles returned no data")
+                return []
+            }
 
-        guard let data = response.data else {
-            print("[PTPIPSession] GetObjectHandles returned no data")
-            return []
+            let handles = parseUInt32List(data)
+            print("[PTPIPSession] GetObjectHandles -> count=\(handles.count)")
+            return handles
         }
-
-        let handles = parseUInt32List(data)
-        print("[PTPIPSession] GetObjectHandles -> count=\(handles.count)")
-        return handles
     }
 
     /// Receive response with data packets (Start/Data/End) followed by OperationResponse
@@ -994,101 +1013,103 @@ class PTPIPSession: NSObject {
             throw PTPIPSessionError.notConnected
         }
 
-        // Reserve exactly the number of op requests we issue here.
-        // Keep transaction IDs contiguous for Sony.
-        var command = await txManager.createCommand(reserve: 5)
+        try await commandQueue.run { [self] in
+            // Reserve exactly the number of op requests we issue here.
+            // Keep transaction IDs contiguous for Sony.
+            var command = await txManager.createCommand(reserve: 5)
 
-        // libgphoto2 sequence for Sony PTP/IP mode:
-        // 1) SDIOConnect(1)
-        // 2) SDIOConnect(2)
-        // 3) GetSDIOGetExtDeviceInfo(0xC8)
-        // 4) SDIOConnect(3)
+            // libgphoto2 sequence for Sony PTP/IP mode:
+            // 1) SDIOConnect(1)
+            // 2) SDIOConnect(2)
+            // 3) GetSDIOGetExtDeviceInfo(0xC8)
+            // 4) SDIOConnect(3)
 
-        for step in [UInt32(1), UInt32(2)] {
-            let sdioCommand = command.sonySDIOConnect(p1: step)
-            let commandData = sdioCommand.toData()
+            for step in [UInt32(1), UInt32(2)] {
+                let sdioCommand = command.sonySDIOConnect(p1: step)
+                let commandData = sdioCommand.toData()
 
-            print("[PTPIPSession] Sony SDIOConnect step=\(step)")
-            try await sendData(connection: connection, data: commandData)
+                print("[PTPIPSession] Sony SDIOConnect step=\(step)")
+                try await sendData(connection: connection, data: commandData)
 
-            let response = try await receiveDataResponse(
-                connection: connection,
-                expectedTransactionID: sdioCommand.transactionID
-            )
+                let response = try await receiveDataResponse(
+                    connection: connection,
+                    expectedTransactionID: sdioCommand.transactionID
+                )
 
-            let code = response.response.responseCode
-            if let responseCode = PTPResponseCode(rawValue: code), !responseCode.isSuccess {
-                print("[PTPIPSession] Sony SDIOConnect step=\(step) failed: \(responseCode.name) (0x\(String(format: "%04X", code)))")
-            } else if code != PTPResponseCode.ok.rawValue {
-                print("[PTPIPSession] Sony SDIOConnect step=\(step) returned: 0x\(String(format: "%04X", code))")
-            }
-        }
-
-        do {
-            let extInfoCmd = command.sonyGetSDIOGetExtDeviceInfo(param: 0x000000C8)
-            let extInfoData = extInfoCmd.toData()
-
-            print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo (0xC8)")
-            try await sendData(connection: connection, data: extInfoData)
-
-            let extResponse = try await receiveDataResponse(
-                connection: connection,
-                expectedTransactionID: extInfoCmd.transactionID
-            )
-
-            let code = extResponse.response.responseCode
-            if let responseCode = PTPResponseCode(rawValue: code), !responseCode.isSuccess {
-                print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo failed: \(responseCode.name) (0x\(String(format: "%04X", code)))")
-            } else if code != PTPResponseCode.ok.rawValue {
-                print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo returned: 0x\(String(format: "%04X", code))")
+                let code = response.response.responseCode
+                if let responseCode = PTPResponseCode(rawValue: code), !responseCode.isSuccess {
+                    print("[PTPIPSession] Sony SDIOConnect step=\(step) failed: \(responseCode.name) (0x\(String(format: "%04X", code)))")
+                } else if code != PTPResponseCode.ok.rawValue {
+                    print("[PTPIPSession] Sony SDIOConnect step=\(step) returned: 0x\(String(format: "%04X", code))")
+                }
             }
 
-            if let data = extResponse.data {
-                print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo data: \(data.count) bytes")
-            } else {
-                print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo data: (none)")
+            do {
+                let extInfoCmd = command.sonyGetSDIOGetExtDeviceInfo(param: 0x000000C8)
+                let extInfoData = extInfoCmd.toData()
+
+                print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo (0xC8)")
+                try await sendData(connection: connection, data: extInfoData)
+
+                let extResponse = try await receiveDataResponse(
+                    connection: connection,
+                    expectedTransactionID: extInfoCmd.transactionID
+                )
+
+                let code = extResponse.response.responseCode
+                if let responseCode = PTPResponseCode(rawValue: code), !responseCode.isSuccess {
+                    print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo failed: \(responseCode.name) (0x\(String(format: "%04X", code)))")
+                } else if code != PTPResponseCode.ok.rawValue {
+                    print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo returned: 0x\(String(format: "%04X", code))")
+                }
+
+                if let data = extResponse.data {
+                    print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo data: \(data.count) bytes")
+                } else {
+                    print("[PTPIPSession] Sony GetSDIOGetExtDeviceInfo data: (none)")
+                }
             }
-        }
 
-        // Finalize SDIO
-        do {
-            let sdioCommand = command.sonySDIOConnect(p1: 3)
-            let commandData = sdioCommand.toData()
+            // Finalize SDIO
+            do {
+                let sdioCommand = command.sonySDIOConnect(p1: 3)
+                let commandData = sdioCommand.toData()
 
-            print("[PTPIPSession] Sony SDIOConnect step=3")
-            try await sendData(connection: connection, data: commandData)
+                print("[PTPIPSession] Sony SDIOConnect step=3")
+                try await sendData(connection: connection, data: commandData)
 
-            let response = try await receiveDataResponse(
-                connection: connection,
-                expectedTransactionID: sdioCommand.transactionID
-            )
+                let response = try await receiveDataResponse(
+                    connection: connection,
+                    expectedTransactionID: sdioCommand.transactionID
+                )
 
-            let code = response.response.responseCode
-            if let responseCode = PTPResponseCode(rawValue: code), !responseCode.isSuccess {
-                print("[PTPIPSession] Sony SDIOConnect step=3 failed: \(responseCode.name) (0x\(String(format: "%04X", code)))")
-            } else if code != PTPResponseCode.ok.rawValue {
-                print("[PTPIPSession] Sony SDIOConnect step=3 returned: 0x\(String(format: "%04X", code))")
+                let code = response.response.responseCode
+                if let responseCode = PTPResponseCode(rawValue: code), !responseCode.isSuccess {
+                    print("[PTPIPSession] Sony SDIOConnect step=3 failed: \(responseCode.name) (0x\(String(format: "%04X", code)))")
+                } else if code != PTPResponseCode.ok.rawValue {
+                    print("[PTPIPSession] Sony SDIOConnect step=3 returned: 0x\(String(format: "%04X", code))")
+                }
             }
-        }
 
-        // Rocc performs an extra Sony handshake request after SDIO init.
-        do {
-            let handshake = command.sonyUnknownHandshakeRequest()
-            let handshakeData = handshake.toData()
+            // Rocc performs an extra Sony handshake request after SDIO init.
+            do {
+                let handshake = command.sonyUnknownHandshakeRequest()
+                let handshakeData = handshake.toData()
 
-            print("[PTPIPSession] Sony UnknownHandshakeRequest (0x920D)")
-            try await sendData(connection: connection, data: handshakeData)
+                print("[PTPIPSession] Sony UnknownHandshakeRequest (0x920D)")
+                try await sendData(connection: connection, data: handshakeData)
 
-            let response = try await receiveDataResponse(
-                connection: connection,
-                expectedTransactionID: handshake.transactionID
-            )
+                let response = try await receiveDataResponse(
+                    connection: connection,
+                    expectedTransactionID: handshake.transactionID
+                )
 
-            let code = response.response.responseCode
-            if let responseCode = PTPResponseCode(rawValue: code), !responseCode.isSuccess {
-                print("[PTPIPSession] Sony UnknownHandshakeRequest failed: \(responseCode.name) (0x\(String(format: "%04X", code)))")
-            } else if code != PTPResponseCode.ok.rawValue {
-                print("[PTPIPSession] Sony UnknownHandshakeRequest returned: 0x\(String(format: "%04X", code))")
+                let code = response.response.responseCode
+                if let responseCode = PTPResponseCode(rawValue: code), !responseCode.isSuccess {
+                    print("[PTPIPSession] Sony UnknownHandshakeRequest failed: \(responseCode.name) (0x\(String(format: "%04X", code)))")
+                } else if code != PTPResponseCode.ok.rawValue {
+                    print("[PTPIPSession] Sony UnknownHandshakeRequest returned: 0x\(String(format: "%04X", code))")
+                }
             }
         }
     }
@@ -1149,29 +1170,50 @@ class PTPIPSession: NSObject {
     /// Wait for event connection to reach ready state
     private func waitForEventConnection(_ connection: NWConnection, timeout: TimeInterval) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let lock = OSAllocatedUnfairLock()
             var resumed = false
 
             // Timeout task
             let timeoutTask = Task {
                 try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                guard !resumed else { return }
-                resumed = true
-                continuation.resume(throwing: PTPIPSessionError.connectionFailed)
+                var shouldResume = false
+                lock.withLock {
+                    guard !resumed else { return }
+                    resumed = true
+                    shouldResume = true
+                }
+                if shouldResume {
+                    continuation.resume(throwing: PTPIPSessionError.connectionFailed)
+                }
             }
 
             connection.stateUpdateHandler = { state in
-                guard !resumed else { return }
-                switch state {
-                case .ready:
-                    resumed = true
-                    timeoutTask.cancel()
+                var shouldResume = false
+                var resumeOK = false
+                var resumeError: Error?
+
+                lock.withLock {
+                    guard !resumed else { return }
+                    switch state {
+                    case .ready:
+                        resumed = true
+                        shouldResume = true
+                        resumeOK = true
+                    case .failed(let error):
+                        resumed = true
+                        shouldResume = true
+                        resumeError = error
+                    default:
+                        break
+                    }
+                }
+
+                guard shouldResume else { return }
+                timeoutTask.cancel()
+                if resumeOK {
                     continuation.resume()
-                case .failed(let error):
-                    resumed = true
-                    timeoutTask.cancel()
-                    continuation.resume(throwing: error)
-                default:
-                    break
+                } else if let resumeError {
+                    continuation.resume(throwing: resumeError)
                 }
             }
         }
@@ -1292,57 +1334,60 @@ class PTPIPSession: NSObject {
             throw PTPIPSessionError.notConnected
         }
 
-        var command = await txManager.createCommand()
-        // Sony often requires the vendor variant of GetDevicePropDesc (0x9203).
-        let request = isSonyPTPIP
-            ? command.sonyGetDevicePropDesc(propCode: propCode)
-            : command.getDevicePropDesc(propCode: propCode)
-        let requestData = request.toData()
+        return try await commandQueue.run { [self] in
 
-        try await sendData(connection: connection, data: requestData)
+            var command = await txManager.createCommand()
+            // Sony often requires the vendor variant of GetDevicePropDesc (0x9203).
+            let request = isSonyPTPIP
+                ? command.sonyGetDevicePropDesc(propCode: propCode)
+                : command.getDevicePropDesc(propCode: propCode)
+            let requestData = request.toData()
 
-        let response = try await receiveDataResponse(
-            connection: connection,
-            expectedTransactionID: request.transactionID
-        )
+            try await sendData(connection: connection, data: requestData)
 
-        if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
-            print("[PTPIPSession] GetDevicePropDesc 0x\(String(format: "%04X", propCode)) failed: \(responseCode.name) (0x\(String(format: "%04X", response.response.responseCode)))")
+            let response = try await receiveDataResponse(
+                connection: connection,
+                expectedTransactionID: request.transactionID
+            )
 
-            // Fallback: if Sony vendor opcode failed, try standard opcode once.
-            if isSonyPTPIP {
-                var fallbackCommand = await txManager.createCommand()
-                let fallback = fallbackCommand.getDevicePropDesc(propCode: propCode)
-                let fallbackData = fallback.toData()
-                try await sendData(connection: connection, data: fallbackData)
+            if let responseCode = PTPResponseCode(rawValue: response.response.responseCode), !responseCode.isSuccess {
+                print("[PTPIPSession] GetDevicePropDesc 0x\(String(format: "%04X", propCode)) failed: \(responseCode.name) (0x\(String(format: "%04X", response.response.responseCode)))")
 
-                let fallbackResponse = try await receiveDataResponse(
-                    connection: connection,
-                    expectedTransactionID: fallback.transactionID
-                )
+                // Fallback: if Sony vendor opcode failed, try standard opcode once.
+                if isSonyPTPIP {
+                    var fallbackCommand = await txManager.createCommand()
+                    let fallback = fallbackCommand.getDevicePropDesc(propCode: propCode)
+                    let fallbackData = fallback.toData()
+                    try await sendData(connection: connection, data: fallbackData)
 
-                if let fallbackCode = PTPResponseCode(rawValue: fallbackResponse.response.responseCode), !fallbackCode.isSuccess {
-                    print("[PTPIPSession] GetDevicePropDesc fallback 0x\(String(format: "%04X", propCode)) failed: \(fallbackCode.name) (0x\(String(format: "%04X", fallbackResponse.response.responseCode)))")
-                    return nil
+                    let fallbackResponse = try await receiveDataResponse(
+                        connection: connection,
+                        expectedTransactionID: fallback.transactionID
+                    )
+
+                    if let fallbackCode = PTPResponseCode(rawValue: fallbackResponse.response.responseCode), !fallbackCode.isSuccess {
+                        print("[PTPIPSession] GetDevicePropDesc fallback 0x\(String(format: "%04X", propCode)) failed: \(fallbackCode.name) (0x\(String(format: "%04X", fallbackResponse.response.responseCode)))")
+                        return nil
+                    }
+
+                    guard let data = fallbackResponse.data else {
+                        print("[PTPIPSession] GetDevicePropDesc fallback 0x\(String(format: "%04X", propCode)) returned no data")
+                        return nil
+                    }
+
+                    return parseDevicePropDescCurrentValue(data, expectedPropCode: propCode)
                 }
 
-                guard let data = fallbackResponse.data else {
-                    print("[PTPIPSession] GetDevicePropDesc fallback 0x\(String(format: "%04X", propCode)) returned no data")
-                    return nil
-                }
-
-                return parseDevicePropDescCurrentValue(data, expectedPropCode: propCode)
+                return nil
             }
 
-            return nil
-        }
+            guard let data = response.data else {
+                print("[PTPIPSession] GetDevicePropDesc 0x\(String(format: "%04X", propCode)) returned no data")
+                return nil
+            }
 
-        guard let data = response.data else {
-            print("[PTPIPSession] GetDevicePropDesc 0x\(String(format: "%04X", propCode)) returned no data")
-            return nil
+            return parseDevicePropDescCurrentValue(data, expectedPropCode: propCode)
         }
-
-        return parseDevicePropDescCurrentValue(data, expectedPropCode: propCode)
     }
 
     private func parseDevicePropDescCurrentValue(_ data: Data, expectedPropCode: UInt16) -> UInt32? {
@@ -1447,6 +1492,7 @@ class PTPIPSession: NSObject {
             return CanonEventSource(
                 commandConnection: commandConnection,
                 transactionManager: transactionManager,
+                commandQueue: commandQueue,
                 photoOps: self
             )
 

@@ -44,6 +44,7 @@ enum PTPIPPhotoDownloaderError: LocalizedError {
 actor PTPIPPhotoDownloader {
     private var commandConnection: NWConnection?
     private var transactionManager: PTPTransactionManager?
+    private var commandQueue: PTPIPCommandQueue?
 
     private let commandTimeout: TimeInterval = 60.0  // 60s for large photo downloads
 
@@ -55,9 +56,10 @@ actor PTPIPPhotoDownloader {
     /// - Parameters:
     ///   - connection: Active NWConnection for command channel
     ///   - transactionManager: Transaction ID manager
-    func configure(connection: NWConnection, transactionManager: PTPTransactionManager) async {
+    func configure(connection: NWConnection, transactionManager: PTPTransactionManager, commandQueue: PTPIPCommandQueue) async {
         self.commandConnection = connection
         self.transactionManager = transactionManager
+        self.commandQueue = commandQueue
     }
 
     /// Download photo by object handle
@@ -70,38 +72,45 @@ actor PTPIPPhotoDownloader {
             throw PTPIPPhotoDownloaderError.notConnected
         }
 
-        PTPLogger.info("Downloading object \(PTPLogger.formatHex(objectHandle))", category: PTPLogger.command)
-
-        // Build GetObject command
-        var command = await txManager.createCommand()
-        let getObjectCommand = command.getObject(handle: objectHandle)
-        let expectedTransactionID = getObjectCommand.transactionID
-
-        let startTime = Date()
-
-        // Send command
-        let commandData = getObjectCommand.toData()
-        try await sendData(connection: connection, data: commandData)
-
-        // Receive data packets
-        let photoData = try await receiveDataPackets(connection: connection)
-
-        // Receive operation response with transaction ID validation
-        let response = try await receiveResponse(connection: connection, expectedTransactionID: expectedTransactionID)
-        guard let responseCode = PTPResponseCode(rawValue: response.responseCode),
-              responseCode.isSuccess else {
-            PTPLogger.error("Download failed: \(PTPResponseCode(rawValue: response.responseCode)?.name ?? "Unknown")", category: PTPLogger.command)
-            throw PTPIPPhotoDownloaderError.downloadFailed(
-                PTPResponseCode(rawValue: response.responseCode) ?? .generalError
-            )
+        guard let commandQueue = commandQueue else {
+            throw PTPIPPhotoDownloaderError.notConnected
         }
 
-        let duration = Date().timeIntervalSince(startTime)
-        let throughput = PTPLogger.formatThroughput(bytes: photoData.count, duration: duration)
+        PTPLogger.info("Downloading object \(PTPLogger.formatHex(objectHandle))", category: PTPLogger.command)
 
-        PTPLogger.info("Download complete: \(PTPLogger.formatSize(photoData.count)) in \(PTPLogger.formatDuration(duration)) (\(throughput))", category: PTPLogger.command)
+        return try await commandQueue.run {
+            // Build GetObject command
+            var command = await txManager.createCommand()
+            let getObjectCommand = command.getObject(handle: objectHandle)
+            let expectedTransactionID = getObjectCommand.transactionID
 
-        return photoData
+            let startTime = Date()
+
+            // Send command
+            let commandData = getObjectCommand.toData()
+            try await self.sendData(connection: connection, data: commandData)
+
+            // Receive data packets
+            let photoData = try await self.receiveDataPackets(connection: connection)
+
+            // Receive operation response with transaction ID validation
+            let response = try await self.receiveResponse(connection: connection, expectedTransactionID: expectedTransactionID)
+            guard let responseCode = PTPResponseCode(rawValue: response.responseCode),
+                  responseCode.isSuccess else {
+                let responseName = PTPResponseCode(rawValue: response.responseCode)?.name ?? "Unknown"
+                PTPLogger.error("Download failed: \(responseName)", category: PTPLogger.command)
+                throw PTPIPPhotoDownloaderError.downloadFailed(
+                    PTPResponseCode(rawValue: response.responseCode) ?? .generalError
+                )
+            }
+
+            let duration = Date().timeIntervalSince(startTime)
+            let throughput = PTPLogger.formatThroughput(bytes: photoData.count, duration: duration)
+
+            PTPLogger.info("Download complete: \(PTPLogger.formatSize(photoData.count)) in \(PTPLogger.formatDuration(duration)) (\(throughput))", category: PTPLogger.command)
+
+            return photoData
+        }
     }
 
     /// Download a partial object range (Sony-friendly)
@@ -112,37 +121,43 @@ actor PTPIPPhotoDownloader {
             throw PTPIPPhotoDownloaderError.notConnected
         }
 
+        guard let commandQueue = commandQueue else {
+            throw PTPIPPhotoDownloaderError.notConnected
+        }
+
         PTPLogger.info(
             "Downloading partial object \(PTPLogger.formatHex(objectHandle)) offset=\(offset) maxBytes=\(maxBytes)",
             category: PTPLogger.command
         )
 
-        var command = await txManager.createCommand()
-        let request = command.getPartialObject(handle: objectHandle, offset: offset, maxBytes: maxBytes)
-        let expectedTransactionID = request.transactionID
-        let startTime = Date()
+        return try await commandQueue.run {
+            var command = await txManager.createCommand()
+            let request = command.getPartialObject(handle: objectHandle, offset: offset, maxBytes: maxBytes)
+            let expectedTransactionID = request.transactionID
+            let startTime = Date()
 
-        let commandData = request.toData()
-        try await sendData(connection: connection, data: commandData)
+            let commandData = request.toData()
+            try await self.sendData(connection: connection, data: commandData)
 
-        let objectData = try await receiveDataPackets(connection: connection)
+            let objectData = try await self.receiveDataPackets(connection: connection)
 
-        let response = try await receiveResponse(connection: connection, expectedTransactionID: expectedTransactionID)
-        guard let responseCode = PTPResponseCode(rawValue: response.responseCode),
-              responseCode.isSuccess else {
-            throw PTPIPPhotoDownloaderError.downloadFailed(
-                PTPResponseCode(rawValue: response.responseCode) ?? .generalError
+            let response = try await self.receiveResponse(connection: connection, expectedTransactionID: expectedTransactionID)
+            guard let responseCode = PTPResponseCode(rawValue: response.responseCode),
+                  responseCode.isSuccess else {
+                throw PTPIPPhotoDownloaderError.downloadFailed(
+                    PTPResponseCode(rawValue: response.responseCode) ?? .generalError
+                )
+            }
+
+            let duration = Date().timeIntervalSince(startTime)
+            let throughput = PTPLogger.formatThroughput(bytes: objectData.count, duration: duration)
+            PTPLogger.info(
+                "Partial download complete: \(PTPLogger.formatSize(objectData.count)) in \(PTPLogger.formatDuration(duration)) (\(throughput))",
+                category: PTPLogger.command
             )
+
+            return objectData
         }
-
-        let duration = Date().timeIntervalSince(startTime)
-        let throughput = PTPLogger.formatThroughput(bytes: objectData.count, duration: duration)
-        PTPLogger.info(
-            "Partial download complete: \(PTPLogger.formatSize(objectData.count)) in \(PTPLogger.formatDuration(duration)) (\(throughput))",
-            category: PTPLogger.command
-        )
-
-        return objectData
     }
 
     /// Receive data packets and reassemble
