@@ -30,6 +30,21 @@ struct ContentView: View {
                     .transition(.opacity)
                     .id("sony-entry")
 
+            case .sonyNewCameraDecision:
+                SonyAPNewCameraDecisionView(
+                    onScanQR: { captureFlow.startSonySetup() },
+                    onAlreadyOnWiFi: { captureFlow.proceedToDiscovery() },
+                    onEnterSSID: { captureFlow.startSonySSIDStub() },
+                    onManualIP: { captureFlow.skipToManualEntry() }
+                )
+                .transition(.opacity)
+                .id("sony-new-camera-decision")
+
+            case .sonySSIDJoinStub:
+                SonyAPSSIDJoinView()
+                    .transition(.opacity)
+                    .id("sony-ssid-stub")
+
             case .hotspotSetup:
                 if captureFlow.selectedManufacturer == .sony {
                     SonyAPSetupView()

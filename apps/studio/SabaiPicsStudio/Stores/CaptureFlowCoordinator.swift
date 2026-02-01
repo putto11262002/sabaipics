@@ -19,6 +19,8 @@ class CaptureFlowCoordinator: ObservableObject {
     enum State: Equatable {
         case manufacturerSelection
         case sonyEntry
+        case sonyNewCameraDecision
+        case sonySSIDJoinStub
         case hotspotSetup
         case discovering
         case manualIPEntry
@@ -32,6 +34,8 @@ class CaptureFlowCoordinator: ObservableObject {
             switch (lhs, rhs) {
             case (.manufacturerSelection, .manufacturerSelection),
                  (.sonyEntry, .sonyEntry),
+                 (.sonyNewCameraDecision, .sonyNewCameraDecision),
+                 (.sonySSIDJoinStub, .sonySSIDJoinStub),
                  (.hotspotSetup, .hotspotSetup),
                  (.discovering, .discovering),
                  (.manualIPEntry, .manualIPEntry),
@@ -102,6 +106,18 @@ class CaptureFlowCoordinator: ObservableObject {
         print("[CaptureFlowCoordinator] Sony: starting setup wizard")
         preferredSonyRecordID = nil
         state = .hotspotSetup
+    }
+
+    func startSonyNewCamera() {
+        print("[CaptureFlowCoordinator] Sony: new camera decision")
+        preferredSonyRecordID = nil
+        state = .sonyNewCameraDecision
+    }
+
+    func startSonySSIDStub() {
+        print("[CaptureFlowCoordinator] Sony: SSID join stub")
+        preferredSonyRecordID = nil
+        state = .sonySSIDJoinStub
     }
 
     func skipToManualEntry() {

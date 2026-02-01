@@ -100,25 +100,9 @@ final class QRCodeScannerViewController: UIViewController, AVCaptureMetadataOutp
         close.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(close)
 
-        let hint = UILabel()
-        hint.text = "Scan the camera QR code"
-        hint.textColor = .white
-        hint.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-        hint.backgroundColor = UIColor(white: 0.0, alpha: 0.5)
-        hint.layer.cornerRadius = 10
-        hint.layer.masksToBounds = true
-        hint.textAlignment = .center
-        hint.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(hint)
-
         NSLayoutConstraint.activate([
             close.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 14),
             close.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 14),
-
-            hint.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
-            hint.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            hint.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, multiplier: 0.9),
-            hint.heightAnchor.constraint(equalToConstant: 40)
         ])
     }
 
