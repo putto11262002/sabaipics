@@ -4,6 +4,7 @@ import { photographers, consentRecords } from '@sabaipics/db/schema';
 import { eq } from 'drizzle-orm';
 import type { Database } from '@sabaipics/db';
 import type { Env } from '../../types';
+import { apiError } from '../../lib/error';
 
 // Use shared types from ../../types
 
@@ -50,7 +51,7 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
 
   if (!secret) {
     console.error('[Clerk Webhook] CLERK_WEBHOOK_SIGNING_SECRET not configured');
-    return c.json({ error: 'Bad request' }, 400);
+    return apiError(c, 'INTERNAL_ERROR', 'Webhook secret not configured');
   }
 
   // Get raw body for signature verification
@@ -62,7 +63,7 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
   const svixSignature = c.req.header('svix-signature');
 
   if (!svixId || !svixTimestamp || !svixSignature) {
-    return c.json({ error: 'Bad request' }, 400);
+    return apiError(c, 'BAD_REQUEST', 'Missing webhook signature headers');
   }
 
   // Verify webhook signature (Svix ensures payload integrity)
@@ -77,7 +78,7 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
     }) as ClerkWebhookEvent;
   } catch (err) {
     console.error('[Clerk Webhook] Signature verification failed:', err);
-    return c.json({ error: 'Bad request' }, 400);
+    return apiError(c, 'UNAUTHORIZED', 'Invalid webhook signature');
   }
 
   // Route to appropriate handler
@@ -91,7 +92,7 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
         const email = getPrimaryEmail(user);
         if (!email) {
           console.error('[Clerk Webhook] ERROR: user.created without required email');
-          return c.json({ error: 'Bad request' }, 500);
+          return apiError(c, 'BAD_REQUEST', 'User created without email');
         }
 
         // Build display name

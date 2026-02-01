@@ -19,9 +19,7 @@ import { createFaceProvider } from '../../lib/rekognition';
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
-// =============================================================================
 // QR Code Generation
-// =============================================================================
 
 type QRSize = 'small' | 'medium' | 'large';
 
@@ -49,13 +47,10 @@ async function generateEventQR(
   });
 }
 
-// =============================================================================
 // Routes
-// =============================================================================
 
 export const eventsRouter = new Hono<Env>()
 
-  // POST /events - Create event (QR code generated client-side)
   .post(
     '/',
     requirePhotographer(),
@@ -143,7 +138,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // GET /events - List photographer's events (with pagination)
   .get(
     '/',
     requirePhotographer(),
@@ -215,7 +209,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // GET /events/:id - Get single event
   .get(
     '/:id',
     requirePhotographer(),
@@ -264,7 +257,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // GET /events/:id/qr-download - Download QR code as PNG
   .get(
     '/:id/qr-download',
     requirePhotographer(),
@@ -333,9 +325,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // =========================================================================
-  // GET /events/:id/slideshow-config - Get slideshow configuration
-  // =========================================================================
   .get(
     '/:id/slideshow-config',
     requirePhotographer(),
@@ -378,9 +367,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // =========================================================================
-  // PUT /events/:id/slideshow-config - Update slideshow configuration
-  // =========================================================================
   .put(
     '/:id/slideshow-config',
     requirePhotographer(),
@@ -429,9 +415,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // =========================================================================
-  // POST /events/:id/logo/presign - Generate presigned URL for logo upload
-  // =========================================================================
   .post(
     '/:id/logo/presign',
     requirePhotographer(),
@@ -529,9 +512,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // =========================================================================
-  // GET /events/:id/logo/status - Poll logo upload status
-  // =========================================================================
   .get(
     '/:id/logo/status',
     requirePhotographer(),
@@ -615,9 +595,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // =========================================================================
-  // DELETE /events/:id/logo - Remove logo from event
-  // =========================================================================
   .delete('/:id/logo', requirePhotographer(), zValidator('param', eventParamsSchema), async (c) => {
     const photographer = c.var.photographer;
     const db = c.var.db();
@@ -653,9 +630,6 @@ export const eventsRouter = new Hono<Env>()
       );
   })
 
-  // =========================================================================
-  // DELETE /events/:id/hard - Hard delete event (DEV ONLY)
-  // =========================================================================
   .delete('/:id/hard', requirePhotographer(), zValidator('param', eventParamsSchema), async (c) => {
     const photographer = c.var.photographer;
     const db = c.var.db();
@@ -663,7 +637,7 @@ export const eventsRouter = new Hono<Env>()
 
     // DEV-ONLY: Block in staging/production
     if (c.env.NODE_ENV !== 'development') {
-      return c.json({ error: 'Hard delete is only available in development' }, 403);
+      return apiError(c, 'FORBIDDEN', 'Hard delete is only available in development');
     }
 
     return safeTry(async function* () {
@@ -720,9 +694,6 @@ export const eventsRouter = new Hono<Env>()
       );
   })
 
-  // =========================================================================
-  // DELETE /events/:id - Soft delete event
-  // =========================================================================
   .delete('/:id', requirePhotographer(), zValidator('param', eventParamsSchema), async (c) => {
     const photographer = c.var.photographer;
     const db = c.var.db();
