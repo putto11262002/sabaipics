@@ -654,48 +654,6 @@ export const eventsRouter = new Hono<Env>()
   })
 
   // =========================================================================
-  // DELETE /events/:id - Soft delete event
-  // =========================================================================
-  .delete('/:id', requirePhotographer(), zValidator('param', eventParamsSchema), async (c) => {
-    const photographer = c.var.photographer;
-    const db = c.var.db();
-    const { id } = c.req.valid('param');
-
-    return safeTry(async function* () {
-      // Verify event ownership and not already deleted
-      const [event] = yield* ResultAsync.fromPromise(
-        db
-          .select({ id: activeEvents.id })
-          .from(activeEvents)
-          .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
-          .limit(1),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-      );
-
-      if (!event) {
-        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
-      }
-
-      // Soft delete event
-      const deletedAt = new Date().toISOString();
-      yield* ResultAsync.fromPromise(
-        db
-          .update(events)
-          .set({ deletedAt })
-          .where(and(eq(events.id, id), isNull(events.deletedAt))),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-      );
-
-      return ok({ data: { deletedAt } });
-    })
-      .orTee((e) => e.cause && console.error('[Events] DELETE /:id', e.code, e.cause))
-      .match(
-        (data) => c.json(data),
-        (e) => apiError(c, e),
-      );
-  })
-
-  // =========================================================================
   // DELETE /events/:id/hard - Hard delete event (DEV ONLY)
   // =========================================================================
   .delete('/:id/hard', requirePhotographer(), zValidator('param', eventParamsSchema), async (c) => {
@@ -756,6 +714,48 @@ export const eventsRouter = new Hono<Env>()
       return ok({ data: result });
     })
       .orTee((e) => e.cause && console.error('[Events] DELETE /:id/hard', e.code, e.cause))
+      .match(
+        (data) => c.json(data),
+        (e) => apiError(c, e),
+      );
+  })
+
+  // =========================================================================
+  // DELETE /events/:id - Soft delete event
+  // =========================================================================
+  .delete('/:id', requirePhotographer(), zValidator('param', eventParamsSchema), async (c) => {
+    const photographer = c.var.photographer;
+    const db = c.var.db();
+    const { id } = c.req.valid('param');
+
+    return safeTry(async function* () {
+      // Verify event ownership and not already deleted
+      const [event] = yield* ResultAsync.fromPromise(
+        db
+          .select({ id: activeEvents.id })
+          .from(activeEvents)
+          .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
+          .limit(1),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      if (!event) {
+        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+      }
+
+      // Soft delete event
+      const deletedAt = new Date().toISOString();
+      yield* ResultAsync.fromPromise(
+        db
+          .update(events)
+          .set({ deletedAt })
+          .where(and(eq(events.id, id), isNull(events.deletedAt))),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      return ok({ data: { deletedAt } });
+    })
+      .orTee((e) => e.cause && console.error('[Events] DELETE /:id', e.code, e.cause))
       .match(
         (data) => c.json(data),
         (e) => apiError(c, e),
