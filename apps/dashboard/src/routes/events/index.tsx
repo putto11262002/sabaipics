@@ -18,6 +18,7 @@ import { useEvents } from '../../hooks/events/useEvents';
 import { CreateEventModal } from '../../components/events/CreateEventModal';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useDownloadQR } from '../../hooks/events/useDownloadQR';
+import { useDeleteEvent } from '../../hooks/events/useDeleteEvent';
 import {
   DataTable,
   DataTableSearch,
@@ -37,6 +38,7 @@ export default function EventsPage() {
   const { data, isLoading, error, refetch } = useEvents(0, 100);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const downloadQR = useDownloadQR();
+  const deleteEvent = useDeleteEvent();
 
   const handleCopyLink = (eventId: string) => {
     const searchUrl = `${window.location.origin}/participant/events/${eventId}/search`;
@@ -73,8 +75,23 @@ export default function EventsPage() {
     onCopySearchLink: (eventId: string) => handleCopyLink(eventId),
     onDownloadQR: (eventId: string, eventName: string) => downloadQR.mutate({ eventId, eventName }),
     onDeleteEvent: (eventId: string) => {
-      // TODO: Implement delete event
-      console.log('Delete event:', eventId);
+      if (
+        confirm(
+          'Are you sure you want to delete this event? The event and all its photos will become inaccessible immediately.'
+        )
+      ) {
+        deleteEvent.mutate(
+          { eventId },
+          {
+            onSuccess: () => {
+              refetch();
+            },
+            onError: (error) => {
+              alert(`Failed to delete event: ${error.message}`);
+            },
+          }
+        );
+      }
     },
     isCopied,
   };
