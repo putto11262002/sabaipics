@@ -7,8 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@sabaipics/uiv3/components/select';
-import type { SlideshowBlock, GalleryProps, GalleryDensity, GalleryAlignY } from '../../types';
-import { Input } from '@sabaipics/uiv3/components/input';
+import type { SlideshowBlock, GalleryProps, GalleryDensity } from '../../types';
 
 export function GallerySettings({
   block,
@@ -35,9 +34,29 @@ export function GallerySettings({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="sparse">Sparse (3-4 cols)</SelectItem>
-            <SelectItem value="normal">Normal (4-6 cols)</SelectItem>
-            <SelectItem value="dense">Dense (6-8 cols)</SelectItem>
+            <SelectItem value="sparse">Sparse (2-4 cols)</SelectItem>
+            <SelectItem value="normal">Normal (3-6 cols)</SelectItem>
+            <SelectItem value="dense">Dense (5-8+ cols)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Label className="w-20 text-xs">Rows</Label>
+        <Select
+          value={String(props.rows ?? 3)}
+          onValueChange={(v) => update({ rows: parseInt(v, 10) })}
+        >
+          <SelectTrigger className="h-8 flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1">1 row</SelectItem>
+            <SelectItem value="2">2 rows</SelectItem>
+            <SelectItem value="3">3 rows</SelectItem>
+            <SelectItem value="4">4 rows</SelectItem>
+            <SelectItem value="5">5 rows</SelectItem>
+            <SelectItem value="6">6 rows</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -54,55 +73,6 @@ export function GallerySettings({
           max={24}
           step={2}
         />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Label className="w-20 text-xs">Max Height</Label>
-        <Select
-          value={props.maxHeight === 'full' ? 'full' : 'custom'}
-          onValueChange={(v) => update({ maxHeight: v === 'full' ? 'full' : props.maxHeight ?? 600 })}
-        >
-          <SelectTrigger className="h-8 flex-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="full">Full (100vh)</SelectItem>
-            <SelectItem value="custom">Custom</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {props.maxHeight !== 'full' && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-xs">Height (px)</Label>
-            <Input
-              type="number"
-              className="h-8 w-20 text-xs"
-              value={typeof props.maxHeight === 'number' ? props.maxHeight : 600}
-              onChange={(e) => update({ maxHeight: parseInt(e.target.value, 10) || 600 })}
-              min={100}
-              max={2000}
-            />
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <Label className="w-20 text-xs">Align Y</Label>
-        <Select
-          value={props.alignY ?? 'center'}
-          onValueChange={(v) => update({ alignY: v as GalleryAlignY })}
-        >
-          <SelectTrigger className="h-8 flex-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="start">Top</SelectItem>
-            <SelectItem value="center">Center</SelectItem>
-            <SelectItem value="end">Bottom</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="space-y-2">

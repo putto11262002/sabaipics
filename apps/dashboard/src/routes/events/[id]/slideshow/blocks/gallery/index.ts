@@ -13,10 +13,6 @@ export const galleryBlockDef: BlockDefinition<GalleryProps> = {
     gap: 8,
     autoplaySpeed: 0,
   },
-  defaultSize: {
-    width: 80, // 80vw
-    height: 60, // 60vh
-  },
   Renderer: GalleryRenderer,
   SettingsPanel: GallerySettings,
 };

@@ -9,15 +9,17 @@ import {
   DropdownMenuTrigger,
 } from '@sabaipics/uiv3/components/dropdown-menu';
 import { ToggleGroup, ToggleGroupItem } from '@sabaipics/uiv3/components/toggle-group';
-import { Save, Plus, Loader2, Eye, Monitor, Tablet, Smartphone } from 'lucide-react';
+import { Save, Plus, Loader2, Eye, Tv, Monitor, Tablet, Smartphone, RotateCcw } from 'lucide-react';
 import { blockRegistry, getTopLevelTypes } from '../blocks/registry';
 import { blockPresets } from '../lib/presets';
-import type { SlideshowBlock, DeviceMode } from '../types';
+import type { SlideshowBlock, DeviceType, Orientation } from '../types';
 
 interface ToolbarProps {
   eventId: string;
-  deviceMode: DeviceMode;
-  onDeviceModeChange: (mode: DeviceMode) => void;
+  deviceType: DeviceType;
+  orientation: Orientation;
+  onDeviceTypeChange: (type: DeviceType) => void;
+  onOrientationChange: (orientation: Orientation) => void;
   onAddBlock: (type: string) => void;
   onAddPreset: (block: SlideshowBlock) => void;
   onSave: () => void;
@@ -27,8 +29,10 @@ interface ToolbarProps {
 
 export function Toolbar({
   eventId,
-  deviceMode,
-  onDeviceModeChange,
+  deviceType,
+  orientation,
+  onDeviceTypeChange,
+  onOrientationChange,
   onAddBlock,
   onAddPreset,
   onSave,
@@ -36,6 +40,10 @@ export function Toolbar({
   isSaving,
 }: ToolbarProps) {
   const types = getTopLevelTypes();
+
+  const handleRotate = () => {
+    onOrientationChange(orientation === 'landscape' ? 'portrait' : 'landscape');
+  };
 
   return (
     <>
@@ -48,20 +56,33 @@ export function Toolbar({
 
       <ToggleGroup
         type="single"
-        value={deviceMode}
-        onValueChange={(value) => value && onDeviceModeChange(value as DeviceMode)}
+        value={deviceType}
+        onValueChange={(value) => value && onDeviceTypeChange(value as DeviceType)}
         size="sm"
       >
-        <ToggleGroupItem value="desktop" aria-label="Desktop view">
+        <ToggleGroupItem value="tv" aria-label="TV view">
+          <Tv className="size-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="monitor" aria-label="Monitor view">
           <Monitor className="size-4" />
         </ToggleGroupItem>
         <ToggleGroupItem value="tablet" aria-label="Tablet view">
           <Tablet className="size-4" />
         </ToggleGroupItem>
-        <ToggleGroupItem value="mobile" aria-label="Mobile view">
+        <ToggleGroupItem value="phone" aria-label="Phone view">
           <Smartphone className="size-4" />
         </ToggleGroupItem>
       </ToggleGroup>
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleRotate}
+        aria-label="Rotate device"
+        title={`Rotate to ${orientation === 'landscape' ? 'portrait' : 'landscape'}`}
+      >
+        <RotateCcw className="size-4" />
+      </Button>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useParams } from 'react-router';
-import type { SlideshowConfig, SlideshowContext, DeviceMode } from '../types';
-import { DEVICE_DIMENSIONS } from '../types';
+import type { SlideshowConfig, SlideshowContext, DeviceType, Orientation } from '../types';
+import { getDeviceDimensions } from '../types';
 
 // ─── Types for postMessage communication ───────────────────────────────────────
 
@@ -34,7 +34,8 @@ interface IframeCanvasProps {
   config: SlideshowConfig;
   context: SlideshowContext;
   selectedBlockId: string | null;
-  deviceMode: DeviceMode;
+  deviceType: DeviceType;
+  orientation: Orientation;
   onSelectBlock: (blockId: string | null) => void;
   onConfigUpdate?: (config: SlideshowConfig) => void;
 }
@@ -43,7 +44,8 @@ export function IframeCanvas({
   config,
   context,
   selectedBlockId,
-  deviceMode,
+  deviceType,
+  orientation,
   onSelectBlock,
   onConfigUpdate,
 }: IframeCanvasProps) {
@@ -146,36 +148,43 @@ export function IframeCanvas({
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Calculate scaled dimensions
-  const deviceDimensions = DEVICE_DIMENSIONS[deviceMode];
-  const padding = 32; // 16px on each side (p-4 = 1rem = 16px)
+  // Calculate scale factor to fit device preview in available space
+  const deviceDimensions = getDeviceDimensions(deviceType, orientation);
+  const padding = 32; // 16px on each side
   const availableWidth = parentSize.width - padding;
   const availableHeight = parentSize.height - padding;
 
-  let scaledWidth = deviceDimensions.width;
-  let scaledHeight = deviceDimensions.height;
-
+  let scale = 1;
   if (availableWidth > 0 && availableHeight > 0) {
     const scaleX = availableWidth / deviceDimensions.width;
     const scaleY = availableHeight / deviceDimensions.height;
-    const scale = Math.min(scaleX, scaleY, 1); // Never scale up, only down
-
-    scaledWidth = deviceDimensions.width * scale;
-    scaledHeight = deviceDimensions.height * scale;
+    scale = Math.min(scaleX, scaleY, 1); // Never scale up, only down
   }
+
+  // Scaled visual dimensions (for the wrapper that reserves space)
+  const scaledWidth = deviceDimensions.width * scale;
+  const scaledHeight = deviceDimensions.height * scale;
 
   return (
     <div ref={containerRef} className="flex h-full w-full items-center justify-center bg-muted/50 p-4">
+      {/* Wrapper reserves the scaled visual space */}
       <div
+        className="relative overflow-hidden rounded-lg border shadow-sm"
         style={{
           width: scaledWidth,
           height: scaledHeight,
         }}
       >
+        {/* Iframe at actual device dimensions, scaled down via CSS transform */}
         <iframe
           ref={iframeRef}
           src={`/events/${id}/slideshow-preview?mode=editor`}
-          className="h-full w-full rounded-lg border bg-background shadow-sm"
+          className="origin-top-left bg-background"
+          style={{
+            width: deviceDimensions.width,
+            height: deviceDimensions.height,
+            transform: `scale(${scale})`,
+          }}
           onLoad={handleIframeLoad}
           title="Slideshow Preview"
         />

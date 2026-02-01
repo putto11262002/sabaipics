@@ -16,14 +16,6 @@ export interface SlideshowBlock {
   enabled: boolean;
   props: Record<string, any>;
   children?: SlideshowBlock[];
-  position?: {
-    x: number; // 0-100 (percentage from left)
-    y: number; // 0-100 (percentage from top)
-  };
-  size?: {
-    width: number; // 0-100 (percentage of viewport width)
-    height: number; // 0-100 (percentage of viewport height)
-  };
 }
 
 export interface SlideshowTheme {
@@ -31,8 +23,18 @@ export interface SlideshowTheme {
   background: string;
 }
 
+export type MaxWidthSize = 'none' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+
+export interface SlideshowLayout {
+  gap: SpacingSize;
+  padding: SpacingSize;
+  align: 'start' | 'center' | 'end';
+  maxWidth: MaxWidthSize;
+}
+
 export interface SlideshowConfig {
   theme: SlideshowTheme;
+  layout: SlideshowLayout;
   blocks: SlideshowBlock[];
 }
 
@@ -64,14 +66,12 @@ export interface SubtitleProps {
 }
 
 export type GalleryDensity = 'sparse' | 'normal' | 'dense';
-export type GalleryAlignY = 'start' | 'center' | 'end';
 
 export interface GalleryProps {
-  density: GalleryDensity; // sparse=3-4 cols, normal=4-6 cols, dense=6-8 cols
+  density: GalleryDensity; // sparse=2-4 cols, normal=3-6 cols, dense=5-8+ cols
   gap: number;
   autoplaySpeed: number;
-  maxHeight?: number | 'full'; // pixels or 'full' for 100vh
-  alignY?: GalleryAlignY; // vertical alignment when height < 100%
+  rows?: number; // Number of rows to display (default: 3)
 }
 
 export interface QrProps {
@@ -115,12 +115,52 @@ export interface SlideshowContext {
 // ─── Device preview modes (editor only) ───────────────────────────────────────
 
 /**
- * Device preview modes for editor with exact pixel dimensions
+ * Device types for preview
  */
-export type DeviceMode = 'desktop' | 'tablet' | 'mobile';
+export type DeviceType = 'tv' | 'monitor' | 'tablet' | 'phone';
 
-export const DEVICE_DIMENSIONS: Record<DeviceMode, { width: number; height: number }> = {
-  desktop: { width: 1920, height: 1080 }, // 16:9 landscape (TV)
-  tablet: { width: 1024, height: 768 }, // 4:3 landscape
-  mobile: { width: 1080, height: 1920 }, // 9:16 portrait
+/**
+ * Orientation for device preview
+ */
+export type Orientation = 'landscape' | 'portrait';
+
+/**
+ * Base dimensions for each device type (in default orientation)
+ */
+export const DEVICE_BASE_DIMENSIONS: Record<DeviceType, { width: number; height: number }> = {
+  tv: { width: 1920, height: 1080 }, // 16:9 Full HD
+  monitor: { width: 1920, height: 1080 }, // 16:9
+  tablet: { width: 1024, height: 768 }, // 4:3
+  phone: { width: 390, height: 844 }, // ~9:19 modern phone
 };
+
+/**
+ * Default orientation for each device type
+ */
+export const DEVICE_DEFAULT_ORIENTATION: Record<DeviceType, Orientation> = {
+  tv: 'landscape',
+  monitor: 'landscape',
+  tablet: 'landscape',
+  phone: 'portrait',
+};
+
+/**
+ * Get device dimensions with orientation applied
+ */
+export function getDeviceDimensions(
+  deviceType: DeviceType,
+  orientation: Orientation,
+): { width: number; height: number } {
+  const base = DEVICE_BASE_DIMENSIONS[deviceType];
+  const defaultOrientation = DEVICE_DEFAULT_ORIENTATION[deviceType];
+
+  // Swap dimensions if orientation differs from default
+  if (orientation !== defaultOrientation) {
+    return { width: base.height, height: base.width };
+  }
+  return base;
+}
+
+// Legacy export for backward compatibility
+export type DeviceMode = DeviceType;
+export const DEVICE_DIMENSIONS = DEVICE_BASE_DIMENSIONS;

@@ -1,4 +1,4 @@
-import type { SpacingSize } from '../types';
+import type { SpacingSize, MaxWidthSize } from '../types';
 
 export const gapClass: Record<SpacingSize, string> = {
   none: 'gap-0',
@@ -16,4 +16,19 @@ export const paddingClass: Record<SpacingSize, string> = {
   md: 'p-4',
   lg: 'p-6',
   xl: 'p-8',
+};
+
+export const maxWidthClass: Record<MaxWidthSize, string> = {
+  none: '',
+  sm: 'max-w-screen-sm',
+  md: 'max-w-screen-md',
+  lg: 'max-w-screen-lg',
+  xl: 'max-w-screen-xl',
+  '2xl': 'max-w-screen-2xl',
+};
+
+export const alignItemsClass: Record<'start' | 'center' | 'end', string> = {
+  start: 'items-start',
+  center: 'items-center',
+  end: 'items-end',
 };

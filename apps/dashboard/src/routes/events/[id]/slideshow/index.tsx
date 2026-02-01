@@ -18,9 +18,17 @@ import { AlertCircle } from 'lucide-react';
 import { PageHeader } from '../../../../components/shell/page-header';
 import { useEvent } from '../../../../hooks/events/useEvent';
 import { useSlideshowConfig, useUpdateSlideshowConfig } from '../../../../hooks/events/useSlideshowConfig';
-import type { SlideshowConfig, SlideshowBlock, SlideshowContext, DeviceMode } from './types';
+import type { SlideshowConfig, SlideshowBlock, SlideshowContext, DeviceType, Orientation, SlideshowLayout } from './types';
+
+const DEFAULT_LAYOUT: SlideshowLayout = {
+  gap: 'md',
+  padding: 'md',
+  align: 'start',
+  maxWidth: 'none',
+};
+import { DEVICE_DEFAULT_ORIENTATION } from './types';
 import { DEFAULT_CONFIG } from './lib/templates';
-import { createBlock } from './blocks/registry';
+import { createBlock, getBlockDef } from './blocks/registry';
 import { IframeCanvas } from './components/iframe-canvas';
 import { EditorSidebar } from './components/sidebar';
 import { Toolbar } from './components/toolbar';
@@ -78,6 +86,50 @@ function deleteBlockFromTree(blocks: SlideshowBlock[], id: string): SlideshowBlo
   });
 }
 
+function isLayoutBlock(block: SlideshowBlock): boolean {
+  return getBlockDef(block.type)?.acceptsChildren === true;
+}
+
+function insertBlockAfter(
+  blocks: SlideshowBlock[],
+  targetId: string,
+  newBlock: SlideshowBlock,
+): SlideshowBlock[] {
+  // Try inserting at root level
+  const rootIndex = blocks.findIndex((b) => b.id === targetId);
+  if (rootIndex !== -1) {
+    const result = [...blocks];
+    result.splice(rootIndex + 1, 0, newBlock);
+    return result;
+  }
+
+  // Otherwise, insert as sibling in parent's children
+  return blocks.map((b) => {
+    if (b.children) {
+      const childIndex = b.children.findIndex((c) => c.id === targetId);
+      if (childIndex !== -1) {
+        const newChildren = [...b.children];
+        newChildren.splice(childIndex + 1, 0, newBlock);
+        return { ...b, children: newChildren };
+      }
+    }
+    return b;
+  });
+}
+
+function addChildToBlock(
+  blocks: SlideshowBlock[],
+  parentId: string,
+  newChild: SlideshowBlock,
+): SlideshowBlock[] {
+  return blocks.map((b) => {
+    if (b.id === parentId) {
+      return { ...b, children: [...(b.children ?? []), newChild] };
+    }
+    return b;
+  });
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function EventSlideshowTab() {
@@ -92,8 +144,15 @@ export default function EventSlideshowTab() {
   const [config, setConfig] = useState<SlideshowConfig>(() => structuredClone(DEFAULT_CONFIG));
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
-  const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
+  const [deviceType, setDeviceType] = useState<DeviceType>('tv');
+  const [orientation, setOrientation] = useState<Orientation>('landscape');
   const hasSynced = useRef(false);
+
+  // Update orientation to device default when device type changes
+  const handleDeviceTypeChange = useCallback((type: DeviceType) => {
+    setDeviceType(type);
+    setOrientation(DEVICE_DEFAULT_ORIENTATION[type]);
+  }, []);
 
   useEffect(() => {
     if (slideshowData?.data && !hasSynced.current) {
@@ -179,18 +238,59 @@ export default function EventSlideshowTab() {
 
   const handleAddBlock = (type: string) => {
     const newBlock = createBlock(type);
-    updateAndDirty((prev) => ({
-      ...prev,
-      blocks: [...prev.blocks, newBlock],
-    }));
+
+    updateAndDirty((prev) => {
+      // If a layout block is selected, add as child
+      if (selectedBlock && isLayoutBlock(selectedBlock)) {
+        return {
+          ...prev,
+          blocks: addChildToBlock(prev.blocks, selectedBlock.id, newBlock),
+        };
+      }
+
+      // If any block is selected, add after it
+      if (selectedBlockId) {
+        return {
+          ...prev,
+          blocks: insertBlockAfter(prev.blocks, selectedBlockId, newBlock),
+        };
+      }
+
+      // Otherwise append to end
+      return {
+        ...prev,
+        blocks: [...prev.blocks, newBlock],
+      };
+    });
+
     setSelectedBlockId(newBlock.id);
   };
 
   const handleAddPreset = (block: SlideshowBlock) => {
-    updateAndDirty((prev) => ({
-      ...prev,
-      blocks: [...prev.blocks, block],
-    }));
+    updateAndDirty((prev) => {
+      // If a layout block is selected, add as child
+      if (selectedBlock && isLayoutBlock(selectedBlock)) {
+        return {
+          ...prev,
+          blocks: addChildToBlock(prev.blocks, selectedBlock.id, block),
+        };
+      }
+
+      // If any block is selected, add after it
+      if (selectedBlockId) {
+        return {
+          ...prev,
+          blocks: insertBlockAfter(prev.blocks, selectedBlockId, block),
+        };
+      }
+
+      // Otherwise append to end
+      return {
+        ...prev,
+        blocks: [...prev.blocks, block],
+      };
+    });
+
     setSelectedBlockId(block.id);
   };
 
@@ -221,6 +321,10 @@ export default function EventSlideshowTab() {
 
   const handleThemeChange = (theme: SlideshowConfig['theme']) => {
     updateAndDirty((prev) => ({ ...prev, theme }));
+  };
+
+  const handleLayoutChange = (layout: SlideshowLayout) => {
+    updateAndDirty((prev) => ({ ...prev, layout }));
   };
 
   const handleSave = () => {
@@ -262,8 +366,10 @@ export default function EventSlideshowTab() {
       >
         <Toolbar
           eventId={id!}
-          deviceMode={deviceMode}
-          onDeviceModeChange={setDeviceMode}
+          deviceType={deviceType}
+          orientation={orientation}
+          onDeviceTypeChange={handleDeviceTypeChange}
+          onOrientationChange={setOrientation}
           onAddBlock={handleAddBlock}
           onAddPreset={handleAddPreset}
           onSave={handleSave}
@@ -294,7 +400,8 @@ export default function EventSlideshowTab() {
               config={config}
               context={context}
               selectedBlockId={selectedBlockId}
-              deviceMode={deviceMode}
+              deviceType={deviceType}
+              orientation={orientation}
               onSelectBlock={handleIframeSelectBlock}
               onConfigUpdate={handleConfigUpdate}
             />
@@ -310,6 +417,8 @@ export default function EventSlideshowTab() {
           onSelectBlock={handleSelectBlock}
           theme={config.theme}
           onThemeChange={handleThemeChange}
+          layout={config.layout ?? DEFAULT_LAYOUT}
+          onLayoutChange={handleLayoutChange}
         />
       </SidebarProvider>
     </div>

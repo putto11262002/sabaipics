@@ -45,6 +45,12 @@ function buildClassic(): SlideshowConfig {
 
   return {
     theme: { primary: '#0f172a', background: '#ffffff' },
+    layout: {
+      gap: 'md',
+      padding: 'md',
+      align: 'start',
+      maxWidth: 'none',
+    },
     blocks: [
       // Header section
       createBlockWithChildren(

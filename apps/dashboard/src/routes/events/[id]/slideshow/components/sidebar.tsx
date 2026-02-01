@@ -8,10 +8,12 @@ import { ScrollArea } from '@sabaipics/uiv3/components/scroll-area';
 import { Button } from '@sabaipics/uiv3/components/button';
 import { Switch } from '@sabaipics/uiv3/components/switch';
 import { Label } from '@sabaipics/uiv3/components/label';
+import { Separator } from '@sabaipics/uiv3/components/separator';
 import { Trash2, ChevronLeft } from 'lucide-react';
-import type { SlideshowBlock, SlideshowTheme } from '../types';
+import type { SlideshowBlock, SlideshowTheme, SlideshowLayout } from '../types';
 import { getBlockDef } from '../blocks/registry';
 import { ThemeSettings } from './theme-settings';
+import { LayoutSettings } from './layout-settings';
 
 interface EditorSidebarProps {
   selectedBlock: SlideshowBlock | null;
@@ -22,6 +24,8 @@ interface EditorSidebarProps {
   onSelectBlock: (id: string) => void;
   theme: SlideshowTheme;
   onThemeChange: (theme: SlideshowTheme) => void;
+  layout: SlideshowLayout;
+  onLayoutChange: (layout: SlideshowLayout) => void;
 }
 
 export function EditorSidebar({
@@ -33,6 +37,8 @@ export function EditorSidebar({
   onSelectBlock,
   theme,
   onThemeChange,
+  layout,
+  onLayoutChange,
 }: EditorSidebarProps) {
   const blockDef = selectedBlock ? getBlockDef(selectedBlock.type) : undefined;
   const parentDef = parentBlock ? getBlockDef(parentBlock.type) : undefined;
@@ -40,7 +46,7 @@ export function EditorSidebar({
   return (
     <Sidebar side="right" collapsible="none" className="border-l bg-background">
       <SidebarHeader className="border-sidebar-border border-b px-4 py-3">
-        <h3 className="text-sm font-semibold">{blockDef ? blockDef.label : 'Theme'}</h3>
+        <h3 className="text-sm font-semibold">{blockDef ? blockDef.label : 'Settings'}</h3>
       </SidebarHeader>
 
       <SidebarContent>
@@ -76,7 +82,17 @@ export function EditorSidebar({
                 </div>
               </div>
             ) : (
-              <ThemeSettings theme={theme} onChange={onThemeChange} />
+              <div className="space-y-6">
+                <div>
+                  <h4 className="mb-3 text-xs font-medium text-muted-foreground">Theme</h4>
+                  <ThemeSettings theme={theme} onChange={onThemeChange} />
+                </div>
+                <Separator />
+                <div>
+                  <h4 className="mb-3 text-xs font-medium text-muted-foreground">Layout</h4>
+                  <LayoutSettings layout={layout} onChange={onLayoutChange} />
+                </div>
+              </div>
             )}
           </div>
         </ScrollArea>
