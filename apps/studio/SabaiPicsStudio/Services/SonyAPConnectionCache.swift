@@ -21,9 +21,10 @@ struct SonyAPConnectionRecord: Codable, Equatable, Identifiable {
     var networkKey: String?
 }
 
-struct SonyAPPendingQRCode: Codable, Equatable {
+struct SonyAPPendingJoinInfo: Codable, Equatable {
     let networkKey: String
-    let qr: SonyWiFiQRCode
+    let ssid: String
+    let cameraId: String?
     let createdAt: Date
 }
 
@@ -32,7 +33,7 @@ final class SonyAPConnectionCache {
 
     private let storageKey = "SonyAP.ConnectionCache.v2"
     private let legacyStorageKey = "SonyAP.ConnectionCache.v1"
-    private let pendingKey = "SonyAP.PendingQRCode.v1"
+    private let pendingKey = "SonyAP.PendingJoinInfo.v1"
 
     private init() {
         migrateIfNeeded()
@@ -55,26 +56,26 @@ final class SonyAPConnectionCache {
         return listRecords().first(where: { $0.networkKey == key })
     }
 
-    func savePendingQRCodeForCurrentNetwork(_ qr: SonyWiFiQRCode) {
+    func savePendingJoinInfoForCurrentNetwork(ssid: String, cameraId: String?) {
         guard let key = currentNetworkKey() else { return }
-        let pending = SonyAPPendingQRCode(networkKey: key, qr: qr, createdAt: Date())
+        let pending = SonyAPPendingJoinInfo(networkKey: key, ssid: ssid, cameraId: cameraId, createdAt: Date())
         guard let data = try? JSONEncoder().encode(pending) else { return }
         UserDefaults.standard.set(data, forKey: pendingKey)
     }
 
-    func consumePendingQRCodeIfMatchesCurrentNetwork() -> SonyWiFiQRCode? {
+    func consumePendingJoinInfoIfMatchesCurrentNetwork() -> (ssid: String, cameraId: String?)? {
         guard let key = currentNetworkKey() else { return nil }
         guard let data = UserDefaults.standard.data(forKey: pendingKey) else { return nil }
-        guard let pending = try? JSONDecoder().decode(SonyAPPendingQRCode.self, from: data) else { return nil }
+        guard let pending = try? JSONDecoder().decode(SonyAPPendingJoinInfo.self, from: data) else { return nil }
         guard pending.networkKey == key else { return nil }
 
         UserDefaults.standard.removeObject(forKey: pendingKey)
-        return pending.qr
+        return (ssid: pending.ssid, cameraId: pending.cameraId)
     }
 
     func saveCurrentNetwork(ip: String, cameraName: String) {
-        let pendingQR = consumePendingQRCodeIfMatchesCurrentNetwork()
-        saveCurrentNetwork(ip: ip, cameraName: cameraName, ssid: pendingQR?.ssid, cameraId: pendingQR?.cameraId)
+        let pending = consumePendingJoinInfoIfMatchesCurrentNetwork()
+        saveCurrentNetwork(ip: ip, cameraName: cameraName, ssid: pending?.ssid, cameraId: pending?.cameraId)
     }
 
     func saveCurrentNetwork(ip: String, cameraName: String, ssid: String?, cameraId: String?) {

@@ -64,3 +64,8 @@ Update
 - Sony entry screen now lists all saved Sony cameras (name-only rows). Tap a row to connect.
 - Added swipe-to-remove for saved cameras (also attempts `removeConfiguration(forSSID:)` when SSID is known).
 - Added hidden debug sheet (long-press title) to copy WiFi IP + subnet mask (not shown in normal UI).
+
+Update
+
+- Sony QR wizard Step 1 now presents a single Scan QR action that opens the scanner; successful scans jump to join, cancels return to Step 1.
+- Back navigation from the QR wizard now routes to `sonyNewCameraDecision`.
