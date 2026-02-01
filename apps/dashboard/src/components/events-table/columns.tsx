@@ -20,6 +20,7 @@ export interface EventTableActions {
   onCopySearchLink: (eventId: string) => void;
   onDownloadQR: (eventId: string, eventName: string) => void;
   onDeleteEvent: (eventId: string) => void;
+  onHardDeleteEvent?: (eventId: string) => void;
   isCopied?: boolean;
 }
 
@@ -130,6 +131,14 @@ export function createColumns(actions: EventTableActions): ColumnDef<Event>[] {
               >
                 Delete Event
               </DropdownMenuItem>
+              {import.meta.env.DEV && actions.onHardDeleteEvent && (
+                <DropdownMenuItem
+                  className="text-destructive font-bold"
+                  onClick={() => actions.onHardDeleteEvent!(event.id)}
+                >
+                  Hard Delete (Dev)
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );

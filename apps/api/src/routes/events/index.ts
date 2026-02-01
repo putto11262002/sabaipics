@@ -13,6 +13,8 @@ import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../../lib/error';
 import { generatePresignedPutUrl } from '../../lib/r2/presign';
 import { createFtpCredentialsWithRetry } from '../../lib/ftp/credentials';
+import { hardDeleteEvent } from '../../lib/events/hard-delete';
+import { createFaceProvider } from '../../lib/rekognition';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -687,6 +689,73 @@ export const eventsRouter = new Hono<Env>()
       return ok({ data: { deletedAt } });
     })
       .orTee((e) => e.cause && console.error('[Events] DELETE /:id', e.code, e.cause))
+      .match(
+        (data) => c.json(data),
+        (e) => apiError(c, e),
+      );
+  })
+
+  // =========================================================================
+  // DELETE /events/:id/hard - Hard delete event (DEV ONLY)
+  // =========================================================================
+  .delete('/:id/hard', requirePhotographer(), zValidator('param', eventParamsSchema), async (c) => {
+    const photographer = c.var.photographer;
+    const db = c.var.db();
+    const { id } = c.req.valid('param');
+
+    // DEV-ONLY: Block in staging/production
+    if (c.env.NODE_ENV !== 'development') {
+      return c.json({ error: 'Hard delete is only available in development' }, 403);
+    }
+
+    return safeTry(async function* () {
+      // Verify event ownership (from base table, allow soft-deleted events)
+      const [event] = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            id: events.id,
+            rekognitionCollectionId: events.rekognitionCollectionId,
+          })
+          .from(events)
+          .where(and(eq(events.id, id), eq(events.photographerId, photographer.id)))
+          .limit(1),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      if (!event) {
+        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+      }
+
+      // Create Rekognition provider and deleteRekognition function
+      const provider = createFaceProvider(c.env);
+      const deleteRekognition = async (collectionId: string): Promise<void> => {
+        await provider.deleteCollection(id).match(
+          () => undefined,
+          (error) => {
+            throw new Error(`Rekognition deletion failed: ${error.type}`);
+          },
+        );
+      };
+
+      // Hard delete all related data
+      const result = yield* ResultAsync.fromPromise(
+        hardDeleteEvent({
+          db,
+          eventId: id,
+          r2Bucket: c.env.PHOTOS_BUCKET,
+          rekognitionCollectionId: event.rekognitionCollectionId,
+          deleteRekognition,
+        }),
+        (cause): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Hard delete failed',
+          cause
+        }),
+      );
+
+      return ok({ data: result });
+    })
+      .orTee((e) => e.cause && console.error('[Events] DELETE /:id/hard', e.code, e.cause))
       .match(
         (data) => c.json(data),
         (e) => apiError(c, e),

@@ -19,6 +19,7 @@ import { CreateEventModal } from '../../components/events/CreateEventModal';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useDownloadQR } from '../../hooks/events/useDownloadQR';
 import { useDeleteEvent } from '../../hooks/events/useDeleteEvent';
+import { useHardDeleteEvent } from '../../hooks/events/useHardDeleteEvent';
 import {
   DataTable,
   DataTableSearch,
@@ -39,6 +40,7 @@ export default function EventsPage() {
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const downloadQR = useDownloadQR();
   const deleteEvent = useDeleteEvent();
+  const hardDeleteEvent = useHardDeleteEvent();
 
   const handleCopyLink = (eventId: string) => {
     const searchUrl = `${window.location.origin}/participant/events/${eventId}/search`;
@@ -93,6 +95,31 @@ export default function EventsPage() {
         );
       }
     },
+    onHardDeleteEvent: import.meta.env.DEV
+      ? (eventId: string) => {
+          if (
+            confirm(
+              '⚠️ HARD DELETE (DEV ONLY)\n\nThis will PERMANENTLY delete:\n- Event from database\n- All photos and faces\n- All R2 objects\n- Rekognition collection\n\nThis CANNOT be undone. Are you absolutely sure?'
+            )
+          ) {
+            hardDeleteEvent.mutate(
+              { eventId },
+              {
+                onSuccess: (result) => {
+                  const summary = result.data.deleted;
+                  alert(
+                    `Hard delete successful!\n\nDeleted:\n- ${summary.database.events} event\n- ${summary.database.photos} photos\n- ${summary.database.faces} faces\n- ${summary.database.participantSearches} searches\n- ${summary.r2Objects} R2 objects\n- Rekognition: ${summary.rekognitionCollection ? 'Yes' : 'No'}`
+                  );
+                  refetch();
+                },
+                onError: (error) => {
+                  alert(`Failed to hard delete event: ${error.message}`);
+                },
+              }
+            );
+          }
+        }
+      : undefined,
     isCopied,
   };
 
