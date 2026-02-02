@@ -1,0 +1,22 @@
+{
+  "Navigation": {
+    "features": "Features",
+    "upload": "Upload",
+    "pricing": "Pricing",
+    "faq": "FAQ",
+    "signIn": "Sign in",
+    "startFreeTrial": "Start free trial"
+  },
+  "Hero": {
+    "eyebrow": "For photographers and event organizers",
+    "title": "You shoot, we handle the rest.",
+    "description": "Upload your way. Guests scan QR, snap a selfie, and AI finds their photos instantly.",
+    "ctaPrimary": "Start free trial",
+    "ctaSecondary": "See features",
+    "trialNote": "Trial includes 1000 photos/credits."
+  },
+  "Metadata": {
+    "title": "SabaiPics - Event Photo Distribution",
+    "description": "AI-powered face recognition photo distribution platform for photographers and event organizers."
+  }
+}

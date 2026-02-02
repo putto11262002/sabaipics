@@ -1,0 +1,34 @@
+---
+title: API Reference
+description: เอกสาร API ของ SabaiPics
+---
+
+# API Reference
+
+SabaiPics API ช่วยให้คุณสามารถเชื่อมต่อระบบแจกจ่ายรูปภาพเข้ากับแอปพลิเคชันของคุณได้
+
+## การยืนยันตัวตน
+
+API request ทั้งหมดต้องมีการยืนยันตัวตนด้วย API key
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.sabaipics.com/v1/events
+```
+
+## Endpoints
+
+### Events
+
+| Method | Endpoint | คำอธิบาย |
+|--------|----------|----------|
+| GET | `/v1/events` | แสดงรายการงานอีเวนต์ทั้งหมด |
+| POST | `/v1/events` | สร้างงานอีเวนต์ใหม่ |
+| GET | `/v1/events/:id` | ดูรายละเอียดงานอีเวนต์ |
+
+### Photos
+
+| Method | Endpoint | คำอธิบาย |
+|--------|----------|----------|
+| GET | `/v1/events/:id/photos` | แสดงรายการรูปภาพในงานอีเวนต์ |
+| POST | `/v1/events/:id/photos` | อัปโหลดรูปภาพ |
