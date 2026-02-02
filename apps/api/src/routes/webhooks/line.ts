@@ -6,6 +6,7 @@ import {
 	type WebhookEvent,
 	type WebhookRequestBody,
 } from "../../lib/line/schemas";
+import { apiError } from "../../lib/error";
 
 /**
  * LINE Webhook Bindings
@@ -30,14 +31,14 @@ export const lineWebhookRouter = new Hono<{
 
 	if (!channelSecret) {
 		console.error("[LINE Webhook] LINE_CHANNEL_SECRET not configured");
-		return c.json({ error: "Webhook secret not configured" }, 500);
+		return apiError(c, 'INTERNAL_ERROR', 'Webhook secret not configured');
 	}
 
 	// Get signature header
 	const signature = c.req.header("x-line-signature");
 	if (!signature) {
 		console.error("[LINE Webhook] Missing x-line-signature header");
-		return c.json({ error: "Missing signature header" }, 400);
+		return apiError(c, 'BAD_REQUEST', 'Missing webhook signature header');
 	}
 
 	// Get raw body for signature verification
@@ -47,7 +48,7 @@ export const lineWebhookRouter = new Hono<{
 	const isValid = await verifyLineSignature(body, signature, channelSecret);
 	if (!isValid) {
 		console.error("[LINE Webhook] Signature verification failed");
-		return c.json({ error: "Invalid signature" }, 401);
+		return apiError(c, 'UNAUTHORIZED', 'Invalid webhook signature');
 	}
 
 	// Parse and validate webhook body with Zod
@@ -58,10 +59,10 @@ export const lineWebhookRouter = new Hono<{
 	} catch (err) {
 		if (err instanceof z.ZodError) {
 			console.error("[LINE Webhook] Validation error:", err.errors);
-			return c.json({ error: "Invalid webhook payload" }, 400);
+			return apiError(c, 'BAD_REQUEST', 'Invalid webhook payload');
 		}
 		console.error("[LINE Webhook] Failed to parse request body");
-		return c.json({ error: "Invalid JSON" }, 400);
+		return apiError(c, 'BAD_REQUEST', 'Invalid JSON in webhook payload');
 	}
 
 	// Log destination (bot user ID)

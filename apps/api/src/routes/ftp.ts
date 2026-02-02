@@ -12,7 +12,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, and, gt, sql } from 'drizzle-orm';
-import { ftpCredentials, events, creditLedger, photographers, uploadIntents } from '@sabaipics/db';
+import { ftpCredentials, activeEvents, creditLedger, photographers, uploadIntents } from '@sabaipics/db';
 import { requirePhotographer, type PhotographerVariables } from '../middleware';
 import type { Env } from '../types';
 import { apiError, type HandlerError } from '../lib/error';
@@ -71,11 +71,11 @@ export const ftpRouter = new Hono<Env>()
             photographerId: ftpCredentials.photographerId,
             passwordHash: ftpCredentials.passwordHash,
             expiresAt: ftpCredentials.expiresAt,
-            eventName: events.name,
-            eventExpiresAt: events.expiresAt,
+            eventName: activeEvents.name,
+            eventExpiresAt: activeEvents.expiresAt,
           })
           .from(ftpCredentials)
-          .innerJoin(events, eq(ftpCredentials.eventId, events.id))
+          .innerJoin(activeEvents, eq(ftpCredentials.eventId, activeEvents.id))
           .where(eq(ftpCredentials.username, username))
           .limit(1),
         (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
@@ -197,11 +197,11 @@ export const ftpRouter = new Hono<Env>()
         const eventRows: any = yield* ResultAsync.fromPromise(
           db
             .select({
-              id: events.id,
-              expiresAt: events.expiresAt,
+              id: activeEvents.id,
+              expiresAt: activeEvents.expiresAt,
             })
-            .from(events)
-            .where(eq(events.id, ftpAuth.eventId))
+            .from(activeEvents)
+            .where(eq(activeEvents.id, ftpAuth.eventId))
             .limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
@@ -328,12 +328,12 @@ export const ftpRouter = new Hono<Env>()
         const eventRows: any = yield* ResultAsync.fromPromise(
           db
             .select({
-              id: events.id,
-              photographerId: events.photographerId,
-              expiresAt: events.expiresAt,
+              id: activeEvents.id,
+              photographerId: activeEvents.photographerId,
+              expiresAt: activeEvents.expiresAt,
             })
-            .from(events)
-            .where(eq(events.id, eventId))
+            .from(activeEvents)
+            .where(eq(activeEvents.id, eventId))
             .limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
@@ -421,9 +421,9 @@ export const ftpRouter = new Hono<Env>()
         // 1. Verify event exists and is owned by photographer
         const eventRows: any = yield* ResultAsync.fromPromise(
           db
-            .select({ id: events.id, photographerId: events.photographerId })
-            .from(events)
-            .where(eq(events.id, eventId))
+            .select({ id: activeEvents.id, photographerId: activeEvents.photographerId })
+            .from(activeEvents)
+            .where(eq(activeEvents.id, eventId))
             .limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
@@ -483,9 +483,9 @@ export const ftpRouter = new Hono<Env>()
         // 1. Verify event exists and is owned by photographer
         const eventRows: any = yield* ResultAsync.fromPromise(
           db
-            .select({ id: events.id, photographerId: events.photographerId })
-            .from(events)
-            .where(eq(events.id, eventId))
+            .select({ id: activeEvents.id, photographerId: activeEvents.photographerId })
+            .from(activeEvents)
+            .where(eq(activeEvents.id, eventId))
             .limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
@@ -560,9 +560,9 @@ export const ftpRouter = new Hono<Env>()
         // 1. Verify event exists and is owned by photographer
         const eventRows: any = yield* ResultAsync.fromPromise(
           db
-            .select({ id: events.id, photographerId: events.photographerId })
-            .from(events)
-            .where(eq(events.id, eventId))
+            .select({ id: activeEvents.id, photographerId: activeEvents.photographerId })
+            .from(activeEvents)
+            .where(eq(activeEvents.id, eventId))
             .limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, and, desc, lt, inArray, sql, asc, gt, isNull } from 'drizzle-orm';
-import { photos, events, photoStatuses, creditLedger, photographers } from '@sabaipics/db';
+import { photos, activeEvents, photoStatuses, creditLedger, photographers } from '@sabaipics/db';
 import { requirePhotographer } from '../middleware';
 import type { Bindings, Env } from '../types';
 import type { PhotoJob } from '../types/photo-job';
@@ -126,9 +126,9 @@ export const photosRouter = new Hono<Env>()
         // CRITICAL: Verify event ownership BEFORE querying photos
         const [event] = yield* ResultAsync.fromPromise(
           db
-            .select({ id: events.id })
-            .from(events)
-            .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
+            .select({ id: activeEvents.id })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)))
             .limit(1)
             .then((rows) => rows),
           (error): HandlerError => ({
@@ -227,9 +227,9 @@ export const photosRouter = new Hono<Env>()
 
       // CRITICAL: Verify event ownership BEFORE fetching photos
       const [event] = await db
-        .select({ id: events.id })
-        .from(events)
-        .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
+        .select({ id: activeEvents.id })
+        .from(activeEvents)
+        .where(and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)))
         .limit(1);
 
       if (!event) {
@@ -304,9 +304,9 @@ export const photosRouter = new Hono<Env>()
 
       // CRITICAL: Verify event ownership BEFORE deleting photos
       const [event] = await db
-        .select({ id: events.id })
-        .from(events)
-        .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
+        .select({ id: activeEvents.id })
+        .from(activeEvents)
+        .where(and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)))
         .limit(1);
 
       if (!event) {
@@ -342,12 +342,12 @@ export const photosRouter = new Hono<Env>()
       const [event] = yield* ResultAsync.fromPromise(
         db
           .select({
-            id: events.id,
-            photographerId: events.photographerId,
-            expiresAt: events.expiresAt,
+            id: activeEvents.id,
+            photographerId: activeEvents.photographerId,
+            expiresAt: activeEvents.expiresAt,
           })
-          .from(events)
-          .where(eq(events.id, eventId))
+          .from(activeEvents)
+          .where(eq(activeEvents.id, eventId))
           .limit(1),
         (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
       );
@@ -579,10 +579,10 @@ export const photosRouter = new Hono<Env>()
           fileSize: photos.fileSize,
           uploadedAt: photos.uploadedAt,
           eventId: photos.eventId,
-          photographerId: events.photographerId,
+          photographerId: activeEvents.photographerId,
         })
         .from(photos)
-        .innerJoin(events, eq(photos.eventId, events.id))
+        .innerJoin(activeEvents, eq(photos.eventId, activeEvents.id))
         .where(inArray(photos.id, ids));
 
       // Filter to only photos owned by this photographer

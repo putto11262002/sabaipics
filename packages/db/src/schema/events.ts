@@ -1,4 +1,4 @@
-import { pgTable, text, index, uuid, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, index, uuid, jsonb, pgView } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { timestamptz, createdAtCol } from './common';
 import { photographers } from './photographers';
@@ -55,10 +55,27 @@ export const events = pgTable(
     slideshowConfig: jsonb('slideshow_config').$type<SlideshowConfig>(), // Nullable: Slideshow configuration (theme + blocks)
     logoR2Key: text('logo_r2_key'), // Nullable: R2 key for event logo (used in slideshow)
     expiresAt: timestamptz('expires_at').notNull(),
+    deletedAt: timestamptz('deleted_at'), // Nullable: Soft delete timestamp (null = active, set = deleted)
     createdAt: createdAtCol(),
   },
-  (table) => [index('events_photographer_id_idx').on(table.photographerId)],
+  (table) => [
+    index('events_photographer_id_idx').on(table.photographerId),
+    index('events_deleted_at_idx').on(table.deletedAt),
+  ],
 );
 
 export type Event = typeof events.$inferSelect;
 export type NewEvent = typeof events.$inferInsert;
+
+/**
+ * Active Events View
+ *
+ * Filters out soft-deleted events (where deleted_at IS NOT NULL).
+ * Use this view for all application queries to automatically exclude deleted events.
+ * Query the base `events` table directly only for admin/debugging purposes.
+ */
+export const activeEvents = pgView('active_events').as((qb) =>
+  qb.select().from(events).where(sql`${events.deletedAt} IS NULL`)
+);
+
+export type ActiveEvent = typeof activeEvents.$inferSelect;

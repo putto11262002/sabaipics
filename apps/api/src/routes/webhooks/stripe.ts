@@ -28,6 +28,7 @@ import {
 } from "../../lib/stripe";
 import { eventBus } from "../../events";
 import type { StripeEvents } from "../../lib/stripe/events";
+import { apiError } from "../../lib/error";
 
 /**
  * Environment bindings for Stripe webhook
@@ -154,19 +155,19 @@ export const stripeWebhookRouter = new Hono<{
   // Validate environment
   if (!c.env.STRIPE_SECRET_KEY) {
     console.error("[Stripe Webhook] STRIPE_SECRET_KEY not configured");
-    return c.json({ error: "Stripe not configured" }, 500);
+    return apiError(c, 'INTERNAL_ERROR', 'Stripe not configured');
   }
 
   if (!c.env.STRIPE_WEBHOOK_SECRET) {
     console.error("[Stripe Webhook] STRIPE_WEBHOOK_SECRET not configured");
-    return c.json({ error: "Webhook secret not configured" }, 500);
+    return apiError(c, 'INTERNAL_ERROR', 'Webhook secret not configured');
   }
 
   // Get signature header
   const signature = c.req.header("stripe-signature");
   if (!signature) {
     console.error("[Stripe Webhook] Missing stripe-signature header");
-    return c.json({ error: "Missing signature" }, 400);
+    return apiError(c, 'BAD_REQUEST', 'Missing webhook signature');
   }
 
   // Create Stripe client
@@ -282,7 +283,7 @@ export const stripeWebhookRouter = new Hono<{
     console.error(`[Stripe Webhook] Verification failed: ${errorMessage}`);
 
     // Return 400 for signature errors - Stripe will retry
-    return c.json({ error: "Invalid signature" }, 400);
+    return apiError(c, 'UNAUTHORIZED', 'Invalid webhook signature');
   }
 });
 

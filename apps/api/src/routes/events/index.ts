@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { eq, desc, sql, and, inArray } from 'drizzle-orm';
+import { eq, desc, sql, and, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { events, DEFAULT_SLIDESHOW_CONFIG, logoUploadIntents, ftpCredentials } from '@sabaipics/db';
+import { events, activeEvents, DEFAULT_SLIDESHOW_CONFIG, logoUploadIntents, ftpCredentials } from '@sabaipics/db';
 import { requirePhotographer } from '../../middleware';
 import type { Env } from '../../types';
 import { generatePngQrCode } from '@juit/qrcode';
@@ -13,13 +13,13 @@ import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../../lib/error';
 import { generatePresignedPutUrl } from '../../lib/r2/presign';
 import { createFtpCredentialsWithRetry } from '../../lib/ftp/credentials';
+import { hardDeleteEvent } from '../../lib/events/hard-delete';
+import { createFaceProvider } from '../../lib/rekognition';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
-// =============================================================================
 // QR Code Generation
-// =============================================================================
 
 type QRSize = 'small' | 'medium' | 'large';
 
@@ -47,13 +47,10 @@ async function generateEventQR(
   });
 }
 
-// =============================================================================
 // Routes
-// =============================================================================
 
 export const eventsRouter = new Hono<Env>()
 
-  // POST /events - Create event (QR code generated client-side)
   .post(
     '/',
     requirePhotographer(),
@@ -141,7 +138,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // GET /events - List photographer's events (with pagination)
   .get(
     '/',
     requirePhotographer(),
@@ -158,18 +154,18 @@ export const eventsRouter = new Hono<Env>()
         const eventsList = yield* ResultAsync.fromPromise(
           db
             .select({
-              id: events.id,
-              name: events.name,
-              subtitle: events.subtitle,
-              logoR2Key: events.logoR2Key,
-              startDate: events.startDate,
-              endDate: events.endDate,
-              createdAt: events.createdAt,
-              expiresAt: events.expiresAt,
+              id: activeEvents.id,
+              name: activeEvents.name,
+              subtitle: activeEvents.subtitle,
+              logoR2Key: activeEvents.logoR2Key,
+              startDate: activeEvents.startDate,
+              endDate: activeEvents.endDate,
+              createdAt: activeEvents.createdAt,
+              expiresAt: activeEvents.expiresAt,
             })
-            .from(events)
-            .where(eq(events.photographerId, photographer.id))
-            .orderBy(desc(events.createdAt))
+            .from(activeEvents)
+            .where(eq(activeEvents.photographerId, photographer.id))
+            .orderBy(desc(activeEvents.createdAt))
             .limit(limit)
             .offset(offset),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
@@ -179,8 +175,8 @@ export const eventsRouter = new Hono<Env>()
         const [countResult] = yield* ResultAsync.fromPromise(
           db
             .select({ count: sql<number>`count(*)::int` })
-            .from(events)
-            .where(eq(events.photographerId, photographer.id)),
+            .from(activeEvents)
+            .where(eq(activeEvents.photographerId, photographer.id)),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
 
@@ -213,7 +209,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // GET /events/:id - Get single event
   .get(
     '/:id',
     requirePhotographer(),
@@ -226,7 +221,7 @@ export const eventsRouter = new Hono<Env>()
 
       return safeTry(async function* () {
         const [event] = yield* ResultAsync.fromPromise(
-          db.select().from(events).where(eq(events.id, id)).limit(1),
+          db.select().from(activeEvents).where(eq(activeEvents.id, id)).limit(1),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
 
@@ -262,7 +257,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // GET /events/:id/qr-download - Download QR code as PNG
   .get(
     '/:id/qr-download',
     requirePhotographer(),
@@ -282,7 +276,7 @@ export const eventsRouter = new Hono<Env>()
 
       return safeTry(async function* () {
         const [event] = yield* ResultAsync.fromPromise(
-          db.select().from(events).where(eq(events.id, id)).limit(1),
+          db.select().from(activeEvents).where(eq(activeEvents.id, id)).limit(1),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
 
@@ -331,9 +325,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // =========================================================================
-  // GET /events/:id/slideshow-config - Get slideshow configuration
-  // =========================================================================
   .get(
     '/:id/slideshow-config',
     requirePhotographer(),
@@ -348,11 +339,11 @@ export const eventsRouter = new Hono<Env>()
         const [event] = yield* ResultAsync.fromPromise(
           db
             .select({
-              id: events.id,
-              slideshowConfig: events.slideshowConfig,
+              id: activeEvents.id,
+              slideshowConfig: activeEvents.slideshowConfig,
             })
-            .from(events)
-            .where(and(eq(events.id, id), eq(events.photographerId, photographer.id)))
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
             .limit(1),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
@@ -376,9 +367,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // =========================================================================
-  // PUT /events/:id/slideshow-config - Update slideshow configuration
-  // =========================================================================
   .put(
     '/:id/slideshow-config',
     requirePhotographer(),
@@ -394,9 +382,9 @@ export const eventsRouter = new Hono<Env>()
         // Verify event ownership
         const [event] = yield* ResultAsync.fromPromise(
           db
-            .select({ id: events.id })
-            .from(events)
-            .where(and(eq(events.id, id), eq(events.photographerId, photographer.id)))
+            .select({ id: activeEvents.id })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
             .limit(1),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
@@ -410,7 +398,7 @@ export const eventsRouter = new Hono<Env>()
           db
             .update(events)
             .set({ slideshowConfig: config })
-            .where(eq(events.id, id))
+            .where(and(eq(events.id, id), isNull(events.deletedAt)))
             .returning({ slideshowConfig: events.slideshowConfig }),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
@@ -427,9 +415,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // =========================================================================
-  // POST /events/:id/logo/presign - Generate presigned URL for logo upload
-  // =========================================================================
   .post(
     '/:id/logo/presign',
     requirePhotographer(),
@@ -445,9 +430,9 @@ export const eventsRouter = new Hono<Env>()
         // Verify event ownership and not expired
         const [event] = yield* ResultAsync.fromPromise(
           db
-            .select({ id: events.id, expiresAt: events.expiresAt })
-            .from(events)
-            .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
+            .select({ id: activeEvents.id, expiresAt: activeEvents.expiresAt })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)))
             .limit(1),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
@@ -527,9 +512,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // =========================================================================
-  // GET /events/:id/logo/status - Poll logo upload status
-  // =========================================================================
   .get(
     '/:id/logo/status',
     requirePhotographer(),
@@ -545,9 +527,9 @@ export const eventsRouter = new Hono<Env>()
         // Verify event ownership
         const [event] = yield* ResultAsync.fromPromise(
           db
-            .select({ id: events.id, logoR2Key: events.logoR2Key })
-            .from(events)
-            .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
+            .select({ id: activeEvents.id, logoR2Key: activeEvents.logoR2Key })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)))
             .limit(1),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
@@ -613,9 +595,6 @@ export const eventsRouter = new Hono<Env>()
     },
   )
 
-  // =========================================================================
-  // DELETE /events/:id/logo - Remove logo from event
-  // =========================================================================
   .delete('/:id/logo', requirePhotographer(), zValidator('param', eventParamsSchema), async (c) => {
     const photographer = c.var.photographer;
     const db = c.var.db();
@@ -625,9 +604,9 @@ export const eventsRouter = new Hono<Env>()
       // Verify event ownership
       const [event] = yield* ResultAsync.fromPromise(
         db
-          .select({ id: events.id })
-          .from(events)
-          .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
+          .select({ id: activeEvents.id })
+          .from(activeEvents)
+          .where(and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)))
           .limit(1),
         (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
       );
@@ -638,13 +617,116 @@ export const eventsRouter = new Hono<Env>()
 
       // Remove logo reference (actual R2 cleanup via lifecycle policy)
       yield* ResultAsync.fromPromise(
-        db.update(events).set({ logoR2Key: null }).where(eq(events.id, eventId)),
+        db.update(events).set({ logoR2Key: null }).where(and(eq(events.id, eventId), isNull(events.deletedAt))),
         (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
       );
 
       return ok({ data: { success: true } });
     })
       .orTee((e) => e.cause && console.error('[Events] DELETE /:id/logo', e.code, e.cause))
+      .match(
+        (data) => c.json(data),
+        (e) => apiError(c, e),
+      );
+  })
+
+  .delete('/:id/hard', requirePhotographer(), zValidator('param', eventParamsSchema), async (c) => {
+    const photographer = c.var.photographer;
+    const db = c.var.db();
+    const { id } = c.req.valid('param');
+
+    // DEV-ONLY: Block in staging/production
+    if (c.env.NODE_ENV !== 'development') {
+      return apiError(c, 'FORBIDDEN', 'Hard delete is only available in development');
+    }
+
+    return safeTry(async function* () {
+      // Verify event ownership (from base table, allow soft-deleted events)
+      const [event] = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            id: events.id,
+            rekognitionCollectionId: events.rekognitionCollectionId,
+          })
+          .from(events)
+          .where(and(eq(events.id, id), eq(events.photographerId, photographer.id)))
+          .limit(1),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      if (!event) {
+        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+      }
+
+      // Create Rekognition provider and deleteRekognition function
+      const provider = createFaceProvider(c.env);
+      const deleteRekognition = async (collectionId: string): Promise<void> => {
+        await provider.deleteCollection(id).match(
+          () => undefined,
+          (error) => {
+            throw new Error(`Rekognition deletion failed: ${error.type}`);
+          },
+        );
+      };
+
+      // Hard delete all related data
+      const result = yield* ResultAsync.fromPromise(
+        hardDeleteEvent({
+          db,
+          eventId: id,
+          r2Bucket: c.env.PHOTOS_BUCKET,
+          rekognitionCollectionId: event.rekognitionCollectionId,
+          deleteRekognition,
+        }),
+        (cause): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Hard delete failed',
+          cause
+        }),
+      );
+
+      return ok({ data: result });
+    })
+      .orTee((e) => e.cause && console.error('[Events] DELETE /:id/hard', e.code, e.cause))
+      .match(
+        (data) => c.json(data),
+        (e) => apiError(c, e),
+      );
+  })
+
+  .delete('/:id', requirePhotographer(), zValidator('param', eventParamsSchema), async (c) => {
+    const photographer = c.var.photographer;
+    const db = c.var.db();
+    const { id } = c.req.valid('param');
+
+    return safeTry(async function* () {
+      // Verify event ownership and not already deleted
+      const [event] = yield* ResultAsync.fromPromise(
+        db
+          .select({ id: activeEvents.id })
+          .from(activeEvents)
+          .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
+          .limit(1),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      if (!event) {
+        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+      }
+
+      // Soft delete event
+      const deletedAt = new Date().toISOString();
+      yield* ResultAsync.fromPromise(
+        db
+          .update(events)
+          .set({ deletedAt })
+          .where(and(eq(events.id, id), isNull(events.deletedAt))),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      return ok({ data: { deletedAt } });
+    })
+      .orTee((e) => e.cause && console.error('[Events] DELETE /:id', e.code, e.cause))
       .match(
         (data) => c.json(data),
         (e) => apiError(c, e),

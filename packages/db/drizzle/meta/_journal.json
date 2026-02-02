@@ -29,6 +29,20 @@
       "when": 1769623614719,
       "tag": "0003_solid_mephisto",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1769937539881,
+      "tag": "0004_productive_forgotten_one",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1769942923598,
+      "tag": "0005_clammy_molten_man",
+      "breakpoints": true
     }
   ]
 }

@@ -10,7 +10,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, and, gt, sql, inArray } from 'drizzle-orm';
-import { events, creditLedger, uploadIntents } from '@sabaipics/db';
+import { activeEvents, creditLedger, uploadIntents } from '@sabaipics/db';
 import { requirePhotographer, type PhotographerVariables } from '../middleware';
 import type { Env } from '../types';
 import { apiError, type HandlerError } from '../lib/error';
@@ -71,12 +71,12 @@ export const uploadsRouter = new Hono<Env>()
       const [event] = yield* ResultAsync.fromPromise(
         db
           .select({
-            id: events.id,
-            photographerId: events.photographerId,
-            expiresAt: events.expiresAt,
+            id: activeEvents.id,
+            photographerId: activeEvents.photographerId,
+            expiresAt: activeEvents.expiresAt,
           })
-          .from(events)
-          .where(eq(events.id, eventId))
+          .from(activeEvents)
+          .where(eq(activeEvents.id, eventId))
           .limit(1),
         (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
       );
@@ -278,9 +278,9 @@ export const uploadsRouter = new Hono<Env>()
         // 3. Verify event still valid (not expired)
         const [event] = yield* ResultAsync.fromPromise(
           db
-            .select({ expiresAt: events.expiresAt })
-            .from(events)
-            .where(eq(events.id, intent.eventId))
+            .select({ expiresAt: activeEvents.expiresAt })
+            .from(activeEvents)
+            .where(eq(activeEvents.id, intent.eventId))
             .limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
