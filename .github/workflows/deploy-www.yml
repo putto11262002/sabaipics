@@ -6,6 +6,7 @@ on:
     paths:
       - 'apps/www/**'
       - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-www.yml'
 
 concurrency:
   group: deploy-www
