@@ -33,11 +33,8 @@ export function SiteNav() {
         </div>
 
         <div className="flex items-center justify-end gap-3">
-          <RoundedButton asChild variant="outline" size="sm" className="hidden md:inline-flex">
+          <RoundedButton asChild variant="outline" size="sm">
             <Link href="#">Sign in</Link>
-          </RoundedButton>
-          <RoundedButton asChild size="sm">
-            <Link href="#pricing">Start free trial</Link>
           </RoundedButton>
         </div>
       </div>

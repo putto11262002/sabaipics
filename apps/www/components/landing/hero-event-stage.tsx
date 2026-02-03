@@ -76,13 +76,6 @@ export function HeroEventStage({ className }: { className?: string }) {
   return (
     <div className={cn('w-full', className)}>
       <div className="relative">
-        <div
-          className="pointer-events-none absolute -inset-12 -z-10 opacity-95"
-          style={{
-            background:
-              'radial-gradient(60% 55% at 35% 25%, color-mix(in oklab, var(--muted) 92%, transparent) 0%, transparent 62%)',
-          }}
-        />
 
         {/* Contact shadow (standout without adding background shapes) */}
         <div
@@ -98,8 +91,11 @@ export function HeroEventStage({ className }: { className?: string }) {
 
         {/* Temporary: no hump/grip. Just the stage body + screen + controls. */}
         <div
-          className="relative border border-border/45 bg-muted/20 p-3 shadow-[0_34px_80px_-52px_color-mix(in_oklab,var(--foreground)_22%,transparent)]"
-          style={{ borderRadius: metrics.camRadius }}
+          className="relative border border-primary-accent/20 p-3 shadow-[0_34px_80px_-52px_color-mix(in_oklab,var(--primary-accent)_25%,transparent)]"
+          style={{
+            borderRadius: metrics.camRadius,
+            background: 'color-mix(in oklab, var(--primary-accent) 8%, var(--muted))',
+          }}
         >
           <div
             className="pointer-events-none absolute inset-0 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_55%,transparent),inset_0_0_0_1px_color-mix(in_oklab,var(--foreground)_6%,transparent)]"
@@ -122,7 +118,21 @@ export function HeroEventStage({ className }: { className?: string }) {
             aria-hidden="true"
           />
 
-          {/* Viewfinder (rounded trapezoid) */}
+          {/* Viewfinder (simple rounded div) */}
+          <div
+            className="pointer-events-none absolute top-0 z-20 -translate-x-1/2 -translate-y-full border border-primary-accent/20"
+            style={{
+              left: metrics.vfLeft,
+              width: metrics.vfW,
+              height: metrics.vfH,
+              borderRadius: '2.5rem 2.5rem 0 0',
+              borderBottom: 'none',
+              background: 'color-mix(in oklab, var(--primary-accent) 8%, var(--muted))',
+            }}
+            aria-hidden="true"
+          />
+
+          {/* Old viewfinder (trapezoid with clipPath) - commented out
           <div
             className="pointer-events-none absolute top-0 z-20 -translate-x-1/2 -translate-y-full overflow-hidden"
             style={{ left: metrics.vfLeft, width: metrics.vfW, height: metrics.vfH }}
@@ -134,8 +144,6 @@ export function HeroEventStage({ className }: { className?: string }) {
                 clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)',
               }}
             />
-
-            {/* Viewfinder fill (clipped to trapezoid) */}
             <div
               className="pointer-events-none absolute inset-0"
               style={{
@@ -146,12 +154,11 @@ export function HeroEventStage({ className }: { className?: string }) {
                 className="absolute inset-0"
                 style={{
                   background:
-                    'linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--foreground) 2.2%, transparent) 50%, transparent 100%)',
+                    'linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--primary-accent) 8%, transparent) 50%, transparent 100%)',
                 }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-foreground/3 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-primary-accent/5 to-transparent" />
             </div>
-
             <svg
               viewBox="0 0 100 60"
               className="pointer-events-none absolute inset-0 h-full w-full"
@@ -170,6 +177,7 @@ export function HeroEventStage({ className }: { className?: string }) {
               />
             </svg>
           </div>
+          */}
 
           {/* Shutter button (top plate, side view; attached, no bottom border) */}
           <div
@@ -179,10 +187,10 @@ export function HeroEventStage({ className }: { className?: string }) {
           >
             <div className="relative" style={{ width: metrics.shW, height: metrics.shH }}>
               <div
-                className="absolute inset-0 rounded-t-xl border-x border-t border-border/45 bg-muted/18 shadow-[0_18px_36px_-28px_color-mix(in_oklab,var(--foreground)_18%,transparent)]"
+                className="absolute inset-0 rounded-t-xl border-x border-t border-primary-accent/20 shadow-[0_18px_36px_-28px_color-mix(in_oklab,var(--primary-accent)_20%,transparent)]"
                 style={{
                   background:
-                    'linear-gradient(180deg, color-mix(in oklab, var(--background) 75%, transparent), color-mix(in oklab, var(--muted) 65%, transparent))',
+                    'linear-gradient(180deg, color-mix(in oklab, var(--primary-accent) 6%, var(--background)), color-mix(in oklab, var(--primary-accent) 10%, var(--muted)))',
                 }}
               />
               <div
@@ -196,7 +204,7 @@ export function HeroEventStage({ className }: { className?: string }) {
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-xl bg-background shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--foreground)_10%,transparent),inset_0_12px_30px_-20px_color-mix(in_oklab,var(--foreground)_18%,transparent)]">
+          <div className="relative overflow-hidden rounded-xl shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--primary-accent)_15%,transparent),inset_0_12px_30px_-20px_color-mix(in_oklab,var(--primary-accent)_18%,transparent)]" style={{ background: 'color-mix(in oklab, var(--primary-accent) 6%, var(--background))' }}>
             <div className="grid p-2" style={{ gridTemplateColumns: `1fr ${metrics.controlW}` }}>
               <div className="relative aspect-[4/3] w-full">
                 <div
@@ -283,13 +291,14 @@ export function HeroEventStage({ className }: { className?: string }) {
                 </div>
               </div>
 
-              <div className="relative bg-muted/20">
+              <div className="relative">
                 <div
-                  className="pointer-events-none absolute right-2 rounded-2xl border border-border/45 bg-muted/20"
+                  className="pointer-events-none absolute right-2 rounded-2xl border border-primary-accent/15"
                   style={{
                     top: 'clamp(2.1rem, 4vw, 2.9rem)',
                     width: 'clamp(2.9rem, 5.2vw, 3.7rem)',
                     height: 'clamp(3.7rem, 6.8vw, 4.6rem)',
+                    background: 'color-mix(in oklab, var(--primary-accent) 8%, var(--muted))',
                   }}
                 />
                 <div
@@ -325,11 +334,15 @@ export function HeroEventStage({ className }: { className?: string }) {
 function HardwareButton() {
   return (
     <div
-      className="relative rounded-full border border-border/60 bg-background/35 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_70%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_12%,transparent)]"
-      style={{ width: 'clamp(2.05rem, 3.6vw, 2.55rem)', height: 'clamp(2.05rem, 3.6vw, 2.55rem)' }}
+      className="relative rounded-full border border-primary-accent/20 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_70%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--primary-accent)_12%,transparent)]"
+      style={{
+        width: 'clamp(2.05rem, 3.6vw, 2.55rem)',
+        height: 'clamp(2.05rem, 3.6vw, 2.55rem)',
+        background: 'color-mix(in oklab, var(--primary-accent) 5%, var(--background))',
+      }}
       aria-hidden="true"
     >
-      <div className="absolute rounded-full border border-border/40" style={{ inset: '18%' }} />
+      <div className="absolute rounded-full border border-primary-accent/15" style={{ inset: '18%' }} />
     </div>
   );
 }
@@ -337,16 +350,20 @@ function HardwareButton() {
 function HardwareDial() {
   return (
     <div
-      className="relative rounded-full border border-border/60 bg-background/35 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_70%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_12%,transparent)]"
-      style={{ width: 'clamp(3.45rem, 6.2vw, 4.55rem)', height: 'clamp(3.45rem, 6.2vw, 4.55rem)' }}
+      className="relative rounded-full border border-primary-accent/20 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_70%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--primary-accent)_12%,transparent)]"
+      style={{
+        width: 'clamp(3.45rem, 6.2vw, 4.55rem)',
+        height: 'clamp(3.45rem, 6.2vw, 4.55rem)',
+        background: 'color-mix(in oklab, var(--primary-accent) 5%, var(--background))',
+      }}
       aria-hidden="true"
     >
-      <div className="absolute rounded-full border border-border/50" style={{ inset: '12%' }} />
+      <div className="absolute rounded-full border border-primary-accent/15" style={{ inset: '12%' }} />
       <div
-        className="absolute rounded-full border border-border/60 bg-muted/30"
-        style={{ inset: '32%' }}
+        className="absolute rounded-full border border-primary-accent/20"
+        style={{ inset: '32%', background: 'color-mix(in oklab, var(--primary-accent) 8%, var(--muted))' }}
       />
-      <div className="absolute left-1/2 top-1.5 h-2 w-px -translate-x-1/2 rounded-full bg-foreground/40" />
+      <div className="absolute left-1/2 top-1.5 h-2 w-px -translate-x-1/2 rounded-full bg-primary-accent/40" />
     </div>
   );
 }

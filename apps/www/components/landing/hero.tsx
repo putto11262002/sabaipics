@@ -31,7 +31,17 @@ export function LandingHero() {
           </div>
 
           <h1 className="mt-4 text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
-            {t('title')}
+            {t.rich('title', {
+              highlight: (chunks) => (
+                <span className="relative inline-block">
+                  {chunks}
+                  <span
+                    className="absolute -bottom-1 left-0 h-2 w-full -rotate-1 rounded-sm bg-primary-accent/50"
+                    aria-hidden="true"
+                  />
+                </span>
+              ),
+            })}
           </h1>
 
           <p className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
@@ -39,7 +49,7 @@ export function LandingHero() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <RoundedButton asChild>
+            <RoundedButton asChild variant="accent">
               <Link href="#pricing">Start free trial</Link>
             </RoundedButton>
             <RoundedButton asChild variant="outline">

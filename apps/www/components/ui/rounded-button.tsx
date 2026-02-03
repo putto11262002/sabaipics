@@ -10,6 +10,7 @@ const roundedButtonVariants = cva(
     variants: {
       variant: {
         default: "border-transparent bg-primary text-primary-foreground hover:bg-primary/90",
+        accent: "border-transparent bg-primary-accent text-white hover:bg-primary-accent/90",
         outline: "border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
         secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "border-transparent hover:bg-muted hover:text-foreground",
