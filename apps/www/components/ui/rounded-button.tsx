@@ -41,7 +41,6 @@ function RoundedButton({
   const Comp = asChild ? Slot.Root : "button"
 
   return (
-    // @ts-expect-error - Slot types conflict with React 19
     <Comp
       data-slot="button"
       data-variant={variant}

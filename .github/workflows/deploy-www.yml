@@ -1,0 +1,36 @@
+name: Deploy WWW
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/www/**'
+      - 'pnpm-lock.yaml'
+
+concurrency:
+  group: deploy-www
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - run: pnpm install
+
+      - name: Build and Deploy
+        run: pnpm --filter=www deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

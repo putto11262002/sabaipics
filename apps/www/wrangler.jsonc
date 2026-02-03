@@ -1,0 +1,55 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sabaipics-www",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2024-12-30",
+  "compatibility_flags": [
+    // Enable Node.js APIs
+    // see https://developers.cloudflare.com/workers/configuration/compatibility-flags/#nodejs-compatibility-flag
+    "nodejs_compat",
+    // Allow fetching URLs in the app
+    // see https://developers.cloudflare.com/workers/configuration/compatibility-flags/#global-fetch-strictly-public
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "sabaipics-www"
+    }
+  ],
+
+  // Development environment (default) - localhost
+  "vars": {
+    "NODE_ENV": "development"
+  },
+
+  "env": {
+    // Production environment
+    "production": {
+      "vars": {
+        "NODE_ENV": "production"
+      },
+      "routes": [
+        {
+          "pattern": "sabaipics.com",
+          "zone_name": "sabaipics.com",
+          "custom_domain": true
+        },
+        {
+          "pattern": "www.sabaipics.com",
+          "zone_name": "sabaipics.com",
+          "custom_domain": true
+        }
+      ],
+      "preview_urls": false,
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+      }
+    }
+  }
+}
