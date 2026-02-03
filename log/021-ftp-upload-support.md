@@ -513,6 +513,7 @@ STOR DSC_0001.JPG
 ## 2025-01-28: MIME Type Validation Fix
 
 **Issue:** SAB-73 FTP upload flow had inconsistent MIME type validation:
+
 - API `/api/ftp/presign` accepted any `contentType` string (no validation)
 - Go FTP server returned fallback `application/octet-stream` for unknown extensions instead of rejecting
 
@@ -602,6 +603,7 @@ if err != nil {
 Removed duplicate `var err error` declaration (already captured from MIME check).
 
 **FTP Error Mapping:** When `mime.FromFilename()` returns error:
+
 - Go returns error from `OpenFile()` → FTP library maps to `550 File type not allowed`
 - Camera receives immediate rejection before sending any data
 - Connection stays open - camera can try another file
@@ -609,10 +611,12 @@ Removed duplicate `var err error` declaration (already captured from MIME check)
 ### Validation
 
 **Build Status:**
+
 - ✅ TypeScript API: `pnpm build` succeeded (no type errors)
 - ✅ Go FTP Server: `go build ./...` succeeded (no compilation errors)
 
 **Whitelist Consistency:**
+
 ```
 API:  image/jpeg, image/png, image/heic, image/heif, image/webp
 Go:   .jpg/.jpeg → image/jpeg, .png → image/png, .heic → image/heic, .heif → image/heif, .webp → image/webp
@@ -622,26 +626,29 @@ Both whitelists match - no drift.
 
 ### Expected Behavior After Changes
 
-| Scenario | Before | After |
-|----------|--------|-------|
-| Camera uploads `photo.jpg` | ✅ Go detects `.jpg` → `image/jpeg` → presign succeeds → upload succeeds | ✅ Same (no change) |
-| Camera uploads `photo.heic` | ✅ Go detects `.heic` → `image/heic` → presign succeeds → upload succeeds | ✅ Same (no change) |
-| Camera uploads `document.pdf` | ❌ Go detects `.pdf` → `application/octet-stream` → presign accepts → R2 upload succeeds → **consumer fails** (wasted credit) | ✅ Go detects `.pdf` → **returns error** → FTP 550 → camera sees immediate rejection (no upload, no credit wasted) |
-| Camera uploads `archive.zip` | ❌ Same as `.pdf` | ✅ Same as `.pdf` (immediate rejection) |
-| Client POSTs to API with `contentType: "application/pdf"` | ❌ API accepts → generates presigned URL (invalid flow) | ✅ API rejects with 400 + Zod error message |
+| Scenario                                                  | Before                                                                                                                        | After                                                                                                              |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Camera uploads `photo.jpg`                                | ✅ Go detects `.jpg` → `image/jpeg` → presign succeeds → upload succeeds                                                      | ✅ Same (no change)                                                                                                |
+| Camera uploads `photo.heic`                               | ✅ Go detects `.heic` → `image/heic` → presign succeeds → upload succeeds                                                     | ✅ Same (no change)                                                                                                |
+| Camera uploads `document.pdf`                             | ❌ Go detects `.pdf` → `application/octet-stream` → presign accepts → R2 upload succeeds → **consumer fails** (wasted credit) | ✅ Go detects `.pdf` → **returns error** → FTP 550 → camera sees immediate rejection (no upload, no credit wasted) |
+| Camera uploads `archive.zip`                              | ❌ Same as `.pdf`                                                                                                             | ✅ Same as `.pdf` (immediate rejection)                                                                            |
+| Client POSTs to API with `contentType: "application/pdf"` | ❌ API accepts → generates presigned URL (invalid flow)                                                                       | ✅ API rejects with 400 + Zod error message                                                                        |
 
 ### Design Notes
 
 **Why whitelist at both API and FTP server?**
+
 - **API validation:** Defends against malicious API clients bypassing FTP (direct presign API calls)
 - **FTP validation:** Fail-fast at filename detection (before camera sends bytes) - better UX, no wasted bandwidth
 
 **Why not add `.CR2`, `.NEF` (RAW formats)?**
+
 - Upload-consumer doesn't support RAW normalization yet
 - Cameras typically send JPEG over FTP (RAW via USB/WiFi proprietary protocols)
 - Can add later when RAW support is implemented (extend both whitelists + consumer)
 
 **Error message format:**
+
 - Go: `unsupported file type: .pdf` (simple, logged to FTP server)
 - API: `Content type must be one of: image/jpeg, image/png, image/heic, image/heif, image/webp` (Zod error)
 
@@ -742,3 +749,8 @@ Single helper used by event creation + manual credential creation route.
 
 - Show username by default
 - Reveal password on demand (toggle + copy)
+
+**2026-02-03 UX polish:**
+
+- Use native `type="password"` masking when hidden (no more literal "Hidden" text)
+- Show inline copy feedback (swap Copy icon to Check for ~2s)
