@@ -13,9 +13,15 @@ struct SonyWiFiQRCode: Codable, Equatable {
     let cameraId: String?
 
     var ssid: String {
-        // Sony convention as shown on-camera.
-        // Example: DIRECT-cWE1:ILCE-7RM4
-        "DIRECT-\(ssidSuffix):\(cameraModel)"
+        // Sony conventions observed on-camera / in QR payloads:
+        // - Imaging Edge era: S:<suffix> (e.g. cWE1) and C:<model> (e.g. ILCE-7RM4)
+        //   => DIRECT-<suffix>:<model>
+        // - Newer payloads: S:<full SSID> (e.g. DIRECT-5HU1:ILCE-7M5)
+        if ssidSuffix.hasPrefix("DIRECT-") {
+            return ssidSuffix
+        }
+
+        return "DIRECT-\(ssidSuffix):\(cameraModel)"
     }
 
     static func parse(_ raw: String) -> SonyWiFiQRCode? {
