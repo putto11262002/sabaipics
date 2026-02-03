@@ -17,7 +17,7 @@ export function LandingHero() {
         <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background" />
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 pb-16 pt-14 sm:pb-24 sm:pt-20">
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-14 sm:pb-24 sm:pt-20">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}

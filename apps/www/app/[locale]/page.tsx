@@ -1,6 +1,7 @@
 import { setRequestLocale } from 'next-intl/server';
 import { Footer } from '@/components/landing/footer';
 import { LandingHero } from '@/components/landing/hero';
+import { BentoFeatures } from '@/components/landing/bento-features';
 import { SiteNav } from '@/components/site-nav';
 
 type Props = {
@@ -16,11 +17,10 @@ export default async function Page({ params }: Props) {
       <SiteNav />
       <main>
         <LandingHero />
+        <BentoFeatures />
 
-        <section id="features" className="mx-auto max-w-6xl px-4 py-16" />
-        <section id="upload" className="mx-auto max-w-6xl px-4 py-16" />
-        <section id="pricing" className="mx-auto max-w-6xl px-4 py-16" />
-        <section id="faq" className="mx-auto max-w-6xl px-4 py-16" />
+        <section id="pricing" className="mx-auto max-w-7xl px-4 py-16" />
+        <section id="faq" className="mx-auto max-w-7xl px-4 py-16" />
       </main>
       <Footer />
     </div>
