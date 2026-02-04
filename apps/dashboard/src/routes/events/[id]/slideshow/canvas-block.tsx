@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@sabaipics/uiv3/lib/utils';
+import { LogoMark } from '@/components/icons/logo-mark';
 import type {
   SlideshowBlock,
   SlideshowTheme,
@@ -79,8 +80,8 @@ function HeaderContent({ props, eventName }: { props: HeaderProps; eventName: st
       )}
     >
       {props.showLogo && (
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-medium text-muted-foreground">
-          Logo
+        <div className="flex size-12 shrink-0 items-center justify-center">
+          <LogoMark className="size-10 text-primary" />
         </div>
       )}
       {props.showName && <h2 className="text-2xl font-bold text-primary">{eventName}</h2>}
