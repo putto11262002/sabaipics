@@ -1,17 +1,20 @@
 /**
  * RekognitionRateLimiter Durable Object
  *
- * Paces API calls to AWS Rekognition to stay within TPS limits.
+ * Paces API calls to AWS Rekognition IndexFaces to stay within TPS limits.
  * Uses in-memory state for zero-latency coordination.
  *
- * us-west-2 limits:
- * - IndexFaces: 50 TPS
- * - SearchFacesByImage: 50 TPS
+ * us-west-2 limits (shared quota):
+ * - IndexFaces + SearchFacesByImage: 50 TPS (shared)
+ *
+ * Quota allocation:
+ * - IndexFaces: 30 TPS (this DO, background processing, can wait)
+ * - SearchFacesByImage: 20 TPS (CF rate limiter, user-facing, reject immediately)
  *
  * Strategy:
  * - Track when last batch will finish
  * - New batches wait until previous batch completes
- * - Within batch, space requests at intervalMs (20ms = 50 TPS)
+ * - Within batch, space requests at intervalMs (~33ms = 30 TPS)
  *
  * If DO is evicted (idle >10s), state resets - safe to start fresh
  * since no recent API activity.
@@ -24,17 +27,17 @@ import type { RateLimiterResponse } from "../types/photo-job";
 // Configuration
 // =============================================================================
 
-/** AWS Rekognition TPS limit in us-west-2 */
-const REKOGNITION_TPS = 50;
+/** AWS Rekognition TPS allocation for IndexFaces (30 out of 50 shared quota) */
+const REKOGNITION_TPS = 30;
 
 /** Milliseconds between requests to achieve TPS limit */
-const INTERVAL_MS = Math.ceil(1000 / REKOGNITION_TPS); // 20ms
+const INTERVAL_MS = Math.ceil(1000 / REKOGNITION_TPS); // 33ms
 
 /** Safety margin - use 90% of limit to avoid edge cases */
 const SAFETY_FACTOR = 0.9;
 
 /** Effective interval with safety margin */
-const SAFE_INTERVAL_MS = Math.ceil(INTERVAL_MS / SAFETY_FACTOR); // ~22ms
+const SAFE_INTERVAL_MS = Math.ceil(INTERVAL_MS / SAFETY_FACTOR); // ~37ms
 
 // =============================================================================
 // Durable Object Class (RPC-enabled)
