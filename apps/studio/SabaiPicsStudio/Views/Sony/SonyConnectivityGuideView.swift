@@ -25,13 +25,12 @@ struct SonyConnectivityGuideView: View {
                         .font(.subheadline)
                         .foregroundColor(Color.Theme.mutedForeground)
 
-                    VStack(alignment: .leading, spacing: 0) {
-                        guideRow(index: 1, text: "Settings > Cellular > Cellular Data: On")
-                        divider
-                        guideRow(index: 2, text: "Settings > Cellular > SabaiPics Studio: On")
-                        divider
-                        guideRow(index: 3, text: "Settings > Cellular > Wi-Fi Assist: On (optional; foreground only)")
+                    VStack(alignment: .leading, spacing: 10) {
+                        guideLine(index: 1, text: "Settings > Cellular > Cellular Data: On")
+                        guideLine(index: 2, text: "Settings > Cellular > SabaiPics Studio: On")
+                        guideLine(index: 3, text: "Settings > Cellular > Wi-Fi Assist: On (optional; foreground only)")
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     Text("Transfers work without internet. If uploads fail, you can upload later on a normal network.")
                         .font(.subheadline)
@@ -55,23 +54,18 @@ struct SonyConnectivityGuideView: View {
     }
 }
 
-private var divider: some View {
-    Rectangle()
-        .fill(Color.Theme.border)
-        .frame(height: 1)
-}
-
-private func guideRow(index: Int, text: String) -> some View {
-    HStack(alignment: .center, spacing: 12) {
+private func guideLine(index: Int, text: String) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 10) {
         ZStack {
             Circle()
-                .fill(Color.Theme.background)
-                .overlay(Circle().stroke(Color.Theme.border, lineWidth: 1))
+                .stroke(Color.Theme.border, lineWidth: 1)
+                .frame(width: 22, height: 22)
             Text("\(index)")
-                .font(.system(size: 14, weight: .bold))
+                .font(.caption)
+                .fontWeight(.semibold)
                 .foregroundColor(Color.Theme.foreground)
         }
-        .frame(width: 28, height: 28)
+        .padding(.top, 1)
 
         Text(text)
             .font(.subheadline)
@@ -79,8 +73,8 @@ private func guideRow(index: Int, text: String) -> some View {
 
         Spacer(minLength: 0)
     }
-    .padding(14)
 }
+
 
 #if DEBUG
 #Preview("Sony Connectivity Guide") {
