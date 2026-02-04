@@ -40,21 +40,19 @@ struct ContentView: View {
                 .transition(.opacity)
                 .id("sony-new-camera-decision")
 
-            case .sonySSIDJoinStub:
-                SonyAPSSIDJoinView()
-                    .transition(.opacity)
-                    .id("sony-ssid-stub")
+            case let .sonyWiFiOnboarding(mode):
+                SonyWiFiOnboardingView(
+                    mode: mode == .qr ? .qr : .manual,
+                    onBack: { captureFlow.state = .sonyNewCameraDecision },
+                    onContinue: { captureFlow.proceedToDiscovery() }
+                )
+                .transition(.opacity)
+                .id("sony-wifi-onboarding")
 
             case .hotspotSetup:
-                if captureFlow.selectedManufacturer == .sony {
-                    SonyAPSetupView()
-                        .transition(.opacity)
-                        .id("sony-ap-setup")
-                } else {
-                    HotspotSetupView()
-                        .transition(.opacity)
-                        .id("hotspot-setup")
-                }
+                HotspotSetupView()
+                    .transition(.opacity)
+                    .id("hotspot-setup")
 
             case .discovering:
                 if captureFlow.selectedManufacturer == .sony {
@@ -100,10 +98,3 @@ struct ContentView: View {
     }
 }
 
-#Preview {
-    let coordinator = AppCoordinator()
-    return ContentView()
-        .environmentObject(coordinator)
-        .environmentObject(coordinator.connectionStore)
-        .environmentObject(coordinator.photoStore)
-}

@@ -17,10 +17,15 @@ class CaptureFlowCoordinator: ObservableObject {
     // MARK: - State
 
     enum State: Equatable {
+        enum SonyWiFiOnboardingMode: Equatable {
+            case qr
+            case manual
+        }
+
         case manufacturerSelection
         case sonyEntry
         case sonyNewCameraDecision
-        case sonySSIDJoinStub
+        case sonyWiFiOnboarding(mode: SonyWiFiOnboardingMode)
         case hotspotSetup
         case discovering
         case manualIPEntry
@@ -35,12 +40,13 @@ class CaptureFlowCoordinator: ObservableObject {
             case (.manufacturerSelection, .manufacturerSelection),
                  (.sonyEntry, .sonyEntry),
                  (.sonyNewCameraDecision, .sonyNewCameraDecision),
-                 (.sonySSIDJoinStub, .sonySSIDJoinStub),
                  (.hotspotSetup, .hotspotSetup),
                  (.discovering, .discovering),
                  (.manualIPEntry, .manualIPEntry),
                  (.transferring, .transferring):
                 return true
+            case let (.sonyWiFiOnboarding(lhsMode), .sonyWiFiOnboarding(rhsMode)):
+                return lhsMode == rhsMode
             case let (.connecting(lhsIP), .connecting(rhsIP)):
                 return lhsIP == rhsIP
             case let (.error(lhsMsg), .error(rhsMsg)):
@@ -105,7 +111,7 @@ class CaptureFlowCoordinator: ObservableObject {
     func startSonySetup() {
         print("[CaptureFlowCoordinator] Sony: starting setup wizard")
         preferredSonyRecordID = nil
-        state = .hotspotSetup
+        state = .sonyWiFiOnboarding(mode: .qr)
     }
 
     func startSonyNewCamera() {
@@ -115,9 +121,9 @@ class CaptureFlowCoordinator: ObservableObject {
     }
 
     func startSonySSIDStub() {
-        print("[CaptureFlowCoordinator] Sony: SSID join stub")
+        print("[CaptureFlowCoordinator] Sony: SSID join")
         preferredSonyRecordID = nil
-        state = .sonySSIDJoinStub
+        state = .sonyWiFiOnboarding(mode: .manual)
     }
 
     func skipToManualEntry() {
