@@ -6,7 +6,9 @@
 //
 
 import Foundation
+#if os(iOS)
 import NetworkExtension
+#endif
 
 struct SonyAPConnectionRecord: Codable, Equatable, Identifiable {
     let id: String
@@ -31,13 +33,10 @@ struct SonyAPPendingJoinInfo: Codable, Equatable {
 final class SonyAPConnectionCache {
     static let shared = SonyAPConnectionCache()
 
-    private let storageKey = "SonyAP.ConnectionCache.v2"
-    private let legacyStorageKey = "SonyAP.ConnectionCache.v1"
-    private let pendingKey = "SonyAP.PendingJoinInfo.v1"
+    private let storageKey = "SonyAP.ConnectionCache"
+    private let pendingKey = "SonyAP.PendingJoinInfo"
 
-    private init() {
-        migrateIfNeeded()
-    }
+    private init() {}
 
     func hasEverConnected() -> Bool {
         !loadAllById().isEmpty
@@ -126,10 +125,12 @@ final class SonyAPConnectionCache {
         all.removeValue(forKey: id)
         saveAllById(all)
 
+        #if os(iOS)
         if let ssid = record?.ssid {
             // Best-effort: removes the app-managed configuration if present.
             NEHotspotConfigurationManager.shared.removeConfiguration(forSSID: ssid)
         }
+        #endif
     }
 
     func currentNetworkKey() -> String? {
@@ -153,41 +154,4 @@ final class SonyAPConnectionCache {
         UserDefaults.standard.set(data, forKey: storageKey)
     }
 
-    private struct LegacyRecordV1: Codable, Equatable {
-        let lastKnownCameraIP: String
-        let cameraName: String
-        let lastConnectedAt: Date
-    }
-
-    private func migrateIfNeeded() {
-        // If v2 already exists, do nothing.
-        if UserDefaults.standard.data(forKey: storageKey) != nil {
-            return
-        }
-
-        guard let legacyData = UserDefaults.standard.data(forKey: legacyStorageKey) else {
-            return
-        }
-
-        // Legacy format was [networkKey: LegacyRecordV1]
-        guard let legacy = try? JSONDecoder().decode([String: LegacyRecordV1].self, from: legacyData) else {
-            return
-        }
-
-        var migrated: [String: SonyAPConnectionRecord] = [:]
-        for (networkKey, rec) in legacy {
-            let id = UUID().uuidString
-            migrated[id] = SonyAPConnectionRecord(
-                id: id,
-                cameraName: rec.cameraName,
-                lastKnownCameraIP: rec.lastKnownCameraIP,
-                lastConnectedAt: rec.lastConnectedAt,
-                ssid: nil,
-                cameraId: nil,
-                networkKey: networkKey
-            )
-        }
-
-        saveAllById(migrated)
-    }
 }

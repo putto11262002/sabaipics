@@ -1,28 +1,28 @@
-//  SonyQRStep1GuideBlocks.swift
+//  QRCodeGuideBlocks.swift
 //  SabaiPicsStudio
 //
-//  UI-only components: variants for the Step 1 Sony QR guide block.
-//  These are not wired into the live flow yet.
+//  UI-only components: QR code guide blocks.
+//  Used to guide users to the camera screen that shows a WiFi QR.
 //
 
 import SwiftUI
 
-struct SonyQRGuideStep: Identifiable, Hashable {
+struct QRCodeGuideStep: Identifiable, Hashable {
     var id = UUID()
     var icon: String
     var text: String
 }
 
 // Variant A: pill rows inside a card
-struct SonyQRStep1GuideBlockPills: View {
+struct QRCodeGuidePills: View {
     let title: String
     let subtitle: String?
-    let steps: [SonyQRGuideStep]
+    let steps: [QRCodeGuideStep]
 
     init(
         title: String = "On your Sony camera",
         subtitle: String? = "Keep the camera QR screen open.",
-        steps: [SonyQRGuideStep]
+        steps: [QRCodeGuideStep]
     ) {
         self.title = title
         self.subtitle = subtitle
@@ -71,15 +71,15 @@ struct SonyQRStep1GuideBlockPills: View {
 }
 
 // Variant B: timeline
-struct SonyQRStep1GuideBlockTimeline: View {
+struct QRCodeGuideTimeline: View {
     let title: String
     let subtitle: String?
-    let steps: [SonyQRGuideStep]
+    let steps: [QRCodeGuideStep]
 
     init(
         title: String = "Show QR on camera",
         subtitle: String? = "Follow these steps in order.",
-        steps: [SonyQRGuideStep]
+        steps: [QRCodeGuideStep]
     ) {
         self.title = title
         self.subtitle = subtitle
@@ -151,15 +151,15 @@ struct SonyQRStep1GuideBlockTimeline: View {
 }
 
 // Variant C: breadcrumb sentence
-struct SonyQRStep1GuideBlockBreadcrumb: View {
+struct QRCodeGuideBreadcrumb: View {
     let title: String
     let note: String?
-    let steps: [SonyQRGuideStep]
+    let steps: [QRCodeGuideStep]
 
     init(
         title: String = "Camera menu path",
         note: String? = "Ends on the screen that shows QR + SSID.",
-        steps: [SonyQRGuideStep]
+        steps: [QRCodeGuideStep]
     ) {
         self.title = title
         self.note = note
@@ -216,18 +216,18 @@ struct SonyQRStep1GuideBlockBreadcrumb: View {
     }
 }
 
-#Preview("Sony QR Step 1 Guide Blocks") {
-    let steps: [SonyQRGuideStep] = [
+#Preview("QR Code Guide Blocks") {
+    let steps: [QRCodeGuideStep] = [
         .init(icon: "line.3.horizontal", text: "MENU"),
         .init(icon: "network", text: "Network"),
         .init(icon: "iphone", text: "Smartphone Control → On"),
         .init(icon: "qrcode", text: "Connection (shows QR + SSID)")
     ]
 
-    SonyQRStep1GuideBlocksPreviewHarness(steps: steps)
+    QRCodeGuideBlocksPreviewHarness(steps: steps)
 }
 
-private struct SonyQRStep1GuideBlocksPreviewHarness: View {
+private struct QRCodeGuideBlocksPreviewHarness: View {
     enum Variant: String, CaseIterable, Identifiable {
         case pills = "Pills"
         case timeline = "Timeline"
@@ -236,7 +236,7 @@ private struct SonyQRStep1GuideBlocksPreviewHarness: View {
         var id: String { rawValue }
     }
 
-    let steps: [SonyQRGuideStep]
+    let steps: [QRCodeGuideStep]
 
     @State private var variant: Variant = .pills
 
@@ -253,11 +253,11 @@ private struct SonyQRStep1GuideBlocksPreviewHarness: View {
                 VStack(alignment: .leading, spacing: 14) {
                     switch variant {
                     case .pills:
-                        SonyQRStep1GuideBlockPills(steps: steps)
+                        QRCodeGuidePills(steps: steps)
                     case .timeline:
-                        SonyQRStep1GuideBlockTimeline(steps: steps)
+                        QRCodeGuideTimeline(steps: steps)
                     case .breadcrumb:
-                        SonyQRStep1GuideBlockBreadcrumb(steps: steps)
+                        QRCodeGuideBreadcrumb(steps: steps)
                     }
 
                     Spacer(minLength: 0)
