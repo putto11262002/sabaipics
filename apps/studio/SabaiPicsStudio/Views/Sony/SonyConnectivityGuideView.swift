@@ -32,14 +32,6 @@ struct SonyConnectivityGuideView: View {
                         divider
                         guideRow(index: 3, text: "Settings > Cellular > Wi-Fi Assist: On (optional; foreground only)")
                     }
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.Theme.card)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.Theme.border, lineWidth: 1)
-                    )
 
                     Text("Transfers work without internet. If uploads fail, you can upload later on a normal network.")
                         .font(.subheadline)
