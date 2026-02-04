@@ -10,9 +10,9 @@ struct SonyAPDiscoveryView: View {
     @EnvironmentObject var captureFlow: CaptureFlowCoordinator
     @StateObject private var scanner = NetworkScannerService()
 
-    @State private var showBackConfirmation = false
     @State private var timeoutTask: Task<Void, Never>?
     @State private var didTimeout = false
+    @State private var needsNetworkHelp = false
     private let startScanOnAppear: Bool
 
     @MainActor
@@ -40,18 +40,14 @@ struct SonyAPDiscoveryView: View {
         .navigationTitle("Connect Sony")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    showBackConfirmation = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Back")
-                    }
-                    .foregroundColor(Color.Theme.primary)
-                }
-            }
+        .appBackButton(
+            confirmation: AppBackConfirmation(
+                title: "Stop connecting?",
+                message: "Return to manufacturer selection?"
+            )
+        ) {
+            await captureFlow.cleanup()
+            captureFlow.backToManufacturerSelection()
         }
         .onAppear {
             captureFlow.registerCleanup { [weak scanner] in
@@ -60,7 +56,6 @@ struct SonyAPDiscoveryView: View {
 
             if startScanOnAppear {
                 startSonyProbe()
-                startTimeout()
             }
         }
         .onDisappear {
@@ -80,22 +75,33 @@ struct SonyAPDiscoveryView: View {
                 captureFlow.selectDiscoveredCamera(camera)
             }
         }
-        .alert("Stop connecting?", isPresented: $showBackConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Go Back", role: .destructive) {
-                Task {
-                    await captureFlow.cleanup()
-                    captureFlow.backToManufacturerSelection()
-                }
-            }
-        } message: {
-            Text("Return to manufacturer selection?")
-        }
     }
 
     @ViewBuilder
     private var mainContent: some View {
-        if !scanner.discoveredCameras.isEmpty {
+        if needsNetworkHelp {
+            VStack(spacing: 20) {
+                Spacer()
+
+                Image(systemName: "network.slash")
+                    .font(.system(size: 50))
+                    .foregroundColor(Color.Theme.mutedForeground.opacity(0.6))
+
+                VStack(spacing: 8) {
+                    Text("Connect to camera WiFi")
+                        .font(.title3)
+                        .fontWeight(.medium)
+
+                    Text("Join the camera WiFi, then try again. If the scan still fails, enable Local Network: Settings > Privacy & Security > Local Network")
+                        .font(.subheadline)
+                        .foregroundColor(Color.Theme.mutedForeground)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                }
+
+                Spacer()
+            }
+        } else if !scanner.discoveredCameras.isEmpty {
             // Reuse the same list style: allow user selection if multiple found
             ScrollView {
                 LazyVStack(spacing: 12) {
@@ -172,6 +178,15 @@ struct SonyAPDiscoveryView: View {
     }
 
     private func startSonyProbe() {
+        needsNetworkHelp = false
+        guard wifiInfo != nil else {
+            needsNetworkHelp = true
+            scanner.stopScan()
+            timeoutTask?.cancel()
+            didTimeout = false
+            return
+        }
+
         didTimeout = false
         var preferredIP: String?
         if let id = captureFlow.preferredSonyRecordID {
@@ -181,6 +196,7 @@ struct SonyAPDiscoveryView: View {
 
         let candidates = SonyAPDiscovery.candidateIPs(preferredIP: preferredIP)
         scanner.startScan(candidateIPs: candidates, perIPTimeout: 1.0)
+        startTimeout()
     }
 
     private func startTimeout() {

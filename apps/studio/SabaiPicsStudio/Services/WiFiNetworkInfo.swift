@@ -19,7 +19,10 @@ struct WiFiIPv4Info: Equatable {
 }
 
 enum WiFiNetworkInfo {
-    /// Returns WiFi IPv4 + netmask for interface `en0` if present.
+    /// Returns WiFi-ish IPv4 + netmask.
+    ///
+    /// - Prefers `en0` (WiFi).
+    /// - Falls back to `bridge100` (iPhone Personal Hotspot).
     ///
     /// Note: This does not provide SSID. SSID generally requires additional
     /// entitlements/permissions and is intentionally not relied on here.
@@ -30,27 +33,32 @@ enum WiFiNetworkInfo {
         }
         defer { freeifaddrs(ifaddr) }
 
-        var addr = firstAddr
-        while true {
-            let name = String(cString: addr.pointee.ifa_name)
-            if name == "en0", let sa = addr.pointee.ifa_addr, sa.pointee.sa_family == UInt8(AF_INET) {
-                let ip = sockaddrInToUInt32(sa)
-                let mask: UInt32
-                if let nm = addr.pointee.ifa_netmask {
-                    mask = sockaddrInToUInt32(nm)
-                } else {
-                    mask = 0
+        // We walk the list multiple times to enforce interface preference.
+        for preferredName in ["en0", "bridge100"] {
+            var addr = firstAddr
+            while true {
+                let name = String(cString: addr.pointee.ifa_name)
+                if name == preferredName,
+                   let sa = addr.pointee.ifa_addr,
+                   sa.pointee.sa_family == UInt8(AF_INET) {
+                    let ip = sockaddrInToUInt32(sa)
+                    let mask: UInt32
+                    if let nm = addr.pointee.ifa_netmask {
+                        mask = sockaddrInToUInt32(nm)
+                    } else {
+                        mask = 0
+                    }
+
+                    if ip != 0 {
+                        return WiFiIPv4Info(ip: ip, netmask: mask)
+                    }
                 }
 
-                if ip != 0 {
-                    return WiFiIPv4Info(ip: ip, netmask: mask)
+                guard let next = addr.pointee.ifa_next else {
+                    break
                 }
+                addr = next
             }
-
-            guard let next = addr.pointee.ifa_next else {
-                break
-            }
-            addr = next
         }
 
         return nil
