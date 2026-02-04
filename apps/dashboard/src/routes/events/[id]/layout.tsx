@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { useParams, useNavigate, Outlet, NavLink, Link } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Button } from '@sabaipics/uiv3/components/button';
 import { Alert } from '@sabaipics/uiv3/components/alert';
 import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
@@ -15,6 +18,9 @@ import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header
 import { useEvent } from '../../../hooks/events/useEvent';
 import { useCopyToClipboard } from '../../../hooks/use-copy-to-clipboard';
 import { useDownloadQR } from '../../../hooks/events/useDownloadQR';
+import { useDeleteEvent } from '../../../hooks/events/useDeleteEvent';
+import { useHardDeleteEvent } from '../../../hooks/events/useHardDeleteEvent';
+import { DeleteConfirmDialog } from '../../../components/events/DeleteConfirmDialog';
 import { cn } from '@sabaipics/uiv3/lib/utils';
 
 const tabs = [
@@ -27,13 +33,66 @@ const tabs = [
 export default function EventDetailLayout() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data, isLoading, error, refetch } = useEvent(id);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const downloadQR = useDownloadQR();
+  const deleteEvent = useDeleteEvent();
+  const hardDeleteEvent = useHardDeleteEvent();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [hardDeleteDialogOpen, setHardDeleteDialogOpen] = useState(false);
 
   const handleCopyLink = (eventId: string) => {
     const searchUrl = `${window.location.origin}/participant/events/${eventId}/search`;
     copyToClipboard(searchUrl);
+  };
+
+  // Handle soft delete
+  const handleSoftDelete = () => {
+    if (!id) return;
+
+    deleteEvent.mutate(
+      { eventId: id },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['events'] });
+          queryClient.removeQueries({ queryKey: ['events', id] }); // Remove specific event from cache
+          toast.success('Event deleted');
+          setDeleteDialogOpen(false);
+          navigate('/events'); // Redirect to list
+        },
+        onError: (error) => {
+          toast.error('Delete failed', {
+            description: error.message,
+          });
+          setDeleteDialogOpen(false);
+        },
+      }
+    );
+  };
+
+  // Handle hard delete
+  const handleHardDelete = () => {
+    if (!id) return;
+
+    hardDeleteEvent.mutate(
+      { eventId: id },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['events'] });
+          queryClient.removeQueries({ queryKey: ['events', id] }); // Remove specific event from cache
+          toast.success('Event permanently deleted');
+          setHardDeleteDialogOpen(false);
+          navigate('/events'); // Redirect to list
+        },
+        onError: (error) => {
+          toast.error('Hard delete failed', {
+            description: error.message,
+          });
+          setHardDeleteDialogOpen(false);
+        },
+      }
+    );
   };
 
   if (isLoading) {
@@ -115,7 +174,17 @@ export default function EventDetailLayout() {
               Download QR Code
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">Delete Event</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={() => setDeleteDialogOpen(true)}>
+              Delete Event
+            </DropdownMenuItem>
+            {import.meta.env.DEV && (
+              <DropdownMenuItem
+                className="text-destructive font-bold"
+                onClick={() => setHardDeleteDialogOpen(true)}
+              >
+                Hard Delete (Dev)
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarPageHeader>
@@ -153,6 +222,25 @@ export default function EventDetailLayout() {
       <div className="flex-1 overflow-auto px-4">
         <Outlet />
       </div>
+
+      {/* Delete Confirmation Dialogs */}
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleSoftDelete}
+        type="soft"
+        isLoading={deleteEvent.isPending}
+      />
+
+      {import.meta.env.DEV && (
+        <DeleteConfirmDialog
+          open={hardDeleteDialogOpen}
+          onOpenChange={setHardDeleteDialogOpen}
+          onConfirm={handleHardDelete}
+          type="hard"
+          isLoading={hardDeleteEvent.isPending}
+        />
+      )}
     </div>
   );
 }

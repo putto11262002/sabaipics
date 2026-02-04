@@ -8,7 +8,7 @@ interface HardDeleteEventParams {
 const hardDeleteEvent = api.events[':id']['hard'].$delete;
 type response = InferResponseType<typeof hardDeleteEvent>;
 type successResponse = InferResponseType<typeof hardDeleteEvent, 200>;
-type errrorResponse = Exclude<response, successResponse>;
+type errorResponse = Exclude<response, successResponse>;
 
 type HardDeleteResult = successResponse['data'];
 
@@ -25,7 +25,7 @@ export function useHardDeleteEvent() {
       );
 
       if (!response.ok) {
-        const error = (await response.json()) as errrorResponse;
+        const error = (await response.json()) as errorResponse;
         const message = error.error.message || `Failed to hard delete event: ${response.status}`;
         throw new Error(message);
       }
