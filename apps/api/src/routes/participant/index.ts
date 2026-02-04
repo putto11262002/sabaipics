@@ -252,8 +252,8 @@ export const participantRouter = new Hono<Env>()
       return safeTry(async function* () {
         const { eventId } = c.req.valid('param');
 
-        // Check rate limit (20 req/10s per eventId)
-        const { success } = await c.env.SEARCH_RATE_LIMITER.limit({ key: eventId });
+        // Check rate limit (20 TPS globally for SearchFacesByImage AWS quota)
+        const { success } = await c.env.SEARCH_RATE_LIMITER.limit({ key: 'global' });
         if (!success) {
           return err<never, HandlerError>({
             code: 'RATE_LIMITED',

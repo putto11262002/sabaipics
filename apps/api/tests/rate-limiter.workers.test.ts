@@ -17,7 +17,7 @@ describe("RekognitionRateLimiter DO", () => {
 
     expect(result.delay).toBe(0);
     expect(result.intervalMs).toBeGreaterThan(0);
-    expect(result.intervalMs).toBeLessThanOrEqual(25); // ~22ms expected
+    expect(result.intervalMs).toBeLessThanOrEqual(40); // ~37ms expected (30 TPS)
   });
 
   it("returns delay for back-to-back batches", async () => {
@@ -52,14 +52,14 @@ describe("RekognitionRateLimiter DO", () => {
     expect(next.delay).toBeGreaterThanOrEqual(2000);
   });
 
-  it("calculates correct interval for 50 TPS", async () => {
+  it("calculates correct interval for 30 TPS", async () => {
     const id = env.AWS_REKOGNITION_RATE_LIMITER.idFromName("test-interval");
     const rateLimiter = env.AWS_REKOGNITION_RATE_LIMITER.get(id);
 
     const result = await rateLimiter.reserveBatch(1);
 
-    // 50 TPS = 20ms interval, with 90% safety = ~22ms
-    expect(result.intervalMs).toBeGreaterThanOrEqual(20);
-    expect(result.intervalMs).toBeLessThanOrEqual(25);
+    // 30 TPS = 33ms interval, with 90% safety = ~37ms
+    expect(result.intervalMs).toBeGreaterThanOrEqual(33);
+    expect(result.intervalMs).toBeLessThanOrEqual(40);
   });
 });
