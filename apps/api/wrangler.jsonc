@@ -22,6 +22,8 @@
     "PHOTO_R2_BASE_URL": "https://devphotos.sabaipics.com",
     "RETENTION_DAYS": "30",
     "CLEANUP_BATCH_SIZE": "10",
+    "HARD_DELETE_GRACE_DAYS": "30",
+    "HARD_DELETE_BATCH_SIZE": "5",
   },
 
   // R2 bucket for photo storage
@@ -137,6 +139,8 @@
         "PHOTO_R2_BASE_URL": "https://photos-staging.sabaipics.com",
         "RETENTION_DAYS": "30",
         "CLEANUP_BATCH_SIZE": "10",
+        "HARD_DELETE_GRACE_DAYS": "30",
+        "HARD_DELETE_BATCH_SIZE": "5",
       },
       "routes": [
         {
@@ -218,7 +222,7 @@
         ],
       },
       "triggers": {
-        "crons": ["0 20 * * *"],
+        "crons": ["0 20 * * *", "0 21 * * *"],
       },
       "observability": {
         "enabled": true,
@@ -243,6 +247,8 @@
         "PHOTO_R2_BASE_URL": "https://photo.sabaipics.com",
         "RETENTION_DAYS": "30",
         "CLEANUP_BATCH_SIZE": "10",
+        "HARD_DELETE_GRACE_DAYS": "30",
+        "HARD_DELETE_BATCH_SIZE": "5",
       },
       "routes": [
         {
@@ -324,7 +330,7 @@
         ],
       },
       "triggers": {
-        "crons": ["0 20 * * *"],
+        "crons": ["0 20 * * *", "0 21 * * *"],
       },
       "preview_urls": false,
       "observability": {

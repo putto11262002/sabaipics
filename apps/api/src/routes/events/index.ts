@@ -13,7 +13,7 @@ import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../../lib/error';
 import { generatePresignedPutUrl } from '../../lib/r2/presign';
 import { createFtpCredentialsWithRetry } from '../../lib/ftp/credentials';
-import { hardDeleteEvent } from '../../lib/events/hard-delete';
+import { hardDeleteEvents } from '../../lib/services/events/hard-delete';
 import { createFaceProvider } from '../../lib/rekognition';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -632,7 +632,7 @@ export const eventsRouter = new Hono<Env>()
 
   .delete('/:id/hard', requirePhotographer(), zValidator('param', eventParamsSchema), async (c) => {
     const photographer = c.var.photographer;
-    const db = c.var.db();
+    const db = c.var.dbTx(); // Use WebSocket adapter for transaction support
     const { id } = c.req.valid('param');
 
     // DEV-ONLY: Block in staging/production
@@ -646,7 +646,6 @@ export const eventsRouter = new Hono<Env>()
         db
           .select({
             id: events.id,
-            rekognitionCollectionId: events.rekognitionCollectionId,
           })
           .from(events)
           .where(and(eq(events.id, id), eq(events.photographerId, photographer.id)))
@@ -661,7 +660,7 @@ export const eventsRouter = new Hono<Env>()
       // Create Rekognition provider and deleteRekognition function
       const provider = createFaceProvider(c.env);
       const deleteRekognition = async (collectionId: string): Promise<void> => {
-        await provider.deleteCollection(id).match(
+        await provider.deleteCollection(collectionId).match(
           () => undefined,
           (error) => {
             throw new Error(`Rekognition deletion failed: ${error.type}`);
@@ -669,21 +668,27 @@ export const eventsRouter = new Hono<Env>()
         );
       };
 
-      // Hard delete all related data
-      const result = yield* ResultAsync.fromPromise(
-        hardDeleteEvent({
-          db,
-          eventId: id,
-          r2Bucket: c.env.PHOTOS_BUCKET,
-          rekognitionCollectionId: event.rekognitionCollectionId,
-          deleteRekognition,
-        }),
-        (cause): HandlerError => ({
+      // Hard delete all related data (batch function with single ID)
+      const results = yield* hardDeleteEvents({
+        db,
+        eventIds: [id],
+        r2Bucket: c.env.PHOTOS_BUCKET,
+        deleteRekognition,
+      }).mapErr((serviceError): HandlerError => ({
+        code: 'INTERNAL_ERROR',
+        message: `Hard delete failed: ${serviceError.type}`,
+        cause: serviceError
+      }));
+
+      // Check if deletion succeeded
+      const result = results[0];
+      if (!result || !result.success) {
+        const errorMsg = result?.error ? `${result.error.type}` : 'Hard delete failed';
+        return err<never, HandlerError>({
           code: 'INTERNAL_ERROR',
-          message: 'Hard delete failed',
-          cause
-        }),
-      );
+          message: errorMsg
+        });
+      }
 
       return ok({ data: result });
     })

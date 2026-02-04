@@ -23,6 +23,7 @@ import { eq, inArray } from 'drizzle-orm';
 
 export interface HardDeleteResult {
   success: boolean;
+  eventId: string;
   deleted: {
     database: {
       faces: number;
@@ -38,139 +39,196 @@ export interface HardDeleteResult {
   };
 }
 
-export interface HardDeleteOptions {
+export interface HardDeleteEventsOptions {
   db: Database;
-  eventId: string;
+  eventIds: string[];
   r2Bucket: R2Bucket;
-  rekognitionCollectionId?: string | null;
   deleteRekognition: (collectionId: string) => Promise<void>;
 }
 
 /**
- * Hard delete an event and all related data.
+ * Hard delete multiple events and all related data in parallel.
  *
- * Order of operations:
+ * Public API that takes event IDs and looks up event details internally.
+ * Use this for both single-event (HTTP route) and batch (cron) deletions.
+ *
+ * Order of operations (per event):
  * 1. Collect R2 keys from database
  * 2. Delete database records (transaction)
  * 3. Delete R2 objects (parallel, best effort)
  * 4. Delete Rekognition collection (best effort)
+ *
+ * Events are deleted in parallel using Promise.allSettled for optimal performance.
  */
-export async function hardDeleteEvent(options: HardDeleteOptions): Promise<HardDeleteResult> {
-  const { db, eventId, r2Bucket, rekognitionCollectionId, deleteRekognition } = options;
+export async function hardDeleteEvents(options: HardDeleteEventsOptions): Promise<HardDeleteResult[]> {
+  const { db, eventIds, r2Bucket, deleteRekognition } = options;
 
-  // Step 1: Collect R2 keys before deleting from database
-  const [eventPhotos, eventSearches, event] = await Promise.all([
-    db.select({ r2Key: photos.r2Key })
-      .from(photos)
-      .where(eq(photos.eventId, eventId)),
-
-    db.select({ selfieR2Key: participantSearches.selfieR2Key })
-      .from(participantSearches)
-      .where(eq(participantSearches.eventId, eventId)),
-
-    db.select({
-      logoR2Key: events.logoR2Key,
-      qrCodeR2Key: events.qrCodeR2Key
+  // Query events to get rekognitionCollectionId for each
+  const eventDetails = await db
+    .select({
+      id: events.id,
+      rekognitionCollectionId: events.rekognitionCollectionId,
     })
-      .from(events)
-      .where(eq(events.id, eventId))
-      .limit(1)
-      .then(rows => rows[0]),
-  ]);
+    .from(events)
+    .where(inArray(events.id, eventIds));
 
-  // Collect all R2 keys (filter out nulls)
-  const r2Keys = [
-    event?.logoR2Key,
-    event?.qrCodeR2Key,
-    ...eventPhotos.map(p => p.r2Key),
-    ...eventSearches.map(s => s.selfieR2Key),
-  ].filter((key): key is string => Boolean(key));
+  // Delete all events in parallel (optimized for bulk operations)
+  const deletionResults = await Promise.allSettled(
+    eventDetails.map(async (event) => {
+      const eventId = event.id;
+      const rekognitionCollectionId = event.rekognitionCollectionId;
 
-  // Step 2: Delete from database (transaction for atomicity)
-  const dbCounts = await db.transaction(async (tx) => {
-    // Get photo IDs for faces deletion
-    const photoIds = eventPhotos.map(p => p.r2Key).filter(Boolean);
-    const photoRecords = await tx.select({ id: photos.id })
-      .from(photos)
-      .where(eq(photos.eventId, eventId));
-    const photoIdList = photoRecords.map(p => p.id);
+      // Step 1: Collect R2 keys before deleting from database
+      const [eventPhotos, eventSearches, eventData] = await Promise.all([
+        db.select({ r2Key: photos.r2Key })
+          .from(photos)
+          .where(eq(photos.eventId, eventId)),
 
-    // Delete in dependency order (all FKs are RESTRICT)
-    const facesDeleted = photoIdList.length > 0
-      ? await tx.delete(faces).where(inArray(faces.photoId, photoIdList)).returning({ id: faces.id })
-      : [];
+        db.select({ selfieR2Key: participantSearches.selfieR2Key })
+          .from(participantSearches)
+          .where(eq(participantSearches.eventId, eventId)),
 
-    const photosDeleted = await tx.delete(photos)
-      .where(eq(photos.eventId, eventId))
-      .returning({ id: photos.id });
+        db.select({
+          logoR2Key: events.logoR2Key,
+          qrCodeR2Key: events.qrCodeR2Key
+        })
+          .from(events)
+          .where(eq(events.id, eventId))
+          .limit(1)
+          .then(rows => rows[0]),
+      ]);
 
-    const searchesDeleted = await tx.delete(participantSearches)
-      .where(eq(participantSearches.eventId, eventId))
-      .returning({ id: participantSearches.id });
+      // Collect all R2 keys (filter out nulls)
+      const r2Keys = [
+        eventData?.logoR2Key,
+        eventData?.qrCodeR2Key,
+        ...eventPhotos.map(p => p.r2Key),
+        ...eventSearches.map(s => s.selfieR2Key),
+      ].filter((key): key is string => Boolean(key));
 
-    const uploadsDeleted = await tx.delete(uploadIntents)
-      .where(eq(uploadIntents.eventId, eventId))
-      .returning({ id: uploadIntents.id });
+      // Step 2: Delete from database (transaction for atomicity)
+      const dbCounts = await db.transaction(async (tx) => {
+        // Get photo IDs for faces deletion
+        const photoIds = eventPhotos.map(p => p.r2Key).filter(Boolean);
+        const photoRecords = await tx.select({ id: photos.id })
+          .from(photos)
+          .where(eq(photos.eventId, eventId));
+        const photoIdList = photoRecords.map(p => p.id);
 
-    const logoUploadsDeleted = await tx.delete(logoUploadIntents)
-      .where(eq(logoUploadIntents.eventId, eventId))
-      .returning({ id: logoUploadIntents.id });
+        // Delete in dependency order (all FKs are RESTRICT)
+        const facesDeleted = photoIdList.length > 0
+          ? await tx.delete(faces).where(inArray(faces.photoId, photoIdList)).returning({ id: faces.id })
+          : [];
 
-    const ftpDeleted = await tx.delete(ftpCredentials)
-      .where(eq(ftpCredentials.eventId, eventId))
-      .returning({ id: ftpCredentials.id });
+        const photosDeleted = await tx.delete(photos)
+          .where(eq(photos.eventId, eventId))
+          .returning({ id: photos.id });
 
-    const eventsDeleted = await tx.delete(events)
-      .where(eq(events.id, eventId))
-      .returning({ id: events.id });
+        const searchesDeleted = await tx.delete(participantSearches)
+          .where(eq(participantSearches.eventId, eventId))
+          .returning({ id: participantSearches.id });
 
-    return {
-      faces: facesDeleted.length,
-      photos: photosDeleted.length,
-      participantSearches: searchesDeleted.length,
-      uploadIntents: uploadsDeleted.length,
-      logoUploadIntents: logoUploadsDeleted.length,
-      ftpCredentials: ftpDeleted.length,
-      events: eventsDeleted.length,
-    };
-  });
+        const uploadsDeleted = await tx.delete(uploadIntents)
+          .where(eq(uploadIntents.eventId, eventId))
+          .returning({ id: uploadIntents.id });
 
-  // Step 3: Delete R2 objects (parallel, best effort - don't fail if R2 delete fails)
-  const r2Results = await Promise.allSettled(
-    r2Keys.map(key => r2Bucket.delete(key))
+        const logoUploadsDeleted = await tx.delete(logoUploadIntents)
+          .where(eq(logoUploadIntents.eventId, eventId))
+          .returning({ id: logoUploadIntents.id });
+
+        const ftpDeleted = await tx.delete(ftpCredentials)
+          .where(eq(ftpCredentials.eventId, eventId))
+          .returning({ id: ftpCredentials.id });
+
+        const eventsDeleted = await tx.delete(events)
+          .where(eq(events.id, eventId))
+          .returning({ id: events.id });
+
+        return {
+          faces: facesDeleted.length,
+          photos: photosDeleted.length,
+          participantSearches: searchesDeleted.length,
+          uploadIntents: uploadsDeleted.length,
+          logoUploadIntents: logoUploadsDeleted.length,
+          ftpCredentials: ftpDeleted.length,
+          events: eventsDeleted.length,
+        };
+      });
+
+      // Step 3: Delete R2 objects (parallel, best effort - don't fail if R2 delete fails)
+      const r2Results = await Promise.allSettled(
+        r2Keys.map(key => r2Bucket.delete(key))
+      );
+
+      const r2SuccessCount = r2Results.filter(r => r.status === 'fulfilled').length;
+
+      if (r2Results.some(r => r.status === 'rejected')) {
+        console.warn('[HardDelete] Some R2 deletions failed (non-fatal)', {
+          eventId,
+          total: r2Keys.length,
+          succeeded: r2SuccessCount,
+          failed: r2Keys.length - r2SuccessCount,
+        });
+      }
+
+      // Step 4: Delete Rekognition collection (best effort)
+      let rekognitionDeleted = false;
+      if (rekognitionCollectionId) {
+        try {
+          await deleteRekognition(rekognitionCollectionId);
+          rekognitionDeleted = true;
+          console.log('[HardDelete] Rekognition collection deleted', { eventId, collectionId: rekognitionCollectionId });
+        } catch (error) {
+          console.warn('[HardDelete] Rekognition deletion failed (non-fatal)', {
+            eventId,
+            collectionId: rekognitionCollectionId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      return {
+        success: true,
+        eventId,
+        deleted: {
+          database: dbCounts,
+          r2Objects: r2SuccessCount,
+          rekognitionCollection: rekognitionDeleted,
+        },
+      };
+    })
   );
 
-  const r2SuccessCount = r2Results.filter(r => r.status === 'fulfilled').length;
-
-  if (r2Results.some(r => r.status === 'rejected')) {
-    console.warn('[HardDelete] Some R2 deletions failed (non-fatal)', {
-      total: r2Keys.length,
-      succeeded: r2SuccessCount,
-      failed: r2Keys.length - r2SuccessCount,
-    });
-  }
-
-  // Step 4: Delete Rekognition collection (best effort)
-  let rekognitionDeleted = false;
-  if (rekognitionCollectionId) {
-    try {
-      await deleteRekognition(rekognitionCollectionId);
-      rekognitionDeleted = true;
-      console.log('[HardDelete] Rekognition collection deleted', { collectionId: rekognitionCollectionId });
-    } catch (error) {
-      console.warn('[HardDelete] Rekognition deletion failed (non-fatal)', {
-        collectionId: rekognitionCollectionId,
-        error: error instanceof Error ? error.message : String(error),
+  // Handle both successful and failed deletions
+  const results: HardDeleteResult[] = deletionResults.map((result, index) => {
+    if (result.status === 'fulfilled') {
+      return result.value;
+    } else {
+      // Deletion failed - return error result
+      const eventId = eventDetails[index]?.id || eventIds[index] || 'unknown';
+      console.error('[HardDelete] Event deletion failed', {
+        eventId,
+        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
       });
+      return {
+        success: false,
+        eventId,
+        deleted: {
+          database: {
+            faces: 0,
+            photos: 0,
+            participantSearches: 0,
+            uploadIntents: 0,
+            logoUploadIntents: 0,
+            ftpCredentials: 0,
+            events: 0,
+          },
+          r2Objects: 0,
+          rekognitionCollection: false,
+        },
+      };
     }
-  }
+  });
 
-  return {
-    success: true,
-    deleted: {
-      database: dbCounts,
-      r2Objects: r2SuccessCount,
-      rekognitionCollection: rekognitionDeleted,
-    },
-  };
+  return results;
 }

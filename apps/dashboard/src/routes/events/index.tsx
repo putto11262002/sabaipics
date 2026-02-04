@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { differenceInDays, parseISO } from 'date-fns';
 import { Button } from '@sabaipics/uiv3/components/button';
 import { Alert } from '@sabaipics/uiv3/components/alert';
@@ -16,10 +18,10 @@ import { Calendar, Plus, Search } from 'lucide-react';
 import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { useEvents } from '../../hooks/events/useEvents';
 import { CreateEventModal } from '../../components/events/CreateEventModal';
+import { DeleteConfirmDialog } from '../../components/events/DeleteConfirmDialog';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useDownloadQR } from '../../hooks/events/useDownloadQR';
 import { useDeleteEvent } from '../../hooks/events/useDeleteEvent';
-import { useHardDeleteEvent } from '../../hooks/events/useHardDeleteEvent';
 import {
   DataTable,
   DataTableSearch,
@@ -33,14 +35,15 @@ type StatusFilter = 'all' | 'active' | 'expiring' | 'expired';
 
 export default function EventsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   // Fetch larger dataset - table handles its own client-side pagination
   const { data, isLoading, error, refetch } = useEvents(0, 100);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const downloadQR = useDownloadQR();
   const deleteEvent = useDeleteEvent();
-  const hardDeleteEvent = useHardDeleteEvent();
 
   const handleCopyLink = (eventId: string) => {
     const searchUrl = `${window.location.origin}/participant/events/${eventId}/search`;
@@ -71,55 +74,40 @@ export default function EventsPage() {
     return filtered;
   }, [data?.data, statusFilter]);
 
+  // Handle soft delete confirmation
+  const handleSoftDeleteConfirm = () => {
+    if (!deleteEventId) return;
+
+    deleteEvent.mutate(
+      { eventId: deleteEventId },
+      {
+        onSuccess: () => {
+          // Invalidate all event queries
+          queryClient.invalidateQueries({ queryKey: ['events'] });
+
+          // Show success toast
+          toast.success('Event deleted');
+
+          setDeleteEventId(null); // Close dialog
+        },
+        onError: (error) => {
+          toast.error('Delete failed', {
+            description: error.message,
+          });
+          setDeleteEventId(null);
+        },
+      }
+    );
+  };
+
   // Create action handlers for the table
   const tableActions: EventTableActions = {
     onViewEvent: (eventId: string) => navigate(`/events/${eventId}`),
     onCopySearchLink: (eventId: string) => handleCopyLink(eventId),
     onDownloadQR: (eventId: string, eventName: string) => downloadQR.mutate({ eventId, eventName }),
     onDeleteEvent: (eventId: string) => {
-      if (
-        confirm(
-          'Are you sure you want to delete this event? The event and all its photos will become inaccessible immediately.'
-        )
-      ) {
-        deleteEvent.mutate(
-          { eventId },
-          {
-            onSuccess: () => {
-              refetch();
-            },
-            onError: (error) => {
-              alert(`Failed to delete event: ${error.message}`);
-            },
-          }
-        );
-      }
+      setDeleteEventId(eventId); // Open soft delete dialog
     },
-    onHardDeleteEvent: import.meta.env.DEV
-      ? (eventId: string) => {
-          if (
-            confirm(
-              '⚠️ HARD DELETE (DEV ONLY)\n\nThis will PERMANENTLY delete:\n- Event from database\n- All photos and faces\n- All R2 objects\n- Rekognition collection\n\nThis CANNOT be undone. Are you absolutely sure?'
-            )
-          ) {
-            hardDeleteEvent.mutate(
-              { eventId },
-              {
-                onSuccess: (result) => {
-                  const summary = result.data.deleted;
-                  alert(
-                    `Hard delete successful!\n\nDeleted:\n- ${summary.database.events} event\n- ${summary.database.photos} photos\n- ${summary.database.faces} faces\n- ${summary.database.participantSearches} searches\n- ${summary.r2Objects} R2 objects\n- Rekognition: ${summary.rekognitionCollection ? 'Yes' : 'No'}`
-                  );
-                  refetch();
-                },
-                onError: (error) => {
-                  alert(`Failed to hard delete event: ${error.message}`);
-                },
-              }
-            );
-          }
-        }
-      : undefined,
     isCopied,
   };
 
@@ -271,6 +259,15 @@ export default function EventsPage() {
 
       {/* Create Event Modal */}
       <CreateEventModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} />
+
+      {/* Soft Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={deleteEventId !== null}
+        onOpenChange={(open) => !open && setDeleteEventId(null)}
+        onConfirm={handleSoftDeleteConfirm}
+        type="soft"
+        isLoading={deleteEvent.isPending}
+      />
     </>
   );
 }
