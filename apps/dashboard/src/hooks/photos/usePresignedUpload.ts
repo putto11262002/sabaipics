@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import { api, useApiClient } from '../../lib/api';
 
 /**
  * Presigned URL upload result
@@ -32,7 +32,9 @@ export function usePresignedUpload() {
       eventId: string;
       file: File;
     }): Promise<PresignedUploadResult> => {
-      // Step 1: Get presigned URL from API
+      const token = await getToken();
+
+      // Step1: Get presigned URL from API
       const presignRes = await api.uploads.presign.$post(
         {
           json: {
@@ -46,7 +48,14 @@ export function usePresignedUpload() {
             contentLength: file.size,
           },
         },
-        await withAuth(getToken)
+        {
+          init: {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        },
       );
 
       if (!presignRes.ok) {
