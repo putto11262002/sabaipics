@@ -28,3 +28,14 @@ pnpm --filter=@sabaipics/dashboard pages:deploy  # Deploy dashboard
 - Use official docs only - spawn subagents to research
 - Append changes to `./log/NNN-topic-name.md` (append-only, create new numbered file for new topics)
 - Use shadcn CLI for components: `pnpm --filter=@sabaipics/ui ui:add <component>`
+
+## API Error Handling
+
+**1. neverthrow with Boundary Conversion**
+- Use `ResultAsync.fromPromise()` and `Result.fromThrowable()` to convert throwing code to Results at boundaries
+- Chain operations with `.andThen()`, `.orElse()`, `.match()` for type-safe error flow
+
+**2. Discriminated Union Errors with Layer Mapping**
+- Define typed errors as discriminated unions: `{ type: 'database' | 'storage_failed' | 'not_found' | ... }`
+- Map between layers via helper functions: raw errors → `databaseError()` → typed `ServiceError<Context>`
+- Each layer adds context and propagates up the stack
