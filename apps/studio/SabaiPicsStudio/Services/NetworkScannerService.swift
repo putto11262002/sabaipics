@@ -65,6 +65,9 @@ class NetworkScannerService: ObservableObject {
     /// Current IP being scanned (for progress display)
     @Published var currentScanIP: String = ""
 
+    /// Diagnostics from the most recent scan (best-effort)
+    @Published var lastDiscoveryDiagnostics: DiscoveryDiagnostics?
+
     // MARK: - Configuration
 
     /// Personal Hotspot subnet (iOS default)
@@ -75,6 +78,25 @@ class NetworkScannerService: ObservableObject {
 
     /// Current scan targets (IP addresses)
     private var scanTargets: [String] = []
+
+    // MARK: - Diagnostics (best-effort)
+
+    private enum FailureKind {
+        case permissionDenied
+        case portClosed
+        case timeout
+        case networkUnreachable
+        case hostUnreachable
+        case other
+    }
+
+    private var diagnosticsTotalTargets: Int = 0
+    private var diagnosticsPermissionDeniedCount: Int = 0
+    private var diagnosticsPortClosedCount: Int = 0
+    private var diagnosticsTimeoutCount: Int = 0
+    private var diagnosticsNetworkUnreachableCount: Int = 0
+    private var diagnosticsHostUnreachableCount: Int = 0
+    private var diagnosticsOtherFailureCount: Int = 0
 
     /// PTP/IP port
     private let ptpipPort: UInt16 = 15740
@@ -164,6 +186,8 @@ class NetworkScannerService: ObservableObject {
         discoveredCameras = []
         state = .scanning(progress: 0.0)
 
+        resetDiagnostics(totalTargets: hotspotScanRange.count)
+
         // Default scan targets: Personal Hotspot range
         scanTargets = hotspotScanRange.map { "\(hotspotSubnet).\($0)" }
         perIPTimeout = 2.0
@@ -190,6 +214,8 @@ class NetworkScannerService: ObservableObject {
         // Explicit candidate targets
         scanTargets = Array(NSOrderedSet(array: candidateIPs)).compactMap { $0 as? String }
         self.perIPTimeout = perIPTimeout
+
+        resetDiagnostics(totalTargets: scanTargets.count)
 
         // For small candidate sets, do a single wave and minimal retry.
         maxScanWaves = 1
@@ -218,6 +244,8 @@ class NetworkScannerService: ObservableObject {
             print("[NetworkScannerService]    State was .scanning -> .completed(\(discoveredCameras.count))")
             state = .completed(cameraCount: discoveredCameras.count)
         }
+
+        publishDiagnostics()
 
         // NOTE: We do NOT disconnect any cameras here!
         // Sessions stay alive until explicitly disconnected.
@@ -266,21 +294,23 @@ class NetworkScannerService: ObservableObject {
         discoveredCameras = []
         state = .idle
 
-        if !camerasToCleanup.isEmpty {
-            // Disconnect all cameras in parallel (like Promise.all)
-            await withTaskGroup(of: Void.self) { group in
-                for camera in camerasToCleanup {
-                    group.addTask {
-                        print("[NetworkScannerService]    Cleanup disconnecting: \(camera.name)")
-                        await camera.disconnect()
-                    }
-                }
-                // Implicitly waits for all tasks to complete
-            }
-            print("[NetworkScannerService]    Cleanup complete")
-        } else {
+        guard !camerasToCleanup.isEmpty else {
             print("[NetworkScannerService]    No cameras to cleanup")
+            return
         }
+
+        // Disconnect sequentially. These disconnect paths are typically MainActor-isolated;
+        // doing them in parallel can create contention and make the UI feel frozen.
+        let start = Date()
+        for (idx, camera) in camerasToCleanup.enumerated() {
+            let t0 = Date()
+            print("[NetworkScannerService]    Cleanup disconnecting (\(idx + 1)/\(camerasToCleanup.count)): \(camera.name)")
+            await camera.disconnect()
+            let dt = Date().timeIntervalSince(t0)
+            print("[NetworkScannerService]    Cleanup disconnected: \(camera.name) (\(String(format: "%.2f", dt))s)")
+            await Task.yield()
+        }
+        print("[NetworkScannerService]    Cleanup complete (\(String(format: "%.2f", Date().timeIntervalSince(start)))s)")
     }
 
     // MARK: - Private Methods
@@ -410,10 +440,96 @@ class NetworkScannerService: ObservableObject {
         // Scan complete
         let totalDuration = Date().timeIntervalSince(scanStart)
         currentScanIP = ""
+        publishDiagnostics()
         state = .completed(cameraCount: discoveredCameras.count)
         print("[\(ts())] [Scanner] ========================================")
         print("[\(ts())] [Scanner] SCAN COMPLETE in \(String(format: "%.2f", totalDuration))s, found: \(discoveredCameras.count)")
         print("[\(ts())] [Scanner] ========================================")
+    }
+
+    // MARK: - Diagnostics helpers
+
+    private func resetDiagnostics(totalTargets: Int) {
+        diagnosticsTotalTargets = totalTargets
+        diagnosticsPermissionDeniedCount = 0
+        diagnosticsPortClosedCount = 0
+        diagnosticsTimeoutCount = 0
+        diagnosticsNetworkUnreachableCount = 0
+        diagnosticsHostUnreachableCount = 0
+        diagnosticsOtherFailureCount = 0
+        lastDiscoveryDiagnostics = nil
+    }
+
+    private func recordFailure(_ kind: FailureKind) {
+        switch kind {
+        case .permissionDenied:
+            diagnosticsPermissionDeniedCount += 1
+        case .portClosed:
+            diagnosticsPortClosedCount += 1
+        case .timeout:
+            diagnosticsTimeoutCount += 1
+        case .networkUnreachable:
+            diagnosticsNetworkUnreachableCount += 1
+        case .hostUnreachable:
+            diagnosticsHostUnreachableCount += 1
+        case .other:
+            diagnosticsOtherFailureCount += 1
+        }
+    }
+
+    private func publishDiagnostics() {
+        guard diagnosticsTotalTargets > 0 else {
+            lastDiscoveryDiagnostics = nil
+            return
+        }
+        lastDiscoveryDiagnostics = DiscoveryDiagnostics(
+            totalTargets: diagnosticsTotalTargets,
+            foundCount: discoveredCameras.count,
+            permissionDeniedCount: diagnosticsPermissionDeniedCount,
+            portClosedCount: diagnosticsPortClosedCount,
+            timeoutCount: diagnosticsTimeoutCount,
+            networkUnreachableCount: diagnosticsNetworkUnreachableCount,
+            hostUnreachableCount: diagnosticsHostUnreachableCount,
+            otherFailureCount: diagnosticsOtherFailureCount
+        )
+    }
+
+    private func classifyFailure(_ error: Error) -> FailureKind {
+        if let nwError = error as? NWError {
+            switch nwError {
+            case .posix(let code):
+                switch code {
+                case .EACCES:
+                    return .permissionDenied
+                case .ECONNREFUSED:
+                    return .portClosed
+                case .ETIMEDOUT:
+                    return .timeout
+                case .ENETUNREACH:
+                    return .networkUnreachable
+                case .EHOSTUNREACH:
+                    return .hostUnreachable
+                default:
+                    return .other
+                }
+            default:
+                return .other
+            }
+        }
+        if let scanError = error as? NetworkScannerError {
+            switch scanError {
+            case .timeout:
+                return .timeout
+            case .scanFailed(let reason):
+                if reason.lowercased().contains("connection closed") {
+                    return .portClosed
+                }
+                return .other
+            case .noHotspotDetected:
+                return .other
+            }
+        }
+        return .other
     }
 
     /// Check if error is retryable (camera might still be initializing)
@@ -509,6 +625,7 @@ class NetworkScannerService: ObservableObject {
 
         // Retry loop for TCP connection (Layer 2)
         var tcpConnected = false
+        var lastTCPError: Error?
         let tcpStart = Date()
         for attempt in 1...maxRetryAttempts {
             // Check for cancellation before each retry attempt
@@ -532,6 +649,7 @@ class NetworkScannerService: ObservableObject {
                 tcpConnected = true
                 break  // Success - exit retry loop
             } catch {
+                lastTCPError = error
                 // Classify the error
                 let errorCode = errorCodeDescription(error)
                 let isRetryable = isRetryableError(error)
@@ -556,6 +674,7 @@ class NetworkScannerService: ObservableObject {
                 } else {
                     // Non-retryable error - fail fast
                     print("[Scanner:\(ip)]   TCP failed: \(errorCode) (not retryable, fail fast)")
+                    recordFailure(classifyFailure(error))
                     cleanupConnections()
                     return nil
                 }
@@ -566,6 +685,11 @@ class NetworkScannerService: ObservableObject {
         guard tcpConnected else {
             let duration = Date().timeIntervalSince(scanStart)
             print("[Scanner:\(ip)] FAILED after \(String(format: "%.2f", duration))s - TCP connect exhausted retries")
+            if let lastTCPError {
+                recordFailure(classifyFailure(lastTCPError))
+            } else {
+                recordFailure(.other)
+            }
             cleanupConnections()
             return nil
         }
@@ -595,6 +719,7 @@ class NetworkScannerService: ObservableObject {
             guard let header = PTPIPHeader.from(ackHeaderData),
                   header.type == PTPIPPacketType.initCommandAck.rawValue else {
                 print("[Scanner:\(ip)]   FAILED: Invalid or wrong packet type")
+                recordFailure(.other)
                 cleanupConnections()
                 return nil
             }
@@ -610,6 +735,7 @@ class NetworkScannerService: ObservableObject {
 
             guard payloadData.count >= 4 else {
                 print("[Scanner:\(ip)]   FAILED: Payload too short (\(payloadData.count) bytes)")
+                recordFailure(.other)
                 cleanupConnections()
                 return nil
             }
@@ -667,6 +793,7 @@ class NetworkScannerService: ObservableObject {
             guard let eventAckHeader = PTPIPHeader.from(eventAckHeaderData),
                   eventAckHeader.type == PTPIPPacketType.initEventAck.rawValue else {
                 print("[Scanner:\(ip)]   FAILED: Event channel handshake failed")
+                recordFailure(.other)
                 cleanupConnections()
                 return nil
             }
@@ -710,6 +837,7 @@ class NetworkScannerService: ObservableObject {
                 let totalDuration = Date().timeIntervalSince(scanStart)
                 print("[Scanner:\(ip)] FAILED after \(String(format: "%.2f", totalDuration))s")
                 print("[Scanner:\(ip)]   Session preparation error: \(error.localizedDescription)")
+                recordFailure(classifyFailure(error))
                 await session.disconnect()
                 cleanupConnections()
                 return nil
@@ -719,6 +847,7 @@ class NetworkScannerService: ObservableObject {
             // Any error in stages 2-4 - clean up
             let totalDuration = Date().timeIntervalSince(scanStart)
             print("[Scanner:\(ip)] FAILED after \(String(format: "%.2f", totalDuration))s - \(error.localizedDescription)")
+            recordFailure(classifyFailure(error))
             cleanupConnections()
             return nil
         }
