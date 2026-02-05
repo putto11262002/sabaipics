@@ -8,7 +8,12 @@ export type BlockType =
   | 'gallery'
   | 'qr'
   | 'stat-card'
-  | 'social-icon';
+  | 'social-icon'
+  // New high-level composite blocks
+  | 'event-header'
+  | 'stats-panel'
+  | 'social-links'
+  | 'text-block';
 
 export interface SlideshowBlock {
   id: string;
@@ -52,7 +57,7 @@ export interface FlexProps {
 }
 
 export interface LogoProps {
-  width: number; // 10-50 (% of viewport width)
+  size: 'sm' | 'md' | 'lg';
 }
 
 export interface EventNameProps {
@@ -86,6 +91,46 @@ export interface StatCardProps {
 export interface SocialIconProps {
   platform: 'instagram' | 'facebook' | 'tiktok' | 'x' | 'youtube';
   url: string;
+}
+
+// ─── New composite block props ─────────────────────────────────────────────────
+
+export type StatsPanelVariant = 'cards' | 'compact' | 'vertical';
+export type SocialLinksVariant = 'horizontal-icons' | 'vertical-list' | 'icon-label';
+export type TextBlockVariant = 'heading' | 'paragraph' | 'caption';
+
+export interface EventHeaderProps {
+  // Component toggles
+  showLogo: boolean;
+  showName: boolean;
+  showSubtitle: boolean;
+  showQr: boolean;
+  // Component sizes
+  logoSize: 'sm' | 'md' | 'lg';
+  qrSize: 'sm' | 'md' | 'lg';
+  // Layout controls
+  direction: 'row' | 'column';
+  align: 'start' | 'center' | 'end';
+  justify: 'start' | 'center' | 'end' | 'between';
+  gap: SpacingSize;
+}
+
+export interface StatsPanelProps {
+  variant: StatsPanelVariant;
+  metrics: Array<'photos' | 'downloads' | 'searches'>;
+}
+
+export interface SocialLinksProps {
+  variant: SocialLinksVariant;
+  links: Array<{
+    platform: 'instagram' | 'facebook' | 'tiktok' | 'x' | 'youtube';
+    url: string;
+  }>;
+}
+
+export interface TextBlockProps {
+  variant: TextBlockVariant;
+  content: string;
 }
 
 // ─── Slideshow context (real data passed to renderers) ────────────────────────

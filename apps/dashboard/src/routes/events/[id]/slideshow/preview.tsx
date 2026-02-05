@@ -7,10 +7,13 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
   verticalListSortingStrategy,
+  horizontalListSortingStrategy,
   arrayMove,
   useSortable,
 } from '@dnd-kit/sortable';
@@ -65,8 +68,11 @@ interface SortableBlockProps {
   context: SlideshowContext;
   isSelected: boolean;
   onSelect: (id: string) => void;
-  onReorderChildren?: (parentId: string, newChildren: SlideshowBlock[]) => void;
   selectedBlockId: string | null;
+  containerId: string; // 'root' or parent block id
+  isOver?: boolean; // drop indicator
+  isActiveContainer?: boolean; // container being dragged into
+  overChildId?: string | null; // which child in this layout is being hovered
 }
 
 function SortableBlock({
@@ -74,15 +80,23 @@ function SortableBlock({
   context,
   isSelected,
   onSelect,
-  onReorderChildren,
   selectedBlockId,
+  containerId,
+  isOver,
+  isActiveContainer,
+  overChildId,
 }: SortableBlockProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: block.id,
+    data: {
+      type: 'block',
+      block,
+      containerId,
+    },
   });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
   };
 
@@ -99,11 +113,14 @@ function SortableBlock({
       style={style}
       className={cn(
         'group relative w-full cursor-grab active:cursor-grabbing',
+        // Selection highlight
         highlighted
           ? 'outline outline-2 outline-blue-500'
           : 'hover:outline hover:outline-1 hover:outline-blue-300',
         !block.enabled && 'opacity-40',
         isDragging && 'opacity-50',
+        // Container highlight when dragging into it
+        isLayout && isActiveContainer && 'ring-2 ring-green-500 ring-offset-2',
       )}
       onClick={(e) => {
         e.stopPropagation();
@@ -112,6 +129,11 @@ function SortableBlock({
       {...attributes}
       {...listeners}
     >
+      {/* Drop indicator line */}
+      {isOver && !isLayout && (
+        <div className="absolute -top-1 left-0 right-0 h-0.5 bg-blue-500" />
+      )}
+
       {/* Block type label */}
       <div
         className={cn(
@@ -130,7 +152,8 @@ function SortableBlock({
           context={context}
           selectedBlockId={selectedBlockId}
           onSelect={onSelect}
-          onReorderChildren={onReorderChildren}
+          isActiveContainer={isActiveContainer}
+          overChildId={overChildId}
         />
       ) : (
         <def.Renderer block={block} context={context} />
@@ -146,7 +169,8 @@ interface LayoutBlockContentProps {
   context: SlideshowContext;
   selectedBlockId: string | null;
   onSelect: (id: string) => void;
-  onReorderChildren?: (parentId: string, newChildren: SlideshowBlock[]) => void;
+  isActiveContainer?: boolean;
+  overChildId?: string | null;
 }
 
 function LayoutBlockContent({
@@ -154,27 +178,17 @@ function LayoutBlockContent({
   context,
   selectedBlockId,
   onSelect,
-  onReorderChildren,
+  isActiveContainer,
+  overChildId,
 }: LayoutBlockContentProps) {
-  const dndId = useId();
   const props = block.props as FlexProps;
   const children = block.children ?? [];
   const enabledChildren = children.filter((c) => c.enabled);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = children.findIndex((c) => c.id === active.id);
-    const newIndex = children.findIndex((c) => c.id === over.id);
-    onReorderChildren?.(block.id, arrayMove(children, oldIndex, newIndex));
-  };
-
   return (
     <div
       className={cn(
-        'flex',
+        'flex min-h-[40px]', // min-height to allow dropping into empty layouts
         props.direction === 'column' ? 'flex-col' : 'flex-row',
         props.wrap && 'flex-wrap',
         props.align === 'center' && 'items-center',
@@ -186,33 +200,36 @@ function LayoutBlockContent({
         props.justify === 'between' && 'justify-between',
         gapClass[props.gap],
         paddingClass[props.padding],
+        // Dashed border when dragging and container is a valid target
+        isActiveContainer && 'border-2 border-dashed border-green-500',
       )}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(block.id);
       }}
     >
-      <DndContext
-        id={`${dndId}-children-${block.id}`}
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
+      {enabledChildren.length === 0 && isActiveContainer && (
+        <div className="flex h-10 w-full items-center justify-center text-xs text-green-600">
+          Drop here
+        </div>
+      )}
+      <SortableContext
+        items={enabledChildren.map((c) => c.id)}
+        strategy={props.direction === 'row' ? horizontalListSortingStrategy : verticalListSortingStrategy}
       >
-        <SortableContext
-          items={enabledChildren.map((c) => c.id)}
-          strategy={props.direction === 'row' ? undefined : verticalListSortingStrategy}
-        >
-          {enabledChildren.map((child) => (
-            <SortableChildBlock
-              key={child.id}
-              block={child}
-              context={context}
-              isSelected={selectedBlockId === child.id}
-              onSelect={onSelect}
-            />
-          ))}
-        </SortableContext>
-      </DndContext>
+        {enabledChildren.map((child) => (
+          <SortableChildBlock
+            key={child.id}
+            block={child}
+            parentId={block.id}
+            context={context}
+            isSelected={selectedBlockId === child.id}
+            onSelect={onSelect}
+            isOver={overChildId === child.id}
+            direction={props.direction}
+          />
+        ))}
+      </SortableContext>
     </div>
   );
 }
@@ -221,18 +238,34 @@ function LayoutBlockContent({
 
 interface SortableChildBlockProps {
   block: SlideshowBlock;
+  parentId: string;
   context: SlideshowContext;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  isOver?: boolean;
+  direction?: 'row' | 'column';
 }
 
-function SortableChildBlock({ block, context, isSelected, onSelect }: SortableChildBlockProps) {
+function SortableChildBlock({
+  block,
+  parentId,
+  context,
+  isSelected,
+  onSelect,
+  isOver,
+  direction = 'row',
+}: SortableChildBlockProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: block.id,
+    data: {
+      type: 'child-block',
+      block,
+      containerId: parentId,
+    },
   });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
   };
 
@@ -258,9 +291,58 @@ function SortableChildBlock({ block, context, isSelected, onSelect }: SortableCh
       {...attributes}
       {...listeners}
     >
+      {/* Drop indicator line */}
+      {isOver && (
+        <div
+          className={cn(
+            'absolute bg-blue-500',
+            direction === 'row'
+              ? '-left-1 top-0 bottom-0 w-0.5'
+              : '-top-1 left-0 right-0 h-0.5',
+          )}
+        />
+      )}
       <def.Renderer block={block} context={context} />
     </div>
   );
+}
+
+// ─── Helper functions for drag operations ──────────────────────────────────────
+
+function removeBlockFromTree(blocks: SlideshowBlock[], blockId: string): SlideshowBlock[] {
+  // Try removing from root level
+  const filtered = blocks.filter((b) => b.id !== blockId);
+  if (filtered.length !== blocks.length) return filtered;
+
+  // Remove from children
+  return blocks.map((b) => {
+    if (b.children) {
+      return { ...b, children: b.children.filter((c) => c.id !== blockId) };
+    }
+    return b;
+  });
+}
+
+function addBlockToContainer(
+  blocks: SlideshowBlock[],
+  block: SlideshowBlock,
+  containerId: string,
+  index: number,
+): SlideshowBlock[] {
+  if (containerId === 'root') {
+    const result = [...blocks];
+    result.splice(index, 0, block);
+    return result;
+  }
+
+  return blocks.map((b) => {
+    if (b.id === containerId) {
+      const children = [...(b.children ?? [])];
+      children.splice(index, 0, block);
+      return { ...b, children };
+    }
+    return b;
+  });
 }
 
 // ─── Editor Mode Component ─────────────────────────────────────────────────────
@@ -270,6 +352,11 @@ function EditorModePreview() {
   const [config, setConfig] = useState<SlideshowConfig | null>(null);
   const [context, setContext] = useState<SlideshowContext | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+
+  // Drag state for visual feedback
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [overContainerId, setOverContainerId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -302,32 +389,103 @@ function EditorModePreview() {
     window.parent.postMessage({ type: 'block-selected', blockId: '' } satisfies BlockSelectedMessage, '*');
   }, []);
 
-  // Handle top-level block reordering
+  // Track drag start
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  }, []);
+
+  // Track drag over for visual feedback
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const { over } = event;
+    if (over) {
+      setOverId(over.id as string);
+      const overData = over.data.current as { containerId?: string } | undefined;
+      setOverContainerId(overData?.containerId ?? 'root');
+    } else {
+      setOverId(null);
+      setOverContainerId(null);
+    }
+  }, []);
+
+  // Unified drag end handler for all block moves
   const handleDragEnd = useCallback((event: DragEndEvent) => {
+    // Reset drag state
+    setActiveId(null);
+    setOverId(null);
+    setOverContainerId(null);
+
     const { active, over } = event;
-    if (!over || active.id === over.id || !config) return;
+    if (!over || !config) return;
 
-    const oldIndex = config.blocks.findIndex((b) => b.id === active.id);
-    const newIndex = config.blocks.findIndex((b) => b.id === over.id);
-    const newBlocks = arrayMove(config.blocks, oldIndex, newIndex);
+    const activeId = active.id as string;
+    const overId = over.id as string;
 
-    const newConfig = { ...config, blocks: newBlocks };
-    setConfig(newConfig);
+    if (activeId === overId) return;
 
-    // Send updated config to parent
-    window.parent.postMessage(
-      { type: 'config-updated', config: newConfig } satisfies ConfigUpdatedMessage,
-      '*',
-    );
-  }, [config]);
+    const activeData = active.data.current as { containerId: string; block: SlideshowBlock } | undefined;
+    const overData = over.data.current as { containerId: string; block?: SlideshowBlock } | undefined;
 
-  // Handle child block reordering within a layout block
-  const handleReorderChildren = useCallback((parentId: string, newChildren: SlideshowBlock[]) => {
-    if (!config) return;
+    if (!activeData) return;
 
-    const newBlocks = config.blocks.map((b) =>
-      b.id === parentId ? { ...b, children: newChildren } : b,
-    );
+    const sourceContainerId = activeData.containerId;
+    const targetContainerId = overData?.containerId ?? 'root';
+
+    // Get the block being dragged
+    const draggedBlock = activeData.block;
+    if (!draggedBlock) return;
+
+    let newBlocks = config.blocks;
+
+    // Same container - reorder
+    if (sourceContainerId === targetContainerId) {
+      if (sourceContainerId === 'root') {
+        // Reorder root blocks
+        const oldIndex = newBlocks.findIndex((b) => b.id === activeId);
+        const newIndex = newBlocks.findIndex((b) => b.id === overId);
+        if (oldIndex !== -1 && newIndex !== -1) {
+          newBlocks = arrayMove(newBlocks, oldIndex, newIndex);
+        }
+      } else {
+        // Reorder within same layout
+        newBlocks = newBlocks.map((b) => {
+          if (b.id === sourceContainerId && b.children) {
+            const oldIndex = b.children.findIndex((c) => c.id === activeId);
+            const newIndex = b.children.findIndex((c) => c.id === overId);
+            if (oldIndex !== -1 && newIndex !== -1) {
+              return { ...b, children: arrayMove(b.children, oldIndex, newIndex) };
+            }
+          }
+          return b;
+        });
+      }
+    } else {
+      // Cross-container move
+      // 1. Validate target exists first
+      let targetIndex = 0;
+      if (targetContainerId === 'root') {
+        // Root always exists
+        targetIndex = newBlocks.findIndex((b) => b.id === overId);
+        if (targetIndex === -1) targetIndex = newBlocks.length;
+      } else {
+        // Validate target parent exists
+        const targetParent = newBlocks.find((b) => b.id === targetContainerId);
+        if (!targetParent) {
+          console.warn(`Target container ${targetContainerId} not found, aborting move`);
+          return; // Abort - don't remove the block
+        }
+        if (targetParent.children) {
+          targetIndex = targetParent.children.findIndex((c) => c.id === overId);
+          if (targetIndex === -1) targetIndex = targetParent.children.length;
+        }
+      }
+
+      // 2. Remove from source (only after validation passes)
+      newBlocks = removeBlockFromTree(newBlocks, activeId);
+
+      // 3. Add to target
+      newBlocks = addBlockToContainer(newBlocks, draggedBlock, targetContainerId, targetIndex);
+    }
+
     const newConfig = { ...config, blocks: newBlocks };
     setConfig(newConfig);
 
@@ -376,23 +534,38 @@ function EditorModePreview() {
             id={dndId}
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
           >
             <SortableContext
               items={enabledBlocks.map((b) => b.id)}
               strategy={verticalListSortingStrategy}
             >
-              {enabledBlocks.map((block) => (
-                <SortableBlock
-                  key={block.id}
-                  block={block}
-                  context={context}
-                  isSelected={selectedBlockId === block.id}
-                  onSelect={handleSelectBlock}
-                  onReorderChildren={handleReorderChildren}
-                  selectedBlockId={selectedBlockId}
-                />
-              ))}
+              {enabledBlocks.map((block) => {
+                const isLayout = getBlockDef(block.type)?.acceptsChildren === true;
+                // Check if this layout is the active drop container
+                const isActiveContainer = !!(isLayout && activeId && overContainerId === block.id);
+                // Check if this block is being hovered (for drop line indicator)
+                const isOver = overId === block.id && overContainerId === 'root';
+                // Get which child is being hovered for this layout
+                const overChildId = isLayout && overContainerId === block.id ? overId : null;
+
+                return (
+                  <SortableBlock
+                    key={block.id}
+                    block={block}
+                    context={context}
+                    isSelected={selectedBlockId === block.id}
+                    onSelect={handleSelectBlock}
+                    selectedBlockId={selectedBlockId}
+                    containerId="root"
+                    isOver={isOver}
+                    isActiveContainer={isActiveContainer}
+                    overChildId={overChildId}
+                  />
+                );
+              })}
             </SortableContext>
           </DndContext>
         )}

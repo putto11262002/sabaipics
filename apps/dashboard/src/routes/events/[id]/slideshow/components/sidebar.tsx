@@ -44,7 +44,7 @@ export function EditorSidebar({
   const parentDef = parentBlock ? getBlockDef(parentBlock.type) : undefined;
 
   return (
-    <Sidebar side="right" collapsible="none" className="border-l bg-background">
+    <Sidebar side="right" collapsible="none" className="">
       <SidebarHeader className="border-sidebar-border border-b px-4 py-3">
         <h3 className="text-sm font-semibold">{blockDef ? blockDef.label : 'Settings'}</h3>
       </SidebarHeader>

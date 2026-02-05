@@ -15,4 +15,5 @@ export const subtitleBlockDef: BlockDefinition<SubtitleProps> = {
   // No defaultSize - subtitle should size to content
   Renderer: SubtitleRenderer,
   SettingsPanel: SubtitleSettings,
+  hidden: true, // Internal use only
 };

@@ -19,4 +19,5 @@ export const flexBlockDef: BlockDefinition<FlexProps> = {
   Renderer: FlexRenderer,
   SettingsPanel: FlexSettings,
   acceptsChildren: true,
+  hidden: true, // Internal use only
 };

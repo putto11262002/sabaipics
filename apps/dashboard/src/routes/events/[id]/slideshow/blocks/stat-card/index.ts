@@ -14,4 +14,5 @@ export const statCardBlockDef: BlockDefinition<StatCardProps> = {
   Renderer: StatCardRenderer,
   SettingsPanel: StatCardSettings,
   childOnly: true,
+  hidden: true, // Internal use only
 };

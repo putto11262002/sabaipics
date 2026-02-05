@@ -26,22 +26,14 @@ export function createBlockWithChildren(
 // ─── Templates ────────────────────────────────────────────────────────────────
 
 function buildClassic(): SlideshowConfig {
-  const socialFlex = createBlockWithChildren(
-    'flex',
-    [
-      createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
-      createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
+  const socialLinks = createBlockWithProps('social-links', {
+    variant: 'horizontal-icons',
+    links: [
+      { platform: 'instagram', url: '' },
+      { platform: 'facebook', url: '' },
     ],
-    {
-      direction: 'row',
-      align: 'center',
-      justify: 'center',
-      gap: 'md',
-      padding: 'sm',
-      wrap: true,
-    },
-  );
-  socialFlex.enabled = false;
+  });
+  socialLinks.enabled = false;
 
   return {
     theme: { primary: '#0f172a', background: '#ffffff' },
@@ -52,42 +44,30 @@ function buildClassic(): SlideshowConfig {
       maxWidth: 'none',
     },
     blocks: [
-      // Header section
-      createBlockWithChildren(
-        'flex',
-        [createBlock('logo'), createBlock('event-name'), createBlock('subtitle')],
-        {
-          direction: 'column',
-          align: 'center',
-          justify: 'center',
-          gap: 'sm',
-          padding: 'lg',
-          wrap: false,
-        },
-      ),
+      // Event Header - Logo + name + subtitle
+      createBlockWithProps('event-header', {
+        showLogo: true,
+        showName: true,
+        showSubtitle: true,
+        showQr: false,
+        logoSize: 'md',
+        qrSize: 'md',
+        direction: 'column',
+        align: 'center',
+        justify: 'center',
+        gap: 'sm',
+      }),
       // Gallery
       createBlock('gallery'),
-      // Stats section
-      createBlockWithChildren(
-        'flex',
-        [
-          createBlock('stat-card'),
-          createBlockWithProps('stat-card', { metric: 'searches' }),
-          createBlockWithProps('stat-card', { metric: 'downloads' }),
-        ],
-        {
-          direction: 'row',
-          align: 'center',
-          justify: 'center',
-          gap: 'lg',
-          padding: 'md',
-          wrap: true,
-        },
-      ),
-      // QR
+      // Stats Panel
+      createBlockWithProps('stats-panel', {
+        variant: 'cards',
+        metrics: ['photos', 'searches', 'downloads'],
+      }),
+      // QR Code
       createBlock('qr'),
-      // Social section (disabled)
-      socialFlex,
+      // Social Links (disabled by default)
+      socialLinks,
     ],
   };
 }

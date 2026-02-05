@@ -15,4 +15,5 @@ export const socialIconBlockDef: BlockDefinition<SocialIconProps> = {
   Renderer: SocialIconRenderer,
   SettingsPanel: SocialIconSettings,
   childOnly: true,
+  hidden: true, // Internal use only
 };

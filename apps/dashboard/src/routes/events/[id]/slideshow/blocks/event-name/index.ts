@@ -15,4 +15,5 @@ export const eventNameBlockDef: BlockDefinition<EventNameProps> = {
   // No defaultSize - event name should size to content
   Renderer: EventNameRenderer,
   SettingsPanel: EventNameSettings,
+  hidden: true, // Internal use only
 };

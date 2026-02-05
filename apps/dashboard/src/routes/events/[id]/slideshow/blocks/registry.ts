@@ -8,6 +8,10 @@ import { galleryBlockDef } from './gallery';
 import { qrBlockDef } from './qr';
 import { statCardBlockDef } from './stat-card';
 import { socialIconBlockDef } from './social-icon';
+import { eventHeaderBlockDef } from './event-header';
+import { statsPanelBlockDef } from './stats-panel';
+import { socialLinksBlockDef } from './social-links';
+import { textBlockBlockDef } from './text-block';
 
 export interface BlockDefinition<P extends Record<string, any> = Record<string, any>> {
   type: string;
@@ -22,6 +26,8 @@ export interface BlockDefinition<P extends Record<string, any> = Record<string, 
   }>;
   acceptsChildren?: boolean;
   childOnly?: boolean;
+  hidden?: boolean; // Hide from user-facing UI
+  composite?: boolean; // Generates internal block tree dynamically
 }
 
 export const blockRegistry = new Map<string, BlockDefinition>();
@@ -39,6 +45,10 @@ register(galleryBlockDef);
 register(qrBlockDef);
 register(statCardBlockDef);
 register(socialIconBlockDef);
+register(eventHeaderBlockDef);
+register(statsPanelBlockDef);
+register(socialLinksBlockDef);
+register(textBlockBlockDef);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,13 +62,14 @@ export function getRegisteredTypes(): string[] {
 
 export function getTopLevelTypes(): string[] {
   return Array.from(blockRegistry.entries())
-    .filter(([_, def]) => !def.childOnly)
+    .filter(([_, def]) => !def.childOnly && !def.hidden)
     .map(([type]) => type);
 }
 
 export function getChildTypes(): string[] {
+  // Return all non-layout blocks (blocks that can be placed inside flex containers)
   return Array.from(blockRegistry.entries())
-    .filter(([_, def]) => def.childOnly)
+    .filter(([_, def]) => !def.acceptsChildren && !def.hidden)
     .map(([type]) => type);
 }
 

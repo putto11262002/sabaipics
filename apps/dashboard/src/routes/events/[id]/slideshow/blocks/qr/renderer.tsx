@@ -1,3 +1,4 @@
+import QRCodeSVG from 'react-qr-code';
 import { cn } from '@sabaipics/uiv3/lib/utils';
 import type { SlideshowBlock, SlideshowContext, QrProps } from '../../types';
 
@@ -7,18 +8,37 @@ const SIZE_CLASS: Record<string, string> = {
   lg: 'size-36',
 };
 
-export function QrRenderer({ block }: { block: SlideshowBlock; context: SlideshowContext }) {
+export function QrRenderer({ block, context }: { block: SlideshowBlock; context: SlideshowContext }) {
   const props = block.props as QrProps;
+  const searchUrl = `${window.location.origin}/participant/events/${context.event.id}/search`;
 
+  // Editor mode - show placeholder
+  if (!context.liveMode) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-2">
+        <div
+          className={cn(
+            SIZE_CLASS[props.size] ?? 'size-28',
+            'flex items-center justify-center rounded-xl border-2 border-border bg-muted',
+          )}
+        >
+          <span className="text-sm font-medium text-muted-foreground">QR</span>
+        </div>
+        {props.label && <p className="text-sm text-muted-foreground">{props.label}</p>}
+      </div>
+    );
+  }
+
+  // Live mode - render actual QR code
   return (
     <div className="flex flex-col items-center gap-3 py-2">
       <div
         className={cn(
           SIZE_CLASS[props.size] ?? 'size-28',
-          'flex items-center justify-center rounded-xl border-2 border-border bg-muted',
+          'flex items-center justify-center rounded-xl bg-white p-2',
         )}
       >
-        <span className="text-sm font-medium text-muted-foreground">QR</span>
+        <QRCodeSVG value={searchUrl} level="M" style={{ height: '100%', width: '100%' }} />
       </div>
       {props.label && <p className="text-sm text-muted-foreground">{props.label}</p>}
     </div>

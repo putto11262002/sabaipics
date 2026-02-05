@@ -1,5 +1,11 @@
 import { Label } from '@sabaipics/uiv3/components/label';
-import { Slider } from '@sabaipics/uiv3/components/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@sabaipics/uiv3/components/select';
 import type { SlideshowBlock, LogoProps } from '../../types';
 
 export function LogoSettings({
@@ -17,18 +23,18 @@ export function LogoSettings({
 
   return (
     <div className="space-y-3">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs">Logo Width</Label>
-          <span className="text-xs text-muted-foreground">{props.width}%</span>
-        </div>
-        <Slider
-          value={[props.width]}
-          onValueChange={([v]) => update({ width: v })}
-          min={10}
-          max={50}
-          step={1}
-        />
+      <div className="flex items-center gap-2">
+        <Label className="w-20 text-xs">Size</Label>
+        <Select value={props.size} onValueChange={(v) => update({ size: v as 'sm' | 'md' | 'lg' })}>
+          <SelectTrigger className="h-8 flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="sm">Small</SelectItem>
+            <SelectItem value="md">Medium</SelectItem>
+            <SelectItem value="lg">Large</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );
