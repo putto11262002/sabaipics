@@ -4,7 +4,6 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { SignInPage } from './routes/sign-in';
 import { SignUpPage } from './routes/sign-up';
 import { DashboardPage } from './routes/dashboard';
-import { CreditPackagesPage } from './routes/credits/packages';
 import { CreditSuccessPage } from './routes/credits/success';
 import EventsPage from './routes/events';
 import EventDetailLayout from './routes/events/[id]/layout';
@@ -45,10 +44,6 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      {
-        path: 'packages',
-        element: <CreditPackagesPage />,
-      },
       {
         path: 'success',
         element: <CreditSuccessPage />,
