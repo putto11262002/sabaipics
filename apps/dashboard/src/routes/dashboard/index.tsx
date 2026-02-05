@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { differenceInDays, parseISO } from 'date-fns';
 import {
@@ -36,8 +36,10 @@ import {
 } from '@sabaipics/uiv3/components/empty';
 import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
 import { Spinner } from '@sabaipics/uiv3/components/spinner';
+import { CreditTopUpDialog } from '../../components/credits/CreditTopUpDialog';
 
 export function DashboardPage() {
+  const [creditDialogOpen, setCreditDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { data, isLoading, error, refetch, isRefetching } = useDashboardData();
   const { data: eventsData, isLoading: eventsLoading } = useEvents(0, 10);
@@ -83,11 +85,9 @@ export function DashboardPage() {
   return (
     <>
       <SidebarPageHeader breadcrumbs={[{ label: 'Dashboard' }]}>
-        <Button asChild size="sm">
-          <Link to="/credits/packages">
-            <CreditCard className="mr-1 size-4" />
-            Buy Credits
-          </Link>
+        <Button size="sm" onClick={() => setCreditDialogOpen(true)}>
+          <CreditCard className="mr-1 size-4" />
+          Buy Credits
         </Button>
       </SidebarPageHeader>
 
@@ -255,6 +255,12 @@ export function DashboardPage() {
           </>
         )}
       </div>
+
+      {/* Credit Top-Up Dialog */}
+      <CreditTopUpDialog
+        open={creditDialogOpen}
+        onOpenChange={setCreditDialogOpen}
+      />
     </>
   );
 }
