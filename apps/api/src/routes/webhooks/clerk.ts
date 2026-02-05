@@ -141,12 +141,71 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
       }
 
       case 'user.updated': {
-        // TODO: Sync profile changes to database
+        const db = c.var.db();
+        const user = event.data;
+
+        // Extract updated fields
+        const email = getPrimaryEmail(user);
+        const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ') || null;
+
+        // Find existing photographer
+        const [existing] = await db
+          .select({ id: photographers.id })
+          .from(photographers)
+          .where(eq(photographers.clerkId, user.id))
+          .limit(1);
+
+        if (!existing) {
+          // User might not be a photographer yet, skip silently
+          console.log('[Clerk Webhook] user.updated: photographer not found, skipping', {
+            clerkId: user.id,
+          });
+          break;
+        }
+
+        // Update photographer (idempotent - safe to run multiple times)
+        if (email) {
+          await db
+            .update(photographers)
+            .set({
+              email,
+              name: displayName,
+            })
+            .where(eq(photographers.clerkId, user.id));
+
+          console.log('[Clerk Webhook] user.updated: photographer updated', {
+            clerkId: user.id,
+            email,
+            name: displayName,
+          });
+        }
+
         break;
       }
 
       case 'user.deleted': {
-        // TODO: Soft delete photographer
+        const db = c.var.db();
+        const user = event.data;
+
+        // Soft delete photographer only (events will be cleaned up by separate cron)
+        const result = await db
+          .update(photographers)
+          .set({ deletedAt: new Date().toISOString() })
+          .where(eq(photographers.clerkId, user.id))
+          .returning({ id: photographers.id });
+
+        if (result.length === 0) {
+          // User might not be a photographer, skip silently
+          console.log('[Clerk Webhook] user.deleted: photographer not found, skipping', {
+            clerkId: user.id,
+          });
+        } else {
+          console.log('[Clerk Webhook] user.deleted: photographer soft deleted', {
+            clerkId: user.id,
+            photographerId: result[0].id,
+          });
+        }
+
         break;
       }
 

@@ -43,6 +43,13 @@
       "when": 1769942923598,
       "tag": "0005_clammy_molten_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770229208489,
+      "tag": "0006_silky_champions",
+      "breakpoints": true
     }
   ]
 }
