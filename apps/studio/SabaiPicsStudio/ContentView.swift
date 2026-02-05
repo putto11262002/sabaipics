@@ -56,9 +56,27 @@ struct ContentView: View {
 
             case .discovering:
                 if captureFlow.selectedManufacturer == .sony {
-                    SonyAPDiscoveryView()
-                        .transition(.opacity)
-                        .id("sony-ap-discovery")
+                    let preferredIP: String? = {
+                        guard let id = captureFlow.preferredSonyRecordID else { return nil }
+                        return SonyAPConnectionCache.shared.listRecords().first(where: { $0.id == id })?.lastKnownCameraIP
+                    }()
+
+                    UnifiedCameraDiscoveryView(
+                        strategy: SonyAPDiscoveryStrategy(),
+                        preferredIP: preferredIP,
+                        onBack: {
+                            captureFlow.backToManufacturerSelection()
+                        },
+                        onManualIP: {
+                            captureFlow.skipToManualEntry()
+                        },
+                        onSelect: { camera, allCameras in
+                            captureFlow.updateDiscoveredCameras(allCameras)
+                            captureFlow.selectDiscoveredCamera(camera)
+                        }
+                    )
+                    .transition(.opacity)
+                    .id("sony-ap-discovery")
                 } else {
                     CameraDiscoveryView()
                         .transition(.opacity)
@@ -97,4 +115,3 @@ struct ContentView: View {
         }
     }
 }
-

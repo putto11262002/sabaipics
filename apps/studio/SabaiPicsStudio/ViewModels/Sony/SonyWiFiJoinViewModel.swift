@@ -35,6 +35,8 @@ final class SonyWiFiJoinViewModel: ObservableObject {
     private let joinTimeout: TimeInterval
     private let ipv4WaitTimeout: TimeInterval
 
+    private var joinTask: Task<Void, Never>?
+
     init(
         step: Step = .intro,
         joinService: WiFiJoinServicing = WiFiJoinService.shared,
@@ -61,7 +63,10 @@ final class SonyWiFiJoinViewModel: ObservableObject {
 
         qrPayload = parsed
         step = .joining
-        Task { await joinUsingQRCodePayload(parsed) }
+        startJoinTask { [weak self] in
+            guard let self else { return }
+            await self.joinUsingQRCodePayload(parsed)
+        }
     }
 
     @MainActor
@@ -81,7 +86,10 @@ final class SonyWiFiJoinViewModel: ObservableObject {
         qrPayload = nil
 
         step = .joining
-        Task { await join(ssid: trimmedSSID, password: trimmedPassword, cameraId: nil) }
+        startJoinTask { [weak self] in
+            guard let self else { return }
+            await self.join(ssid: trimmedSSID, password: trimmedPassword, cameraId: nil)
+        }
     }
 
     @MainActor
@@ -89,13 +97,19 @@ final class SonyWiFiJoinViewModel: ObservableObject {
         errorMessage = nil
         if let qrPayload {
             step = .joining
-            Task { await joinUsingQRCodePayload(qrPayload) }
+            startJoinTask { [weak self] in
+                guard let self else { return }
+                await self.joinUsingQRCodePayload(qrPayload)
+            }
             return
         }
 
         if !ssid.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             step = .joining
-            Task { await join(ssid: ssid, password: password, cameraId: nil) }
+            startJoinTask { [weak self] in
+                guard let self else { return }
+                await self.join(ssid: self.ssid, password: self.password, cameraId: nil)
+            }
             return
         }
 
@@ -133,5 +147,18 @@ final class SonyWiFiJoinViewModel: ObservableObject {
 
             errorMessage = "Could not join WiFi automatically. Join the camera WiFi, then try again. (\(error.localizedDescription))"
         }
+    }
+
+    @MainActor
+    func cancelJoin() {
+        joinTask?.cancel()
+        joinTask = nil
+        isJoining = false
+    }
+
+    @MainActor
+    private func startJoinTask(_ op: @escaping () async -> Void) {
+        joinTask?.cancel()
+        joinTask = Task { await op() }
     }
 }

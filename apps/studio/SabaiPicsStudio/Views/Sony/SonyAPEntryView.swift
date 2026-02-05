@@ -42,18 +42,8 @@ struct SonyAPEntryView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    captureFlow.backToManufacturerSelection()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Back")
-                    }
-                    .foregroundColor(Color.Theme.primary)
-                }
-            }
+        .appBackButton {
+            captureFlow.backToManufacturerSelection()
         }
         .confirmationDialog(
             "",

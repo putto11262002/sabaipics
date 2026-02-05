@@ -40,6 +40,7 @@ Relevant code (Studio iOS app)
 
 - AP-mode discovery UI (candidate IP probe -> select camera):
   - `apps/studio/SabaiPicsStudio/Views/Sony/SonyAPDiscoveryView.swift`
+  - Discovery view model: `apps/studio/SabaiPicsStudio/ViewModels/Sony/SonyDiscoveryViewModel.swift`
 
 - Discovery helpers (candidate IP list + Sony heuristics):
   - `apps/studio/SabaiPicsStudio/Services/SonyAPDiscovery.swift`
@@ -81,9 +82,12 @@ Refinement plan (high level)
   - Output state: `intro | joining(progress) | connectivityGuide(wifiInfo) | error(message, recoveryActions)`.
 - `SonyAPSSIDJoinViewModel`
   - Inputs: SSID/password -> join -> network check.
-- `SonyAPDiscoveryViewModel`
-  - Inputs: preferred record ID / cached record / wifi info.
-  - Orchestrates `NetworkScannerService` and timeout.
+- `SonyDiscoveryViewModel`
+  - Inputs: preferred record IP (optional).
+  - Orchestrates Sony-only discovery via abstractions:
+    - `CameraDiscovering` (adapter over `NetworkScannerService`)
+    - `DiscoveryScanPlan` (candidate IPs + per-IP timeout)
+    - `SonyAPDiscoveryStrategy` (preflight, scan plan, auto-select policy)
 
 3. Improve diagnostics + error taxonomy
 
@@ -115,10 +119,12 @@ Refinement plan (high level)
 
 Todo list (actionable)
 
-- [ ] Audit current Sony views and identify duplicated code blocks (join + error handling).
+- [x] Audit current Sony views and identify duplicated code blocks (join + error handling).
 - [x] Implement `WiFiJoinService` + `SonyWiFiJoinViewModel` and use them from unified onboarding.
 - [x] Replace old Sony join views with `SonyWiFiOnboardingView`.
-- [ ] Create view models for join flows (start with QR join) and move state machine out of views.
+- [x] Create view models for join flows (start with QR join) and move state machine out of views.
+- [x] Refactor Sony discovery to use `CameraDiscovering` + `DiscoveryScanPlan` + `SonyAPDiscoveryStrategy`.
+- [x] Refactor shared discovery (UnifiedCameraDiscoveryView + CameraDiscoveryViewModel) to use typed `DiscoveryErrorKind` + `GuidanceModel` (Sony-only wiring for now).
 - [ ] Create a typed `SonyConnectionError` enum + UI mapping.
 - [ ] Update discovery step to surface “15740 closed / wrong mode / Access Authen” guidance.
 - [ ] Add a dev-only diagnostics view (copyable) for: WiFi IP/netmask, candidate IP list, and last scan results.
