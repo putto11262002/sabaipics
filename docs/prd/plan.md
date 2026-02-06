@@ -1,11 +1,11 @@
 # Desktop Uploader MVP - Shippable Plan
 
 ## Slice 1: Desktop Foundation (shippable)
-- [ ] Tauri app shell + routing
-- [ ] Auth via system browser + localhost callback
-- [ ] Secure token storage (keychain)
-- [ ] Event list + create mapping UI (folder -> event)
-- [ ] Token refresh note: Clerk session JWTs are short-lived; refresh via bridge page `getToken()` (no refresh token)
+- [x] Tauri app shell + routing
+- [x] Auth via system browser + localhost callback
+- [x] Secure token storage (keychain)
+- [x] Event list + create mapping UI (folder -> event)
+- [x] Token refresh note: Clerk session JWTs are short-lived; refresh via bridge page `getToken()` (no refresh token)
 
 ## Slice 2: Sync Engine v1 (shippable)
 - [ ] File watcher + startup scan + stabilization
