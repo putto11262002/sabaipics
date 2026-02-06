@@ -121,16 +121,23 @@ final class CameraDiscoveryViewModel: ObservableObject {
 
         await Task.yield()
 
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { [weak self] in
-                guard let self else { return }
+        // Race: cleanup vs timeout. Unlike withTaskGroup, this truly abandons
+        // slow cleanup after timeout — it continues in the background but we
+        // stop waiting and return control to the UI.
+        let once = OnceFlag()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            Task { [weak self] in
+                guard let self else {
+                    if once.claim() { continuation.resume() }
+                    return
+                }
                 await self.cleanup()
+                if once.claim() { continuation.resume() }
             }
-            group.addTask {
+            Task {
                 try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                if once.claim() { continuation.resume() }
             }
-            _ = await group.next()
-            group.cancelAll()
         }
 
         // Ensure overlay doesn't flash
@@ -143,6 +150,19 @@ final class CameraDiscoveryViewModel: ObservableObject {
         state = .scanning
         autoSelectCamera = nil
         isCleaningUp = false
+    }
+
+    /// Thread-safe one-shot flag for continuation racing.
+    private final class OnceFlag: @unchecked Sendable {
+        private var claimed = false
+        private let lock = NSLock()
+        func claim() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            guard !claimed else { return false }
+            claimed = true
+            return true
+        }
     }
 
     // MARK: - Private

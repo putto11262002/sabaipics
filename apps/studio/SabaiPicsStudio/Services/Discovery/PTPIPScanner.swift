@@ -151,12 +151,19 @@ final class PTPIPScanner: ObservableObject {
         scanTask = nil
         task.cancel()
 
-        // Wait for task to finish, but don't block forever
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await task.value }
-            group.addTask { try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000)) }
-            _ = await group.next()
-            group.cancelAll()
+        // Race: wait for cancelled task to drain vs timeout.
+        // Unlike withTaskGroup, this truly abandons slow work after timeout —
+        // the drain continues in the background but we stop waiting.
+        let once = OnceFlag()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            Task {
+                await task.value
+                if once.claim() { continuation.resume() }
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                if once.claim() { continuation.resume() }
+            }
         }
 
         if case .scanning = state {
@@ -539,6 +546,19 @@ final class PTPIPScanner: ObservableObject {
     }
 
     // MARK: - Error Helpers
+
+    /// Thread-safe one-shot flag for continuation racing.
+    private final class OnceFlag: @unchecked Sendable {
+        private var claimed = false
+        private let lock = NSLock()
+        func claim() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            guard !claimed else { return false }
+            claimed = true
+            return true
+        }
+    }
 
     private func isRetryableError(_ error: Error) -> Bool {
         if let nwError = error as? NWError {
