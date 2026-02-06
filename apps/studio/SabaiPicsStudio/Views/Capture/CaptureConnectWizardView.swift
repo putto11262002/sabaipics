@@ -24,7 +24,7 @@ struct CaptureConnectWizardView: View {
     var body: some View {
         NavigationStack(path: $path) {
             CaptureHomeView(
-                onConnectNew: {
+                onConnectNew: { _ in
                     connect.reset()
                     path = [.manufacturerSelection]
                 },

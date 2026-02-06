@@ -6,10 +6,23 @@ import SwiftUI
 struct CaptureTabRootView: View {
     @ObservedObject var sessionStore: CaptureSessionStore
 
-    // TODO: This is wrong. It the states be ativeManufacturer?? sony cannon nikon? and flow type as in fresh or reconect?
-    @State private var isShowingSonyFlow = false
-    @State private var sonyStartMode: SonyConnectFlowView.StartMode = .new
+    // MARK: - Sheet
+
+    private enum ActiveSheet: Identifiable {
+        case sony(SonyConnectFlowView.StartMode)
+        case canon(CanonConnectFlowView.StartMode)
+
+        var id: String {
+            switch self {
+            case .sony: return "sony"
+            case .canon: return "canon"
+            }
+        }
+    }
+
+    @State private var activeSheet: ActiveSheet? = nil
     @State private var recentSony: [APCameraConnectionRecord] = []
+    @State private var recentCanon: [APCameraConnectionRecord] = []
 
     @State private var pendingSonyReconnectID: String? = nil
     @State private var pendingSonyReconnectSSID: String? = nil
@@ -18,57 +31,53 @@ struct CaptureTabRootView: View {
     var body: some View {
         NavigationStack {
             CaptureHomeView(
-                onConnectNew: {
+                onConnectNew: { manufacturer in
                     guard sessionStore.state == .idle else { return }
-                    sonyStartMode = .new
-                    isShowingSonyFlow = true
+                    switch manufacturer {
+                    case .sony:
+                        activeSheet = .sony(.new)
+                    case .canon:
+                        activeSheet = .canon(.new)
+                    case .nikon:
+                        break // TODO: Nikon flow
+                    }
                 },
                 recentSony: recentSony,
+                recentCanon: recentCanon,
                 onReconnect: { manufacturer, id in
                     guard sessionStore.state == .idle else { return }
-                    guard manufacturer.lowercased() == "sony" else { return }
-
-                    let recordID = UUID(uuidString: id)
-                    let record = APCameraConnectionStore.shared.listRecords(manufacturer: .sony).first(where: { $0.id == recordID })
-                    if let record, let ssid = record.ssid, !ssid.isEmpty {
-                        if let currentKey = WiFiNetworkInfo.currentNetworkKey(), currentKey == record.networkKey {
-                            sonyStartMode = .reconnect(recordID: id)
-                            isShowingSonyFlow = true
-                        } else {
-                            pendingSonyReconnectID = id
-                            pendingSonyReconnectSSID = ssid
-                            isShowingSonyReconnectAlert = true
-                        }
-                    } else {
-                        // No SSID saved. Proceed to scan anyway.
-                        sonyStartMode = .reconnect(recordID: id)
-                        isShowingSonyFlow = true
+                    switch manufacturer.lowercased() {
+                    case "sony":
+                        handleSonyReconnect(id: id)
+                    case "canon":
+                        handleCanonReconnect(id: id)
+                    default:
+                        break
                     }
+                },
+                onRemoveRecent: { manufacturer, id in
+                    switch manufacturer.lowercased() {
+                    case "sony":
+                        APCameraConnectionStore.shared.deleteRecord(id: id)
+                    case "canon":
+                        APCameraConnectionStore.shared.deleteRecord(id: id)
+                    default:
+                        break
+                    }
+                    reloadRecent()
                 },
                 isConnectionMuted: sessionStore.state != .idle
             )
-            .sheet(isPresented: $isShowingSonyFlow) {
-                NavigationStack {
-                    SonyConnectFlowView(
-                        startMode: sonyStartMode,
-                        onConnected: { activeCamera in
-                            sessionStore.start(activeCamera: activeCamera)
-                            isShowingSonyFlow = false
-                            reloadRecentSony()
-                        },
-                        onCancel: {
-                            isShowingSonyFlow = false
-                            reloadRecentSony()
-                        }
-                    )
-                }
-                .interactiveDismissDisabled(true)
-                .presentationDragIndicator(.hidden)
+            .sheet(item: $activeSheet) { sheet in
+                sheetContent(sheet)
+                    .interactiveDismissDisabled(true)
+                    .presentationDragIndicator(.hidden)
             }
             .onAppear {
-                reloadRecentSony()
+                reloadRecent()
             }
         }
+        // MARK: Sony reconnect alert
         .alert("Reconnect Sony", isPresented: $isShowingSonyReconnectAlert) {
             Button("Cancel", role: .cancel) {
                 pendingSonyReconnectID = nil
@@ -78,12 +87,9 @@ struct CaptureTabRootView: View {
                 guard let id = pendingSonyReconnectID else { return }
                 pendingSonyReconnectID = nil
                 pendingSonyReconnectSSID = nil
-
-                // Ensure the alert dismisses before navigating.
                 isShowingSonyReconnectAlert = false
                 DispatchQueue.main.async {
-                    sonyStartMode = .reconnect(recordID: id)
-                    isShowingSonyFlow = true
+                    activeSheet = .sony(.reconnect(recordID: id))
                 }
             }
         } message: {
@@ -91,8 +97,72 @@ struct CaptureTabRootView: View {
         }
     }
 
-    private func reloadRecentSony() {
+    // MARK: - Sheet content
+
+    @ViewBuilder
+    private func sheetContent(_ sheet: ActiveSheet) -> some View {
+        switch sheet {
+        case .sony(let startMode):
+            NavigationStack {
+                SonyConnectFlowView(
+                    startMode: startMode,
+                    onConnected: { activeCamera in
+                        sessionStore.start(activeCamera: activeCamera)
+                        activeSheet = nil
+                        reloadRecent()
+                    },
+                    onCancel: {
+                        activeSheet = nil
+                        reloadRecent()
+                    }
+                )
+            }
+        case .canon(let startMode):
+            NavigationStack {
+                CanonConnectFlowView(
+                    startMode: startMode,
+                    onConnected: { activeCamera in
+                        sessionStore.start(activeCamera: activeCamera)
+                        activeSheet = nil
+                        reloadRecent()
+                    },
+                    onCancel: {
+                        activeSheet = nil
+                        reloadRecent()
+                    }
+                )
+            }
+        }
+    }
+
+    // MARK: - Reconnect handlers
+
+    private func handleSonyReconnect(id: String) {
+        let recordID = UUID(uuidString: id)
+        let record = APCameraConnectionStore.shared.listRecords(manufacturer: .sony)
+            .first(where: { $0.id == recordID })
+        if let record, let ssid = record.ssid, !ssid.isEmpty {
+            if let currentKey = WiFiNetworkInfo.currentNetworkKey(), currentKey == record.networkKey {
+                activeSheet = .sony(.reconnect(recordID: id))
+            } else {
+                pendingSonyReconnectID = id
+                pendingSonyReconnectSSID = ssid
+                isShowingSonyReconnectAlert = true
+            }
+        } else {
+            activeSheet = .sony(.reconnect(recordID: id))
+        }
+    }
+
+    private func handleCanonReconnect(id: String) {
+        activeSheet = .canon(.reconnect(recordID: id))
+    }
+
+    // MARK: - Data
+
+    private func reloadRecent() {
         recentSony = APCameraConnectionStore.shared.listRecords(manufacturer: .sony)
+        recentCanon = APCameraConnectionStore.shared.listRecords(manufacturer: .canon)
     }
 }
 
