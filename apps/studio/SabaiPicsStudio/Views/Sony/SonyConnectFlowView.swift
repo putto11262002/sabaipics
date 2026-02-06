@@ -183,7 +183,8 @@ struct SonyConnectFlowView: View {
             ip: activeCamera.ipAddress,
             cameraName: activeCamera.name,
             ssid: joinedWiFi?.credentials.ssid ?? reconnectSavedSSID,
-            cameraId: joinedWiFi?.cameraId ?? reconnectSavedCameraId
+            cameraId: joinedWiFi?.cameraId ?? reconnectSavedCameraId,
+            connectionMode: .cameraHotspot
         )
 
         await MainActor.run {

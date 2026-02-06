@@ -141,21 +141,39 @@ struct CaptureTabRootView: View {
         let recordID = UUID(uuidString: id)
         let record = APCameraConnectionStore.shared.listRecords(manufacturer: .sony)
             .first(where: { $0.id == recordID })
-        if let record, let ssid = record.ssid, !ssid.isEmpty {
-            if let currentKey = WiFiNetworkInfo.currentNetworkKey(), currentKey == record.networkKey {
-                activeSheet = .sony(.reconnect(recordID: id))
+
+        let mode = record?.connectionMode ?? .unknown
+        switch mode {
+        case .cameraHotspot, .unknown, .sameWifi:
+            if let ssid = record?.ssid, !ssid.isEmpty {
+                if let currentKey = WiFiNetworkInfo.currentNetworkKey(), currentKey == record?.networkKey {
+                    activeSheet = .sony(.reconnect(recordID: id))
+                } else {
+                    pendingSonyReconnectID = id
+                    pendingSonyReconnectSSID = ssid
+                    isShowingSonyReconnectAlert = true
+                }
             } else {
-                pendingSonyReconnectID = id
-                pendingSonyReconnectSSID = ssid
-                isShowingSonyReconnectAlert = true
+                activeSheet = .sony(.reconnect(recordID: id))
             }
-        } else {
+
+        case .personalHotspot:
+            // Shouldn't happen for Sony, but treat as generic scan.
             activeSheet = .sony(.reconnect(recordID: id))
         }
     }
 
     private func handleCanonReconnect(id: String) {
-        activeSheet = .canon(.reconnect(recordID: id))
+        let recordID = UUID(uuidString: id)
+        let record = APCameraConnectionStore.shared.listRecords(manufacturer: .canon)
+            .first(where: { $0.id == recordID })
+        let mode = record?.connectionMode ?? .unknown
+        if mode == .personalHotspot {
+            // Show Canon setup sheet first; user can continue to discovery.
+            activeSheet = .canon(.new)
+        } else {
+            activeSheet = .canon(.reconnect(recordID: id))
+        }
     }
 
     // MARK: - Data

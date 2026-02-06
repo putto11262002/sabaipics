@@ -5,6 +5,8 @@
 //
 
 import Foundation
+
+// This file is shared across many targets; keep imports minimal.
 #if os(iOS)
 import NetworkExtension
 #endif
@@ -16,6 +18,24 @@ struct APCameraConnectionRecord: Codable, Equatable, Identifiable {
     var cameraName: String
     var lastKnownCameraIP: String
     var lastConnectedAt: Date
+
+    enum ConnectionMode: String, Codable {
+        /// Device joined the camera's own WiFi/hotspot (AP-mode).
+        case cameraHotspot
+
+        /// Device is on iPhone Personal Hotspot (bridge interface).
+        case personalHotspot
+
+        /// Device and camera are assumed to be on the same LAN WiFi.
+        case sameWifi
+
+        /// Unknown / not recorded (backward-compatible default).
+        case unknown
+    }
+
+    /// Best-effort hint for reconnect UX.
+    /// Optional for backward compatibility with already-stored records.
+    var connectionMode: ConnectionMode? = nil
 
     // Optional metadata (best-effort)
     var ssid: String?
@@ -55,7 +75,8 @@ final class APCameraConnectionStore {
         ip: String,
         cameraName: String,
         ssid: String? = nil,
-        cameraId: String? = nil
+        cameraId: String? = nil,
+        connectionMode: APCameraConnectionRecord.ConnectionMode = .unknown
     ) {
         let networkKey = WiFiNetworkInfo.currentNetworkKey()
         var all = loadAllById()
@@ -66,16 +87,19 @@ final class APCameraConnectionStore {
                 record.manufacturer == manufacturer && record.networkKey == key && record.cameraName == cameraName
             })
 
-            if let existing {
-            var updated = existing
-            updated.lastKnownCameraIP = ip
-            updated.lastConnectedAt = Date()
-            updated.ssid = ssid ?? updated.ssid
-            updated.cameraId = cameraId ?? updated.cameraId
-            updated.networkKey = key
-            all[updated.id] = updated
-            saveAllById(all)
-            return
+            if let existing = existing {
+                var updated = existing
+                updated.lastKnownCameraIP = ip
+                updated.lastConnectedAt = Date()
+                updated.ssid = ssid ?? updated.ssid
+                updated.cameraId = cameraId ?? updated.cameraId
+                updated.networkKey = key
+                if updated.connectionMode == nil || updated.connectionMode == .unknown {
+                    updated.connectionMode = connectionMode
+                }
+                all[updated.id] = updated
+                saveAllById(all)
+                return
             }
         }
 
@@ -85,6 +109,7 @@ final class APCameraConnectionStore {
             cameraName: cameraName,
             lastKnownCameraIP: ip,
             lastConnectedAt: Date(),
+            connectionMode: connectionMode,
             ssid: ssid,
             cameraId: cameraId,
             networkKey: networkKey
