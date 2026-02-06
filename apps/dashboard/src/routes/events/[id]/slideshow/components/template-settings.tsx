@@ -14,20 +14,20 @@ interface TemplateSettingsProps {
 
 const TEMPLATE_INFO: Record<TemplateId, { name: string; description: string }> = {
   classic: {
-    name: 'Classic Centered',
-    description: 'Traditional centered layout, professional',
+    name: 'Classic',
+    description: 'Traditional layout with subtitle',
   },
-  modern: {
-    name: 'Modern Horizontal',
-    description: 'Clean horizontal header, spacious',
+  'classic-portrait': {
+    name: 'Classic Portrait',
+    description: 'Classic layout for portrait screens',
   },
-  bold: {
-    name: 'Bold Magazine',
-    description: 'Dynamic with bold colors, eye-catching',
+  minimal: {
+    name: 'Minimal',
+    description: 'Clean minimal layout',
   },
-  elegant: {
-    name: 'Elegant Minimal',
-    description: 'Sophisticated with refined spacing',
+  'minimal-portrait': {
+    name: 'Minimal Portrait',
+    description: 'Minimal layout for portrait screens',
   },
 };
 
