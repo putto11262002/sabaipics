@@ -36,10 +36,22 @@ function buildClassicCentered(): SlideshowConfig {
       maxWidth: 'none',
     },
     blocks: [
-      // Event Name
-      createBlock('event-name'),
-      // Subtitle
-      createBlock('subtitle'),
+      // Event Name + Subtitle centered
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlock('event-name'),
+          createBlock('subtitle'),
+        ],
+        {
+          direction: 'column',
+          align: 'center',
+          justify: 'center',
+          gap: 'xs',
+          padding: 'none',
+          wrap: false,
+        },
+      ),
       // Social links (disabled by default)
       (() => {
         const social = createBlockWithChildren(
