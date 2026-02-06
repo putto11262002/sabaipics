@@ -280,8 +280,7 @@ class ConnectionStore: ObservableObject {
             self.shouldDismissConnected = false
             self.connectionError = nil
 
-            // Note: Auto-transition to capturing happens at app level (AppState)
-            // This store only manages connection state
+            // Note: This store only manages connection state.
         }
     }
 
@@ -325,11 +324,12 @@ class ConnectionStore: ObservableObject {
  // connectionStore.connectionState == .error(...)
  ```
 
- Example 3: SwiftUI Environment Injection (Phase 4)
+ Example 3: SwiftUI Environment Injection (legacy)
 
  ```swift
- // App root
- ContentView()
+ // App root (example)
+ RootFlowView()
+     .environmentObject(AppCoordinator())
      .environmentObject(connectionStore)
 
  // Any child view

@@ -76,6 +76,12 @@ class CaptureFlowCoordinator: ObservableObject {
 
     weak var appCoordinator: AppCoordinator?
 
+    // MARK: - Capture Tab Integration
+
+    /// Optional hook used by the Capture tab to take over what happens when a camera is connected.
+    /// When nil, the coordinator performs the legacy behavior (start a TransferSession).
+    var onActiveCameraConnected: ((ActiveCamera) -> Void)?
+
     // MARK: - Navigation Methods (migrated from AppCoordinator)
 
     func selectManufacturer(_ manufacturer: CameraManufacturer) {
@@ -195,7 +201,15 @@ class CaptureFlowCoordinator: ObservableObject {
         }
         discoveredCameras = []
 
-        // Start transfer session via global coordinator
+        // If the Capture tab wants to own the session, hand off here.
+        if let onActiveCameraConnected {
+            onActiveCameraConnected(activeCamera)
+            backToManufacturerSelection()
+            print("[CaptureFlowCoordinator] ═══════════════════════════════════════════")
+            return
+        }
+
+        // Legacy behavior: start transfer session via global coordinator
         appCoordinator?.startTransferSession(with: activeCamera)
         state = .transferring
         print("[CaptureFlowCoordinator] ═══════════════════════════════════════════")
@@ -219,6 +233,16 @@ class CaptureFlowCoordinator: ObservableObject {
                 let activeCamera = try await appCoordinator?.createManualSession(ip: ip)
                 guard let activeCamera = activeCamera else {
                     state = .error("Failed to create camera session")
+                    return
+                }
+
+                // If the Capture tab wants to own the session, hand off here.
+                if let onActiveCameraConnected {
+                    await MainActor.run {
+                        onActiveCameraConnected(activeCamera)
+                        backToManufacturerSelection()
+                    }
+                    connectionTask = nil
                     return
                 }
 

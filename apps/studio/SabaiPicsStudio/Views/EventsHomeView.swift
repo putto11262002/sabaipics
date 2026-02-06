@@ -4,15 +4,19 @@
 //
 //  Created: 2026-01-22
 //  Updated: 2026-01-29 - SAB-39: Events browser with skeleton loading
+//  Updated: 2026-02-01 - Fix: Use @StateObject to persist state across tab switches
 //
 
 import SwiftUI
 
-struct EventsHomeView: View {
-    @State private var events: [Event] = []
-    @State private var isFirstLoad = true
-    @State private var error: Error?
-    @State private var isRefreshing = false
+// MARK: - ViewModel
+
+@MainActor
+class EventsViewModel: ObservableObject {
+    @Published var events: [Event] = []
+    @Published var isFirstLoad = true
+    @Published var error: Error?
+    @Published var isRefreshing = false
 
     private let apiClient: EventsAPIClient
 
@@ -22,14 +26,55 @@ struct EventsHomeView: View {
         self.apiClient = EventsAPIClient(baseURL: baseURL)
     }
 
+    func loadEvents() async {
+        isFirstLoad = events.isEmpty
+        error = nil
+
+        // Concurrent operations: fetch + minimum display time
+        async let eventsData = apiClient.fetchEvents(page: 0, limit: 10)
+        async let minimumDelay: () = Task.sleep(nanoseconds: 300_000_000)  // 300ms
+
+        do {
+            let response = try await eventsData
+            try await minimumDelay  // Prevent skeleton flicker
+            events = response.data
+        } catch {
+            try? await minimumDelay
+            self.error = error
+        }
+
+        isFirstLoad = false
+    }
+
+    func refreshEvents() async {
+        isRefreshing = true
+
+        do {
+            let response = try await apiClient.fetchEvents(page: 0, limit: 10)
+            events = response.data
+            error = nil
+        } catch {
+            self.error = error
+        }
+
+        isRefreshing = false
+    }
+}
+
+// MARK: - View
+
+struct EventsHomeView: View {
+    @StateObject private var viewModel = EventsViewModel()
+    @State private var navigationPath = NavigationPath()
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             Group {
-                if isFirstLoad && events.isEmpty {
+                if viewModel.isFirstLoad && viewModel.events.isEmpty {
                     skeletonListView
-                } else if let error = error, events.isEmpty {
+                } else if let error = viewModel.error, viewModel.events.isEmpty {
                     errorView(error: error)
-                } else if events.isEmpty {
+                } else if viewModel.events.isEmpty {
                     emptyStateView
                 } else {
                     eventsList
@@ -37,13 +82,20 @@ struct EventsHomeView: View {
             }
             .navigationTitle("Events")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: String.self) { eventId in
+                EventDetailView(eventId: eventId)
+            }
             .refreshable {
-                await refreshEvents()
+                await viewModel.refreshEvents()
             }
             .task {
-                if events.isEmpty {
-                    await loadEvents()
+                if viewModel.events.isEmpty {
+                    await viewModel.loadEvents()
                 }
+            }
+            .onAppear {
+                // Reset navigation state when view appears (fixes fullScreenCover corruption)
+                navigationPath = NavigationPath()
             }
         }
     }
@@ -71,8 +123,8 @@ struct EventsHomeView: View {
     private var eventsList: some View {
         List {
             Section {
-                ForEach(events) { event in
-                    NavigationLink(destination: EventDetailView(eventId: event.id)) {
+                ForEach(viewModel.events) { event in
+                    NavigationLink(value: event.id) {
                         EventRow(event: event)
                     }
                 }
@@ -126,7 +178,7 @@ struct EventsHomeView: View {
 
             Button {
                 Task {
-                    await loadEvents()
+                    await viewModel.loadEvents()
                 }
             } label: {
                 Text("Retry")
@@ -137,41 +189,6 @@ struct EventsHomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Data Loading
-
-    private func loadEvents() async {
-        isFirstLoad = events.isEmpty
-        error = nil
-
-        // Concurrent operations: fetch + minimum display time
-        async let eventsData = apiClient.fetchEvents(page: 0, limit: 10)
-        async let minimumDelay: () = Task.sleep(nanoseconds: 300_000_000)  // 300ms
-
-        do {
-            let response = try await eventsData
-            try await minimumDelay  // Prevent skeleton flicker
-            events = response.data
-        } catch {
-            try? await minimumDelay
-            self.error = error
-        }
-
-        isFirstLoad = false
-    }
-
-    private func refreshEvents() async {
-        isRefreshing = true
-
-        do {
-            let response = try await apiClient.fetchEvents(page: 0, limit: 10)
-            events = response.data
-            error = nil
-        } catch {
-            self.error = error
-        }
-
-        isRefreshing = false
-    }
 }
 
 // MARK: - Previews
