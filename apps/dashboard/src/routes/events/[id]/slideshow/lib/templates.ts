@@ -52,26 +52,22 @@ function buildClassicCentered(): SlideshowConfig {
           wrap: false,
         },
       ),
-      // Social links (disabled by default)
-      (() => {
-        const social = createBlockWithChildren(
-          'flex',
-          [
-            createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
-            createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
-          ],
-          {
-            direction: 'row',
-            align: 'center',
-            justify: 'center',
-            gap: 'sm',
-            padding: 'none',
-            wrap: false,
-          },
-        );
-        social.enabled = false;
-        return social;
-      })(),
+      // Social links (placeholders - will add URL fields to event later)
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
+          createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
+        ],
+        {
+          direction: 'row',
+          align: 'center',
+          justify: 'center',
+          gap: 'sm',
+          padding: 'none',
+          wrap: false,
+        },
+      ),
       // QR Code
       createBlockWithProps('qr', { size: 'md', label: 'Scan to find your photos' }),
       // Gallery
