@@ -19,13 +19,13 @@ struct SonyAPEntryView: View {
     let onNewCamera: () -> Void
     let onConnectRecord: (String) -> Void
 
-    @State private var selectedRecord: SonyAPConnectionRecord?
+    @State private var selectedRecord: APCameraConnectionRecord?
     @State private var showRecordActions = false
 
-    @State private var records: [SonyAPConnectionRecord] = []
+    @State private var records: [APCameraConnectionRecord] = []
 
     private var currentNetworkKey: String? {
-        SonyAPConnectionCache.shared.currentNetworkKey()
+        WiFiNetworkInfo.currentNetworkKey()
     }
 
     // Keep WiFi utilities off this entry screen.
@@ -62,7 +62,7 @@ struct SonyAPEntryView: View {
                 }
 
                 Button("Connect") {
-                    onConnectRecord(record.id)
+                    onConnectRecord(record.id.uuidString)
                 }
                 .disabled(!isOnSameNetwork)
 
@@ -88,7 +88,7 @@ struct SonyAPEntryView: View {
                     Task { @MainActor in
                         // Optimistically update UI immediately.
                         records.removeAll(where: { $0.id == record.id })
-                        SonyAPConnectionCache.shared.deleteRecord(id: record.id)
+                        APCameraConnectionStore.shared.deleteRecord(id: record.id)
                     }
                 }
             }
@@ -96,7 +96,7 @@ struct SonyAPEntryView: View {
             Button("Cancel", role: .cancel) {}
         }
         .onAppear {
-            records = SonyAPConnectionCache.shared.listRecords()
+            records = APCameraConnectionStore.shared.listRecords(manufacturer: .sony)
         }
     }
 

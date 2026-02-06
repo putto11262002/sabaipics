@@ -37,7 +37,8 @@ final class CameraConnectCoordinator: ObservableObject {
 
     func preferredIPHint() -> String? {
         guard manufacturer == .sony, let id = preferredRecordID else { return nil }
-        return SonyAPConnectionCache.shared.listRecords().first(where: { $0.id == id })?.lastKnownCameraIP
+        let uuid = UUID(uuidString: id)
+        return APCameraConnectionStore.shared.listRecords(manufacturer: .sony).first(where: { $0.id == uuid })?.lastKnownCameraIP
     }
 
     func acceptSelection(_ camera: DiscoveredCamera) {
@@ -70,7 +71,7 @@ final class CameraConnectCoordinator: ObservableObject {
 
         // Persist Sony "Saved" info.
         if manufacturer == .sony {
-            SonyAPConnectionCache.shared.saveCurrentNetwork(ip: activeCamera.ipAddress, cameraName: activeCamera.name)
+            APCameraConnectionStore.shared.saveCurrentNetwork(manufacturer: .sony, ip: activeCamera.ipAddress, cameraName: activeCamera.name)
         }
 
         onConnected?(activeCamera)

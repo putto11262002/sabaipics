@@ -5,7 +5,7 @@ import SwiftUI
 
 struct CaptureHomeView: View {
     let onConnectNew: () -> Void
-    let recentSony: [SonyAPConnectionRecord]
+    let recentSony: [APCameraConnectionRecord]
     let onReconnect: (_ manufacturer: String, _ id: String) -> Void
     var isConnectionMuted: Bool = false
 
@@ -40,7 +40,7 @@ struct CaptureHomeView: View {
                 } else {
                     ForEach(recentSony) { record in
                         Button {
-                            onReconnect("sony", record.id)
+                            onReconnect("sony", record.id.uuidString)
                         } label: {
                             HStack(spacing: 12) {
                                 VStack(alignment: .leading, spacing: 2) {

@@ -89,7 +89,8 @@ struct SonyConnectFlowView: View {
             case .discovery(let preferredRecordID, let backTarget):
                 let preferredIP: String? = {
                     guard let preferredRecordID else { return nil }
-                    return SonyAPConnectionCache.shared.listRecords().first(where: { $0.id == preferredRecordID })?.lastKnownCameraIP
+                    let uuid = UUID(uuidString: preferredRecordID)
+                    return APCameraConnectionStore.shared.listRecords(manufacturer: .sony).first(where: { $0.id == uuid })?.lastKnownCameraIP
                 }()
 
                 CameraDiscoveryScreen(
@@ -168,7 +169,8 @@ struct SonyConnectFlowView: View {
         }
 
         // Persist Sony "Saved" record (AP mode) with the credentials we used (if known).
-        SonyAPConnectionCache.shared.saveCurrentNetwork(
+        APCameraConnectionStore.shared.saveCurrentNetwork(
+            manufacturer: .sony,
             ip: activeCamera.ipAddress,
             cameraName: activeCamera.name,
             ssid: joinedWiFi?.credentials.ssid ?? reconnectSavedSSID,

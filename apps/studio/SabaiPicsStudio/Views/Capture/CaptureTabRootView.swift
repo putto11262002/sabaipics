@@ -9,7 +9,7 @@ struct CaptureTabRootView: View {
     // TODO: This is wrong. It the states be ativeManufacturer?? sony cannon nikon? and flow type as in fresh or reconect?
     @State private var isShowingSonyFlow = false
     @State private var sonyStartMode: SonyConnectFlowView.StartMode = .new
-    @State private var recentSony: [SonyAPConnectionRecord] = []
+    @State private var recentSony: [APCameraConnectionRecord] = []
 
     @State private var pendingSonyReconnectID: String? = nil
     @State private var pendingSonyReconnectSSID: String? = nil
@@ -28,9 +28,10 @@ struct CaptureTabRootView: View {
                     guard sessionStore.state == .idle else { return }
                     guard manufacturer.lowercased() == "sony" else { return }
 
-                    let record = SonyAPConnectionCache.shared.listRecords().first(where: { $0.id == id })
+                    let recordID = UUID(uuidString: id)
+                    let record = APCameraConnectionStore.shared.listRecords(manufacturer: .sony).first(where: { $0.id == recordID })
                     if let record, let ssid = record.ssid, !ssid.isEmpty {
-                        if let currentKey = SonyAPConnectionCache.shared.currentNetworkKey(), currentKey == record.networkKey {
+                        if let currentKey = WiFiNetworkInfo.currentNetworkKey(), currentKey == record.networkKey {
                             sonyStartMode = .reconnect(recordID: id)
                             isShowingSonyFlow = true
                         } else {
@@ -91,7 +92,7 @@ struct CaptureTabRootView: View {
     }
 
     private func reloadRecentSony() {
-        recentSony = SonyAPConnectionCache.shared.listRecords()
+        recentSony = APCameraConnectionStore.shared.listRecords(manufacturer: .sony)
     }
 }
 

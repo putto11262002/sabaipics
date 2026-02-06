@@ -58,6 +58,7 @@ struct CameraDiscoveryScreen: View {
                         ForEach(viewModel.cameras) { camera in
                             CameraRow(camera: camera) {
                                 Task { await viewModel.stop() }
+                                viewModel.releaseCamera(camera)
                                 onSelect(camera, viewModel.cameras)
                             }
                         }
@@ -155,15 +156,17 @@ struct CameraDiscoveryScreen: View {
                 }
             }
         }
-        .task {
-            await viewModel.start(preferredIP: preferredIP)
+        .onAppear {
+            guard viewModel.cameras.isEmpty else { return }
+            Task { await viewModel.start(preferredIP: preferredIP) }
         }
         .onDisappear {
-            Task { await viewModel.stop() }
+            Task { await viewModel.cleanup() }
         }
         .onChange(of: viewModel.autoSelectCamera) { camera in
             guard let camera else { return }
             Task { await viewModel.stop() }
+            viewModel.releaseCamera(camera)
             onSelect(camera, viewModel.cameras)
             viewModel.autoSelectCamera = nil
         }
