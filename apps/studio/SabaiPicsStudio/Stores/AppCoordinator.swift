@@ -193,7 +193,7 @@ class AppCoordinator: ObservableObject {
         print("[AppCoordinator] Starting transfer session with: \(camera.name)")
 
         if SonyAPDiscovery.isSonyCameraName(camera.name) {
-            APCameraConnectionStore.shared.saveCurrentNetwork(manufacturer: .sony, ip: camera.ipAddress, cameraName: camera.name)
+            APCameraConnectionStore.shared.saveCurrentNetwork(manufacturer: .sony, ip: camera.ipAddress, cameraName: camera.name, connectionMode: .sameWifi)
         }
 
         // Create transfer session

@@ -148,7 +148,8 @@ struct CanonConnectFlowView: View {
             ip: activeCamera.ipAddress,
             cameraName: activeCamera.name,
             ssid: nil,
-            cameraId: nil
+            cameraId: nil,
+            connectionMode: .personalHotspot
         )
 
         await MainActor.run {
