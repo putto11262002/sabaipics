@@ -81,48 +81,62 @@ function buildClassicPortrait(): SlideshowConfig {
   return {
     theme: { primary: '#0f172a', background: '#ffffff' },
     layout: {
-      gap: 'lg',
+      gap: 'none',
       padding: 'lg',
       align: 'center',
       maxWidth: 'none',
     },
     blocks: [
-      // Event Name + Subtitle centered
+      // Wrapper to center vertically
       createBlockWithChildren(
         'flex',
         [
-          createBlock('event-name'),
-          createBlock('subtitle'),
+          // Event Name + Subtitle centered
+          createBlockWithChildren(
+            'flex',
+            [
+              createBlock('event-name'),
+              createBlock('subtitle'),
+            ],
+            {
+              direction: 'column',
+              align: 'center',
+              justify: 'center',
+              gap: 'xs',
+              padding: 'none',
+              wrap: false,
+            },
+          ),
+          // Social links
+          createBlockWithChildren(
+            'flex',
+            [
+              createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
+              createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
+            ],
+            {
+              direction: 'row',
+              align: 'center',
+              justify: 'center',
+              gap: 'sm',
+              padding: 'none',
+              wrap: false,
+            },
+          ),
+          // QR Code
+          createBlockWithProps('qr', { size: 'md', label: 'Scan to find your photos' }),
+          // Gallery - more rows for portrait
+          createBlockWithProps('gallery', { rows: 5 }),
         ],
         {
           direction: 'column',
           align: 'center',
           justify: 'center',
-          gap: 'xs',
+          gap: 'lg',
           padding: 'none',
           wrap: false,
         },
       ),
-      // Social links
-      createBlockWithChildren(
-        'flex',
-        [
-          createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
-          createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
-        ],
-        {
-          direction: 'row',
-          align: 'center',
-          justify: 'center',
-          gap: 'sm',
-          padding: 'none',
-          wrap: false,
-        },
-      ),
-      // QR Code
-      createBlockWithProps('qr', { size: 'md', label: 'Scan to find your photos' }),
-      // Gallery - more rows for portrait
-      createBlockWithProps('gallery', { rows: 5 }),
     ],
   };
 }
@@ -180,45 +194,59 @@ function buildMinimalPortrait(): SlideshowConfig {
   return {
     theme: { primary: '#0f172a', background: '#ffffff' },
     layout: {
-      gap: 'xl',
+      gap: 'none',
       padding: 'xl',
       align: 'center',
       maxWidth: 'lg',
     },
     blocks: [
-      // Event Name centered
+      // Wrapper to center vertically
       createBlockWithChildren(
         'flex',
-        [createBlock('event-name')],
+        [
+          // Event Name centered
+          createBlockWithChildren(
+            'flex',
+            [createBlock('event-name')],
+            {
+              direction: 'column',
+              align: 'center',
+              justify: 'center',
+              gap: 'none',
+              padding: 'none',
+              wrap: false,
+            },
+          ),
+          // Social links
+          createBlockWithChildren(
+            'flex',
+            [
+              createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
+              createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
+            ],
+            {
+              direction: 'row',
+              align: 'center',
+              justify: 'center',
+              gap: 'sm',
+              padding: 'none',
+              wrap: false,
+            },
+          ),
+          // QR Code
+          createBlockWithProps('qr', { size: 'md', label: 'Scan to search' }),
+          // Gallery - sparse density, more rows for portrait
+          createBlockWithProps('gallery', { density: 'sparse', rows: 4 }),
+        ],
         {
           direction: 'column',
           align: 'center',
           justify: 'center',
-          gap: 'none',
+          gap: 'xl',
           padding: 'none',
           wrap: false,
         },
       ),
-      // Social links
-      createBlockWithChildren(
-        'flex',
-        [
-          createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
-          createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
-        ],
-        {
-          direction: 'row',
-          align: 'center',
-          justify: 'center',
-          gap: 'sm',
-          padding: 'none',
-          wrap: false,
-        },
-      ),
-      // QR Code
-      createBlockWithProps('qr', { size: 'md', label: 'Scan to search' }),
-      // Gallery - sparse density, more rows for portrait
-      createBlockWithProps('gallery', { density: 'sparse', rows: 4 }),
     ],
   };
 }
