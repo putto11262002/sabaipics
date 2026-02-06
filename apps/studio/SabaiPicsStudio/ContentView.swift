@@ -73,8 +73,9 @@ struct ContentView: View {
                 if captureFlow.selectedManufacturer == .sony {
                     let preferredIP: String? = {
                         guard let id = captureFlow.preferredSonyRecordID else { return nil }
-                        return SonyAPConnectionCache.shared.listRecords().first(where: {
-                            $0.id == id
+                        let uuid = UUID(uuidString: id)
+                        return APCameraConnectionStore.shared.listRecords(manufacturer: .sony).first(where: {
+                            $0.id == uuid
                         })?.lastKnownCameraIP
                     }()
 

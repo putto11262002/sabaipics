@@ -17,7 +17,7 @@ enum SonyAPDiscovery {
         }
 
         // 1) Cached IP for the current WiFi network signature
-        if let record = SonyAPConnectionCache.shared.loadCurrentNetworkRecord() {
+        if let record = APCameraConnectionStore.shared.loadCurrentNetworkRecord(manufacturer: .sony) {
             candidates.append(record.lastKnownCameraIP)
         }
 

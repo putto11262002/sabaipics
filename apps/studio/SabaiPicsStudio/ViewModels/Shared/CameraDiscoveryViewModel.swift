@@ -92,6 +92,12 @@ final class CameraDiscoveryViewModel: ObservableObject {
         await scanner.stop()
     }
 
+    /// Remove a camera from the managed list so cleanup won't disconnect it.
+    /// Call this before handing the camera off to a parent (e.g. on select).
+    func releaseCamera(_ camera: DiscoveredCamera) {
+        cameras.removeAll { $0.id == camera.id }
+    }
+
     func cleanup() async {
         timeoutTask?.cancel()
         isCleaningUp = true

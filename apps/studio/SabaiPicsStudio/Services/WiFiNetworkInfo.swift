@@ -64,6 +64,16 @@ enum WiFiNetworkInfo {
         return nil
     }
 
+    /// Returns a stable-ish identifier for the current WiFi network without requiring SSID.
+    ///
+    /// Uses subnet base + netmask as the signature.
+    static func currentNetworkKey() -> String? {
+        guard let wifi = currentWiFiIPv4() else {
+            return nil
+        }
+        return "subnet:\(wifi.subnetBaseString)/\(wifi.netmaskString)"
+    }
+
     static func ipv4String(from ipv4: UInt32) -> String {
         let a = (ipv4 >> 24) & 0xFF
         let b = (ipv4 >> 16) & 0xFF
