@@ -47,23 +47,23 @@ struct CaptureTabRootView: View {
                 },
                 isConnectionMuted: sessionStore.state != .idle
             )
-            .navigationDestination(isPresented: $isShowingSonyFlow) {
-                SonyConnectFlowView(
-                    startMode: sonyStartMode,
-                    onConnected: { activeCamera in
-                        let shouldAutoOpen = (sessionStore.state == .idle)
-                        sessionStore.start(activeCamera: activeCamera)
-                        if shouldAutoOpen {
-                            sessionStore.isDetailsPresented = true
+            .sheet(isPresented: $isShowingSonyFlow) {
+                NavigationStack {
+                    SonyConnectFlowView(
+                        startMode: sonyStartMode,
+                        onConnected: { activeCamera in
+                            sessionStore.start(activeCamera: activeCamera)
+                            isShowingSonyFlow = false
+                            reloadRecentSony()
+                        },
+                        onCancel: {
+                            isShowingSonyFlow = false
+                            reloadRecentSony()
                         }
-                        isShowingSonyFlow = false
-                        reloadRecentSony()
-                    },
-                    onCancel: {
-                        isShowingSonyFlow = false
-                        reloadRecentSony()
-                    }
-                )
+                    )
+                }
+                .interactiveDismissDisabled(true)
+                .presentationDragIndicator(.hidden)
             }
             .onAppear {
                 reloadRecentSony()

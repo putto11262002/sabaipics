@@ -78,7 +78,6 @@ struct CameraDiscoveryScreen: View {
                     },
                     onManualIP: {
                         Task {
-                            await viewModel.stop()
                             await viewModel.cleanupWithTimeout()
                             onManualIP()
                         }
@@ -96,7 +95,6 @@ struct CameraDiscoveryScreen: View {
                     },
                     onManualIP: {
                         Task {
-                            await viewModel.stop()
                             await viewModel.cleanupWithTimeout()
                             onManualIP()
                         }
@@ -126,7 +124,6 @@ struct CameraDiscoveryScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .appBackButton {
-            await viewModel.stop()
             await viewModel.cleanupWithTimeout()
             onBack()
         }
@@ -135,7 +132,6 @@ struct CameraDiscoveryScreen: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         Task {
-                            await viewModel.stop()
                             await viewModel.cleanupWithTimeout()
                             onDone()
                         }
@@ -156,12 +152,8 @@ struct CameraDiscoveryScreen: View {
                 }
             }
         }
-        .onAppear {
-            guard viewModel.cameras.isEmpty else { return }
-            Task { await viewModel.start(preferredIP: preferredIP) }
-        }
-        .onDisappear {
-            Task { await viewModel.cleanup() }
+        .task {
+            await viewModel.start(preferredIP: preferredIP)
         }
         .onChange(of: viewModel.autoSelectCamera) { camera in
             guard let camera else { return }
