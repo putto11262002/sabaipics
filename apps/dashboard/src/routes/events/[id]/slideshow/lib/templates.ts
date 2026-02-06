@@ -81,62 +81,48 @@ function buildClassicPortrait(): SlideshowConfig {
   return {
     theme: { primary: '#0f172a', background: '#ffffff' },
     layout: {
-      gap: 'none',
+      gap: 'lg',
       padding: 'lg',
       align: 'center',
       maxWidth: 'none',
     },
     blocks: [
-      // Wrapper to center vertically
+      // Event Name + Subtitle centered
       createBlockWithChildren(
         'flex',
         [
-          // Event Name + Subtitle centered
-          createBlockWithChildren(
-            'flex',
-            [
-              createBlock('event-name'),
-              createBlock('subtitle'),
-            ],
-            {
-              direction: 'column',
-              align: 'center',
-              justify: 'center',
-              gap: 'xs',
-              padding: 'none',
-              wrap: false,
-            },
-          ),
-          // Social links
-          createBlockWithChildren(
-            'flex',
-            [
-              createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
-              createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
-            ],
-            {
-              direction: 'row',
-              align: 'center',
-              justify: 'center',
-              gap: 'sm',
-              padding: 'none',
-              wrap: false,
-            },
-          ),
-          // QR Code
-          createBlockWithProps('qr', { size: 'md', label: 'Scan to find your photos' }),
-          // Gallery - more rows for portrait
-          createBlockWithProps('gallery', { rows: 5 }),
+          createBlock('event-name'),
+          createBlock('subtitle'),
         ],
         {
           direction: 'column',
           align: 'center',
           justify: 'center',
-          gap: 'lg',
+          gap: 'xs',
           padding: 'none',
           wrap: false,
         },
       ),
+      // Social links
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
+          createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
+        ],
+        {
+          direction: 'row',
+          align: 'center',
+          justify: 'center',
+          gap: 'sm',
+          padding: 'none',
+          wrap: false,
+        },
+      ),
+      // QR Code
+      createBlockWithProps('qr', { size: 'md', label: 'Scan to find your photos' }),
+      // Gallery - more rows for portrait
+      createBlockWithProps('gallery', { rows: 5 }),
     ],
   };
 }
@@ -194,59 +180,45 @@ function buildMinimalPortrait(): SlideshowConfig {
   return {
     theme: { primary: '#0f172a', background: '#ffffff' },
     layout: {
-      gap: 'none',
+      gap: 'xl',
       padding: 'xl',
       align: 'center',
       maxWidth: 'lg',
     },
     blocks: [
-      // Wrapper to center vertically
+      // Event Name centered
       createBlockWithChildren(
         'flex',
-        [
-          // Event Name centered
-          createBlockWithChildren(
-            'flex',
-            [createBlock('event-name')],
-            {
-              direction: 'column',
-              align: 'center',
-              justify: 'center',
-              gap: 'none',
-              padding: 'none',
-              wrap: false,
-            },
-          ),
-          // Social links
-          createBlockWithChildren(
-            'flex',
-            [
-              createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
-              createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
-            ],
-            {
-              direction: 'row',
-              align: 'center',
-              justify: 'center',
-              gap: 'sm',
-              padding: 'none',
-              wrap: false,
-            },
-          ),
-          // QR Code
-          createBlockWithProps('qr', { size: 'md', label: 'Scan to search' }),
-          // Gallery - sparse density, more rows for portrait
-          createBlockWithProps('gallery', { density: 'sparse', rows: 4 }),
-        ],
+        [createBlock('event-name')],
         {
           direction: 'column',
           align: 'center',
           justify: 'center',
-          gap: 'xl',
+          gap: 'none',
           padding: 'none',
           wrap: false,
         },
       ),
+      // Social links
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
+          createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
+        ],
+        {
+          direction: 'row',
+          align: 'center',
+          justify: 'center',
+          gap: 'sm',
+          padding: 'none',
+          wrap: false,
+        },
+      ),
+      // QR Code
+      createBlockWithProps('qr', { size: 'md', label: 'Scan to search' }),
+      // Gallery - sparse density, more rows for portrait
+      createBlockWithProps('gallery', { density: 'sparse', rows: 4 }),
     ],
   };
 }
