@@ -101,7 +101,7 @@ function buildClassicCentered(): SlideshowConfig {
 // Template 2: Modern Horizontal - Clean, spacious, left-aligned
 function buildModernHorizontal(): SlideshowConfig {
   return {
-    theme: { primary: '#3b82f6', background: '#ffffff' },
+    theme: { primary: '#0f172a', background: '#ffffff' },
     layout: {
       gap: 'xl',
       padding: 'lg',
@@ -193,7 +193,7 @@ function buildModernHorizontal(): SlideshowConfig {
 // Template 3: Bold Magazine - Eye-catching, dynamic, bold colors
 function buildBoldMagazine(): SlideshowConfig {
   return {
-    theme: { primary: '#ef4444', background: '#f8fafc' },
+    theme: { primary: '#0f172a', background: '#ffffff' },
     layout: {
       gap: 'md',
       padding: 'lg',
@@ -288,7 +288,7 @@ function buildBoldMagazine(): SlideshowConfig {
 // Template 4: Elegant Minimal - Sophisticated, refined, balanced
 function buildElegantMinimal(): SlideshowConfig {
   return {
-    theme: { primary: '#1e293b', background: '#ffffff' },
+    theme: { primary: '#0f172a', background: '#ffffff' },
     layout: {
       gap: 'lg',
       padding: 'xl',

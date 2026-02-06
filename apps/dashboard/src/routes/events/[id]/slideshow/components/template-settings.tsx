@@ -52,10 +52,7 @@ export function TemplateSettings({ onApplyTemplate }: TemplateSettingsProps) {
           <SelectContent>
             {Object.entries(TEMPLATE_INFO).map(([id, info]) => (
               <SelectItem key={id} value={id}>
-                <div className="flex flex-col items-start">
-                  <span className="font-medium">{info.name}</span>
-                  <span className="text-xs text-muted-foreground">{info.description}</span>
-                </div>
+                {info.name}
               </SelectItem>
             ))}
           </SelectContent>
