@@ -25,51 +25,367 @@ export function createBlockWithChildren(
 
 // ─── Templates ────────────────────────────────────────────────────────────────
 
-function buildClassic(): SlideshowConfig {
-  const socialLinks = createBlockWithProps('social-links', {
-    variant: 'horizontal-icons',
-    links: [
-      { platform: 'instagram', url: '' },
-      { platform: 'facebook', url: '' },
-    ],
-  });
-  socialLinks.enabled = false;
-
+// Template 1: Classic Centered - Traditional, clean, professional
+function buildClassicCentered(): SlideshowConfig {
   return {
     theme: { primary: '#0f172a', background: '#ffffff' },
     layout: {
-      gap: 'md',
-      padding: 'md',
-      align: 'start',
+      gap: 'lg',
+      padding: 'lg',
+      align: 'center',
       maxWidth: 'none',
     },
     blocks: [
-      // Event Header - Logo + name + subtitle
-      createBlockWithProps('event-header', {
-        showLogo: true,
-        showName: true,
-        showSubtitle: true,
-        showQr: false,
-        logoSize: 'md',
-        qrSize: 'md',
-        direction: 'column',
-        align: 'center',
-        justify: 'center',
-        gap: 'sm',
-      }),
+      // Header section - Logo, Name, Subtitle centered
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithProps('logo', { size: 'md' }),
+          createBlock('event-name'),
+          createBlock('subtitle'),
+        ],
+        {
+          direction: 'column',
+          align: 'center',
+          justify: 'center',
+          gap: 'sm',
+          padding: 'md',
+          wrap: false,
+        },
+      ),
       // Gallery
       createBlock('gallery'),
-      // Stats Panel
-      createBlockWithProps('stats-panel', {
-        variant: 'cards',
-        metrics: ['photos', 'searches', 'downloads'],
-      }),
+      // Stats cards in horizontal row
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithProps('stat-card', { metric: 'photos' }),
+          createBlockWithProps('stat-card', { metric: 'searches' }),
+          createBlockWithProps('stat-card', { metric: 'downloads' }),
+        ],
+        {
+          direction: 'row',
+          align: 'center',
+          justify: 'center',
+          gap: 'md',
+          padding: 'none',
+          wrap: true,
+        },
+      ),
       // QR Code
-      createBlock('qr'),
-      // Social Links (disabled by default)
-      socialLinks,
+      createBlockWithProps('qr', { size: 'md', label: 'Scan to find your photos' }),
+      // Social links (disabled by default)
+      (() => {
+        const social = createBlockWithChildren(
+          'flex',
+          [
+            createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
+            createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
+          ],
+          {
+            direction: 'row',
+            align: 'center',
+            justify: 'center',
+            gap: 'sm',
+            padding: 'none',
+            wrap: false,
+          },
+        );
+        social.enabled = false;
+        return social;
+      })(),
     ],
   };
 }
 
-export const DEFAULT_CONFIG: SlideshowConfig = buildClassic();
+// Template 2: Modern Horizontal - Clean, spacious, left-aligned
+function buildModernHorizontal(): SlideshowConfig {
+  return {
+    theme: { primary: '#3b82f6', background: '#ffffff' },
+    layout: {
+      gap: 'xl',
+      padding: 'lg',
+      align: 'start',
+      maxWidth: 'none',
+    },
+    blocks: [
+      // Horizontal header - Logo left, Name/Subtitle right
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithProps('logo', { size: 'lg' }),
+          createBlockWithChildren(
+            'flex',
+            [createBlock('event-name'), createBlock('subtitle')],
+            {
+              direction: 'column',
+              align: 'start',
+              justify: 'center',
+              gap: 'xs',
+              padding: 'none',
+              wrap: false,
+            },
+          ),
+        ],
+        {
+          direction: 'row',
+          align: 'center',
+          justify: 'start',
+          gap: 'lg',
+          padding: 'md',
+          wrap: false,
+        },
+      ),
+      // Gallery
+      createBlock('gallery'),
+      // Stats compact horizontal
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithProps('stat-card', { metric: 'photos' }),
+          createBlockWithProps('stat-card', { metric: 'searches' }),
+          createBlockWithProps('stat-card', { metric: 'downloads' }),
+        ],
+        {
+          direction: 'row',
+          align: 'center',
+          justify: 'start',
+          gap: 'sm',
+          padding: 'none',
+          wrap: true,
+        },
+      ),
+      // QR and Social in horizontal row
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithProps('qr', { size: 'sm', label: '' }),
+          createBlockWithChildren(
+            'flex',
+            [
+              createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
+              createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
+              createBlockWithProps('social-icon', { platform: 'tiktok', url: '' }),
+            ],
+            {
+              direction: 'row',
+              align: 'center',
+              justify: 'start',
+              gap: 'xs',
+              padding: 'none',
+              wrap: false,
+            },
+          ),
+        ],
+        {
+          direction: 'row',
+          align: 'center',
+          justify: 'between',
+          gap: 'md',
+          padding: 'md',
+          wrap: false,
+        },
+      ),
+    ],
+  };
+}
+
+// Template 3: Bold Magazine - Eye-catching, dynamic, bold colors
+function buildBoldMagazine(): SlideshowConfig {
+  return {
+    theme: { primary: '#ef4444', background: '#f8fafc' },
+    layout: {
+      gap: 'md',
+      padding: 'lg',
+      align: 'center',
+      maxWidth: 'none',
+    },
+    blocks: [
+      // Large logo centered
+      createBlockWithChildren(
+        'flex',
+        [createBlockWithProps('logo', { size: 'lg' })],
+        {
+          direction: 'column',
+          align: 'center',
+          justify: 'center',
+          gap: 'none',
+          padding: 'sm',
+          wrap: false,
+        },
+      ),
+      // Name and subtitle bold
+      createBlockWithChildren(
+        'flex',
+        [createBlock('event-name'), createBlock('subtitle')],
+        {
+          direction: 'column',
+          align: 'center',
+          justify: 'center',
+          gap: 'xs',
+          padding: 'sm',
+          wrap: false,
+        },
+      ),
+      // Gallery
+      createBlock('gallery'),
+      // Stats vertical with QR on side
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithChildren(
+            'flex',
+            [
+              createBlockWithProps('stat-card', { metric: 'photos' }),
+              createBlockWithProps('stat-card', { metric: 'searches' }),
+              createBlockWithProps('stat-card', { metric: 'downloads' }),
+            ],
+            {
+              direction: 'column',
+              align: 'stretch',
+              justify: 'start',
+              gap: 'sm',
+              padding: 'none',
+              wrap: false,
+            },
+          ),
+          createBlockWithProps('qr', { size: 'lg', label: 'Find Your Photos' }),
+        ],
+        {
+          direction: 'row',
+          align: 'start',
+          justify: 'center',
+          gap: 'lg',
+          padding: 'md',
+          wrap: true,
+        },
+      ),
+      // Social vertical list (disabled)
+      (() => {
+        const social = createBlockWithChildren(
+          'flex',
+          [
+            createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
+            createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
+            createBlockWithProps('social-icon', { platform: 'x', url: '' }),
+          ],
+          {
+            direction: 'column',
+            align: 'center',
+            justify: 'center',
+            gap: 'sm',
+            padding: 'sm',
+            wrap: false,
+          },
+        );
+        social.enabled = false;
+        return social;
+      })(),
+    ],
+  };
+}
+
+// Template 4: Elegant Minimal - Sophisticated, refined, balanced
+function buildElegantMinimal(): SlideshowConfig {
+  return {
+    theme: { primary: '#1e293b', background: '#ffffff' },
+    layout: {
+      gap: 'lg',
+      padding: 'xl',
+      align: 'center',
+      maxWidth: 'lg',
+    },
+    blocks: [
+      // Horizontal logo + name header
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithProps('logo', { size: 'md' }),
+          createBlock('event-name'),
+        ],
+        {
+          direction: 'row',
+          align: 'center',
+          justify: 'center',
+          gap: 'md',
+          padding: 'md',
+          wrap: false,
+        },
+      ),
+      // Subtitle
+      createBlockWithChildren(
+        'flex',
+        [createBlock('subtitle')],
+        {
+          direction: 'column',
+          align: 'center',
+          justify: 'center',
+          gap: 'none',
+          padding: 'xs',
+          wrap: false,
+        },
+      ),
+      // Gallery
+      createBlock('gallery'),
+      // Stats elegant cards
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithProps('stat-card', { metric: 'photos' }),
+          createBlockWithProps('stat-card', { metric: 'searches' }),
+          createBlockWithProps('stat-card', { metric: 'downloads' }),
+        ],
+        {
+          direction: 'row',
+          align: 'stretch',
+          justify: 'center',
+          gap: 'lg',
+          padding: 'sm',
+          wrap: true,
+        },
+      ),
+      // QR centered with label
+      createBlockWithChildren(
+        'flex',
+        [createBlockWithProps('qr', { size: 'md', label: 'Scan to search' })],
+        {
+          direction: 'column',
+          align: 'center',
+          justify: 'center',
+          gap: 'none',
+          padding: 'md',
+          wrap: false,
+        },
+      ),
+      // Social horizontal
+      createBlockWithChildren(
+        'flex',
+        [
+          createBlockWithProps('social-icon', { platform: 'instagram', url: '' }),
+          createBlockWithProps('social-icon', { platform: 'facebook', url: '' }),
+        ],
+        {
+          direction: 'row',
+          align: 'center',
+          justify: 'center',
+          gap: 'md',
+          padding: 'sm',
+          wrap: false,
+        },
+      ),
+    ],
+  };
+}
+
+// ─── Exports ──────────────────────────────────────────────────────────────────
+
+export const TEMPLATES = {
+  classic: buildClassicCentered,
+  modern: buildModernHorizontal,
+  bold: buildBoldMagazine,
+  elegant: buildElegantMinimal,
+} as const;
+
+export type TemplateId = keyof typeof TEMPLATES;
+
+export const DEFAULT_CONFIG: SlideshowConfig = buildClassicCentered();
