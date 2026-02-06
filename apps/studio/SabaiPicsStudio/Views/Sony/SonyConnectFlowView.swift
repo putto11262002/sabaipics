@@ -54,8 +54,17 @@ struct SonyConnectFlowView: View {
                 )
                 .navigationTitle("Sony")
                 .navigationBarTitleDisplayMode(.inline)
-                .appBackButton {
-                    onCancel()
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            onCancel()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.Theme.mutedForeground)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
 
             case .credentialsQR:
