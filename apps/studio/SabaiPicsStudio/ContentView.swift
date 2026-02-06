@@ -8,6 +8,14 @@
 
 import SwiftUI
 
+/// LEGACY: The old capture wizard container.
+///
+/// Kept temporarily for reference while the Capture tab flow is migrating.
+/// New entry point is `MainTabView` -> `CaptureTabRootView`.
+@available(
+    *, deprecated,
+    message: "Legacy capture wizard container. Use Capture tab (CaptureTabRootView) instead."
+)
 struct ContentView: View {
     @EnvironmentObject var coordinator: AppCoordinator
     @EnvironmentObject var captureFlow: CaptureFlowCoordinator  // NEW
@@ -15,23 +23,30 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             // Background color
-            Color(.systemBackground)
+            Color(Color.Theme.background)
                 .ignoresSafeArea()
 
             // Content based on capture flow state (CHANGED)
             switch captureFlow.state {
             case .manufacturerSelection:
-                ManufacturerSelectionView()
+                ManufacturerSelectionView(onSelectManufacturer: { manufacturer in
+                    captureFlow.selectManufacturer(manufacturer)
+                })
                     .transition(.opacity)
                     .id("manufacturer-selection")
 
             case .sonyEntry:
-                SonyAPEntryView()
+                SonyAPEntryView(
+                    onBack: { captureFlow.backToManufacturerSelection() },
+                    onNewCamera: { captureFlow.startSonyNewCamera() },
+                    onConnectRecord: { id in captureFlow.connectToSonyRecord(id: id) }
+                )
                     .transition(.opacity)
                     .id("sony-entry")
 
             case .sonyNewCameraDecision:
                 SonyAPNewCameraDecisionView(
+                    isWiFiConnected: false,
                     onScanQR: { captureFlow.startSonySetup() },
                     onAlreadyOnWiFi: { captureFlow.proceedToDiscovery() },
                     onEnterSSID: { captureFlow.startSonySSIDStub() },
@@ -44,7 +59,7 @@ struct ContentView: View {
                 SonyWiFiOnboardingView(
                     mode: mode == .qr ? .qr : .manual,
                     onBack: { captureFlow.state = .sonyNewCameraDecision },
-                    onContinue: { captureFlow.proceedToDiscovery() }
+                    onContinue: { _ in captureFlow.proceedToDiscovery() }
                 )
                 .transition(.opacity)
                 .id("sony-wifi-onboarding")
@@ -58,12 +73,17 @@ struct ContentView: View {
                 if captureFlow.selectedManufacturer == .sony {
                     let preferredIP: String? = {
                         guard let id = captureFlow.preferredSonyRecordID else { return nil }
-                        return SonyAPConnectionCache.shared.listRecords().first(where: { $0.id == id })?.lastKnownCameraIP
+                        return SonyAPConnectionCache.shared.listRecords().first(where: {
+                            $0.id == id
+                        })?.lastKnownCameraIP
                     }()
 
                     UnifiedCameraDiscoveryView(
-                        strategy: SonyAPDiscoveryStrategy(),
                         preferredIP: preferredIP,
+                        makeScanTargets: { preferredIP in
+                            SonyAPDiscovery.candidateIPs(preferredIP: preferredIP)
+                        },
+                        scanConfig: ScanConfig(timeout: 1.0, maxRetries: 2, retryDelay: 0.2, maxWaves: 3, waveDelay: 0),
                         onBack: {
                             captureFlow.backToManufacturerSelection()
                         },
@@ -108,7 +128,7 @@ struct ContentView: View {
                 }
 
             case .error(let message):
-                ConnectionErrorView(errorMessage: message)
+                ConnectionErrorView(errorMessage: message, onTryAgain: { captureFlow.backToManufacturerSelection() })
                     .transition(.opacity)
                     .id("error")
             }

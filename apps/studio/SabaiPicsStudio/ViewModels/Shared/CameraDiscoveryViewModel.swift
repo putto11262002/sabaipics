@@ -2,219 +2,144 @@
 //  CameraDiscoveryViewModel.swift
 //  SabaiPicsStudio
 //
-//  Shared discovery view model driven by a strategy + discoverer.
+//  Shared discovery view model. Owns camera list, drives UI state,
+//  delegates scanning to PTPIPScanner.
 //
 
 import Combine
 import Foundation
 
 @MainActor
-final class CameraDiscoveryViewModel<Strategy: CameraDiscoveryStrategizing & CameraDiscoveryGuidanceProviding>: ObservableObject {
+final class CameraDiscoveryViewModel: ObservableObject {
     @Published private(set) var state: UIState
     @Published private(set) var cameras: [DiscoveredCamera]
     @Published var autoSelectCamera: DiscoveredCamera?
     @Published var isCleaningUp: Bool = false
 
-    @Published private(set) var networkHelpKind: DiscoveryErrorKind?
-    @Published private(set) var timedOutHint: DiscoveryErrorKind?
-
-    private let discoverer: CameraDiscovering
-    private let strategy: Strategy
-    private let timeoutSeconds: TimeInterval
-
-    private var cancellables = Set<AnyCancellable>()
-    private var timeoutTask: Task<Void, Never>?
-    private var lastScannerState: NetworkScannerState = .idle
-
-    private var lastDiagnostics: DiscoveryDiagnostics?
-
     typealias UIState = DiscoveryUIState
 
+    private let scanner: PTPIPScanner
+    private let preflight: () -> CameraDiscoveryPreflightResult
+    private let makeScanTargets: (_ preferredIP: String?) -> [String]
+    private let scanConfig: ScanConfig
+    private let autoSelect: (_ cameras: [DiscoveredCamera]) -> DiscoveredCamera?
+    private let timeoutSeconds: TimeInterval
+
+    private var timeoutTask: Task<Void, Never>?
+
     init(
-        discoverer: CameraDiscovering,
-        strategy: Strategy,
-        timeoutSeconds: TimeInterval = 12.0,
-        initialState: UIState = .scanning,
-        initialCameras: [DiscoveredCamera] = []
+        scanner: PTPIPScanner? = nil,
+        preflight: @escaping () -> CameraDiscoveryPreflightResult = {
+            WiFiNetworkInfo.currentWiFiIPv4() == nil ? .needsNetworkHelp(.notOnLocalNetwork) : .ok
+        },
+        makeScanTargets: @escaping (_ preferredIP: String?) -> [String],
+        scanConfig: ScanConfig = .default,
+        autoSelect: @escaping (_ cameras: [DiscoveredCamera]) -> DiscoveredCamera? = { _ in nil },
+        timeoutSeconds: TimeInterval = 12.0
     ) {
-        self.discoverer = discoverer
-        self.strategy = strategy
+        self.scanner = scanner ?? PTPIPScanner()
+        self.preflight = preflight
+        self.makeScanTargets = makeScanTargets
+        self.scanConfig = scanConfig
+        self.autoSelect = autoSelect
         self.timeoutSeconds = timeoutSeconds
-        self.state = initialState
-        self.cameras = initialCameras
-        self.networkHelpKind = nil
-        self.timedOutHint = nil
+        self.state = .scanning
+        self.cameras = []
 
-        self.discoverer.camerasPublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] newCameras in
-                guard let self else { return }
-                self.cameras = newCameras
+        // Wire scanner callback
+        self.scanner.onCameraDiscovered = { [weak self] camera in
+            guard let self else { return }
+            self.cameras.append(camera)
+            self.state = .found
+            self.timeoutTask?.cancel()
 
-                if !newCameras.isEmpty {
-                    self.state = .found
-                    self.timeoutTask?.cancel()
-                } else if case .scanning = self.lastScannerState {
-                    self.state = .scanning
-                }
-
-                if let auto = self.strategy.autoSelectCamera(from: newCameras) {
-                    self.autoSelectCamera = auto
-                }
+            if let auto = self.autoSelect(self.cameras) {
+                self.autoSelectCamera = auto
             }
-            .store(in: &cancellables)
-
-        self.discoverer.statePublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] scannerState in
-                guard let self else { return }
-                self.lastScannerState = scannerState
-                switch scannerState {
-                case .idle:
-                    // Keep existing behavior: if no cameras are found, we keep showing scanning UI
-                    // until either a camera appears or the UI timeout flips to .timedOut.
-                    break
-                case .scanning:
-                    if self.cameras.isEmpty {
-                        self.state = .scanning
-                    }
-                case .completed(let count):
-                    // Important: don't override a terminal UI state (e.g. timedOut).
-                    // When count==0, we intentionally keep showing "scanning" until our UI timeout
-                    // flips state to ".timedOut". The timeout handler is the source of truth.
-                    break
-                case .error(let message):
-                    self.timeoutTask?.cancel()
-                    self.state = .error(.scannerError(message))
-                }
-            }
-            .store(in: &cancellables)
-
-        if let diagnosticsProvider = discoverer as? DiscoveryDiagnosticsProviding {
-            diagnosticsProvider.diagnosticsPublisher
-                .receive(on: DispatchQueue.main)
-                .sink { [weak self] diagnostics in
-                    self?.lastDiagnostics = diagnostics
-                }
-                .store(in: &cancellables)
         }
     }
 
-    var navigationTitle: String {
-        strategy.navigationTitle
-    }
+    // MARK: - Public API
 
-    var backConfirmation: AppBackConfirmation? {
-        strategy.backConfirmation
-    }
-
-    var guidance: GuidanceModel? {
-        strategy.guidance(for: state, networkHelpKind: networkHelpKind, timedOutHint: timedOutHint)
-    }
-
-    var primaryActionTitle: String {
-        strategy.primaryActionTitle
-    }
-
-    var secondaryActionTitle: String? {
-        strategy.secondaryActionTitle
-    }
-
-    func start(preferredIP: String?) {
+    func start(preferredIP: String?) async {
         autoSelectCamera = nil
         timeoutTask?.cancel()
-        networkHelpKind = nil
-        timedOutHint = nil
-        lastDiagnostics = nil
 
-        switch strategy.preflight() {
+        switch preflight() {
         case .ok:
             break
-        case .needsNetworkHelp(let kind):
-            networkHelpKind = kind
+        case .needsNetworkHelp:
             state = .needsNetworkHelp
-            discoverer.stopScan()
+            await scanner.stop()
             return
         }
 
         state = .scanning
-        let plan = strategy.makeScanPlan(preferredIP: preferredIP)
-        discoverer.startScan(plan: plan)
+        cameras = []
+
+        let targets = makeScanTargets(preferredIP)
+        await scanner.scan(targets: targets, config: scanConfig)
         startTimeout()
     }
 
-    func retry(preferredIP: String?) {
-        discoverer.stopScan()
-        start(preferredIP: preferredIP)
+    func retry(preferredIP: String?) async {
+        await scanner.stop()
+        await start(preferredIP: preferredIP)
     }
 
-    func stop() {
+    func stop() async {
         timeoutTask?.cancel()
-        discoverer.stopScan()
+        await scanner.stop()
     }
 
     func cleanup() async {
         timeoutTask?.cancel()
         isCleaningUp = true
-        await discoverer.cleanup()
-        state = .scanning
+        await scanner.stop()
+
+        for camera in cameras {
+            await camera.disconnect()
+        }
+
         cameras = []
+        state = .scanning
         autoSelectCamera = nil
-        networkHelpKind = nil
-        timedOutHint = nil
-        lastDiagnostics = nil
         isCleaningUp = false
     }
 
     /// Best-effort cleanup with a timeout so UI never blocks forever.
-    func cleanupWithTimeout(_ timeoutSeconds: TimeInterval = 4.0, minOverlaySeconds: TimeInterval = 0.35) async {
+    func cleanupWithTimeout(_ timeout: TimeInterval = 4.0, minOverlaySeconds: TimeInterval = 0.35) async {
         let startedAt = Date()
-        print("[DiscoveryCleanup] start timeout=\(timeoutSeconds)s cameras=\(cameras.count) state=\(state)")
-
         isCleaningUp = true
         timeoutTask?.cancel()
 
-        // Give SwiftUI a chance to render the overlay before doing heavy work.
         await Task.yield()
 
-        var didTimeout = false
         await withTaskGroup(of: Void.self) { group in
             group.addTask { [weak self] in
                 guard let self else { return }
-                await self.discoverer.cleanup()
+                await self.cleanup()
             }
             group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             }
-
-            // Wait for the first task (cleanup or timeout)
             _ = await group.next()
-            didTimeout = (Date().timeIntervalSince(startedAt) >= timeoutSeconds)
             group.cancelAll()
         }
 
-        if didTimeout {
-            print("[DiscoveryCleanup] timed out after \(String(format: "%.2f", Date().timeIntervalSince(startedAt)))s")
-        } else {
-            print("[DiscoveryCleanup] finished in \(String(format: "%.2f", Date().timeIntervalSince(startedAt)))s")
-        }
-
-        // Ensure the overlay doesn't flash.
+        // Ensure overlay doesn't flash
         let elapsed = Date().timeIntervalSince(startedAt)
         if elapsed < minOverlaySeconds {
-            let remaining = minOverlaySeconds - elapsed
-            try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64((minOverlaySeconds - elapsed) * 1_000_000_000))
         }
 
-        // Always reset local state even if cleanup timed out.
-        state = .scanning
         cameras = []
+        state = .scanning
         autoSelectCamera = nil
-        networkHelpKind = nil
-        timedOutHint = nil
-        lastDiagnostics = nil
         isCleaningUp = false
     }
+
+    // MARK: - Private
 
     private func startTimeout() {
         timeoutTask?.cancel()
@@ -223,20 +148,7 @@ final class CameraDiscoveryViewModel<Strategy: CameraDiscoveryStrategizing & Cam
             try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
             if Task.isCancelled { return }
             if self.cameras.isEmpty {
-                self.discoverer.stopScan()
-
-                if let diagnostics = self.lastDiagnostics {
-                    if diagnostics.permissionDeniedCount > 0 {
-                        self.timedOutHint = .localNetworkDenied
-                    } else if diagnostics.totalTargets > 0,
-                              diagnostics.portClosedCount == diagnostics.totalTargets {
-                        // Best-effort: looks like the PTP/IP port is refusing connections on all targets.
-                        self.timedOutHint = .unknown("ptpipPortClosed")
-                    } else if diagnostics.totalTargets > 0,
-                              (diagnostics.networkUnreachableCount + diagnostics.hostUnreachableCount) == diagnostics.totalTargets {
-                        self.timedOutHint = .notOnLocalNetwork
-                    }
-                }
+                await self.scanner.stop()
                 self.state = .timedOut
             }
         }

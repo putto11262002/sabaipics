@@ -1,136 +1,309 @@
-# Sony AP-Mode Connection Plan (iOS Studio)
+# Capture Tab + Live Session Plan
 
-Context: Sony WiFi PTP/IP cameras (e.g. ILCE-7RM4) typically run as a WiFi hotspot (AP mode). The phone connects to the camera's WiFi and talks PTP/IP locally over TCP `:15740`.
+Goal
 
-This plan focuses on making Sony AP-mode feel "just works" on repeat use, without requiring multicast/SSDP, while keeping Canon LAN discovery intact.
+- Make Capture a first-class tab with a clear "Capture Home" entry screen.
+- Keep connection/onboarding flows as normal navigation (not modal).
+- Represent live capture as a persistent session with a pinned status bar + toggleable details sheet.
+- Keep architecture closure-driven (leaf views emit events; router/coordinator owns global state).
+- Stub upload integration via callbacks/events (no upload queue implementation yet).
 
-## Goals
+Workable Slices
 
-- Fast repeat-connect: user turns on camera WiFi + joins it, app connects automatically.
-- Offline-first transfer: capture + download works with zero internet.
-- Optional real-time upload: supported via a guided "advanced" flow (user-driven), without blocking local transfer.
-- Do not interleave command-channel operations: keep the single-queue invariant on the PTP/IP command socket.
+Slice 1: Add Capture Tab Shell
 
-## Non-goals (for the starter implementation)
+- Add a new tab item "Capture" in `apps/studio/SabaiPicsStudio/Views/MainTabView.swift`.
+- Create `apps/studio/SabaiPicsStudio/Views/Capture/CaptureTabRootView.swift`.
+  - Hosts a `NavigationStack`.
+  - Renders a placeholder `CaptureHomeView`.
+- Remove the current modal entry (`.sheet(CaptureModeView)` / capture button) once the tab exists.
 
-- No SSDP/UPnP/multicast discovery (requires entitlement; not assumed).
-- No programmatic WiFi IP configuration (iOS does not allow apps to set static IP/subnet/gateway).
+Slice 2: Capture Home (UI only, closure-driven)
 
-## Core User Flows
+- Create `apps/studio/SabaiPicsStudio/Views/Capture/CaptureHomeView.swift`.
+  - Sections: "Recent Sony", "Recent Canon" (read-only list for now).
+  - CTAs: "Connect new camera", "Manual IP".
+  - Outputs (closures):
+    - `onConnectNew()`
+    - `onReconnect(brand, id)`
+    - `onManualIP()`
 
-### A) Default (Recommended): Transfer-only while on camera WiFi
+Slice 3: Session Store (no uploads yet)
 
-1. User turns on Sony camera WiFi (DIRECT-xxxx).
-2. User joins camera WiFi.
-3. App connects to camera (no internet required).
-4. Photos download and are available in-app.
-5. Any cloud/API sync is queued and retried later when internet is available.
+- Create `apps/studio/SabaiPicsStudio/Stores/CaptureSessionStore.swift`.
+  - State: `idle | connecting | active | error`.
+  - Stats: `downloadsCount`, `lastFilename`, `startedAt`.
+  - Sheet state: `isDetailsPresented`.
+- Methods:
+  - `start(activeCamera:)`
+  - `disconnect()`
+  - `handle(event:)` (updates stats only)
 
-### B) Advanced: Real-time upload while on camera WiFi
+Notes / Follow-ups
 
-1. Same steps as flow A.
-2. App asks: "Do you want real-time upload while connected to the camera WiFi?"
-3. If YES, app shows an interactive guide explaining the manual iOS network configuration workaround (similar to PhotoSync):
-   - show current WiFi IP address + subnet mask (read-only)
-   - provide copy buttons for values
-   - provide "Open Settings" button
-   - provide a "Test internet" button after returning to the app
+- PTP/IP disconnect paths (`PTPIPSession.disconnect()`, `TransferSession.end()`) currently have no hard timeout.
+  Discovery cleanup uses a UI-level timeout (`cleanupWithTimeout`), but session teardown itself can still run long.
+  Track as tech debt: add an explicit disconnect timeout + always-force-close sockets + idempotent teardown.
 
-Important: This is optional and must never block local capture/download.
+Slice 4: Status Bar + Details Sheet (UI only)
 
-## Technical Design
+- Create `apps/studio/SabaiPicsStudio/Views/Capture/CaptureStatusBarView.swift`.
+  - Shows camera name + stats.
+  - Buttons: `Open`, `Disconnect`.
+- Create `apps/studio/SabaiPicsStudio/Views/Capture/CaptureSessionSheetView.swift`.
+  - Shows live stats and a simple log list (optional).
+- Wire into `CaptureTabRootView`:
+  - Show status bar when sessionStore.state != idle.
+  - Present `.sheet` when `isDetailsPresented == true`.
 
-### Persisted State (repeat-connect)
+Slice 5: Wire existing flows into Capture tab (Sony first)
 
-Store per "camera WiFi network":
+- In `CaptureTabRootView`, route into the existing closure-driven modules:
+  - manufacturer selection
+  - Sony onboarding (`SonyWiFiOnboardingView`)
+  - shared discovery (`UnifiedCameraDiscoveryView` with Sony strategy)
+- On discovery selection:
+  - build `ActiveCamera` (via coordinator/helper)
+  - call `sessionStore.start(activeCamera:)`
+  - set `sessionStore.isDetailsPresented = true` (auto-open on first connect)
+  - navigate back to Capture Home
 
-- Primary key: SSID if available (requires iOS permissions/entitlements); otherwise fall back to a "network signature".
-- Network signature fallback: `(wifiIPv4 + netmask)` and/or derived `subnetBase`.
+Follow-ups
 
-Stored values:
+- Refactor connect wizard navigation from `CaptureFlowCoordinator.state` switching to native `NavigationPath` once Capture session + live feed is stable.
 
-- `lastKnownCameraIP` (e.g. `192.168.122.1`)
-- `lastConnectedAt`
-- `cameraModel` and vendor markers (from `GetDeviceInfo`)
-- `ptpipPort` (default `15740`)
+Slice 6: Cleanup navigation/state (remove legacy modal flow)
 
-### Discovery / Connection Algorithm (no multicast)
+- Remove `CaptureModeView` entry points if still present.
+- Shrink `CaptureFlowCoordinator` responsibilities to only what's needed inside Capture tab navigation,
+  or replace it with a smaller local navigation state.
 
-All probes are simple TCP connect attempts to `:15740` with short timeouts, followed by a PTP/IP handshake + `GetDeviceInfo` validation.
+Slice 7: Canon migration (later)
 
-Ordered candidate set:
+- Add Canon strategy/guidance to shared discovery stack.
+- Route Canon discovery to `UnifiedCameraDiscoveryView`.
+- Retire `apps/studio/SabaiPicsStudio/Views/CameraDiscoveryView.swift`.
 
-1. Cached IP (fast path)
-2. Gateway-ish local candidates computed from WiFi interface IP/netmask:
-   - `subnetBase + 1`
-   - `subnetBase + 2`
-3. Known Sony defaults:
-   - `192.168.122.1`
-   - optionally `192.168.1.1`, `192.168.0.1` (as fallback)
-4. Optional user-triggered "Scan more" (very small sweep):
-   - e.g. `subnetBase + 1..20` with very tight timeouts
+Slice 8: Upload callback integration (later)
 
-Validation step (to prevent false positives):
+- Introduce an `UploadQueue` / `UploadPipeline` interface.
+  - Inject into `CaptureSessionStore` as the handler for `photoDownloaded` events.
 
-- perform PTP/IP InitCommand
-- call `GetDeviceInfo`
-- confirm model/vendor contains `sony` / `ilce` / `dsc` (or matches our existing Sony detection heuristic)
+Follow-ups
 
-### Networking and Routing
+- Capture Home "Recent Sony" should be powered by `SonyAPConnectionCache.shared.listRecords()` and call `onReconnect("sony", record.id)`.
+  Today `CaptureHomeView` is UI-only placeholders and does not observe any recents store.
 
-We cannot force iOS to use cellular for internet while connected to camera WiFi. Therefore:
+---
 
-- Transfer/capture must be offline-first.
-- WAN operations must be non-blocking (queued) while on camera WiFi.
-- If implementing an "online while on camera WiFi" guide, treat it as user-driven setup only.
+# Camera Network Scanner Refactoring Plan
 
-### NEHotspotConfiguration
+**Date:** 2026-02-06
+**Goal:** Create a new, cleaner `CameraNetworkScanner` service with better API, logging, and error handling.
 
-Use `NEHotspotConfiguration` only to streamline joining the camera SSID (when we know the SSID/password).
+## 🎯 Overview
 
-Limitations:
+Replace the complex `NetworkScannerService` (967 lines) with a simplified, focused scanner service. The old service works well but has accumulated complexity. We'll create a new service alongside it, copying the working logic while simplifying the interface.
 
-- Does not let us set static IP/subnet/gateway.
-- Does not guarantee WAN routing over cellular.
+**Key Principle:** Scanner only scans. Caller manages discovered camera lifecycle.
 
-### Command-channel Safety Invariant
+---
 
-Keep the single-queue invariant for command-socket operations:
+## 1. New Service Interface
 
-- All command-channel send/receive transactions go through `PTPIPCommandQueue`.
-- Canon `GetEvent` polling also uses the same queue to avoid interleaving.
+### Main Class
 
-## Rocc Audit Plan (after Sony AP-mode flow)
+```swift
+@MainActor
+class CameraNetworkScanner {
+    // Published state (observe from UI/ViewModel)
+    @Published private(set) var state: ScanState
+    @Published private(set) var error: ScanError?
 
-After the UX+discovery work is stable, do a focused audit against Rocc's Sony behavior to confirm we match the important invariants:
+    // Discovery callback (transfers ownership to caller)
+    var onCameraDiscovered: ((DiscoveredCamera) -> Void)?
 
-- Vendor events mapping (0xC201 as ObjectAdded)
-- Reused in-memory handle `0xFFFFC001`
-- `GetPartialObject (0x101B)` using size from `GetObjectInfo`
-- Readiness gating on `objectInMemory (0xD215) >= 0x8000` via `GetAllDevicePropData (0x9209)`
-- Post-SDIO handshake (`0x920D`) if required
-- Event-channel keepalive Pong behavior
-- Strict command-channel serialization
+    // Simple API
+    func scan(targets: [String], config: ScanConfig = .default)
+    func stop()
 
-Any intentional deviations should be documented with rationale.
+    deinit // Auto-cancels running scan
+}
+```
 
-## Starter Implementation (what to do first)
+### Supporting Types
 
-1. Add an explicit "Sony AP-mode" connection screen/flow (first-run wizard):
-   - Step 1: turn on camera WiFi
-   - Step 2: join WiFi (with optional `NEHotspotConfiguration` when possible)
-   - Step 3: connect (transfer-only by default), optional real-time upload guide
+```swift
+enum ScanState: Equatable {
+    case idle
+    case scanning(current: Int, total: Int, currentIP: String?)
+    case completed(found: Int)
+}
 
-2. Implement persistence for repeat-connect:
-   - store `lastKnownCameraIP` keyed by SSID (or network signature fallback)
+enum ScanError: Error {
+    case cancelled
+    case noTargets
+    case networkUnavailable
+    case timeout
+}
 
-3. Implement the candidate-IP probing algorithm (small ordered set) and validation via `GetDeviceInfo`.
+struct ScanConfig {
+    var timeout: TimeInterval = 2.0
+    var maxRetries: Int = 3
+    var retryDelay: TimeInterval = 0.5
 
-4. Ensure capture/download runs offline-first:
-   - avoid blocking the transfer loop on WAN calls
-   - add a simple "Uploads queued" indicator (no uploads required for the starter)
+    static let `default` = ScanConfig()
+}
+```
 
-5. Add lightweight in-app diagnostics:
-   - show detected WiFi IPv4 + subnet mask
-   - show which candidate IP succeeded
-   - allow copying values for the advanced real-time upload guide
+---
+
+## 2. Copy from Old Service ✅
+
+**These parts work well - reuse them:**
+
+- **PTP/IP handshake logic** - The `scanIP()` method with full 5-stage handshake
+- **Parallel scanning** - TaskGroup approach for scanning all IPs simultaneously
+- **TCP retry logic** - Handles slow camera startup (ECONNREFUSED, ETIMEDOUT)
+- **Connection helpers:**
+  - `waitForConnection()` - Async wrapper for NWConnection state
+  - `sendData()` - Send data with continuation
+  - `receiveWithTimeout()` - Receive with timeout using TaskGroup
+- **Persistent GUID** - Shared GUID for PTP/IP connections (Canon compatibility)
+- **Error classification** - Map NWError POSIX codes to failure kinds
+- **Retryable error detection** - Know when to retry vs fail fast
+
+---
+
+## 3. Simplify/Change 🔄
+
+### API Changes
+
+- ✅ **Single scan method** - Only `scan(targets:config:)`, no dual overloads
+- ✅ **Callback for discoveries** - No owned camera list, transfer ownership via callback
+- ✅ **Published error** - Use `@Published var error` instead of throwing
+- ✅ **Config object** - Use `ScanConfig` struct instead of multiple parameters
+- ✅ **Only scan supplied IPs** - No automatic subnet detection or range expansion
+
+### Implementation Changes
+
+- ✅ **Structured logging** - Replace scattered `print()` with structured logger
+- ✅ **Simpler state** - Progress info included in `ScanState.scanning`
+- ✅ **Single-pass scanning** - Remove wave-based retry (simplify to one TaskGroup pass)
+- ✅ **No session management** - Scanner doesn't track or cleanup discovered sessions
+
+---
+
+## 4. Remove ❌
+
+**Move these responsibilities elsewhere:**
+
+- `isHotspotActive()` - Move to network utility helper
+- Hardcoded hotspot subnet scanning (172.20.10.2-20)
+- `startScan()` with no parameters - No default subnet scanning
+- `disconnectOtherCameras()` - Caller manages camera lifecycle
+- `disconnectAllCameras()` - Caller manages camera lifecycle
+- `cleanup()` method - No cleanup needed (callback transfers ownership)
+- Wave-based scanning - Over-engineered for current needs
+- `@Published var lastDiscoveryDiagnostics` - Log diagnostics internally instead
+- `@Published var currentScanIP` - Now part of `ScanState.scanning`
+
+---
+
+## 5. Migration Strategy
+
+### Phase 1: Create New Service
+
+1. ✅ Create `CameraNetworkScanner.swift` in `Services/Discovery/`
+2. ✅ Copy working logic from `NetworkScannerService`
+3. ✅ Apply simplifications from plan
+4. ✅ Add structured logging
+5. ✅ Write unit tests (if feasible)
+
+### Phase 2: Remove Wrapper Layer
+
+1. ✅ Update `CameraDiscoveryViewModel` to use `CameraNetworkScanner` directly
+2. ✅ Remove `NetworkScannerDiscoverer` (thin wrapper, no longer needed)
+3. ✅ Remove `CameraDiscovering` protocol (premature abstraction)
+
+### Phase 3: Deprecate Old Service
+
+1. ⏸️ Leave `NetworkScannerService` in place (deprecated)
+2. ⏸️ Add `@available(*, deprecated)` annotation
+3. ⏸️ Remove after confirming new service works in production
+
+---
+
+## 6. Usage Example
+
+### Before (Old Service + Wrapper):
+
+```swift
+let discoverer = NetworkScannerDiscoverer()
+let viewModel = CameraDiscoveryViewModel(discoverer: discoverer, ...)
+
+// Two scan methods, confusing
+discoverer.startScan()  // Hotspot default
+discoverer.startScan(candidateIPs: [...], perIPTimeout: 2.0)  // Custom
+
+// Must cleanup sessions
+await discoverer.cleanup()
+```
+
+### After (New Service):
+
+```swift
+let scanner = CameraNetworkScanner()
+
+// Callback receives discovered cameras
+scanner.onCameraDiscovered = { camera in
+    viewModel.addCamera(camera)  // Caller owns it now
+}
+
+// Simple, explicit scanning
+let targets = ["192.168.1.1", "192.168.1.2", "192.168.1.3"]
+scanner.scan(targets: targets)
+
+// Stop scan (no cleanup needed)
+scanner.stop()
+
+// Caller manages camera lifecycle
+await viewModel.disconnectAllCameras()
+```
+
+---
+
+## 7. Benefits
+
+✅ **Simpler API** - One scan method, clear ownership model
+✅ **Better separation** - Scanner scans, caller manages lifecycle
+✅ **Cleaner logging** - Structured, filterable logs
+✅ **Less code** - Remove wrapper layer, diagnostics publishing, cleanup methods
+✅ **More flexible** - Caller provides IPs, decides what to scan
+✅ **Easier testing** - Clearer interface, callback-based
+✅ **No premature abstraction** - Wait for real UPnP implementation before creating protocol
+
+---
+
+## 8. Non-Goals (Out of Scope)
+
+❌ UPnP/SSDP discovery implementation
+❌ Automatic subnet detection utilities
+❌ Camera session lifecycle management
+❌ Upload queue integration
+❌ Multi-protocol support (PTP/IP only for now)
+
+---
+
+## 9. Follow-Up Tasks
+
+- [ ] Create subnet utility: `NetworkUtils.hotspotRange() -> [String]`
+- [ ] Move `isHotspotActive()` to `NetworkUtils`
+- [ ] Consider structured logger abstraction for app-wide use
+- [ ] Document PTP/IP protocol flow for future maintainers
+- [ ] Add retry strategies documentation (when to retry vs fail fast)
+
+---
+
+**Status:** Ready to implement
+**Next Step:** Create `CameraNetworkScanner.swift`
