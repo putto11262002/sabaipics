@@ -1,18 +1,12 @@
-# iOS Studio App Shell (Tabs + Capture Mode)
-
-This doc describes the high-level navigation and information architecture of the iOS Studio app.
-
-The key idea is to keep the camera/transfer flow strict and linear, while making the rest of the app extensible.
+# iOS Studio App Shell (Tabs + Capture)
 
 ## Intent
 
 - Use a native iOS bottom tab bar for the main app.
-- Treat photo capture/transfer as a full-screen "mode" the user enters/exits.
-- Avoid growing `AppCoordinator.appState` into an everything-state-machine.
+- Capture tab has its own NavigationStack with sheet-based connection flows.
+- Connection flows are per-manufacturer step machines sharing a common discovery UI.
 
-## Current structure
-
-### Root auth gate
+## Root auth gate
 
 `RootFlowView` is responsible for:
 
@@ -21,54 +15,79 @@ The key idea is to keep the camera/transfer flow strict and linear, while making
 
 See also: `AUTH.md`.
 
-### Main tabs
+## Main tabs
 
 `MainTabView` uses a native `TabView` with 3 tab items:
 
-- Events
-  - (Today) placeholder UI for selecting an event id
-  - (Next) real event list + selection (requires consent)
-- Capture (action tab)
-  - tapping triggers capture mode presentation
-  - selection immediately reverts to the previous non-capture tab
-- Profile
-  - sign out, account details
+- **Events** — event list + detail view
+- **Capture** — camera connection + photo transfer
+- **Profile** — sign out, account details
 
-### Capture mode
+## Capture tab architecture
 
-Capture is presented full-screen via `fullScreenCover`.
+```
+MainTabView
+  └── Capture tab
+        └── CaptureTabRootView (owns NavigationStack + session store)
+              ├── CaptureHomeView
+              │     ├── "Connect new camera" menu (Sony / Canon / Nikon)
+              │     ├── Recent Sony section (tap to reconnect, swipe to remove)
+              │     └── Recent Canon section (same)
+              │
+              ├── .sheet(item: $activeSheet)
+              │     ├── .sony → NavigationStack → SonyConnectFlowView
+              │     └── .canon → NavigationStack → CanonConnectFlowView
+              │
+              └── CaptureStatusBarView (inline bar when session active)
+                    └── taps → CaptureSessionSheetView (photo list + disconnect)
+```
 
-`CaptureModeView` currently wraps the existing capture wizard (`ContentView`) and provides a consistent "Close" affordance that:
+### Connection flows as sheets
 
-- ends any active `TransferSession`
-- resets the coordinator back to manufacturer selection
-- dismisses back to tabs
+Connection flows (Sony, Canon) are presented as `.sheet` instead of navigation push.
 
-## Event gating policy
+**Why:**
+- SwiftUI tab switches dismiss pushed views → leaked PTP/IP connections
+- Sheets persist across tab switches
+- Each presentation creates fresh state
+- Full dismissal control (swipe-to-dismiss blocked)
 
-Default policy:
+**SwiftUI constraint:** Only one `.sheet` per view. We use `.sheet(item:)` with an `ActiveSheet` enum.
 
-- Starting capture requires an event selection.
-- If no event is selected, tapping the Capture tab routes to Events and shows an alert.
+### Sony flow steps
 
-This prevents ambiguous upload destination once cloud sync is introduced.
+`SonyConnectFlowView` step machine:
 
-## Why the Capture tab is an action tab (vs floating button)
+1. **Decision** — new camera or reconnect from saved list
+2. **Onboarding** — QR scan or manual SSID/password entry
+3. **WiFi join** — `NEHotspotConfiguration` join + network check
+4. **Discovery** — `CameraDiscoveryScreen` (shared)
+5. **Select** → `onConnected(activeCamera)` → sheet dismisses
 
-We intentionally avoid a floating center button overlay because:
+### Canon flow steps
 
-- Floating buttons are not a standard iOS pattern.
-- Overlays tend to react to keyboard safe area changes ("jumping" when text fields focus).
+`CanonConnectFlowView` step machine:
 
-Using a real tab item keeps behavior native and predictable.
+1. **Hotspot check** — soft-gate alert if Personal Hotspot not active
+2. **Discovery** — `CameraDiscoveryScreen` (shared)
+3. **Select** → `onConnected(activeCamera)` → sheet dismisses
+
+### Active session
+
+After connecting, `CaptureSessionStore` owns the `TransferSession`. The capture tab shows:
+
+- `CaptureStatusBarView` — inline bar with camera name and photo count
+- Tapping opens `CaptureSessionSheetView` — full photo list with disconnect button
 
 ## Key files
 
-- `apps/studio/SabaiPicsStudio/Views/RootFlowView.swift`
-- `apps/studio/SabaiPicsStudio/Views/MainTabView.swift`
-- `apps/studio/SabaiPicsStudio/Views/CaptureModeView.swift`
-
-Placeholder screens (will be replaced by real implementations):
-
-- `apps/studio/SabaiPicsStudio/Views/EventsHomeView.swift`
-- `apps/studio/SabaiPicsStudio/Views/ProfileView.swift`
+- `Views/MainTabView.swift`
+- `Views/RootFlowView.swift`
+- `Views/Capture/CaptureTabRootView.swift`
+- `Views/Capture/CaptureHomeView.swift`
+- `Views/Capture/CaptureSessionSheetView.swift`
+- `Views/Capture/CaptureStatusBarView.swift`
+- `Views/Sony/SonyConnectFlowView.swift`
+- `Views/Canon/CanonConnectFlowView.swift`
+- `Views/Shared/CameraDiscoveryScreen.swift`
+- `Stores/CaptureSessionStore.swift`
