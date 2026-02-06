@@ -185,11 +185,12 @@ class PhotoStore: ObservableObject {
  // photoStore.photos[0].name == "IMG_002.JPG" (newest first)
  ```
 
- Example 3: SwiftUI Environment Injection (Phase 4)
+ Example 3: SwiftUI Environment Injection (legacy)
 
  ```swift
- // App root
- ContentView()
+ // App root (example)
+ RootFlowView()
+     .environmentObject(AppCoordinator())
      .environmentObject(photoStore)
 
  // Any child view

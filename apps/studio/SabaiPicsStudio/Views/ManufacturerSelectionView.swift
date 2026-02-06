@@ -16,7 +16,7 @@ import SwiftUI
 /// Shows three manufacturer options: Canon, Nikon, Sony
 /// User taps manufacturer to start camera discovery flow
 struct ManufacturerSelectionView: View {
-    @EnvironmentObject var captureFlow: CaptureFlowCoordinator  // CHANGED
+    let onSelectManufacturer: (CameraManufacturer) -> Void
 
     var body: some View {
         VStack(spacing: 24) {
@@ -56,7 +56,7 @@ struct ManufacturerSelectionView: View {
         }
 
         print("[ManufacturerSelectionView] Selected: \(manufacturer.rawValue)")
-        captureFlow.selectManufacturer(manufacturer)  // CHANGED
+        onSelectManufacturer(manufacturer)
     }
 }
 
@@ -95,7 +95,5 @@ struct ManufacturerButton: View {
 // MARK: - Previews
 
 #Preview("Manufacturer Selection") {
-    let coordinator = AppCoordinator()
-    return ManufacturerSelectionView()
-        .environmentObject(coordinator)
+    ManufacturerSelectionView(onSelectManufacturer: { _ in })
 }

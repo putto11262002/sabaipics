@@ -16,6 +16,9 @@ struct ConnectingView: View {
     /// IP address being connected to (not displayed to user)
     var ipAddress: String? = nil
 
+    /// Optional callback used by Capture tab connect flow.
+    var onDone: (() -> Void)? = nil
+
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -35,16 +38,36 @@ struct ConnectingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.Theme.background)
         .onAppear {
-            print("[ConnectingView] View appeared, registering cleanup")
-
-            // Register cleanup to cancel connection if user closes
+            // Keep legacy stage-level cleanup registration for flows that use `captureFlow.cleanup()`.
             captureFlow.registerCleanup { [weak captureFlow] in
-                print("[ConnectingView] Running registered cleanup (cancel connection)")
                 captureFlow?.cancelConnection()
             }
         }
         .onDisappear {
             captureFlow.unregisterCleanup()
+        }
+        .toolbar {
+            if let onDone {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        captureFlow.cancelConnection()
+                        onDone()
+                    } label: {
+                        Text("Done")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(Color.Theme.muted)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.Theme.border, lineWidth: 1)
+                            )
+                            .foregroundStyle(Color.Theme.foreground)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 }

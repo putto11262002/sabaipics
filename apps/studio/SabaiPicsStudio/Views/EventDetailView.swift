@@ -28,33 +28,33 @@ struct EventDetailView: View {
     }
 
     var body: some View {
-        Group {
-            if isFirstLoad && event == nil {
-                skeletonView
-            } else if let error = error {
-                errorView(error: error)
-            } else if let event = event {
-                eventContentView(event: event)
-                    .refreshable {
-                        await loadEvent(isRefresh: true)
-                    }
-            } else {
-                Text("No event data")
-                    .foregroundStyle(Color.Theme.mutedForeground)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+        contentView
+            .navigationTitle("Event Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .tint(Color.Theme.primary)
+            .task {
+                await loadEvent()
             }
-        }
-        .navigationTitle("Event Details")
-        .navigationBarTitleDisplayMode(.inline)
-        .tint(Color.Theme.primary)
-        .task {
-            await loadEvent()
-        }
-        .overlay(alignment: .top) {
-            if showCopyConfirmation {
-                CopyConfirmationView()
-                    .transition(.move(edge: .top).combined(with: .opacity))
+            .overlay(alignment: .top) {
+                if showCopyConfirmation {
+                    CopyConfirmationView()
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
             }
+    }
+
+    @ViewBuilder
+    private var contentView: some View {
+        if isFirstLoad && event == nil {
+            skeletonView
+        } else if let error = error {
+            errorView(error: error)
+        } else if let event = event {
+            eventContentView(event: event)
+        } else {
+            Text("No event data")
+                .foregroundStyle(Color.Theme.mutedForeground)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -70,7 +70,7 @@ struct EventDetailView: View {
 
     @ViewBuilder
     private func eventContentView(event: Event) -> some View {
-        Form {
+        List {
             Section("Details") {
                 LabeledContent("Name", value: event.name)
 
@@ -96,6 +96,7 @@ struct EventDetailView: View {
                 LabeledContent("Expires", value: event.expiresAt.formattedDateTime())
             }
         }
+        .listStyle(.insetGrouped)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -295,7 +296,7 @@ struct CopyConfirmationView: View {
 
 private struct EventDetailSkeletonPreview: View {
     var body: some View {
-        Form {
+        List {
             Section("Details") {
                 LabeledContent("Name", value: "Loading Event Name")
 
@@ -315,6 +316,7 @@ private struct EventDetailSkeletonPreview: View {
                 LabeledContent("Expires", value: "Jan 1, 2026 at 12:00 AM")
             }
         }
+        .listStyle(.insetGrouped)
         .redacted(reason: .placeholder)
         .disabled(true)
         .navigationTitle("Event Details")
@@ -326,7 +328,7 @@ private struct EventDetailPreview: View {
     let event: Event
 
     var body: some View {
-        Form {
+        List {
             Section("Details") {
                 LabeledContent("Name", value: event.name)
 
@@ -352,6 +354,7 @@ private struct EventDetailPreview: View {
                 LabeledContent("Expires", value: event.expiresAt.formattedDateTime())
             }
         }
+        .listStyle(.insetGrouped)
         .navigationTitle("Event Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

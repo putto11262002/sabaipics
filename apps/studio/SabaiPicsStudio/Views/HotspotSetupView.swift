@@ -16,9 +16,6 @@ import SwiftUI
 struct HotspotSetupView: View {
     @EnvironmentObject var captureFlow: CaptureFlowCoordinator  // CHANGED
 
-    /// Whether to show the back confirmation dialog
-    @State private var showBackConfirmation = false
-
     var body: some View {
         VStack(spacing: 32) {
             Spacer()
@@ -81,27 +78,13 @@ struct HotspotSetupView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: {
-                    showBackConfirmation = true
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .medium))
-                        Text("Back")
-                    }
-                    .foregroundColor(Color.Theme.primary)
-                }
-            }
-        }
-        .alert("Go back?", isPresented: $showBackConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Go Back", role: .destructive) {
-                captureFlow.backToManufacturerSelection()
-            }
-        } message: {
-            Text("Return to manufacturer selection?")
+        .appBackButton(
+            confirmation: AppBackConfirmation(
+                title: "Go back?",
+                message: "Return to manufacturer selection?"
+            )
+        ) {
+            captureFlow.backToManufacturerSelection()
         }
     }
 }

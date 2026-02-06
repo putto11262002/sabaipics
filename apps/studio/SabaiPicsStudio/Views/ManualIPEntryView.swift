@@ -18,6 +18,11 @@ struct ManualIPEntryView: View {
     @State private var showPermissionError = false
     @FocusState private var isIPFieldFocused: Bool
 
+    /// Optional hooks for native NavigationStack flows.
+    /// When nil, this view uses `CaptureFlowCoordinator` (legacy state-machine routing).
+    var onBack: (() -> Void)? = nil
+    var onConnect: ((String) -> Void)? = nil
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -96,8 +101,12 @@ struct ManualIPEntryView: View {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
                                                to: nil, from: nil, for: nil)
 
-                // Then connect via capture flow (Path 2: Manual IP)
-                captureFlow.connectManualIP(cameraIP)  // CHANGED
+                if let onConnect {
+                    onConnect(cameraIP)
+                } else {
+                    // Then connect via capture flow (Path 2: Manual IP)
+                    captureFlow.connectManualIP(cameraIP)  // CHANGED
+                }
             }) {
                 HStack(spacing: 12) {
                     Image(systemName: "wifi")
@@ -129,6 +138,18 @@ struct ManualIPEntryView: View {
             }
         }
         .background(Color(.systemBackground))
+        .navigationTitle("Enter Camera IP")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .appBackButton {
+            isIPFieldFocused = false
+            if let onBack {
+                onBack()
+            } else {
+                await captureFlow.cleanup()
+                captureFlow.proceedToDiscovery()
+            }
+        }
         .sheet(isPresented: $showInstructions) {
             CanonWiFiInstructionsView()
         }
@@ -169,8 +190,6 @@ struct CanonWiFiInstructionsView: View {
 // MARK: - Preview
 
 #Preview {
-    let coordinator = AppCoordinator()
-
-    return ManualIPEntryView()
-        .environmentObject(coordinator)
+    ManualIPEntryView()
+        .environmentObject(CaptureFlowCoordinator())
 }

@@ -10,6 +10,9 @@ import SwiftUI
 /// Full-screen container for the existing capture wizard (`ContentView`).
 ///
 /// This provides a single place to exit capture mode back to the main tabs.
+///
+/// LEGACY: Capture is now a dedicated tab (`CaptureTabRootView`).
+@available(*, deprecated, message: "Legacy capture modal entry. Use Capture tab (CaptureTabRootView) instead.")
 struct CaptureModeView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var coordinator: AppCoordinator

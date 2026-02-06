@@ -23,12 +23,7 @@ import Network
 ///
 /// Both auto-discovery and manual IP paths converge to TransferSession.
 ///
-/// Usage:
-/// ```swift
-/// let coordinator = AppCoordinator()
-/// ContentView()
-///     .environmentObject(coordinator)
-/// ```
+/// Usage: Provided at app root (`SabaiPicsStudioApp`).
 @MainActor
 class AppCoordinator: ObservableObject {
 
