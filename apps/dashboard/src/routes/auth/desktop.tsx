@@ -6,8 +6,17 @@ function getRedirectUrl() {
   return params.get("redirect_url") ?? params.get("redirect") ?? "";
 }
 
+function isAllowedRedirect(url: URL) {
+  const isLocalhost = url.hostname === "127.0.0.1" || url.hostname === "localhost";
+  const isHttp = url.protocol === "http:" || url.protocol === "https:";
+  return isHttp && isLocalhost && url.pathname === "/callback";
+}
+
 function buildReturnUrl(redirectUrl: string, token: string) {
   const url = new URL(redirectUrl);
+  if (!isAllowedRedirect(url)) {
+    throw new Error("Invalid redirect_url");
+  }
   url.searchParams.set("token", token);
   return url.toString();
 }
@@ -20,6 +29,15 @@ export function DesktopAuthPage() {
   useEffect(() => {
     if (!redirectUrl) {
       setError("Missing redirect_url");
+      return;
+    }
+    try {
+      const candidate = new URL(redirectUrl);
+      if (!isAllowedRedirect(candidate)) {
+        setError("Invalid redirect_url");
+      }
+    } catch {
+      setError("Invalid redirect_url");
     }
   }, [redirectUrl]);
 
@@ -60,7 +78,8 @@ function DesktopAuthRedirect({
           onError("Failed to obtain session token");
           return;
         }
-        window.location.href = buildReturnUrl(redirectUrl, token);
+        const returnUrl = buildReturnUrl(redirectUrl, token);
+        window.location.href = returnUrl;
       } catch (err) {
         onError(err instanceof Error ? err.message : "Failed to redirect");
       }
