@@ -8,28 +8,26 @@
 import SwiftUI
 
 struct SonyAPNewCameraDecisionView: View {
-    var wifiConnectedOverride: Bool? = nil
+    let isWiFiConnected: Bool
+    var showsManualIPOption: Bool = true
 
     var onScanQR: () -> Void = {}
     var onAlreadyOnWiFi: () -> Void = {}
     var onEnterSSID: () -> Void = {}
     var onManualIP: () -> Void = {}
 
-    private var wifiConnected: Bool {
-        if let wifiConnectedOverride { return wifiConnectedOverride }
-        return WiFiNetworkInfo.currentWiFiIPv4() != nil
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(spacing: 12) {
                     decisionCard(icon: "qrcode.viewfinder", title: "Scan QR Code", isEnabled: true, isPrimary: true, action: onScanQR)
-                    if wifiConnected {
+                    if isWiFiConnected {
                         decisionCard(icon: "wifi", title: "Already on Camera WiFi", isEnabled: true, action: onAlreadyOnWiFi)
                     }
                     decisionCard(icon: "key.fill", title: "Enter SSID & Password", isEnabled: true, action: onEnterSSID)
-                    decisionCard(icon: "network", title: "Enter IP Manually", isEnabled: true, action: onManualIP)
+                    if showsManualIPOption {
+                        decisionCard(icon: "network", title: "Enter IP Manually", isEnabled: true, action: onManualIP)
+                    }
                 }
             }
             .padding(20)
@@ -67,7 +65,7 @@ struct SonyAPNewCameraDecisionView: View {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.Theme.card)
+                    .fill(Color.Theme.background)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
@@ -82,12 +80,12 @@ struct SonyAPNewCameraDecisionView: View {
 
 #Preview("New Sony Camera (WiFi)") {
     NavigationView {
-        SonyAPNewCameraDecisionView(wifiConnectedOverride: true)
+        SonyAPNewCameraDecisionView(isWiFiConnected: true)
     }
 }
 
 #Preview("New Sony Camera (No WiFi)") {
     NavigationView {
-        SonyAPNewCameraDecisionView(wifiConnectedOverride: false)
+        SonyAPNewCameraDecisionView(isWiFiConnected: false)
     }
 }

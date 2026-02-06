@@ -12,7 +12,7 @@ import SwiftUI
 /// Filled button with primary brand color
 struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
-    
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .frame(maxWidth: .infinity)
@@ -20,7 +20,7 @@ struct PrimaryButtonStyle: ButtonStyle {
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(Color.Theme.primaryForeground)
             .background(Color.Theme.primary)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(Capsule())
             .opacity(configuration.isPressed ? 0.9 : 1.0)
             .opacity(isEnabled ? 1.0 : 0.5)
     }
@@ -31,7 +31,7 @@ struct PrimaryButtonStyle: ButtonStyle {
 /// Outlined button with border
 struct SecondaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
-    
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .frame(maxWidth: .infinity)
@@ -39,9 +39,9 @@ struct SecondaryButtonStyle: ButtonStyle {
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(Color.Theme.foreground)
             .background(Color.Theme.background)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                Capsule()
                     .strokeBorder(Color.Theme.border, lineWidth: 1)
             )
             .opacity(configuration.isPressed ? 0.9 : 1.0)
@@ -69,7 +69,7 @@ struct GhostButtonStyle: ButtonStyle {
 /// Red destructive action button
 struct DestructiveButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
-    
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .frame(maxWidth: .infinity)
@@ -77,7 +77,30 @@ struct DestructiveButtonStyle: ButtonStyle {
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(.white)
             .background(Color.Theme.destructive)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(Capsule())
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .opacity(isEnabled ? 1.0 : 0.5)
+    }
+}
+
+// MARK: - Compact Button Style
+
+/// Compact capsule-shaped button with auto-width
+struct CompactButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .foregroundStyle(Color.Theme.foreground)
+            .background(Color.Theme.muted)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.Theme.border, lineWidth: 1)
+            )
             .opacity(configuration.isPressed ? 0.9 : 1.0)
             .opacity(isEnabled ? 1.0 : 0.5)
     }
@@ -101,22 +124,29 @@ extension ButtonStyle where Self == DestructiveButtonStyle {
     static var destructive: DestructiveButtonStyle { DestructiveButtonStyle() }
 }
 
+extension ButtonStyle where Self == CompactButtonStyle {
+    static var compact: CompactButtonStyle { CompactButtonStyle() }
+}
+
 // MARK: - Preview
 
 #Preview("Button Styles") {
     VStack(spacing: 16) {
         Button("Primary Button") { }
             .buttonStyle(.primary)
-        
+
         Button("Secondary Button") { }
             .buttonStyle(.secondary)
-        
+
         Button("Ghost Button") { }
             .buttonStyle(.ghost)
-        
+
         Button("Destructive Button") { }
             .buttonStyle(.destructive)
-        
+
+        Button("Compact Button") { }
+            .buttonStyle(.compact)
+
         Button("Disabled Primary") { }
             .buttonStyle(.primary)
             .disabled(true)

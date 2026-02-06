@@ -67,6 +67,24 @@ extension Color {
         
         /// Text on destructive background
         static let destructiveForeground = Color("ThemeDestructiveForeground")
+
+        /// Success color (green)
+        static let success = Color("ThemeSuccess")
+
+        /// Text on success background
+        static let successForeground = Color("ThemeSuccessForeground")
+
+        /// Warning color (amber)
+        static let warning = Color("ThemeWarning")
+
+        /// Text on warning background
+        static let warningForeground = Color("ThemeWarningForeground")
+
+        /// Info color (blue)
+        static let info = Color("ThemeInfo")
+
+        /// Text on info background
+        static let infoForeground = Color("ThemeInfoForeground")
         
         /// Border color
         static let border = Color("ThemeBorder")
