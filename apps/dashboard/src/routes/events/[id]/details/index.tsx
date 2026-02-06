@@ -28,7 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@sabaipics/uiv3/components/dropdown-menu';
-import { Copy, ExternalLink, Download, Save, Upload, X, Image as ImageIcon, Info, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Check, Copy, ExternalLink, Download, Save, Upload, X, Image as ImageIcon, Info, Loader2, Eye, EyeOff } from 'lucide-react';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router';
