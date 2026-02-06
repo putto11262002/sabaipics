@@ -3,7 +3,7 @@
 
 import SwiftUI
 
-struct SonyWiFiJoiningView: View {
+struct WiFiJoiningView: View {
     let title: String
     let ssid: String?
 
@@ -14,26 +14,30 @@ struct SonyWiFiJoiningView: View {
             ProgressView()
                 .scaleEffect(1.2)
 
-            Text(title)
+            Text(displayTitle)
                 .font(.headline)
                 .foregroundColor(Color.Theme.foreground)
-
-            if let ssid, !ssid.isEmpty {
-                Text(ssid)
-                    .font(.subheadline)
-                    .foregroundColor(Color.Theme.mutedForeground)
-            }
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    private var displayTitle: String {
+        if let ssid, !ssid.isEmpty {
+            return "Joining \(ssid)"
+        }
+        return title
+    }
 }
 
-struct SonyWiFiJoinErrorView: View {
+struct WiFiJoinErrorView: View {
     let title: String
     let subtitle: String
     let onRetry: () -> Void
+
+    var secondaryActionTitle: String? = nil
+    var onSecondaryAction: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 18) {
@@ -55,31 +59,64 @@ struct SonyWiFiJoinErrorView: View {
             }
             .padding(.horizontal, 32)
 
-            Spacer()
+            VStack(spacing: 10) {
+                Button("Try Again") {
+                    onRetry()
+                }
+                .buttonStyle(.compact)
 
-            Button("Try Again") {
-                onRetry()
+                if let secondaryActionTitle, let onSecondaryAction {
+                    Button(secondaryActionTitle) {
+                        onSecondaryAction()
+                    }
+                    .buttonStyle(.compact)
+                }
             }
-            .buttonStyle(.secondary)
-            .padding(.horizontal, 40)
-            .padding(.bottom, 40)
+            .padding(.horizontal, 32)
+            .padding(.top, 8)
+
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
+@available(*, deprecated, message: "Use WiFiJoiningView")
+typealias SonyWiFiJoiningView = WiFiJoiningView
+
+@available(*, deprecated, message: "Use WiFiJoinErrorView")
+typealias SonyWiFiJoinErrorView = WiFiJoinErrorView
+
 #if DEBUG
 
-#Preview("Sony Joining") {
-    SonyWiFiJoiningView(title: "Joining camera WiFi...", ssid: "DIRECT-cWE1:ILCE-7RM4")
+#Preview("WiFi Joining with SSID") {
+    WiFiJoiningView(title: "Joining camera WiFi...", ssid: "DIRECT-cWE1:ILCE-7RM4")
+        .background(Color.Theme.background)
 }
 
-#Preview("Sony Join Error") {
-    SonyWiFiJoinErrorView(
-        title: "Couldn’t join Wi‑Fi",
-        subtitle: "Make sure you’re connected to the camera Wi‑Fi, then try again.",
+#Preview("WiFi Joining without SSID") {
+    WiFiJoiningView(title: "Joining camera WiFi...", ssid: nil)
+        .background(Color.Theme.background)
+}
+
+#Preview("WiFi Join Error") {
+    WiFiJoinErrorView(
+        title: "Couldn't join Wi‑Fi",
+        subtitle: "Check your camera Wi‑Fi connection.",
         onRetry: {}
     )
+    .background(Color.Theme.background)
+}
+
+#Preview("WiFi Join Error with Secondary") {
+    WiFiJoinErrorView(
+        title: "Couldn't join Wi‑Fi",
+        subtitle: "Check your camera Wi‑Fi connection.",
+        onRetry: {},
+        secondaryActionTitle: "Enter IP Manually",
+        onSecondaryAction: {}
+    )
+    .background(Color.Theme.background)
 }
 
 #endif
