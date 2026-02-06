@@ -9,71 +9,64 @@ struct SonyWiFiOnboardingView: View {
         case manual
     }
 
-    @StateObject private var viewModel: SonyWiFiJoinViewModel
     @State private var showQRScanner: Bool = false
+    @State private var qrError: String? = nil
+    @State private var joining: (credentials: WiFiCredentials, cameraId: String?)? = nil
+
+    // Manual entry
+    @State private var ssid: String = ""
+    @State private var password: String = ""
+    @State private var manualError: String? = nil
+
     @FocusState private var ssidFocused: Bool
     @FocusState private var passwordFocused: Bool
     private let previewWiFiInfo: WiFiIPv4Info?
     private let mode: Mode
     private let onBack: () -> Void
-    private let onContinue: () -> Void
-
-    private var wifiInfo: WiFiIPv4Info? {
-        previewWiFiInfo ?? WiFiNetworkInfo.currentWiFiIPv4()
-    }
+    private let onContinue: (_ joinInfo: SonyWiFiJoinViewModel.JoinInfo?) -> Void
 
     init(
         mode: Mode,
-        viewModel: SonyWiFiJoinViewModel = SonyWiFiJoinViewModel(step: .intro),
         previewWiFiInfo: WiFiIPv4Info? = nil,
         onBack: @escaping () -> Void,
-        onContinue: @escaping () -> Void
+        onContinue: @escaping (_ joinInfo: SonyWiFiJoinViewModel.JoinInfo?) -> Void
     ) {
         self.mode = mode
-        _viewModel = StateObject(wrappedValue: viewModel)
         self.previewWiFiInfo = previewWiFiInfo
         self.onBack = onBack
         self.onContinue = onContinue
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            switch viewModel.step {
-            case .intro:
-                ssidInput
-            case .joining:
-                if let errorMessage = viewModel.errorMessage {
-                    SonyWiFiJoinErrorView(
-                        title: "Couldn’t join Wi‑Fi",
-                        subtitle: "Make sure you’re connected to the camera Wi‑Fi, then try again.",
-                        onRetry: { viewModel.retry() }
-                    )
-                } else {
-                    SonyWiFiJoiningView(
-                        title: "Joining camera WiFi...",
-                        ssid: viewModel.qrPayload?.ssid ?? viewModel.ssid
-                    )
-                }
-            case .connectivityGuide:
-                SonyConnectivityGuideView(
-                    wifiInfo: wifiInfo,
-                    onSkip: { onContinue() },
-                    onDone: { onContinue() }
+        Group {
+            if let joining {
+                WiFiJoinView(
+                    credentials: joining.credentials,
+                    onContinue: { credentials in
+                        onContinue(SonyWiFiJoinViewModel.JoinInfo(credentials: credentials, cameraId: joining.cameraId))
+                    },
+                    onCancel: {
+                        self.joining = nil
+                    },
+                    previewWiFiInfo: previewWiFiInfo
                 )
+            } else {
+                ssidInput
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.Theme.background.ignoresSafeArea())
+                    .navigationTitle(navigationTitle)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarBackButtonHidden(true)
+                    .appBackButton {
+                        onBack()
+                    }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.Theme.background.ignoresSafeArea())
-        .navigationTitle(navigationTitle)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .appBackButton {
-            onBack()
-        }
         .fullScreenCover(isPresented: $showQRScanner) {
             QRCodeScannerView {
                 showQRScanner = false
-                viewModel.handleScannedQRCode($0)
+                handleScannedQRCode($0)
             } onCancel: {
                 showQRScanner = false
             }
@@ -122,7 +115,7 @@ struct SonyWiFiOnboardingView: View {
                         .font(.subheadline)
                         .foregroundColor(Color.Theme.mutedForeground)
 
-                    if let qrError = viewModel.qrError {
+                    if let qrError {
                         Text(qrError)
                             .font(.footnote)
                             .foregroundColor(.red)
@@ -133,7 +126,7 @@ struct SonyWiFiOnboardingView: View {
             }
 
             Button("Scan QR") {
-                viewModel.qrError = nil
+                qrError = nil
                 showQRScanner = true
             }
             .buttonStyle(.primary)
@@ -172,7 +165,7 @@ struct SonyWiFiOnboardingView: View {
                     Text("WiFi name (SSID)")
                         .font(.subheadline)
                         .foregroundColor(Color.Theme.mutedForeground)
-                    TextField("DIRECT-...", text: $viewModel.ssid)
+                    TextField("DIRECT-...", text: $ssid)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .keyboardType(.asciiCapable)
@@ -184,7 +177,7 @@ struct SonyWiFiOnboardingView: View {
                     Text("Password")
                         .font(.subheadline)
                         .foregroundColor(Color.Theme.mutedForeground)
-                    SecureField("Password", text: $viewModel.password)
+                    SecureField("Password", text: $password)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .keyboardType(.asciiCapable)
@@ -192,8 +185,8 @@ struct SonyWiFiOnboardingView: View {
                         .focused($passwordFocused)
                 }
 
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
+                if let manualError {
+                    Text(manualError)
                         .font(.footnote)
                         .foregroundColor(.red)
                         .padding(.top, 4)
@@ -204,12 +197,41 @@ struct SonyWiFiOnboardingView: View {
                 Button("Join WiFi") {
                     ssidFocused = false
                     passwordFocused = false
-                    viewModel.joinFromManualInput()
+                    joinFromManualInput()
                 }
                 .buttonStyle(.primary)
             }
             .padding(20)
         }
+    }
+
+    private func handleScannedQRCode(_ raw: String) {
+        qrError = nil
+        manualError = nil
+
+        guard let parsed = SonyWiFiQRCode.parse(raw) else {
+            qrError = "Unsupported QR code. Please scan the QR shown on the camera WiFi screen."
+            return
+        }
+
+        joining = (WiFiCredentials(ssid: parsed.ssid, password: parsed.password), parsed.cameraId)
+    }
+
+    private func joinFromManualInput() {
+        let trimmedSSID = ssid.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedSSID.isEmpty else {
+            manualError = "SSID is required."
+            return
+        }
+
+        ssid = trimmedSSID
+        password = trimmedPassword
+        manualError = nil
+        qrError = nil
+
+        joining = (WiFiCredentials(ssid: trimmedSSID, password: trimmedPassword.isEmpty ? nil : trimmedPassword), nil)
     }
 }
 
@@ -217,58 +239,24 @@ struct SonyWiFiOnboardingView: View {
 
 #Preview("Sony Onboarding - QR Intro") {
     NavigationView {
-        SonyWiFiOnboardingView(mode: .qr, onBack: {}, onContinue: {})
+        SonyWiFiOnboardingView(mode: .qr, onBack: {}, onContinue: { _ in })
     }
 }
 
 #Preview("Sony Onboarding - Manual Intro") {
     NavigationView {
-        SonyWiFiOnboardingView(mode: .manual, onBack: {}, onContinue: {})
-    }
-}
-
-#Preview("Sony Onboarding - Joining") {
-    NavigationView {
-        SonyWiFiOnboardingView(
-            mode: .qr,
-            viewModel: {
-                let vm = SonyWiFiJoinViewModel(step: .joining)
-                vm.isJoining = true
-                vm.qrPayload = SonyWiFiQRCode(ssidSuffix: "cWE1", password: "MQGMTeKr", cameraModel: "ILCE-7RM4", cameraId: "D44DA4344543")
-                return vm
-            }(),
-            onBack: {},
-            onContinue: {}
-        )
-    }
-}
-
-#Preview("Sony Onboarding - Join Error") {
-    NavigationView {
-        SonyWiFiOnboardingView(
-            mode: .qr,
-            viewModel: {
-                let vm = SonyWiFiJoinViewModel(step: .joining)
-                vm.isJoining = false
-                vm.qrPayload = SonyWiFiQRCode(ssidSuffix: "cWE1", password: "MQGMTeKr", cameraModel: "ILCE-7RM4", cameraId: "D44DA4344543")
-                vm.errorMessage = "Mock: join failed"
-                return vm
-            }(),
-            onBack: {},
-            onContinue: {}
-        )
+        SonyWiFiOnboardingView(mode: .manual, onBack: {}, onContinue: { _ in })
     }
 }
 
 #Preview("Sony Onboarding - Connectivity Guide") {
     NavigationView {
-        SonyWiFiOnboardingView(
-            mode: .qr,
-            viewModel: SonyWiFiJoinViewModel(step: .connectivityGuide),
-            previewWiFiInfo: WiFiIPv4Info(ip: 0xC0A87A17, netmask: 0xFFFFFF00),
-            onBack: {},
-            onContinue: {}
+        WiFiConnectivityGuideView(
+            wifiInfo: WiFiIPv4Info(ip: 0xC0A87A17, netmask: 0xFFFFFF00),
+            onSkip: {},
+            onDone: {}
         )
+        .navigationTitle("Scan QR")
     }
 }
 

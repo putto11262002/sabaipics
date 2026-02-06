@@ -8,7 +8,7 @@
 
 import SwiftUI
 
-struct SonyConnectivityGuideView: View {
+struct WiFiConnectivityGuideView: View {
     let wifiInfo: WiFiIPv4Info?
     let onSkip: () -> Void
     let onDone: () -> Void
@@ -54,6 +54,9 @@ struct SonyConnectivityGuideView: View {
     }
 }
 
+@available(*, deprecated, message: "Use WiFiConnectivityGuideView")
+typealias SonyConnectivityGuideView = WiFiConnectivityGuideView
+
 private func guideLine(index: Int, text: String) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 10) {
         ZStack {
@@ -79,7 +82,7 @@ private func guideLine(index: Int, text: String) -> some View {
 #if DEBUG
 #Preview("Sony Connectivity Guide") {
     NavigationView {
-        SonyConnectivityGuideView(
+        WiFiConnectivityGuideView(
             wifiInfo: WiFiIPv4Info(ip: 0xC0A8010A, netmask: 0xFFFFFF00),
             onSkip: {},
             onDone: {}

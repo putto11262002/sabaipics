@@ -15,8 +15,9 @@ import NetworkExtension
 
 
 struct SonyAPEntryView: View {
-    @EnvironmentObject var captureFlow: CaptureFlowCoordinator
-    // Intentionally unused on this screen (no Settings shortcut here).
+    let onBack: () -> Void
+    let onNewCamera: () -> Void
+    let onConnectRecord: (String) -> Void
 
     @State private var selectedRecord: SonyAPConnectionRecord?
     @State private var showRecordActions = false
@@ -34,7 +35,7 @@ struct SonyAPEntryView: View {
             cameraList
 
             Button("New camera") {
-                captureFlow.startSonyNewCamera()
+                onNewCamera()
             }
             .buttonStyle(PrimaryButtonStyle())
             .padding(.horizontal, 20)
@@ -43,7 +44,7 @@ struct SonyAPEntryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .appBackButton {
-            captureFlow.backToManufacturerSelection()
+            onBack()
         }
         .confirmationDialog(
             "",
@@ -61,7 +62,7 @@ struct SonyAPEntryView: View {
                 }
 
                 Button("Connect") {
-                    captureFlow.connectToSonyRecord(id: record.id)
+                    onConnectRecord(record.id)
                 }
                 .disabled(!isOnSameNetwork)
 
@@ -100,6 +101,7 @@ struct SonyAPEntryView: View {
     }
 
     private var cameraList: some View {
+        let currentKey = currentNetworkKey
         return List {
             Section {
                 if records.isEmpty {
@@ -113,7 +115,7 @@ struct SonyAPEntryView: View {
 
                             Spacer(minLength: 0)
 
-                            if let currentNetworkKey, currentNetworkKey == record.networkKey {
+                            if let currentKey, currentKey == record.networkKey {
                                 Circle()
                                     .fill(Color.green)
                                     .frame(width: 8, height: 8)
