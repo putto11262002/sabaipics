@@ -33,6 +33,10 @@ import { IframeCanvas } from './components/iframe-canvas';
 import { EditorSidebar } from './components/sidebar';
 import { Toolbar } from './components/toolbar';
 
+// ─── Feature Flags ────────────────────────────────────────────────────────────
+
+const ENABLE_BLOCK_EDITING = false; // Set to true when drag-and-drop + click-to-edit are stable
+
 // ─── Recursive helpers ────────────────────────────────────────────────────────
 
 function findBlock(blocks: SlideshowBlock[], id: string): SlideshowBlock | null {
@@ -382,6 +386,7 @@ export default function EventSlideshowTab() {
           onSave={handleSave}
           disabled={isLoading || hasError}
           isSaving={updateConfig.isPending}
+          showAddBlock={ENABLE_BLOCK_EDITING}
         />
       </PageHeader>
 
@@ -406,18 +411,18 @@ export default function EventSlideshowTab() {
             <IframeCanvas
               config={config}
               context={context}
-              selectedBlockId={selectedBlockId}
+              selectedBlockId={ENABLE_BLOCK_EDITING ? selectedBlockId : null}
               deviceType={deviceType}
               orientation={orientation}
-              onSelectBlock={handleIframeSelectBlock}
-              onConfigUpdate={handleConfigUpdate}
+              onSelectBlock={ENABLE_BLOCK_EDITING ? handleIframeSelectBlock : () => {}}
+              onConfigUpdate={ENABLE_BLOCK_EDITING ? handleConfigUpdate : undefined}
             />
           )}
         </SidebarInset>
 
         <EditorSidebar
-          selectedBlock={selectedBlock}
-          parentBlock={parentBlock}
+          selectedBlock={ENABLE_BLOCK_EDITING ? selectedBlock : null}
+          parentBlock={ENABLE_BLOCK_EDITING ? parentBlock : null}
           onUpdateBlock={handleUpdateBlock}
           onToggleBlock={handleToggleBlock}
           onDeleteBlock={handleDeleteBlock}

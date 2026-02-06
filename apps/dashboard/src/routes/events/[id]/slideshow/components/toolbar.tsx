@@ -25,6 +25,7 @@ interface ToolbarProps {
   onSave: () => void;
   disabled?: boolean;
   isSaving?: boolean;
+  showAddBlock?: boolean;
 }
 
 export function Toolbar({
@@ -38,6 +39,7 @@ export function Toolbar({
   onSave,
   disabled,
   isSaving,
+  showAddBlock = true,
 }: ToolbarProps) {
   const types = getTopLevelTypes();
 
@@ -84,38 +86,40 @@ export function Toolbar({
         <RotateCcw className="size-4" />
       </Button>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-1.5" disabled={disabled}>
-            <Plus className="size-4" />
-            Add Block
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="min-w-[180px]">
-          <DropdownMenuLabel className="text-xs">Blocks</DropdownMenuLabel>
-          {types.map((type) => {
-            const def = blockRegistry.get(type)!;
-            const Icon = def.icon;
-            return (
-              <DropdownMenuItem key={type} onClick={() => onAddBlock(type)}>
-                <Icon className="size-4" />
-                <span className="ml-2">{def.label}</span>
-              </DropdownMenuItem>
-            );
-          })}
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-xs">Presets</DropdownMenuLabel>
-          {blockPresets.map((preset) => {
-            const Icon = preset.icon;
-            return (
-              <DropdownMenuItem key={preset.key} onClick={() => onAddPreset(preset.create())}>
-                <Icon className="size-4" />
-                <span className="ml-2">{preset.label}</span>
-              </DropdownMenuItem>
-            );
-          })}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {showAddBlock && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5" disabled={disabled}>
+              <Plus className="size-4" />
+              Add Block
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="min-w-[180px]">
+            <DropdownMenuLabel className="text-xs">Blocks</DropdownMenuLabel>
+            {types.map((type) => {
+              const def = blockRegistry.get(type)!;
+              const Icon = def.icon;
+              return (
+                <DropdownMenuItem key={type} onClick={() => onAddBlock(type)}>
+                  <Icon className="size-4" />
+                  <span className="ml-2">{def.label}</span>
+                </DropdownMenuItem>
+              );
+            })}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs">Presets</DropdownMenuLabel>
+            {blockPresets.map((preset) => {
+              const Icon = preset.icon;
+              return (
+                <DropdownMenuItem key={preset.key} onClick={() => onAddPreset(preset.create())}>
+                  <Icon className="size-4" />
+                  <span className="ml-2">{preset.label}</span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
 
       <Button size="sm" onClick={onSave} className="gap-1.5" disabled={disabled || isSaving}>
         {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
