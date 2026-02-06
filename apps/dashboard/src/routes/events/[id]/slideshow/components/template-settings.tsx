@@ -1,4 +1,3 @@
-import { Button } from '@sabaipics/uiv3/components/button';
 import { Label } from '@sabaipics/uiv3/components/label';
 import {
   Select,
@@ -7,8 +6,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@sabaipics/uiv3/components/select';
-import { Wand2 } from 'lucide-react';
-import { useState } from 'react';
 import type { TemplateId } from '../lib/templates';
 
 interface TemplateSettingsProps {
@@ -35,38 +32,25 @@ const TEMPLATE_INFO: Record<TemplateId, { name: string; description: string }> =
 };
 
 export function TemplateSettings({ onApplyTemplate }: TemplateSettingsProps) {
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>('classic');
-
-  const handleApply = () => {
-    onApplyTemplate(selectedTemplate);
+  const handleChange = (templateId: string) => {
+    onApplyTemplate(templateId as TemplateId);
   };
 
   return (
-    <div className="space-y-3">
-      <div className="space-y-2">
-        <Label className="text-xs">Template</Label>
-        <Select value={selectedTemplate} onValueChange={(v) => setSelectedTemplate(v as TemplateId)}>
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(TEMPLATE_INFO).map(([id, info]) => (
-              <SelectItem key={id} value={id}>
-                {info.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <Button onClick={handleApply} size="sm" className="w-full gap-2">
-        <Wand2 className="size-4" />
-        Apply Template
-      </Button>
-
-      <p className="text-xs text-muted-foreground">
-        This will replace your current layout with the selected template.
-      </p>
+    <div className="space-y-2">
+      <Label className="text-xs">Template</Label>
+      <Select onValueChange={handleChange} defaultValue="classic">
+        <SelectTrigger className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(TEMPLATE_INFO).map(([id, info]) => (
+            <SelectItem key={id} value={id}>
+              {info.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
