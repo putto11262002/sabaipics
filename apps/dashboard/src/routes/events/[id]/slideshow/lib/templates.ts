@@ -55,23 +55,6 @@ function buildClassicCentered(): SlideshowConfig {
       ),
       // Gallery
       createBlock('gallery'),
-      // Stats cards in horizontal row
-      createBlockWithChildren(
-        'flex',
-        [
-          createBlockWithProps('stat-card', { metric: 'photos' }),
-          createBlockWithProps('stat-card', { metric: 'searches' }),
-          createBlockWithProps('stat-card', { metric: 'downloads' }),
-        ],
-        {
-          direction: 'row',
-          align: 'center',
-          justify: 'center',
-          gap: 'md',
-          padding: 'none',
-          wrap: true,
-        },
-      ),
       // QR Code
       createBlockWithProps('qr', { size: 'md', label: 'Scan to find your photos' }),
       // Social links (disabled by default)
@@ -138,23 +121,6 @@ function buildModernHorizontal(): SlideshowConfig {
       ),
       // Gallery
       createBlock('gallery'),
-      // Stats compact horizontal
-      createBlockWithChildren(
-        'flex',
-        [
-          createBlockWithProps('stat-card', { metric: 'photos' }),
-          createBlockWithProps('stat-card', { metric: 'searches' }),
-          createBlockWithProps('stat-card', { metric: 'downloads' }),
-        ],
-        {
-          direction: 'row',
-          align: 'center',
-          justify: 'start',
-          gap: 'sm',
-          padding: 'none',
-          wrap: true,
-        },
-      ),
       // QR and Social in horizontal row
       createBlockWithChildren(
         'flex',
@@ -229,37 +195,8 @@ function buildBoldMagazine(): SlideshowConfig {
       ),
       // Gallery
       createBlock('gallery'),
-      // Stats vertical with QR on side
-      createBlockWithChildren(
-        'flex',
-        [
-          createBlockWithChildren(
-            'flex',
-            [
-              createBlockWithProps('stat-card', { metric: 'photos' }),
-              createBlockWithProps('stat-card', { metric: 'searches' }),
-              createBlockWithProps('stat-card', { metric: 'downloads' }),
-            ],
-            {
-              direction: 'column',
-              align: 'stretch',
-              justify: 'start',
-              gap: 'sm',
-              padding: 'none',
-              wrap: false,
-            },
-          ),
-          createBlockWithProps('qr', { size: 'lg', label: 'Find Your Photos' }),
-        ],
-        {
-          direction: 'row',
-          align: 'start',
-          justify: 'center',
-          gap: 'lg',
-          padding: 'md',
-          wrap: true,
-        },
-      ),
+      // QR Code
+      createBlockWithProps('qr', { size: 'lg', label: 'Find Your Photos' }),
       // Social vertical list (disabled)
       (() => {
         const social = createBlockWithChildren(
@@ -327,23 +264,6 @@ function buildElegantMinimal(): SlideshowConfig {
       ),
       // Gallery
       createBlock('gallery'),
-      // Stats elegant cards
-      createBlockWithChildren(
-        'flex',
-        [
-          createBlockWithProps('stat-card', { metric: 'photos' }),
-          createBlockWithProps('stat-card', { metric: 'searches' }),
-          createBlockWithProps('stat-card', { metric: 'downloads' }),
-        ],
-        {
-          direction: 'row',
-          align: 'stretch',
-          justify: 'center',
-          gap: 'lg',
-          padding: 'sm',
-          wrap: true,
-        },
-      ),
       // QR centered with label
       createBlockWithChildren(
         'flex',
