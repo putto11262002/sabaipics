@@ -16,9 +16,6 @@ struct CameraDiscoveryView: View {
     @EnvironmentObject var captureFlow: CaptureFlowCoordinator  // CHANGED
     @StateObject private var scanner = NetworkScannerService()
 
-    /// Whether to show the back confirmation dialog
-    @State private var showBackConfirmation = false
-
     /// Timer for 30-second timeout
     @State private var timeoutTask: Task<Void, Never>?
 
@@ -52,7 +49,14 @@ struct CameraDiscoveryView: View {
         .navigationTitle("Find Cameras")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
-        .toolbar(content: toolbarContent)
+        .appBackButton(
+            confirmation: AppBackConfirmation(
+                title: "Stop scanning?",
+                message: "Go back to manufacturer selection?"
+            )
+        ) {
+            await handleBack()
+        }
         .onAppear {
             print("[CameraDiscoveryView] View appeared, starting scan")
 
@@ -71,31 +75,6 @@ struct CameraDiscoveryView: View {
         .onChange(of: scanner.discoveredCameras) { newCameras in
             print("[CameraDiscoveryView] Cameras updated: \(newCameras.count) found")
             captureFlow.updateDiscoveredCameras(newCameras)  // CHANGED
-        }
-        .alert("Stop scanning?", isPresented: $showBackConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Go Back", role: .destructive) {
-                handleBack()
-            }
-        } message: {
-            Text("Go back to manufacturer selection?")
-        }
-    }
-
-    // MARK: - Toolbar
-
-    @ToolbarContentBuilder
-    private func toolbarContent() -> some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            Button {
-                showBackConfirmation = true
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left")
-                    Text("Back")
-                }
-                .foregroundColor(Color.Theme.primary)
-            }
         }
     }
 
@@ -249,18 +228,15 @@ struct CameraDiscoveryView: View {
 
     /// Handle back button
     /// Flow: Cancel timeout -> Cleanup scanner (stop + disconnect all) -> Navigate back
-    private func handleBack() {
+    private func handleBack() async {
         print("[CameraDiscoveryView] handleBack()")
 
         // Cancel timeout task
         timeoutTask?.cancel()
         print("[CameraDiscoveryView]    Timeout cancelled")
 
-        // Call registered cleanup then navigate
-        Task {
-            await captureFlow.cleanup()  // Uses registered cleanup
-            captureFlow.backToManufacturerSelection()
-        }
+        await captureFlow.cleanup()  // Uses registered cleanup
+        captureFlow.backToManufacturerSelection()
     }
 }
 
