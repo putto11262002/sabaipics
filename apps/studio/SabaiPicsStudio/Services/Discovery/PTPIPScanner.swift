@@ -177,6 +177,7 @@ final class PTPIPScanner: ObservableObject {
     private func performScan(targets: [String], config: ScanConfig) async {
         let scanStart = Date()
         var totalFound = 0
+        var foundIPs: Set<String> = []
 
         log(.info, "Scan starting - \(targets.count) targets, \(config.maxWaves) wave(s), timeout: \(config.timeout)s")
 
@@ -187,12 +188,18 @@ final class PTPIPScanner: ObservableObject {
                 return
             }
 
-            log(.info, "Wave \(wave)/\(config.maxWaves) starting")
+            let waveTargets = targets.filter { !foundIPs.contains($0) }
+            guard !waveTargets.isEmpty else {
+                log(.info, "Wave \(wave) skipped — all targets already found")
+                break
+            }
+
+            log(.info, "Wave \(wave)/\(config.maxWaves) starting (\(waveTargets.count) target(s))")
             var completedCount = 0
             var waveFound = 0
 
             await withTaskGroup(of: DiscoveredCamera?.self) { group in
-                for ip in targets {
+                for ip in waveTargets {
                     group.addTask {
                         guard !Task.isCancelled else { return nil }
                         return await self.scanIP(ip, config: config)
@@ -213,6 +220,7 @@ final class PTPIPScanner: ObservableObject {
 
                     if let camera = result {
                         waveFound += 1
+                        foundIPs.insert(camera.ipAddress)
                         log(.info, "Found: \(camera.name) at \(camera.ipAddress)")
                         await MainActor.run {
                             onCameraDiscovered?(camera)
@@ -231,8 +239,8 @@ final class PTPIPScanner: ObservableObject {
             totalFound += waveFound
             log(.info, "Wave \(wave)/\(config.maxWaves) done - found: \(waveFound)")
 
-            // Wait before next wave
-            if wave < config.maxWaves {
+            // Wait before next wave (only if no cameras found yet)
+            if wave < config.maxWaves && foundIPs.isEmpty {
                 log(.info, "No cameras found, waiting \(config.waveDelay)s before wave \(wave + 1)")
                 do {
                     try await Task.sleep(nanoseconds: UInt64(config.waveDelay * 1_000_000_000))
