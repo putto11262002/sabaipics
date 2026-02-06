@@ -36,27 +36,10 @@ function buildClassicCentered(): SlideshowConfig {
       maxWidth: 'none',
     },
     blocks: [
-      // Header section - Logo, Name, Subtitle centered
-      createBlockWithChildren(
-        'flex',
-        [
-          createBlockWithProps('logo', { size: 'md' }),
-          createBlock('event-name'),
-          createBlock('subtitle'),
-        ],
-        {
-          direction: 'column',
-          align: 'center',
-          justify: 'center',
-          gap: 'sm',
-          padding: 'md',
-          wrap: false,
-        },
-      ),
-      // Gallery
-      createBlock('gallery'),
-      // QR Code
-      createBlockWithProps('qr', { size: 'md', label: 'Scan to find your photos' }),
+      // Event Name
+      createBlock('event-name'),
+      // Subtitle
+      createBlock('subtitle'),
       // Social links (disabled by default)
       (() => {
         const social = createBlockWithChildren(
@@ -77,6 +60,10 @@ function buildClassicCentered(): SlideshowConfig {
         social.enabled = false;
         return social;
       })(),
+      // QR Code
+      createBlockWithProps('qr', { size: 'md', label: 'Scan to find your photos' }),
+      // Gallery
+      createBlock('gallery'),
     ],
   };
 }
