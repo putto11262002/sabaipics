@@ -5,8 +5,8 @@
 //  Created by Hendrik Holtmann on 21.10.18.
 //  Copyright © 2019 Hendrik Holtmann. All rights reserved.
 //
-//  Modified for Canon EOS WiFi Testing
-//  Target: Canon EOS cameras via WiFi (ptpip:192.168.1.1)
+//  Modified for Sony PTP/IP WiFi Testing
+//  Target: Sony ILCE cameras via WiFi (ptpip:192.168.122.1)
 //
 
 #import "ViewController.h"
@@ -14,9 +14,10 @@
 #import "ptp-private.h"
 @import gphoto2;
 
-// Canon WiFi Configuration Constants
-#define CANON_WIFI_IP @"192.168.1.1"
-#define CANON_CAMERA_MODEL @"Canon EOS (WLAN)"
+// Sony PTP/IP WiFi Configuration Constants
+// Use the generic PTP/IP camera model entry in libgphoto2.
+#define CANON_WIFI_IP @"192.168.122.1"
+#define CANON_CAMERA_MODEL @"PTP/IP Camera"
 #define CANON_PROTOCOL @"ptpip"
 
 @interface ViewController ()
@@ -50,7 +51,7 @@
     self.totalPhotosOnCamera = 0;
     self.isMonitoring = NO;
 
-    // Pre-configure Canon WiFi settings
+    // Pre-configure Sony PTP/IP WiFi settings
     self.ipTextField.text = CANON_WIFI_IP;
     self.protocol = CANON_PROTOCOL;
     self.cameraModel = CANON_CAMERA_MODEL;
@@ -59,7 +60,7 @@
     [self setupCustomUI];
 
     // Log startup configuration
-    NSLog(@"=== Canon EOS WiFi Test App Started ===");
+    NSLog(@"=== Sony PTP/IP WiFi Test App Started ===");
     NSLog(@"Camera IP: %@", CANON_WIFI_IP);
     NSLog(@"Camera Model: %@", CANON_CAMERA_MODEL);
     NSLog(@"Protocol: %@", CANON_PROTOCOL);
@@ -67,13 +68,13 @@
     NSLog(@"=====================================");
 
     // Update console with instructions
-    self.consoleTextView.text = @"Canon EOS WiFi Test App\n\n"
+    self.consoleTextView.text = @"Sony PTP/IP WiFi Test App\n\n"
                                 @"Instructions:\n"
-                                @"1. Enable WiFi on your Canon camera\n"
-                                @"2. Connect iPad to camera's WiFi network\n"
-                                @"3. Tap 'Connect to Canon' button\n"
+                                @"1. Enable WiFi (Access Point) on your Sony camera\n"
+                                @"2. Connect iPhone/iPad to the camera's DIRECT-xxxx WiFi\n"
+                                @"3. Tap 'Connect' (PTP/IP)\n"
                                 @"4. Once connected, tap 'Start Event Monitor'\n"
-                                @"5. Take photos - they will be detected!\n\n"
+                                @"5. Take photos - events/download will appear in logs\n\n"
                                 @"Ready to connect...";
 }
 
@@ -453,7 +454,7 @@ static void logdumper(GPLogLevel level, const char *domain, const char *str,
                         self.connected = YES;
 
                         NSString *successMsg = [NSString stringWithFormat:
-                            @"Connected to Canon EOS!\n\n"
+                            @"Connected to Sony PTP/IP!\n\n"
                             @"Camera: %@\n"
                             @"IP: %@\n"
                             @"Protocol: %@\n\n"
@@ -504,15 +505,15 @@ static void logdumper(GPLogLevel level, const char *domain, const char *str,
 }
 
 /**
- * Connect button action for Canon EOS camera
- * Pre-configures settings for Canon WiFi connection
+ * Connect button action for Sony PTP/IP camera
+ * Pre-configures settings for Sony PTP/IP connection
  */
 - (IBAction)connectTouchedPTP:(id)sender {
-    NSLog(@"=== Connect to Canon Button Pressed ===");
+    NSLog(@"=== Connect to Sony (PTP/IP) Button Pressed ===");
     self.protocol = CANON_PROTOCOL;  // "ptpip"
-    self.cameraModel = CANON_CAMERA_MODEL;  // "Canon EOS (WLAN)"
+    self.cameraModel = CANON_CAMERA_MODEL;  // "PTP/IP Camera"
 
-    // Ensure IP is set to Canon default if empty
+    // Ensure IP is set to default if empty
     if (!self.ipTextField.text || [self.ipTextField.text isEqualToString:@""]) {
         self.ipTextField.text = CANON_WIFI_IP;
     }
@@ -856,15 +857,57 @@ static void logdumper(GPLogLevel level, const char *domain, const char *str,
                         }
                     }
 
+                    // Attempt to download the file to app Documents
+                    CameraFile *downloadFile = NULL;
+                    ret = gp_file_new(&downloadFile);
+                    if (ret != GP_OK) {
+                        NSLog(@"ERROR: gp_file_new failed: %d", ret);
+                        [self logEvent:[NSString stringWithFormat:@"Download init failed: %d", ret]];
+                        break;
+                    }
+
+                    ret = gp_camera_file_get(camera, filePath->folder, filePath->name, GP_FILE_TYPE_NORMAL, downloadFile, context);
+                    if (ret != GP_OK) {
+                        NSLog(@"ERROR: gp_camera_file_get failed: %d", ret);
+                        [self logEvent:[NSString stringWithFormat:@"Download failed: %d", ret]];
+                        gp_file_free(downloadFile);
+                        break;
+                    }
+
+                    const char *data = NULL;
+                    unsigned long int dataSize = 0;
+                    ret = gp_file_get_data_and_size(downloadFile, &data, &dataSize);
+                    if (ret != GP_OK || data == NULL || dataSize == 0) {
+                        NSLog(@"ERROR: gp_file_get_data_and_size failed: %d (size=%lu)", ret, dataSize);
+                        [self logEvent:[NSString stringWithFormat:@"Download data failed: %d", ret]];
+                        gp_file_free(downloadFile);
+                        break;
+                    }
+
+                    NSData *photoData = [NSData dataWithBytes:data length:(NSUInteger)dataSize];
+                    NSString *documentsDir = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+                    NSString *savePath = [documentsDir stringByAppendingPathComponent:filename];
+                    BOOL wrote = [photoData writeToFile:savePath atomically:YES];
+                    gp_file_free(downloadFile);
+
+                    if (wrote) {
+                        NSLog(@"Downloaded %@ (%lu bytes) -> %@", filename, dataSize, savePath);
+                        [self logEvent:[NSString stringWithFormat:@"Downloaded: %@ (%lu bytes)", filename, dataSize]];
+                    } else {
+                        NSLog(@"ERROR: Failed to write file to %@", savePath);
+                        [self logEvent:[NSString stringWithFormat:@"Write failed: %@", filename]];
+                    }
+
                     // Update console with new photo info
                     dispatch_async(dispatch_get_main_queue(), ^{
                         NSString *consoleText = [NSString stringWithFormat:
                             @"NEW PHOTO DETECTED!\n\n"
                             @"File: %@\n"
                             @"Path: %@\n\n"
+                            @"Saved to Documents: %@\n\n"
                             @"Total detected: %d\n\n"
                             @"Event monitor still running...",
-                            filename, fullPath, self.detectedPhotoCount];
+                            filename, fullPath, savePath, self.detectedPhotoCount];
                         self.consoleTextView.text = consoleText;
                     });
 

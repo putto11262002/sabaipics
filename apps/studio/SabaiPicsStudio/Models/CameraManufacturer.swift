@@ -11,7 +11,7 @@
 import Foundation
 
 /// Camera manufacturer options
-enum CameraManufacturer: String, CaseIterable {
+enum CameraManufacturer: String, CaseIterable, Codable {
     case canon = "Canon"
     case nikon = "Nikon"
     case sony = "Sony"
@@ -22,7 +22,7 @@ enum CameraManufacturer: String, CaseIterable {
         case .canon, .nikon:
             return true
         case .sony:
-            return false  // Sony support coming soon (separate project)
+            return true
         }
     }
 }

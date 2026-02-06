@@ -25,7 +25,7 @@ Color.Theme.mutedForeground // Secondary text
 Color.Theme.accentForeground
 
 // Brand
-Color.Theme.primary         // Primary brand (#9f6db1 magenta/purple)
+Color.Theme.primary         // Primary brand (#343434 neutral gray)
 Color.Theme.primaryForeground
 Color.Theme.secondary
 Color.Theme.secondaryForeground
@@ -43,7 +43,7 @@ Color.Theme.ring            // Focus ring
 | --------------- | --------- | --------- |
 | background      | `#f8f8f8` | `#0a0a0a` |
 | foreground      | `#0a0a0a` | `#fafafa` |
-| primary         | `#9f6db1` | `#9f6db1` |
+| primary         | `#343434` | `#DEDEDE` |
 | muted           | `#eceaec` | `#232123` |
 | mutedForeground | `#565457` | `#afadaf` |
 | destructive     | `#df2225` | `#ff6467` |
@@ -69,6 +69,10 @@ Button("Learn more") { }
 // Destructive - red danger
 Button("Delete") { }
     .buttonStyle(.destructive)
+
+// Compact - smaller pill button for inline actions
+Button("Next") { }
+    .buttonStyle(.compact)
 ```
 
 ## Clerk Theme Integration
@@ -127,5 +131,5 @@ SabaiPicsStudio/
 │   └── ... (14 color sets)
 └── Theme/
     ├── Colors.swift       # Color.Theme.* extension
-    └── ButtonStyles.swift # .primary, .secondary, .ghost, .destructive
+    └── ButtonStyles.swift # .primary, .secondary, .ghost, .destructive, .compact
 ```

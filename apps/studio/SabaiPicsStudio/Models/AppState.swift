@@ -31,6 +31,9 @@ import Foundation
 /// - connecting: Connection in progress (ConnectingView)
 /// - transferring: Active photo transfer session (LiveCaptureView)
 /// - error: Error state with message
+///
+/// LEGACY: Capture is now a dedicated tab (`CaptureTabRootView`).
+@available(*, deprecated, message: "Legacy app-level capture state. Capture is now driven by Capture tab flow.")
 enum AppState: Equatable {
     /// Choose camera manufacturer (Canon/Nikon/Sony)
     case manufacturerSelection

@@ -21,6 +21,8 @@ import Network
 protocol PhotoOperationsProvider: AnyObject {
     func getObjectInfo(objectHandle: UInt32) async throws -> PTPObjectInfo
     func downloadPhoto(objectHandle: UInt32) async throws -> Data
+    func getStorageIDs() async throws -> [UInt32]
+    func getObjectHandles(storageID: UInt32) async throws -> [UInt32]
 }
 
 // MARK: - Canon Event Source
@@ -35,6 +37,7 @@ class CanonEventSource: CameraEventSource {
     // Dependencies
     private weak var commandConnection: NWConnection?
     private weak var transactionManager: PTPTransactionManager?
+    private let commandQueue: PTPIPCommandQueue
     private weak var photoOps: PhotoOperationsProvider?
 
     // Polling state
@@ -54,10 +57,12 @@ class CanonEventSource: CameraEventSource {
     init(
         commandConnection: NWConnection?,
         transactionManager: PTPTransactionManager?,
+        commandQueue: PTPIPCommandQueue,
         photoOps: PhotoOperationsProvider?
     ) {
         self.commandConnection = commandConnection
         self.transactionManager = transactionManager
+        self.commandQueue = commandQueue
         self.photoOps = photoOps
     }
 
@@ -148,7 +153,7 @@ class CanonEventSource: CameraEventSource {
     /// This ensures no events are left in the queue before closing the session
     private func drainPendingEvents() async {
         guard let connection = commandConnection,
-              let txManager = transactionManager else {
+               let txManager = transactionManager else {
             return
         }
         
@@ -156,12 +161,14 @@ class CanonEventSource: CameraEventSource {
         
         // Poll once with a short timeout to drain any pending events
         do {
-            var command = await txManager.createCommand()
-            let getEventCmd = command.canonGetEvent()
-            let getEventData = getEventCmd.toData()
-            
-            try await sendData(connection: connection, data: getEventData)
-            _ = try await receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCmd.transactionID)
+            try await commandQueue.run {
+                var command = await txManager.createCommand()
+                let getEventCmd = command.canonGetEvent()
+                let getEventData = getEventCmd.toData()
+
+                try await Self.sendData(connection: connection, data: getEventData)
+                _ = try await Self.receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCmd.transactionID)
+            }
             
             print("[CanonEventSource] Pending events drained")
         } catch {
@@ -182,12 +189,14 @@ class CanonEventSource: CameraEventSource {
         print("[CanonEventSource] Disabling event mode (SetEventMode(0))...")
         
         do {
-            var command = await txManager.createCommand()
-            let setEventModeCmd = command.canonSetEventMode(mode: 0)  // 0 = disable
-            let eventModeData = setEventModeCmd.toData()
-            
-            try await sendData(connection: connection, data: eventModeData)
-            let response = try await receiveResponse(connection: connection, expectedTransactionID: setEventModeCmd.transactionID)
+            let response = try await commandQueue.run { () async throws -> PTPIPOperationResponse in
+                var command = await txManager.createCommand()
+                let setEventModeCmd = command.canonSetEventMode(mode: 0)  // 0 = disable
+                let eventModeData = setEventModeCmd.toData()
+
+                try await Self.sendData(connection: connection, data: eventModeData)
+                return try await Self.receiveResponse(connection: connection, expectedTransactionID: setEventModeCmd.transactionID)
+            }
             
             if let responseCode = PTPResponseCode(rawValue: response.responseCode), responseCode.isSuccess {
                 print("[CanonEventSource] Event mode disabled successfully")
@@ -212,14 +221,16 @@ class CanonEventSource: CameraEventSource {
             throw CanonEventSourceError.notConnected
         }
 
-        // SetEventMode(1) - Enable event reporting (CRITICAL!)
-        // NOTE: We skip SetRemoteMode because we only want to monitor events
-        var command = await txManager.createCommand()
-        let setEventModeCmd = command.canonSetEventMode(mode: 1)
-        let eventModeData = setEventModeCmd.toData()
+        let eventModeResponse = try await commandQueue.run { () async throws -> PTPIPOperationResponse in
+            // SetEventMode(1) - Enable event reporting (CRITICAL!)
+            // NOTE: We skip SetRemoteMode because we only want to monitor events
+            var command = await txManager.createCommand()
+            let setEventModeCmd = command.canonSetEventMode(mode: 1)
+            let eventModeData = setEventModeCmd.toData()
 
-        try await sendData(connection: connection, data: eventModeData)
-        let eventModeResponse = try await receiveResponse(connection: connection, expectedTransactionID: setEventModeCmd.transactionID)
+            try await Self.sendData(connection: connection, data: eventModeData)
+            return try await Self.receiveResponse(connection: connection, expectedTransactionID: setEventModeCmd.transactionID)
+        }
 
         if let responseCode = PTPResponseCode(rawValue: eventModeResponse.responseCode), !responseCode.isSuccess {
             print("[CanonEventSource] WARNING: SetEventMode failed - events may not work")
@@ -227,12 +238,14 @@ class CanonEventSource: CameraEventSource {
 
         // Flush initial event queue (per libgphoto2 ptp_check_eos_events)
         do {
-            var command2 = await txManager.createCommand()
-            let getEventCmd = command2.canonGetEvent()
-            let getEventData = getEventCmd.toData()
+            try await commandQueue.run {
+                var command2 = await txManager.createCommand()
+                let getEventCmd = command2.canonGetEvent()
+                let getEventData = getEventCmd.toData()
 
-            try await sendData(connection: connection, data: getEventData)
-            _ = try await receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCmd.transactionID)
+                try await Self.sendData(connection: connection, data: getEventData)
+                _ = try await Self.receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCmd.transactionID)
+            }
         } catch {
             // Non-fatal - initial flush can fail
         }
@@ -305,23 +318,15 @@ class CanonEventSource: CameraEventSource {
             return false
         }
 
-        // Create Canon GetEvent command
-        var command = await txManager.createCommand()
-        let getEventCommand = command.canonGetEvent()
-        let commandData = getEventCommand.toData()
+        // Canon GetEvent must not interleave with other PTP/IP commands on the shared command socket.
+        // Use the shared commandQueue to serialize the entire send/receive transaction.
+        let response = try await commandQueue.run { () async throws -> (data: Data?, response: PTPIPOperationResponse) in
+            var command = await txManager.createCommand()
+            let getEventCommand = command.canonGetEvent()
+            let commandData = getEventCommand.toData()
 
-        // Send command with cancellation support
-        try await withTaskCancellationHandler {
-            try await sendData(connection: connection, data: commandData)
-        } onCancel: {
-            connection.cancel()
-        }
-
-        // Read response (may contain data packets with events) with cancellation support
-        let response = try await withTaskCancellationHandler {
-            try await receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCommand.transactionID)
-        } onCancel: {
-            connection.cancel()
+            try await Self.sendData(connection: connection, data: commandData)
+            return try await Self.receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCommand.transactionID)
         }
 
         // Parse events from response data
@@ -338,6 +343,7 @@ class CanonEventSource: CameraEventSource {
         // Download photos SEQUENTIALLY (PTP/IP commands must be serialized)
         // Filter out RAW files - only download JPEGs
         for handle in photosToDownload {
+            if Task.isCancelled { break }
             await processPhotoHandle(handle)
         }
 
@@ -458,7 +464,7 @@ class CanonEventSource: CameraEventSource {
     // MARK: - Network I/O (copied from PTPIPSession for self-contained operation)
 
     /// Receive Canon GetEvent response (handles data packets + response)
-    private func receiveCanonEventResponse(connection: NWConnection, expectedTransactionID: UInt32) async throws -> (data: Data?, response: PTPIPOperationResponse) {
+    private static func receiveCanonEventResponse(connection: NWConnection, expectedTransactionID: UInt32) async throws -> (data: Data?, response: PTPIPOperationResponse) {
         var accumulatedData = Data()
 
         // Read packets until we get OperationResponse
@@ -525,7 +531,7 @@ class CanonEventSource: CameraEventSource {
     }
 
     /// Send data on connection
-    private func sendData(connection: NWConnection, data: Data) async throws {
+    private static func sendData(connection: NWConnection, data: Data) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             connection.send(content: data, completion: .contentProcessed { error in
                 if let error = error {
@@ -538,7 +544,7 @@ class CanonEventSource: CameraEventSource {
     }
 
     /// Receive exact number of bytes from connection
-    private func receiveData(connection: NWConnection, length: Int) async throws -> Data {
+    private static func receiveData(connection: NWConnection, length: Int) async throws -> Data {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
             connection.receive(minimumIncompleteLength: length, maximumLength: length) { content, _, isComplete, error in
                 if let error = error {
@@ -555,7 +561,7 @@ class CanonEventSource: CameraEventSource {
     }
 
     /// Receive PTP operation response
-    private func receiveResponse(connection: NWConnection, expectedTransactionID: UInt32) async throws -> PTPIPOperationResponse {
+    private static func receiveResponse(connection: NWConnection, expectedTransactionID: UInt32) async throws -> PTPIPOperationResponse {
         // Read header (8 bytes)
         let headerData = try await receiveData(connection: connection, length: 8)
         guard let header = PTPIPHeader.from(headerData) else {

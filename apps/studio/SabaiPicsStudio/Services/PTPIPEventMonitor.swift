@@ -61,7 +61,7 @@ actor PTPIPEventMonitor {
 
     /// Initialize event monitor
     init() {
-        print("[PTPIPEventMonitor] Initialized")
+        PTPLogger.debug("Event monitor initialized", category: PTPLogger.event)
     }
 
     /// Set the delegate for event callbacks
@@ -74,14 +74,14 @@ actor PTPIPEventMonitor {
     /// - Parameter connection: Active NWConnection for event channel
     func startMonitoring(connection: NWConnection) async {
         guard !isMonitoring else {
-            print("[PTPIPEventMonitor] Already monitoring")
+            PTPLogger.debug("Event monitor already running", category: PTPLogger.event)
             return
         }
 
         self.eventConnection = connection
         self.isMonitoring = true
 
-        print("[PTPIPEventMonitor] Starting event monitoring...")
+        PTPLogger.info("Starting event monitoring", category: PTPLogger.event)
 
         // Start async monitoring task
         monitorTask = Task {
@@ -92,7 +92,7 @@ actor PTPIPEventMonitor {
     /// Stop monitoring events
     func stopMonitoring() async {
         guard isMonitoring else { return }
-        print("[PTPIPEventMonitor] Stopping event monitoring...")
+        PTPLogger.info("Stopping event monitoring", category: PTPLogger.event)
         isMonitoring = false
 
         // Cancel connection FIRST to interrupt pending receive operations
@@ -105,38 +105,67 @@ actor PTPIPEventMonitor {
         // while the event loop is still executing
         await monitorTask?.value
         monitorTask = nil
-        print("[PTPIPEventMonitor] Event monitoring stopped")
+        PTPLogger.info("Event monitoring stopped", category: PTPLogger.event)
     }
 
     /// Main event monitoring loop
     /// Based on libgphoto2's select() pattern with timeout
     private func monitorEventLoop() async {
-        print("[PTPIPEventMonitor] Event loop started")
+        PTPLogger.debug("Event loop started", category: PTPLogger.event)
 
         while isMonitoring {
             do {
                 // Read event packet with timeout (like libgphoto2's select)
-                guard let eventData = try await receiveEventPacket() else {
+                guard let packet = try await receiveEventPacket() else {
                     // Timeout - continue loop (normal behavior)
                     continue
                 }
 
-                // Parse and handle event
-                try await handleEventPacket(eventData)
+                // Handle packet types (event channel can include ping/pong/cancel)
+                if let packetType = packet.packetType {
+                    if packetType == .event {
+                        // Parse and handle event
+                        try await handleEventPacket(packet.data)
+                    } else {
+                        switch packetType {
+                        case .ping:
+                            PTPLogger.debug("Received Ping, replying with Pong", category: PTPLogger.event)
+                            if let connection = eventConnection {
+                                await sendPong(connection: connection)
+                            }
+                        case .pong:
+                            // Keepalive response; no action needed.
+                            PTPLogger.debug("Received Pong", category: PTPLogger.event)
+                        default:
+                            PTPLogger.debug("Ignoring non-event packet: \(packetType.name) (0x\(String(format: "%08X", packetType.rawValue)))", category: PTPLogger.event)
+                        }
+                    }
+                } else {
+                    PTPLogger.debug("Ignoring unknown packet type: 0x\(String(format: "%08X", packet.rawType))", category: PTPLogger.event)
+                }
 
             } catch {
-                print("[PTPIPEventMonitor] Event monitoring error: \(error)")
-                notifyError(error)
+                if !isMonitoring || Task.isCancelled {
+                    break
+                }
+
+                PTPLogger.error("Event monitoring error: \(error)", category: PTPLogger.event)
+
+                if let monitorError = error as? PTPIPEventMonitorError, monitorError == .connectionLost {
+                    notifyDisconnect()
+                } else {
+                    notifyError(error)
+                }
                 break
             }
         }
 
-        print("[PTPIPEventMonitor] Event loop stopped")
+        PTPLogger.debug("Event loop stopped", category: PTPLogger.event)
     }
 
     /// Receive event packet with timeout
     /// Based on libgphoto2's ptpip_read_with_timeout pattern
-    private func receiveEventPacket() async throws -> Data? {
+    private func receiveEventPacket() async throws -> (packetType: PTPIPPacketType?, rawType: UInt32, data: Data)? {
         guard let connection = eventConnection else {
             throw PTPIPEventMonitorError.notConnected
         }
@@ -144,12 +173,14 @@ actor PTPIPEventMonitor {
         do {
             // First, read header (8 bytes)
             let headerData = try await receiveData(connection: connection, minimumLength: 8, maximumLength: 8)
-            guard let header = PTPIPHeader.from(headerData) else {
-                throw PTPIPEventMonitorError.invalidPacket
-            }
+
+            let lengthValue = headerData.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 0, as: UInt32.self) }
+            let typeValue = headerData.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4, as: UInt32.self) }
+            let totalLength = UInt32(littleEndian: lengthValue)
+            let rawType = UInt32(littleEndian: typeValue)
 
             // Read remaining payload
-            let payloadLength = Int(header.length) - 8
+            let payloadLength = Int(totalLength) - 8
             guard payloadLength >= 0 else {
                 throw PTPIPEventMonitorError.invalidPacket
             }
@@ -158,14 +189,27 @@ actor PTPIPEventMonitor {
                 let payloadData = try await receiveData(connection: connection, minimumLength: payloadLength, maximumLength: payloadLength)
                 var fullPacket = headerData
                 fullPacket.append(payloadData)
-                return fullPacket
+                return (PTPIPPacketType(rawValue: rawType), rawType, fullPacket)
             } else {
-                return headerData
+                return (PTPIPPacketType(rawValue: rawType), rawType, headerData)
             }
         } catch PTPIPEventMonitorError.timeout {
             // Timeout is normal - no events received in 30s, just keep waiting
-            print("[PTPIPEventMonitor] No events received (timeout), continuing to monitor...")
+            PTPLogger.debug("No events received (timeout), continuing...", category: PTPLogger.event)
             return nil
+        }
+    }
+
+    private func sendPong(connection: NWConnection) async {
+        let packet = PTPIPHeader(length: 8, type: .pong).toData()
+        await sendData(connection: connection, data: packet)
+    }
+
+    private func sendData(connection: NWConnection, data: Data) async {
+        await withCheckedContinuation { continuation in
+            connection.send(content: data, completion: .contentProcessed { _ in
+                continuation.resume()
+            })
         }
     }
 
@@ -227,37 +271,40 @@ actor PTPIPEventMonitor {
     /// Based on libgphoto2's event parsing
     private func handleEventPacket(_ data: Data) async throws {
         guard let event = PTPIPEventPacket.from(data) else {
-            print("[PTPIPEventMonitor] Failed to parse event packet")
+            PTPLogger.error("Failed to parse event packet", category: PTPLogger.event)
             throw PTPIPEventMonitorError.invalidPacket
         }
 
         guard let eventCode = PTPEventCode(rawValue: event.eventCode) else {
-            print("[PTPIPEventMonitor] Unknown event code: 0x\(String(format: "%04X", event.eventCode))")
+            PTPLogger.debug("Unknown event code: 0x\(String(format: "%04X", event.eventCode))", category: PTPLogger.event)
             return
         }
 
         // Log transaction ID for debugging
-        print("[PTPIPEventMonitor] Received event: \(eventCode) (0x\(String(format: "%04X", event.eventCode))) (txID: \(event.transactionID))")
+        PTPLogger.debug("Event: \(eventCode) (0x\(String(format: "%04X", event.eventCode))) txID=\(event.transactionID)", category: PTPLogger.event)
 
         switch eventCode {
-        case .objectAdded, .canonEOSObjectAddedEx:
+        case .objectAdded, .canonEOSObjectAddedEx, .sonyObjectAdded:
             // ObjectAdded: parameter[0] is the object handle
             if let objectHandle = event.parameters.first {
-                print("[PTPIPEventMonitor] ObjectAdded: handle=0x\(String(format: "%08X", objectHandle))")
+                PTPLogger.debug("ObjectAdded: handle=0x\(String(format: "%08X", objectHandle))", category: PTPLogger.event)
                 notifyObjectAdded(objectHandle)
             }
 
-        case .objectRemoved:
-            print("[PTPIPEventMonitor] Object removed")
+        case .objectRemoved, .sonyObjectRemoved:
+            // Sony emits this often after in-memory transfers; never triggers capture.
+            break
 
         case .storeFull:
-            print("[PTPIPEventMonitor] Storage full")
+            PTPLogger.info("Storage full", category: PTPLogger.event)
 
-        case .devicePropChanged, .canonEOSPropValueChanged:
-            print("[PTPIPEventMonitor] Property changed")
+        case .devicePropChanged, .canonEOSPropValueChanged, .sonyPropertyChanged,
+             .sonyUnknown1, .sonyUnknown2, .sonyUnknown3, .sonyUnknown4, .sonyUnknown5:
+            // Noisy/non-capture events; ignore.
+            break
 
         default:
-            print("[PTPIPEventMonitor] Unhandled event: \(eventCode)")
+            PTPLogger.debug("Unhandled event: \(eventCode)", category: PTPLogger.event)
         }
     }
 

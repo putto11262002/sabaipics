@@ -145,7 +145,7 @@
         "NODE_ENV": "staging",
         "DASHBOARD_FRONTEND_URL": "https://app-staging.sabaipics.com",
         "EVENT_FRONTEND_URL": "https://event-staging.sabaipics.com",
-        "CORS_ORIGIN": "https://app-staging.sabaipics.com,https://event-staging.sabaipics.com",
+        "CORS_ORIGIN": "https://app-staging.sabaipics.com,https://event-staging.sabaipics.com,http://localhost:5175",
         "AUTHORIZED_PARTIES": "https://app-staging.sabaipics.com,https://event-staging.sabaipics.com",
         "AWS_REGION": "us-west-2",
         "CF_ZONE": "sabaipics.com",

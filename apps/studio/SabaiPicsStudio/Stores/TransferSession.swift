@@ -48,6 +48,15 @@ class TransferSession: ObservableObject {
     /// Downloaded photos (newest first)
     @Published var photos: [CapturedPhoto] = []
 
+    /// Completed downloads count (used for status UI)
+    @Published var completedDownloadsCount: Int = 0
+
+    /// Last completed filename (used for status UI)
+    @Published var lastCompletedFilename: String? = nil
+
+    /// Session start time
+    @Published private(set) var startedAt: Date = Date()
+
     /// Whether session is active
     @Published var isActive: Bool = true
 
@@ -89,6 +98,7 @@ class TransferSession: ObservableObject {
         self.camera = camera
         self.cameraName = camera.name
         self.cameraIP = camera.ipAddress
+        self.startedAt = Date()
 
         // Set ourselves as the session delegate to receive photos
         camera.session.delegate = self
@@ -119,6 +129,9 @@ class TransferSession: ObservableObject {
 
         // Clear photos
         photos.removeAll()
+
+        // Reset transient UI state
+        pendingDownloads.removeAll()
 
         isDisconnecting = false
         print("[TransferSession] Session ended")
@@ -195,6 +208,9 @@ extension TransferSession: PTPIPSessionDelegate {
 
         // Clean up tracking
         pendingDownloads.removeValue(forKey: objectHandle)
+
+        completedDownloadsCount += 1
+        lastCompletedFilename = photo.name
 
         print("[TransferSession] ✅ Download complete: \(photo.name) (\(data.count) bytes)")
     }

@@ -3,6 +3,7 @@ import { SignedIn, SignedOut } from '@sabaipics/auth/react';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { SignInPage } from './routes/sign-in';
 import { SignUpPage } from './routes/sign-up';
+import { DesktopAuthPage } from './routes/auth/desktop';
 import { DashboardPage } from './routes/dashboard';
 import { CreditSuccessPage } from './routes/credits/success';
 import EventsPage from './routes/events';
@@ -25,6 +26,11 @@ export const router = createBrowserRouter([
     path: '/sign-up/*',
     element: <SignUpPage />,
   },
+  {
+    path: '/auth/desktop',
+    element: <DesktopAuthPage />,
+  },
+
   // Slideshow editor (auth required, no sidebar)
   {
     path: '/events/:id/slideshow-editor',
