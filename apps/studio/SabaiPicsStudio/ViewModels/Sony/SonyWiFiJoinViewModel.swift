@@ -30,6 +30,13 @@ final class SonyWiFiJoinViewModel: ObservableObject {
     @Published var qrPayload: SonyWiFiQRCode?
     @Published var qrError: String?
 
+    struct JoinInfo: Equatable {
+        let credentials: WiFiCredentials
+        let cameraId: String?
+    }
+
+    @Published private(set) var joinInfo: JoinInfo? = nil
+
     private let joinService: WiFiJoinServicing
 
     private let joinTimeout: TimeInterval
@@ -125,6 +132,7 @@ final class SonyWiFiJoinViewModel: ObservableObject {
     private func join(ssid: String, password: String, cameraId: String?) async {
         isJoining = true
         errorMessage = nil
+        joinInfo = nil
 
         do {
             try await joinService.join(ssid: ssid, password: password, joinOnce: false, timeout: joinTimeout)
@@ -132,7 +140,7 @@ final class SonyWiFiJoinViewModel: ObservableObject {
                 throw WiFiJoinServiceError.timeout
             }
 
-            SonyAPConnectionCache.shared.savePendingJoinInfoForCurrentNetwork(ssid: ssid, cameraId: cameraId)
+            joinInfo = JoinInfo(credentials: WiFiCredentials(ssid: ssid, password: password.isEmpty ? nil : password), cameraId: cameraId)
 
             isJoining = false
             step = .connectivityGuide
