@@ -259,8 +259,8 @@ function buildElegantMinimal(): SlideshowConfig {
       ),
       // QR Code
       createBlockWithProps('qr', { size: 'md', label: 'Scan to search' }),
-      // Gallery - sparse density for larger images
-      createBlockWithProps('gallery', { density: 'sparse' }),
+      // Gallery - sparse density for larger images, 2 rows
+      createBlockWithProps('gallery', { density: 'sparse', rows: 2 }),
     ],
   };
 }
