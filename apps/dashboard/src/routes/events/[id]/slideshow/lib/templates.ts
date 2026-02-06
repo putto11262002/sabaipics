@@ -229,7 +229,18 @@ function buildElegantMinimal(): SlideshowConfig {
     },
     blocks: [
       // Event Name centered
-      createBlock('event-name'),
+      createBlockWithChildren(
+        'flex',
+        [createBlock('event-name')],
+        {
+          direction: 'column',
+          align: 'center',
+          justify: 'center',
+          gap: 'none',
+          padding: 'none',
+          wrap: false,
+        },
+      ),
       // Social links
       createBlockWithChildren(
         'flex',
@@ -248,8 +259,8 @@ function buildElegantMinimal(): SlideshowConfig {
       ),
       // QR Code
       createBlockWithProps('qr', { size: 'md', label: 'Scan to search' }),
-      // Gallery
-      createBlock('gallery'),
+      // Gallery - sparse density for larger images
+      createBlockWithProps('gallery', { density: 'sparse' }),
     ],
   };
 }
