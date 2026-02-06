@@ -14,6 +14,11 @@ enum DiscoveryErrorKind: Equatable {
     case unknown(String)
 }
 
+enum CameraDiscoveryPreflightResult: Equatable {
+    case ok
+    case needsNetworkHelp(DiscoveryErrorKind)
+}
+
 extension DiscoveryErrorKind {
     var userFacingMessage: String {
         switch self {
