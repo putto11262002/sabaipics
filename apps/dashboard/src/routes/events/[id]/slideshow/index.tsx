@@ -27,7 +27,7 @@ const DEFAULT_LAYOUT: SlideshowLayout = {
   maxWidth: 'none',
 };
 import { DEVICE_DEFAULT_ORIENTATION } from './types';
-import { DEFAULT_CONFIG } from './lib/templates';
+import { DEFAULT_CONFIG, TEMPLATES, type TemplateId } from './lib/templates';
 import { createBlock, getBlockDef } from './blocks/registry';
 import { IframeCanvas } from './components/iframe-canvas';
 import { EditorSidebar } from './components/sidebar';
@@ -327,6 +327,13 @@ export default function EventSlideshowTab() {
     updateAndDirty((prev) => ({ ...prev, layout }));
   };
 
+  const handleApplyTemplate = (templateId: TemplateId) => {
+    const template = TEMPLATES[templateId]();
+    updateAndDirty(template);
+    setSelectedBlockId(null); // Deselect after applying template
+    toast.success('Template applied');
+  };
+
   const handleSave = () => {
     updateConfig.mutate(config, {
       onSuccess: () => {
@@ -419,6 +426,7 @@ export default function EventSlideshowTab() {
           onThemeChange={handleThemeChange}
           layout={config.layout ?? DEFAULT_LAYOUT}
           onLayoutChange={handleLayoutChange}
+          onApplyTemplate={handleApplyTemplate}
         />
       </SidebarProvider>
     </div>

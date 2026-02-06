@@ -14,6 +14,8 @@ import type { SlideshowBlock, SlideshowTheme, SlideshowLayout } from '../types';
 import { getBlockDef } from '../blocks/registry';
 import { ThemeSettings } from './theme-settings';
 import { LayoutSettings } from './layout-settings';
+import { TemplateSettings } from './template-settings';
+import type { TemplateId } from '../lib/templates';
 
 interface EditorSidebarProps {
   selectedBlock: SlideshowBlock | null;
@@ -26,6 +28,7 @@ interface EditorSidebarProps {
   onThemeChange: (theme: SlideshowTheme) => void;
   layout: SlideshowLayout;
   onLayoutChange: (layout: SlideshowLayout) => void;
+  onApplyTemplate: (templateId: TemplateId) => void;
 }
 
 export function EditorSidebar({
@@ -39,6 +42,7 @@ export function EditorSidebar({
   onThemeChange,
   layout,
   onLayoutChange,
+  onApplyTemplate,
 }: EditorSidebarProps) {
   const blockDef = selectedBlock ? getBlockDef(selectedBlock.type) : undefined;
   const parentDef = parentBlock ? getBlockDef(parentBlock.type) : undefined;
@@ -83,6 +87,11 @@ export function EditorSidebar({
               </div>
             ) : (
               <div className="space-y-6">
+                <div>
+                  <h4 className="mb-3 text-xs font-medium text-muted-foreground">Template</h4>
+                  <TemplateSettings onApplyTemplate={onApplyTemplate} />
+                </div>
+                <Separator />
                 <div>
                   <h4 className="mb-3 text-xs font-medium text-muted-foreground">Theme</h4>
                   <ThemeSettings theme={theme} onChange={onThemeChange} />
