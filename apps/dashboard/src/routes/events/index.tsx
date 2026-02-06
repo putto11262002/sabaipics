@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { differenceInDays, parseISO } from 'date-fns';
 import { Button } from '@sabaipics/uiv3/components/button';
 import { Alert } from '@sabaipics/uiv3/components/alert';
@@ -16,8 +18,10 @@ import { Calendar, Plus, Search } from 'lucide-react';
 import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { useEvents } from '../../hooks/events/useEvents';
 import { CreateEventModal } from '../../components/events/CreateEventModal';
+import { DeleteConfirmDialog } from '../../components/events/DeleteConfirmDialog';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useDownloadQR } from '../../hooks/events/useDownloadQR';
+import { useDeleteEvent } from '../../hooks/events/useDeleteEvent';
 import {
   DataTable,
   DataTableSearch,
@@ -31,12 +35,15 @@ type StatusFilter = 'all' | 'active' | 'expiring' | 'expired';
 
 export default function EventsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   // Fetch larger dataset - table handles its own client-side pagination
   const { data, isLoading, error, refetch } = useEvents(0, 100);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const downloadQR = useDownloadQR();
+  const deleteEvent = useDeleteEvent();
 
   const handleCopyLink = (eventId: string) => {
     const searchUrl = `${window.location.origin}/participant/events/${eventId}/search`;
@@ -67,14 +74,39 @@ export default function EventsPage() {
     return filtered;
   }, [data?.data, statusFilter]);
 
+  // Handle soft delete confirmation
+  const handleSoftDeleteConfirm = () => {
+    if (!deleteEventId) return;
+
+    deleteEvent.mutate(
+      { eventId: deleteEventId },
+      {
+        onSuccess: () => {
+          // Invalidate all event queries
+          queryClient.invalidateQueries({ queryKey: ['events'] });
+
+          // Show success toast
+          toast.success('Event deleted');
+
+          setDeleteEventId(null); // Close dialog
+        },
+        onError: (error) => {
+          toast.error('Delete failed', {
+            description: error.message,
+          });
+          setDeleteEventId(null);
+        },
+      }
+    );
+  };
+
   // Create action handlers for the table
   const tableActions: EventTableActions = {
     onViewEvent: (eventId: string) => navigate(`/events/${eventId}`),
     onCopySearchLink: (eventId: string) => handleCopyLink(eventId),
     onDownloadQR: (eventId: string, eventName: string) => downloadQR.mutate({ eventId, eventName }),
     onDeleteEvent: (eventId: string) => {
-      // TODO: Implement delete event
-      console.log('Delete event:', eventId);
+      setDeleteEventId(eventId); // Open soft delete dialog
     },
     isCopied,
   };
@@ -227,6 +259,15 @@ export default function EventsPage() {
 
       {/* Create Event Modal */}
       <CreateEventModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} />
+
+      {/* Soft Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={deleteEventId !== null}
+        onOpenChange={(open) => !open && setDeleteEventId(null)}
+        onConfirm={handleSoftDeleteConfirm}
+        type="soft"
+        isLoading={deleteEvent.isPending}
+      />
     </>
   );
 }

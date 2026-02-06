@@ -32,3 +32,31 @@ export function createAuthClient(token: string) {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+/**
+ * Injects Bearer token into Hono client request options
+ *
+ * Usage:
+ * const { getToken } = useApiClient();
+ * const res = await api.events[':id'].$get(
+ *   { param: { id } },
+ *   await withAuth(getToken)
+ * );
+ */
+export async function withAuth(
+  getToken: () => Promise<string | null>,
+  options: RequestInit = {}
+): Promise<{ init: RequestInit }> {
+  const token = await getToken();
+
+  return {
+    init: {
+      credentials: 'include', // Keep cookie support
+      ...options,
+      headers: {
+        ...options.headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    },
+  };
+}

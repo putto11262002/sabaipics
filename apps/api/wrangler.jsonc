@@ -22,6 +22,8 @@
     "PHOTO_R2_BASE_URL": "https://devphotos.sabaipics.com",
     "RETENTION_DAYS": "30",
     "CLEANUP_BATCH_SIZE": "10",
+    "HARD_DELETE_GRACE_DAYS": "30",
+    "HARD_DELETE_BATCH_SIZE": "5",
   },
 
   // R2 bucket for photo storage
@@ -64,7 +66,7 @@
         "max_batch_size": 50,
         "max_batch_timeout": 5,
         "max_retries": 3,
-        "max_concurrency": 1,
+        "max_concurrency": 3,
         "dead_letter_queue": "photo-processing-dlq-dev",
       },
       {
@@ -80,7 +82,7 @@
         "max_batch_size": 10,
         "max_batch_timeout": 5,
         "max_retries": 3,
-        "max_concurrency": 1,
+        "max_concurrency": 4,
         "dead_letter_queue": "upload-processing-dlq-dev",
       },
       {
@@ -122,10 +124,13 @@
         "simple": { "limit": 100, "period": 60 },
       },
       {
+        // AWS Rekognition SearchFacesByImage quota enforcement (20 TPS globally)
+        // Note: IndexFaces + SearchFacesByImage share 50 TPS in us-west-2
+        // Allocation: 30 TPS for IndexFaces (DO), 20 TPS for SearchFaces (this limiter)
         "name": "SEARCH_RATE_LIMITER",
         "type": "ratelimit",
         "namespace_id": "1002",
-        "simple": { "limit": 200, "period": 10 },
+        "simple": { "limit": 200, "period": 10 },  // 200 req/10s = 20 TPS
       },
     ],
   },
@@ -149,6 +154,8 @@
         "PHOTO_R2_BASE_URL": "https://photos-staging.sabaipics.com",
         "RETENTION_DAYS": "30",
         "CLEANUP_BATCH_SIZE": "10",
+        "HARD_DELETE_GRACE_DAYS": "30",
+        "HARD_DELETE_BATCH_SIZE": "5",
       },
       "routes": [
         {
@@ -188,7 +195,7 @@
             "max_batch_size": 50,
             "max_batch_timeout": 5,
             "max_retries": 3,
-            "max_concurrency": 1,
+            "max_concurrency": 3,
             "dead_letter_queue": "photo-processing-dlq-staging",
           },
           {
@@ -204,7 +211,7 @@
             "max_batch_size": 10,
             "max_batch_timeout": 5,
             "max_retries": 3,
-            "max_concurrency": 1,
+            "max_concurrency": 4,
             "dead_letter_queue": "upload-processing-dlq-staging",
           },
           {
@@ -234,15 +241,18 @@
             "simple": { "limit": 100, "period": 60 },
           },
           {
+            // AWS Rekognition SearchFacesByImage quota enforcement (20 TPS globally)
+            // Note: IndexFaces + SearchFacesByImage share 50 TPS in us-west-2
+            // Allocation: 30 TPS for IndexFaces (DO), 20 TPS for SearchFaces (this limiter)
             "name": "SEARCH_RATE_LIMITER",
             "type": "ratelimit",
             "namespace_id": "1002",
-            "simple": { "limit": 200, "period": 10 },
+            "simple": { "limit": 200, "period": 10 },  // 200 req/10s = 20 TPS
           },
         ],
       },
       "triggers": {
-        "crons": ["0 20 * * *"],
+        "crons": ["0 20 * * *", "0 21 * * *", "0 22 * * *"],
       },
       "observability": {
         "enabled": true,
@@ -267,6 +277,8 @@
         "PHOTO_R2_BASE_URL": "https://photo.sabaipics.com",
         "RETENTION_DAYS": "30",
         "CLEANUP_BATCH_SIZE": "10",
+        "HARD_DELETE_GRACE_DAYS": "30",
+        "HARD_DELETE_BATCH_SIZE": "5",
       },
       "routes": [
         {
@@ -306,7 +318,7 @@
             "max_batch_size": 50,
             "max_batch_timeout": 5,
             "max_retries": 3,
-            "max_concurrency": 1,
+            "max_concurrency": 3,
             "dead_letter_queue": "photo-processing-dlq",
           },
           {
@@ -322,7 +334,7 @@
             "max_batch_size": 10,
             "max_batch_timeout": 5,
             "max_retries": 3,
-            "max_concurrency": 1,
+            "max_concurrency": 4,
             "dead_letter_queue": "upload-processing-dlq",
           },
           {
@@ -352,15 +364,18 @@
             "simple": { "limit": 100, "period": 60 },
           },
           {
+            // AWS Rekognition SearchFacesByImage quota enforcement (20 TPS globally)
+            // Note: IndexFaces + SearchFacesByImage share 50 TPS in us-west-2
+            // Allocation: 30 TPS for IndexFaces (DO), 20 TPS for SearchFaces (this limiter)
             "name": "SEARCH_RATE_LIMITER",
             "type": "ratelimit",
             "namespace_id": "1002",
-            "simple": { "limit": 200, "period": 10 },
+            "simple": { "limit": 200, "period": 10 },  // 200 req/10s = 20 TPS
           },
         ],
       },
       "triggers": {
-        "crons": ["0 20 * * *"],
+        "crons": ["0 20 * * *", "0 21 * * *", "0 22 * * *"],
       },
       "preview_urls": false,
       "observability": {

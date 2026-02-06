@@ -65,6 +65,8 @@ export default function EventDetailsTab() {
   // FTP credentials state
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
+  const [isUsernameCopied, setIsUsernameCopied] = useState(false);
+  const [isPasswordCopied, setIsPasswordCopied] = useState(false);
 
   // Hooks
   const presign = useLogoPresign();
@@ -161,6 +163,20 @@ export default function EventDetailsTab() {
     });
   }, [id, deleteLogo]);
 
+  const handleCopyUsername = async () => {
+    if (!ftpCredentials.data?.username) {
+      return;
+    }
+
+    const ok = await copyToClipboard(ftpCredentials.data.username);
+    if (!ok) {
+      return;
+    }
+
+    setIsUsernameCopied(true);
+    setTimeout(() => setIsUsernameCopied(false), 2000);
+  };
+
   const handleRevealPassword = async () => {
     if (!isPasswordVisible) {
       const result = await revealCredentials.mutateAsync();
@@ -172,10 +188,18 @@ export default function EventDetailsTab() {
     setIsPasswordVisible(false);
   };
 
-  const handleCopyPassword = () => {
-    if (revealedPassword) {
-      copyToClipboard(revealedPassword);
+  const handleCopyPassword = async () => {
+    if (!revealedPassword) {
+      return;
     }
+
+    const ok = await copyToClipboard(revealedPassword);
+    if (!ok) {
+      return;
+    }
+
+    setIsPasswordCopied(true);
+    setTimeout(() => setIsPasswordCopied(false), 2000);
   };
 
   if (!event) {
@@ -212,6 +236,16 @@ export default function EventDetailsTab() {
   const handleCopyLink = (eventId: string) => {
     copyToClipboard(`${window.location.origin}/participant/events/${eventId}/search`);
   };
+  const passwordValue = isPasswordVisible
+    ? (revealedPassword ?? '')
+    : (revealedPassword ?? (ftpCredentials.data?.username ? '************' : ''));
+
+  const passwordPlaceholder =
+    isPasswordVisible && revealCredentials.isPending
+      ? 'Loading...'
+      : !ftpCredentials.data?.username
+        ? 'Not available'
+        : '';
 
   return (
     <div className="grid gap-4 py-4 lg:grid-cols-[1fr_auto]">
@@ -438,16 +472,13 @@ export default function EventDetailsTab() {
                 />
                 <InputGroupAddon align="inline-end">
                   <InputGroupButton
-                    aria-label="Copy username"
-                    title="Copy username"
+                    aria-label={isUsernameCopied ? 'Copied username' : 'Copy username'}
+                    title={isUsernameCopied ? 'Copied!' : 'Copy username'}
                     size="icon-xs"
-                    onClick={() =>
-                      ftpCredentials.data?.username &&
-                      copyToClipboard(ftpCredentials.data.username)
-                    }
+                    onClick={handleCopyUsername}
                     disabled={!ftpCredentials.data?.username}
                   >
-                    <Copy />
+                    {isUsernameCopied ? <Check /> : <Copy />}
                   </InputGroupButton>
                 </InputGroupAddon>
               </InputGroup>
@@ -457,13 +488,9 @@ export default function EventDetailsTab() {
               <InputGroup>
                 <InputGroupInput
                   readOnly
-                  value={
-                    isPasswordVisible
-                      ? revealedPassword ?? 'Loading...'
-                      : revealedPassword
-                        ? '••••••••••••'
-                        : 'Hidden'
-                  }
+                  type={isPasswordVisible ? 'text' : 'password'}
+                  value={passwordValue}
+                  placeholder={passwordPlaceholder}
                 />
                 <InputGroupAddon align="inline-end">
                   <InputGroupButton
@@ -476,13 +503,13 @@ export default function EventDetailsTab() {
                     {isPasswordVisible ? <EyeOff /> : <Eye />}
                   </InputGroupButton>
                   <InputGroupButton
-                    aria-label="Copy password"
-                    title="Copy password"
+                    aria-label={isPasswordCopied ? 'Copied password' : 'Copy password'}
+                    title={isPasswordCopied ? 'Copied!' : 'Copy password'}
                     size="icon-xs"
                     onClick={handleCopyPassword}
                     disabled={!revealedPassword}
                   >
-                    <Copy />
+                    {isPasswordCopied ? <Check /> : <Copy />}
                   </InputGroupButton>
                 </InputGroupAddon>
               </InputGroup>

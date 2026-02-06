@@ -4,6 +4,7 @@ import { photographers, consentRecords } from '@sabaipics/db/schema';
 import { eq } from 'drizzle-orm';
 import type { Database } from '@sabaipics/db';
 import type { Env } from '../../types';
+import { apiError } from '../../lib/error';
 
 // Use shared types from ../../types
 
@@ -50,7 +51,7 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
 
   if (!secret) {
     console.error('[Clerk Webhook] CLERK_WEBHOOK_SIGNING_SECRET not configured');
-    return c.json({ error: 'Bad request' }, 400);
+    return apiError(c, 'INTERNAL_ERROR', 'Webhook secret not configured');
   }
 
   // Get raw body for signature verification
@@ -62,7 +63,7 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
   const svixSignature = c.req.header('svix-signature');
 
   if (!svixId || !svixTimestamp || !svixSignature) {
-    return c.json({ error: 'Bad request' }, 400);
+    return apiError(c, 'BAD_REQUEST', 'Missing webhook signature headers');
   }
 
   // Verify webhook signature (Svix ensures payload integrity)
@@ -77,7 +78,7 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
     }) as ClerkWebhookEvent;
   } catch (err) {
     console.error('[Clerk Webhook] Signature verification failed:', err);
-    return c.json({ error: 'Bad request' }, 400);
+    return apiError(c, 'UNAUTHORIZED', 'Invalid webhook signature');
   }
 
   // Route to appropriate handler
@@ -91,7 +92,7 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
         const email = getPrimaryEmail(user);
         if (!email) {
           console.error('[Clerk Webhook] ERROR: user.created without required email');
-          return c.json({ error: 'Bad request' }, 500);
+          return apiError(c, 'BAD_REQUEST', 'User created without email');
         }
 
         // Build display name
@@ -140,12 +141,71 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
       }
 
       case 'user.updated': {
-        // TODO: Sync profile changes to database
+        const db = c.var.db();
+        const user = event.data;
+
+        // Extract updated fields
+        const email = getPrimaryEmail(user);
+        const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ') || null;
+
+        // Find existing photographer
+        const [existing] = await db
+          .select({ id: photographers.id })
+          .from(photographers)
+          .where(eq(photographers.clerkId, user.id))
+          .limit(1);
+
+        if (!existing) {
+          // User might not be a photographer yet, skip silently
+          console.log('[Clerk Webhook] user.updated: photographer not found, skipping', {
+            clerkId: user.id,
+          });
+          break;
+        }
+
+        // Update photographer (idempotent - safe to run multiple times)
+        if (email) {
+          await db
+            .update(photographers)
+            .set({
+              email,
+              name: displayName,
+            })
+            .where(eq(photographers.clerkId, user.id));
+
+          console.log('[Clerk Webhook] user.updated: photographer updated', {
+            clerkId: user.id,
+            email,
+            name: displayName,
+          });
+        }
+
         break;
       }
 
       case 'user.deleted': {
-        // TODO: Soft delete photographer
+        const db = c.var.db();
+        const user = event.data;
+
+        // Soft delete photographer only (events will be cleaned up by separate cron)
+        const result = await db
+          .update(photographers)
+          .set({ deletedAt: new Date().toISOString() })
+          .where(eq(photographers.clerkId, user.id))
+          .returning({ id: photographers.id });
+
+        if (result.length === 0) {
+          // User might not be a photographer, skip silently
+          console.log('[Clerk Webhook] user.deleted: photographer not found, skipping', {
+            clerkId: user.id,
+          });
+        } else {
+          console.log('[Clerk Webhook] user.deleted: photographer soft deleted', {
+            clerkId: user.id,
+            photographerId: result[0].id,
+          });
+        }
+
         break;
       }
 

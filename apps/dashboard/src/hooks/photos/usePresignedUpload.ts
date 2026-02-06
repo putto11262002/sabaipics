@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, useApiClient } from '../../lib/api';
 
 /**
  * Presigned URL upload result
@@ -22,6 +22,8 @@ export interface PresignedUploadResult {
  * Note: photoId is obtained later via useUploadIntentStatus when status='completed'
  */
 export function usePresignedUpload() {
+  const { getToken } = useApiClient();
+
   return useMutation({
     mutationFn: async ({
       eventId,
@@ -30,7 +32,9 @@ export function usePresignedUpload() {
       eventId: string;
       file: File;
     }): Promise<PresignedUploadResult> => {
-      // Step 1: Get presigned URL from API
+      const token = await getToken();
+
+      // Step1: Get presigned URL from API
       const presignRes = await api.uploads.presign.$post(
         {
           json: {
@@ -46,7 +50,10 @@ export function usePresignedUpload() {
         },
         {
           init: {
-            credentials: 'include',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
           },
         },
       );

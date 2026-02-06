@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, useApiClient, withAuth } from '../../lib/api';
 import type { InferResponseType } from 'hono';
 
 // =============================================================================
@@ -75,6 +75,8 @@ export function useUploadIntentStatus(
     refetchInterval?: number | false;
   },
 ) {
+  const { getToken } = useApiClient();
+
   return useQuery({
     queryKey: ['uploads', 'status', uploadIds],
     queryFn: async (): Promise<MappedUploadIntent[]> => {
@@ -84,11 +86,7 @@ export function useUploadIntentStatus(
         {
           query: { ids: uploadIds.join(',') },
         },
-        {
-          init: {
-            credentials: 'include',
-          },
-        },
+        await withAuth(getToken)
       );
 
       if (!response.ok) {

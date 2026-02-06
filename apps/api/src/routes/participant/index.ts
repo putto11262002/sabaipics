@@ -17,7 +17,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, and, inArray, isNull, desc, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { events, photos, participantSearches, DEFAULT_SLIDESHOW_CONFIG } from '@sabaipics/db';
+import { activeEvents, photos, participantSearches, DEFAULT_SLIDESHOW_CONFIG, events } from '@sabaipics/db';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
 import { createFaceProvider } from '../../lib/rekognition/provider';
@@ -260,8 +260,8 @@ export const participantRouter = new Hono<Env>()
       return safeTry(async function* () {
         const { eventId } = c.req.valid('param');
 
-        // Check rate limit (20 req/10s per eventId)
-        const { success } = await c.env.SEARCH_RATE_LIMITER.limit({ key: eventId });
+        // Check rate limit (20 TPS globally for SearchFacesByImage AWS quota)
+        const { success } = await c.env.SEARCH_RATE_LIMITER.limit({ key: 'global' });
         if (!success) {
           return err<never, HandlerError>({
             code: 'RATE_LIMITED',
@@ -279,7 +279,7 @@ export const participantRouter = new Hono<Env>()
 
         // Step 1: Validate eventId exists
         const [event] = yield* ResultAsync.fromPromise(
-          db.select({ id: events.id }).from(events).where(eq(events.id, eventId)).limit(1),
+          db.select({ id: activeEvents.id }).from(activeEvents).where(eq(activeEvents.id, eventId)).limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 
@@ -626,25 +626,25 @@ export const participantRouter = new Hono<Env>()
       const [result] = yield* ResultAsync.fromPromise(
         db
           .select({
-            name: events.name,
-            subtitle: events.subtitle,
-            logoR2Key: events.logoR2Key,
-            slideshowConfig: events.slideshowConfig,
+            name: activeEvents.name,
+            subtitle: activeEvents.subtitle,
+            logoR2Key: activeEvents.logoR2Key,
+            slideshowConfig: activeEvents.slideshowConfig,
             photoCount: sql<number>`(
-              SELECT COUNT(*)::int 
-              FROM ${photos} 
-              WHERE ${photos.eventId} = ${events.id}
+              SELECT COUNT(*)::int
+              FROM ${photos}
+              WHERE ${photos.eventId} = ${activeEvents.id}
                 AND ${photos.status} = 'indexed'
                 AND ${photos.deletedAt} IS NULL
             )`,
             searchCount: sql<number>`(
-              SELECT COUNT(*)::int 
-              FROM ${participantSearches} 
-              WHERE ${participantSearches.eventId} = ${events.id}
+              SELECT COUNT(*)::int
+              FROM ${participantSearches}
+              WHERE ${participantSearches.eventId} = ${activeEvents.id}
             )`,
           })
-          .from(events)
-          .where(eq(events.id, eventId))
+          .from(activeEvents)
+          .where(eq(activeEvents.id, eventId))
           .limit(1),
         (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
       );
@@ -694,7 +694,7 @@ export const participantRouter = new Hono<Env>()
 
         // Verify event exists
         const [event] = yield* ResultAsync.fromPromise(
-          db.select({ id: events.id }).from(events).where(eq(events.id, eventId)).limit(1),
+          db.select({ id: activeEvents.id }).from(activeEvents).where(eq(activeEvents.id, eventId)).limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 

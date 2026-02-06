@@ -1,18 +1,20 @@
 import { createDb, events } from '@sabaipics/db';
-import { and, lt, sql } from 'drizzle-orm';
+import { and, lt, sql, isNull } from 'drizzle-orm';
 import type { Bindings } from '../types';
 
 interface CleanupResult {
-	eventsQueued: number;
+	eventsSoftDeleted: number;
 }
 
 /**
- * Cleanup expired events (LIGHTWEIGHT PRODUCER):
- * 1. Query expired events (max 10 per run)
- * 2. Send each event to CLEANUP_QUEUE for processing
- * 3. Queue consumer handles heavy lifting (soft-delete photos, delete AWS, update DB)
+ * Cleanup expired events (SOFT DELETE):
+ * 1. Query expired events that haven't been soft-deleted yet
+ * 2. Set deletedAt timestamp on expired events
+ * 3. Events become invisible to all queries (children inherit deletion state)
  *
  * Runs daily at 3 AM Bangkok time (8 PM UTC)
+ *
+ * Note: Hard deletion (AWS Rekognition, R2 objects, DB records) is phase 2
  */
 export async function cleanupExpiredEvents(env: Bindings): Promise<CleanupResult> {
 	const startTime = Date.now();
@@ -27,49 +29,33 @@ export async function cleanupExpiredEvents(env: Bindings): Promise<CleanupResult
 
 	const db = createDb(env.DATABASE_URL);
 
-	// Query expired events (don't filter by collectionId - let consumer handle all states)
-	const expiredEvents = await db
-		.select({
-			id: events.id,
-			collectionId: events.rekognitionCollectionId,
-		})
-		.from(events)
+	// Soft-delete expired events that haven't been deleted yet
+	const result = await db
+		.update(events)
+		.set({ deletedAt: new Date().toISOString() })
 		.where(
 			and(
 				lt(events.createdAt, sql`NOW() - INTERVAL '${sql.raw(retentionDays.toString())} days'`),
-				lt(events.expiresAt, sql`NOW()`) // Double-check expired
+				lt(events.expiresAt, sql`NOW()`), // Expired
+				isNull(events.deletedAt) // Not already soft-deleted
 			)
 		)
-		.limit(batchSize);
+		.returning({ id: events.id });
 
-	if (expiredEvents.length === 0) {
-		console.log('[Cleanup] No events to queue');
-		return {
-			eventsQueued: 0,
-		};
-	}
+	const eventsSoftDeleted = result.length;
 
-	console.log('[Cleanup] Queuing expired events', {
-		count: expiredEvents.length,
-		eventIds: expiredEvents.map((e) => e.id),
-	});
-
-	// Send each event to cleanup queue
-	for (const event of expiredEvents) {
-		await env.CLEANUP_QUEUE.send({
-			event_id: event.id,
-			collection_id: event.collectionId,
-		});
+	if (eventsSoftDeleted === 0) {
+		console.log('[Cleanup] No events to soft-delete');
+		return { eventsSoftDeleted: 0 };
 	}
 
 	const duration = Date.now() - startTime;
 
 	console.log('[Cleanup] Cron completed', {
-		eventsQueued: expiredEvents.length,
+		eventsSoftDeleted,
+		eventIds: result.map((e) => e.id),
 		durationMs: duration,
 	});
 
-	return {
-		eventsQueued: expiredEvents.length,
-	};
+	return { eventsSoftDeleted };
 }

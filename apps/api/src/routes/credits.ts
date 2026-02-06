@@ -11,19 +11,53 @@ import {
 } from '../lib/stripe';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../lib/error';
+import { calculateTieredDiscount, getDiscountTiers } from '../lib/pricing/discounts';
+import { topUpSchema } from '../lib/pricing/validation';
 
 /**
- * Credit packages API
- * GET / - Public endpoint (no auth)
- * POST /checkout - Authenticated photographers only
+ * Credits API
+ * GET / - Public endpoint (legacy packages - deprecated)
+ * GET /preview - Preview discount calculation
+ * GET /tiers - Get discount tier info
+ * POST /checkout - Flexible top-up (replaces package-based checkout)
  */
 
 export const creditsRouter = new Hono<Env>()
   /**
+   * GET /credit-packages/preview?amount=X
+   *
+   * Preview discount calculation for flexible top-up.
+   * Returns credit amount, discount, and effective rate.
+   */
+  .get('/preview', async (c) => {
+    const amountStr = c.req.query('amount');
+    const amount = parseInt(amountStr || '0', 10);
+
+    // Validate amount
+    const validation = topUpSchema.safeParse({ amount });
+    if (!validation.success) {
+      return c.json({ error: 'Invalid amount. Must be between 50-10,000 THB' }, 400);
+    }
+
+    // Calculate discount
+    const result = calculateTieredDiscount(amount);
+
+    return c.json(result);
+  })
+  /**
+   * GET /credit-packages/tiers
+   *
+   * Returns discount tier information for UI display.
+   */
+  .get('/tiers', async (c) => {
+    return c.json({ tiers: getDiscountTiers() });
+  })
+  /**
    * GET /credit-packages
    *
-   * Returns all active credit packages sorted by sortOrder.
+   * [DEPRECATED] Returns all active credit packages sorted by sortOrder.
    * Public endpoint - no authentication required.
+   * Keep for backward compatibility during migration.
    */
   .get('/', async (c) => {
     return safeTry(async function* () {
@@ -54,11 +88,11 @@ export const creditsRouter = new Hono<Env>()
   /**
    * POST /credit-packages/checkout
    *
-   * Creates a Stripe Checkout session for the selected credit package.
+   * Creates a Stripe Checkout session for flexible credit top-up.
    * Requires authenticated photographer with PDPA consent.
    *
-   * Request body: { packageId: string }
-   * Response: { data: { checkoutUrl: string, sessionId: string } }
+   * Request body: { amount: number } (THB, 50-10,000)
+   * Response: { data: { checkoutUrl: string, sessionId: string, preview: DiscountResult } }
    */
   .post('/checkout', requirePhotographer(), async (c) => {
     return safeTry(async function* () {
@@ -70,22 +104,28 @@ export const creditsRouter = new Hono<Env>()
         c.req.json(),
         (cause): HandlerError => ({ code: 'BAD_REQUEST', message: 'Invalid request body', cause }),
       );
-      const packageId = body?.packageId;
 
-      // Validate packageId
-      if (!packageId || typeof packageId !== 'string') {
-        return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'packageId is required' });
+      // Validate amount
+      const validation = topUpSchema.safeParse(body);
+      if (!validation.success) {
+        return err<never, HandlerError>({
+          code: 'BAD_REQUEST',
+          message: validation.error.errors[0]?.message || 'Invalid amount',
+        });
       }
 
-      // Query package (must be active)
-      const [pkg] = yield* ResultAsync.fromPromise(
-        db.select().from(creditPackages).where(eq(creditPackages.id, packageId)).limit(1),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-      );
+      const { amount } = validation.data;
 
-      if (!pkg || !pkg.active) {
-        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Credit package not found' });
+      // Additional check: Stripe minimum for THB is 10 THB
+      if (amount < 10) {
+        return err<never, HandlerError>({
+          code: 'BAD_REQUEST',
+          message: 'Amount must be at least 10 THB (Stripe minimum)',
+        });
       }
+
+      // Calculate discount and credits
+      const discount = calculateTieredDiscount(amount);
 
       // Get or create Stripe customer
       const stripe = createStripeClient(c.env);
@@ -135,7 +175,14 @@ export const creditsRouter = new Hono<Env>()
 
       const dashboardUrl = c.env.DASHBOARD_FRONTEND_URL;
       const successUrl = `${dashboardUrl}/credits/success`;
-      const cancelUrl = `${dashboardUrl}/credits/packages`;
+      const cancelUrl = `${dashboardUrl}/credits`;
+
+      // Create product name and description
+      const productName = `${discount.creditAmount.toLocaleString()} Credits`;
+      const productDescription =
+        discount.discountPercent > 0
+          ? `Top-up ${discount.originalAmount} THB (${discount.discountPercent}% discount applied)`
+          : `Top-up ${discount.originalAmount} THB`;
 
       // Create checkout session
       const result = yield* ResultAsync.fromPromise(
@@ -144,20 +191,26 @@ export const creditsRouter = new Hono<Env>()
           customerId: customer.id,
           lineItems: [
             {
-              name: pkg.name,
-              description: `${pkg.credits} credits for photo uploads`,
-              amount: pkg.priceThb, // priceThb is in satang (smallest unit)
+              name: productName,
+              description: productDescription,
+              amount: discount.finalAmount * 100, // Convert Baht → Satang for Stripe
               quantity: 1,
-              metadata: { package_id: pkg.id, credits: pkg.credits.toString() },
+              metadata: {
+                credits: discount.creditAmount.toString(),
+                original_amount: discount.originalAmount.toString(),
+                discount_percent: discount.discountPercent.toString(),
+              },
             },
           ],
           successUrl,
           cancelUrl,
           metadata: {
             photographer_id: photographer.id,
-            package_id: pkg.id,
-            package_name: pkg.name,
-            credits: pkg.credits.toString(),
+            credits: discount.creditAmount.toString(), // Webhook expects 'credits' key
+            original_amount: discount.originalAmount.toString(),
+            discount_percent: discount.discountPercent.toString(),
+            final_amount: discount.finalAmount.toString(),
+            purchase_type: 'topup',
           },
           currency: 'thb',
           mode: 'payment',
@@ -172,6 +225,7 @@ export const creditsRouter = new Hono<Env>()
       return ok({
         checkoutUrl: result.url,
         sessionId: result.sessionId,
+        preview: discount,
       });
     })
       .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))

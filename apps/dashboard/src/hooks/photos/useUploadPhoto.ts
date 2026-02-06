@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, useApiClient, withAuth } from '../../lib/api';
 import type { InferRequestType } from 'hono';
 
 const uploadPhoto = api.photos.$post;
@@ -17,6 +17,8 @@ export interface UploadPhotoResult {
 }
 
 export function useUploadPhoto() {
+  const { getToken } = useApiClient();
+
   return useMutation({
     mutationFn: async ({ eventId, file }: { eventId: string; file: File }): Promise<UploadPhotoResult> => {
       const response = await uploadPhoto(
@@ -26,11 +28,7 @@ export function useUploadPhoto() {
             eventId,
           },
         },
-        {
-          init: {
-            credentials: 'include',
-          },
-        },
+        await withAuth(getToken)
       );
 
       if (!response.ok) {
