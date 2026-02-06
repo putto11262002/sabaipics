@@ -222,57 +222,15 @@ function buildElegantMinimal(): SlideshowConfig {
   return {
     theme: { primary: '#0f172a', background: '#ffffff' },
     layout: {
-      gap: 'lg',
+      gap: 'xl',
       padding: 'xl',
       align: 'center',
       maxWidth: 'lg',
     },
     blocks: [
-      // Horizontal logo + name header
-      createBlockWithChildren(
-        'flex',
-        [
-          createBlockWithProps('logo', { size: 'md' }),
-          createBlock('event-name'),
-        ],
-        {
-          direction: 'row',
-          align: 'center',
-          justify: 'center',
-          gap: 'md',
-          padding: 'md',
-          wrap: false,
-        },
-      ),
-      // Subtitle
-      createBlockWithChildren(
-        'flex',
-        [createBlock('subtitle')],
-        {
-          direction: 'column',
-          align: 'center',
-          justify: 'center',
-          gap: 'none',
-          padding: 'xs',
-          wrap: false,
-        },
-      ),
-      // Gallery
-      createBlock('gallery'),
-      // QR centered with label
-      createBlockWithChildren(
-        'flex',
-        [createBlockWithProps('qr', { size: 'md', label: 'Scan to search' })],
-        {
-          direction: 'column',
-          align: 'center',
-          justify: 'center',
-          gap: 'none',
-          padding: 'md',
-          wrap: false,
-        },
-      ),
-      // Social horizontal
+      // Event Name centered
+      createBlock('event-name'),
+      // Social links
       createBlockWithChildren(
         'flex',
         [
@@ -283,11 +241,15 @@ function buildElegantMinimal(): SlideshowConfig {
           direction: 'row',
           align: 'center',
           justify: 'center',
-          gap: 'md',
-          padding: 'sm',
+          gap: 'sm',
+          padding: 'none',
           wrap: false,
         },
       ),
+      // QR Code
+      createBlockWithProps('qr', { size: 'md', label: 'Scan to search' }),
+      // Gallery
+      createBlock('gallery'),
     ],
   };
 }
