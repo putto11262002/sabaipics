@@ -7,6 +7,7 @@ struct CaptureHomeView: View {
     let onConnectNew: (CameraManufacturer) -> Void
     let recentSony: [APCameraConnectionRecord]
     var recentCanon: [APCameraConnectionRecord] = []
+    var recentNikon: [APCameraConnectionRecord] = []
     let onReconnect: (_ manufacturer: String, _ id: String) -> Void
     var onRemoveRecent: (_ manufacturer: String, _ id: UUID) -> Void = { _, _ in }
     var isConnectionMuted: Bool = false
@@ -106,6 +107,44 @@ struct CaptureHomeView: View {
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 onRemoveRecent("canon", record.id)
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
+                            .tint(Color.Theme.destructive)
+                        }
+                    }
+                }
+            }
+
+            Section("Recent Nikon") {
+                if recentNikon.isEmpty {
+                    Text("No recent Nikon cameras yet")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(recentNikon) { record in
+                        Button {
+                            onReconnect("nikon", record.id.uuidString)
+                        } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(record.cameraName)
+                                        .foregroundStyle(Color.Theme.foreground)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer(minLength: 0)
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .disabled(isConnectionMuted)
+                        .buttonStyle(.plain)
+                        .padding(.vertical, 2)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                onRemoveRecent("nikon", record.id)
                             } label: {
                                 Label("Remove", systemImage: "trash")
                             }

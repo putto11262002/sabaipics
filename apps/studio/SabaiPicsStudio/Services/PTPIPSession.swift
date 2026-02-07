@@ -1498,7 +1498,9 @@ class PTPIPSession: NSObject {
 
         case .nikon:
             return NikonEventSource(
-                eventConnection: eventConnection,
+                commandConnection: commandConnection,
+                transactionManager: transactionManager,
+                commandQueue: commandQueue,
                 photoOps: self
             )
 
