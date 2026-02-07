@@ -96,10 +96,11 @@ create_bucket_notification() {
   local b="$1"
   local q="$2"
   local desc="$3"
+  local prefix="${4:-uploads/}"
 
   set +e
   local out
-  out=$($WRANGLER r2 bucket notification create "$b" --event-type object-create --queue "$q" --prefix "uploads/" --description "$desc" 2>&1)
+  out=$($WRANGLER r2 bucket notification create "$b" --event-type object-create --queue "$q" --prefix "$prefix" --description "$desc" 2>&1)
   local code=$?
   set -e
 
@@ -158,16 +159,11 @@ case "$ENVIRONMENT" in
     PHOTOS_BUCKET="sabaipics-photos-dev"
     PHOTO_DOMAIN="devphotos.sabaipics.com"
     QUEUES=(
-      "photo-processing-dev"
-      "photo-processing-dlq-dev"
-      "rekognition-cleanup-dev"
-      "rekognition-cleanup-dlq-dev"
-      "upload-processing-dev"
-      "upload-processing-dlq-dev"
       "r2-notification-proxy"
     )
     UPLOAD_QUEUE="upload-processing-dev"
     NOTIFICATION_QUEUE="r2-notification-proxy"
+    LOGO_NOTIFICATION_QUEUE="r2-notification-proxy"
     ;;
   staging)
     PHOTOS_BUCKET="sabaipics-photos-staging"
@@ -179,9 +175,13 @@ case "$ENVIRONMENT" in
       "rekognition-cleanup-dlq-staging"
       "upload-processing-staging"
       "upload-processing-dlq-staging"
+      "logo-processing-staging"
+      "logo-processing-dlq-staging"
     )
     UPLOAD_QUEUE="upload-processing-staging"
+    LOGO_QUEUE="logo-processing-staging"
     NOTIFICATION_QUEUE="$UPLOAD_QUEUE"
+    LOGO_NOTIFICATION_QUEUE="$LOGO_QUEUE"
     ;;
   production)
     PHOTOS_BUCKET="sabaipics-photos"
@@ -193,9 +193,13 @@ case "$ENVIRONMENT" in
       "rekognition-cleanup-dlq"
       "upload-processing"
       "upload-processing-dlq"
+      "logo-processing"
+      "logo-processing-dlq"
     )
     UPLOAD_QUEUE="upload-processing"
+    LOGO_QUEUE="logo-processing"
     NOTIFICATION_QUEUE="$UPLOAD_QUEUE"
+    LOGO_NOTIFICATION_QUEUE="$LOGO_QUEUE"
     ;;
 esac
 
@@ -215,7 +219,8 @@ echo "\n== R2 CORS =="
 set_bucket_cors "$PHOTOS_BUCKET"
 
 echo "\n== R2 Notifications =="
-create_bucket_notification "$PHOTOS_BUCKET" "$NOTIFICATION_QUEUE" "uploads/ object-create -> $NOTIFICATION_QUEUE"
+create_bucket_notification "$PHOTOS_BUCKET" "$NOTIFICATION_QUEUE" "uploads/ object-create -> $NOTIFICATION_QUEUE" "uploads/"
+create_bucket_notification "$PHOTOS_BUCKET" "$LOGO_NOTIFICATION_QUEUE" "logos/ object-create -> $LOGO_NOTIFICATION_QUEUE" "logos/"
 
 echo "\n== R2 Custom Domain =="
 add_r2_custom_domain "$PHOTOS_BUCKET" "$PHOTO_DOMAIN"

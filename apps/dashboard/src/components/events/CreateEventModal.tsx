@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useNavigate } from 'react-router';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ interface CreateEventModalProps {
 }
 
 export function CreateEventModal({ open, onOpenChange }: CreateEventModalProps) {
+  const navigate = useNavigate();
   const createEvent = useCreateEvent();
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -32,21 +34,26 @@ export function CreateEventModal({ open, onOpenChange }: CreateEventModalProps) 
     },
   });
 
-  const onSubmit = async (data: EventFormData) => {
+  const onSubmit = (data: EventFormData) => {
     setApiError(null);
 
-    try {
-      await createEvent.mutateAsync({ name: data.name });
-
-      // Success - close modal and reset form
-      form.reset();
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Create event error:', error);
-      setApiError(
-        error instanceof Error ? error.message : 'Failed to create event. Please try again.',
-      );
-    }
+    createEvent.mutate(
+      { name: data.name },
+      {
+        onSuccess: (result) => {
+          // Success - close modal, reset form, and navigate to event details
+          form.reset();
+          onOpenChange(false);
+          navigate(`/events/${result.data.id}/details`);
+        },
+        onError: (error) => {
+          console.error('Create event error:', error);
+          setApiError(
+            error instanceof Error ? error.message : 'Failed to create event. Please try again.',
+          );
+        },
+      },
+    );
   };
 
   const handleOpenChange = (newOpen: boolean) => {
@@ -96,12 +103,12 @@ export function CreateEventModal({ open, onOpenChange }: CreateEventModalProps) 
             type="button"
             variant="outline"
             onClick={() => handleOpenChange(false)}
-            disabled={form.formState.isSubmitting}
+            disabled={createEvent.isPending}
           >
             Cancel
           </Button>
-          <Button type="submit" form="create-event-form" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting && <Spinner className="mr-1 size-4" />}
+          <Button type="submit" form="create-event-form" disabled={createEvent.isPending}>
+            {createEvent.isPending && <Spinner className="mr-1 size-4" />}
             Create Event
           </Button>
         </DialogFooter>

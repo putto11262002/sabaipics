@@ -8,9 +8,9 @@ import type { Env } from '../../types';
  * Dev Webhook Routes
  *
  * These routes are only available in development mode.
- * Used for proxying R2 notifications from the remote proxy worker to local UPLOAD_QUEUE.
+ * Used for proxying R2 notifications from the remote proxy worker to local queues.
  *
- * Flow: R2 notification → r2-notification-proxy → ngrok → this endpoint → UPLOAD_QUEUE → upload-consumer
+ * Flow: R2 notification → r2-notification-proxy → ngrok → this endpoint → UPLOAD_QUEUE / LOGO_QUEUE → consumer
  */
 
 const r2NotificationSchema = z.object({
@@ -36,8 +36,12 @@ export const devWebhookRouter = new Hono<Env>().post(
 
     const notification = c.req.valid('json');
 
-    // Send to UPLOAD_QUEUE for processing by upload-consumer
-    await c.env.UPLOAD_QUEUE.send({
+    // Dispatch to the correct queue based on R2 key prefix
+    const queue = notification.object.key.startsWith('logos/')
+      ? c.env.LOGO_QUEUE
+      : c.env.UPLOAD_QUEUE;
+
+    await queue.send({
       account: notification.account,
       bucket: notification.bucket,
       eventTime: notification.eventTime,

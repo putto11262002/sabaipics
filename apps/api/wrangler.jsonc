@@ -55,6 +55,10 @@
         "queue": "upload-processing-dev",
         "binding": "UPLOAD_QUEUE",
       },
+      {
+        "queue": "logo-processing-dev",
+        "binding": "LOGO_QUEUE",
+      },
     ],
     "consumers": [
       {
@@ -80,6 +84,14 @@
         "max_retries": 3,
         "max_concurrency": 4,
         "dead_letter_queue": "upload-processing-dlq-dev",
+      },
+      {
+        "queue": "logo-processing-dev",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "max_concurrency": 1,
+        "dead_letter_queue": "logo-processing-dlq-dev",
       },
     ],
   },
@@ -172,6 +184,10 @@
             "queue": "upload-processing-staging",
             "binding": "UPLOAD_QUEUE",
           },
+          {
+            "queue": "logo-processing-staging",
+            "binding": "LOGO_QUEUE",
+          },
         ],
         "consumers": [
           {
@@ -197,6 +213,14 @@
             "max_retries": 3,
             "max_concurrency": 4,
             "dead_letter_queue": "upload-processing-dlq-staging",
+          },
+          {
+            "queue": "logo-processing-staging",
+            "max_batch_size": 5,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "max_concurrency": 1,
+            "dead_letter_queue": "logo-processing-dlq-staging",
           },
         ],
       },
@@ -283,6 +307,10 @@
             "queue": "upload-processing",
             "binding": "UPLOAD_QUEUE",
           },
+          {
+            "queue": "logo-processing",
+            "binding": "LOGO_QUEUE",
+          },
         ],
         "consumers": [
           {
@@ -308,6 +336,14 @@
             "max_retries": 3,
             "max_concurrency": 4,
             "dead_letter_queue": "upload-processing-dlq",
+          },
+          {
+            "queue": "logo-processing",
+            "max_batch_size": 5,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "max_concurrency": 1,
+            "dead_letter_queue": "logo-processing-dlq",
           },
         ],
       },

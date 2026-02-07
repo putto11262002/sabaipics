@@ -13,6 +13,7 @@ import EventUploadTab from './routes/events/[id]/upload';
 import EventStatisticsTab from './routes/events/[id]/statistics';
 import EventPhotosTab from './routes/events/[id]/photos';
 import EventSlideshowTab from './routes/events/[id]/slideshow';
+import SlideshowPreviewPage from './routes/events/[id]/slideshow/preview';
 import { SidebarLayout } from './components/shell/sidebar-layout';
 
 export const router = createBrowserRouter([
@@ -36,6 +37,15 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <EventSlideshowTab />
+      </ProtectedRoute>
+    ),
+  },
+  // Slideshow preview (auth required, no sidebar)
+  {
+    path: '/events/:id/slideshow-preview',
+    element: (
+      <ProtectedRoute>
+        <SlideshowPreviewPage />
       </ProtectedRoute>
     ),
   },

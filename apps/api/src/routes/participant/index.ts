@@ -17,7 +17,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, and, inArray, isNull, desc, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { activeEvents, photos, participantSearches, DEFAULT_SLIDESHOW_CONFIG } from '@sabaipics/db';
+import { activeEvents, photos, participantSearches, DEFAULT_SLIDESHOW_CONFIG, events } from '@sabaipics/db';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
 import { createFaceProvider } from '../../lib/rekognition/provider';
@@ -225,7 +225,11 @@ export const participantRouter = new Hono<Env>()
     const { eventId } = c.req.valid('param');
 
     const [event] = await db
-      .select({ name: activeEvents.name })
+      .select({
+        name: activeEvents.name,
+        subtitle: activeEvents.subtitle,
+        logoR2Key: activeEvents.logoR2Key,
+      })
       .from(activeEvents)
       .where(eq(activeEvents.id, eventId))
       .limit(1);
@@ -234,9 +238,13 @@ export const participantRouter = new Hono<Env>()
       return c.json({ error: { code: 'NOT_FOUND', message: 'Event not found' } }, 404);
     }
 
+    const logoUrl = event.logoR2Key ? `${c.env.PHOTO_R2_BASE_URL}/${event.logoR2Key}` : null;
+
     return c.json({
       data: {
         name: event.name,
+        subtitle: event.subtitle,
+        logoUrl,
       },
     });
   })
