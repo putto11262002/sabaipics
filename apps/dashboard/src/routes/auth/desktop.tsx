@@ -7,26 +7,18 @@ function getRedirectUrl() {
   return params.get('redirect_url') ?? params.get('redirect') ?? '';
 }
 
-function getFlowMode() {
-  const params = new URLSearchParams(window.location.search);
-  // Backwards compat: existing desktop clients expect `token` in callback.
-  // New clients should pass flow=code to use the safer code-based flow.
-  return params.get('flow') === 'code' ? 'code' : 'token';
-}
-
 function isAllowedRedirect(url: URL) {
   const isLocalhost = url.hostname === '127.0.0.1' || url.hostname === 'localhost';
   const isHttp = url.protocol === 'http:' || url.protocol === 'https:';
   return isHttp && isLocalhost && url.pathname === '/callback';
 }
 
-function buildReturnUrl(redirectUrl: string, params: { code?: string; token?: string }) {
+function buildReturnUrl(redirectUrl: string, code: string) {
   const url = new URL(redirectUrl);
   if (!isAllowedRedirect(url)) {
     throw new Error('Invalid redirect_url');
   }
-  if (params.code) url.searchParams.set('code', params.code);
-  if (params.token) url.searchParams.set('token', params.token);
+  url.searchParams.set('code', code);
   return url.toString();
 }
 
@@ -35,7 +27,6 @@ export function DesktopAuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const redirectUrl = useMemo(getRedirectUrl, []);
-  const flowMode = useMemo(getFlowMode, []);
 
   useEffect(() => {
     if (!redirectUrl) {
@@ -66,7 +57,6 @@ export function DesktopAuthPage() {
         <DesktopAuthRedirect
           redirectUrl={redirectUrl}
           getToken={getToken}
-          flowMode={flowMode}
           error={error}
           onError={setError}
           attempt={attempt}
@@ -80,7 +70,6 @@ export function DesktopAuthPage() {
 function DesktopAuthRedirect({
   redirectUrl,
   getToken,
-  flowMode,
   error,
   onError,
   attempt,
@@ -88,7 +77,6 @@ function DesktopAuthRedirect({
 }: {
   redirectUrl: string;
   getToken: (options?: { template?: string }) => Promise<string | null>;
-  flowMode: 'code' | 'token';
   error: string | null;
   onError: (value: string | null) => void;
   attempt: number;
@@ -106,19 +94,11 @@ function DesktopAuthRedirect({
           return;
         }
 
-        if (flowMode === 'code') {
-          const exchanged = await exchange.mutateAsync({
-            clerkToken,
-            deviceName: 'FrameFast Desktop',
-          });
-          const returnUrl = buildReturnUrl(redirectUrl, { code: exchanged.code });
-          window.location.href = returnUrl;
-          return;
-        }
-
-        // Legacy flow: return Clerk session token directly.
-        // TODO: remove once desktop uploader redeems code.
-        const returnUrl = buildReturnUrl(redirectUrl, { token: clerkToken });
+        const exchanged = await exchange.mutateAsync({
+          clerkToken,
+          deviceName: 'FrameFast Desktop',
+        });
+        const returnUrl = buildReturnUrl(redirectUrl, exchanged.code);
         window.location.href = returnUrl;
       } catch (err) {
         onError(err instanceof Error ? err.message : 'Failed to redirect');
@@ -126,7 +106,7 @@ function DesktopAuthRedirect({
     };
 
     void run();
-  }, [attempt, redirectUrl, getToken, onError, flowMode, exchange]);
+  }, [attempt, redirectUrl, getToken, onError, exchange]);
 
   if (error) {
     return (
