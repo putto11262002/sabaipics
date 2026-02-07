@@ -7,6 +7,8 @@ import type { Database, DatabaseTx } from '@sabaipics/db';
 export type Bindings = Cloudflare.Env & {
   FTP_JWT_SECRET: string;
   FTP_JWT_SECRET_PREVIOUS?: string;
+  DESKTOP_ACCESS_JWT_SECRET: string;
+  DESKTOP_REFRESH_TOKEN_PEPPER: string;
 };
 
 export type Variables = AuthVariables & {

@@ -96,24 +96,26 @@ All secrets are stored in GitHub repository settings under Environments (`stagin
 
 ### Required Secrets
 
-| Secret                         | Used By               | Description              |
-| ------------------------------ | --------------------- | ------------------------ |
-| `CLOUDFLARE_API_TOKEN`         | All                   | CF API access            |
-| `CLOUDFLARE_ACCOUNT_ID`        | All                   | CF account               |
-| `DATABASE_URL`                 | API                   | Neon connection string   |
-| `CLERK_SECRET_KEY`             | API                   | Clerk backend key        |
-| `CLERK_PUBLISHABLE_KEY`        | API, Dashboard, Event | Clerk frontend key       |
-| `CLERK_JWT_KEY`                | API                   | JWT verification         |
-| `CLERK_WEBHOOK_SIGNING_SECRET` | API                   | Webhook validation       |
-| `AWS_ACCESS_KEY_ID`            | API                   | Rekognition access       |
-| `AWS_SECRET_ACCESS_KEY`        | API                   | Rekognition secret       |
-| `STRIPE_SECRET_KEY`            | API                   | Stripe backend key       |
-| `STRIPE_WEBHOOK_SECRET`        | API                   | Webhook validation       |
-| `R2_ACCESS_KEY_ID`             | API                   | R2 S3-compatible access  |
-| `R2_SECRET_ACCESS_KEY`         | API                   | R2 S3-compatible secret  |
-| `ADMIN_API_KEY`                | API                   | Internal admin endpoints |
-| `FTP_JWT_SECRET`               | API                   | FTP token signing key    |
-| `FTP_PASSWORD_ENCRYPTION_KEY`  | API                   | FTP password encryption  |
+| Secret                         | Used By               | Description                          |
+| ------------------------------ | --------------------- | ------------------------------------ |
+| `CLOUDFLARE_API_TOKEN`         | All                   | CF API access                        |
+| `CLOUDFLARE_ACCOUNT_ID`        | All                   | CF account                           |
+| `DATABASE_URL`                 | API                   | Neon connection string               |
+| `CLERK_SECRET_KEY`             | API                   | Clerk backend key                    |
+| `CLERK_PUBLISHABLE_KEY`        | API, Dashboard, Event | Clerk frontend key                   |
+| `CLERK_JWT_KEY`                | API                   | JWT verification                     |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | API                   | Webhook validation                   |
+| `AWS_ACCESS_KEY_ID`            | API                   | Rekognition access                   |
+| `AWS_SECRET_ACCESS_KEY`        | API                   | Rekognition secret                   |
+| `STRIPE_SECRET_KEY`            | API                   | Stripe backend key                   |
+| `STRIPE_WEBHOOK_SECRET`        | API                   | Webhook validation                   |
+| `R2_ACCESS_KEY_ID`             | API                   | R2 S3-compatible access              |
+| `R2_SECRET_ACCESS_KEY`         | API                   | R2 S3-compatible secret              |
+| `ADMIN_API_KEY`                | API                   | Internal admin endpoints             |
+| `FTP_JWT_SECRET`               | API                   | FTP token signing key                |
+| `FTP_PASSWORD_ENCRYPTION_KEY`  | API                   | FTP password encryption              |
+| `DESKTOP_ACCESS_JWT_SECRET`    | API                   | Desktop access JWT secret            |
+| `DESKTOP_REFRESH_TOKEN_PEPPER` | API                   | Desktop refresh/token hashing pepper |
 
 ### Optional Secrets
 
