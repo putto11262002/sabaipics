@@ -13,13 +13,18 @@ function isAllowedRedirect(url: URL) {
   return isHttp && isLocalhost && url.pathname === '/callback';
 }
 
-function buildReturnUrl(redirectUrl: string, code: string) {
+function buildCompleteUrl(redirectUrl: string, code: string) {
+  // Validate redirect_url even though we don't immediately navigate to it.
+  // This prevents open redirects and keeps the auth flow constrained to loopback.
   const url = new URL(redirectUrl);
   if (!isAllowedRedirect(url)) {
     throw new Error('Invalid redirect_url');
   }
-  url.searchParams.set('code', code);
-  return url.toString();
+
+  const complete = new URL('/auth/desktop/complete', window.location.origin);
+  complete.searchParams.set('code', code);
+  complete.searchParams.set('redirect_url', redirectUrl);
+  return complete.toString();
 }
 
 export function DesktopAuthPage() {
@@ -98,8 +103,8 @@ function DesktopAuthRedirect({
           clerkToken,
           deviceName: 'FrameFast Desktop',
         });
-        const returnUrl = buildReturnUrl(redirectUrl, exchanged.code);
-        window.location.href = returnUrl;
+        const completeUrl = buildCompleteUrl(redirectUrl, exchanged.code);
+        window.location.href = completeUrl;
       } catch (err) {
         onError(err instanceof Error ? err.message : 'Failed to redirect');
       }
