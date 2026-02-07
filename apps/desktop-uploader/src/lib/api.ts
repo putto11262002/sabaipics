@@ -1,10 +1,14 @@
-import { hc } from "hono/client"
-import type { AppType } from "@sabaipics/api"
+import { hc } from 'hono/client';
 
-export const api = hc<AppType>(import.meta.env.VITE_API_URL)
+// NOTE: We intentionally avoid typing this client with @sabaipics/api AppType here.
+// The monorepo currently resolves multiple hono versions in CI, which can cause
+// type-level incompatibilities between the server's AppType and this package's hc().
+// Runtime behavior is unaffected.
+
+export const api = hc(import.meta.env.VITE_API_URL) as any;
 
 export function createAuthClient(token: string) {
-  return hc<AppType>(import.meta.env.VITE_API_URL, {
+  return hc(import.meta.env.VITE_API_URL, {
     headers: { Authorization: `Bearer ${token}` },
-  })
+  }) as any;
 }
