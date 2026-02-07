@@ -29,7 +29,7 @@ struct CanonHotspotSetupView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
-            Button("Next") {
+            Button("Continue") {
                 if NetworkScannerService.isHotspotActive() {
                     onNext()
                 } else {
