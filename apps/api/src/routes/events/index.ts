@@ -276,7 +276,7 @@ export const eventsRouter = new Hono<Env>()
 
       return safeTry(async function* () {
         const [event] = yield* ResultAsync.fromPromise(
-          db.select().from(events).where(eq(events.id, id)).limit(1),
+          db.select().from(activeEvents).where(eq(activeEvents.id, id)).limit(1),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
 

@@ -226,12 +226,12 @@ export const participantRouter = new Hono<Env>()
 
     const [event] = await db
       .select({
-        name: events.name,
-        subtitle: events.subtitle,
-        logoR2Key: events.logoR2Key,
+        name: activeEvents.name,
+        subtitle: activeEvents.subtitle,
+        logoR2Key: activeEvents.logoR2Key,
       })
-      .from(events)
-      .where(eq(events.id, eventId))
+      .from(activeEvents)
+      .where(eq(activeEvents.id, eventId))
       .limit(1);
 
     if (!event) {
