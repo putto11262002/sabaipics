@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { createClerkAuth } from '@sabaipics/auth/middleware';
+import { createAnyAuth } from './middleware/any-auth';
 import { createDbHttp, createDbTx } from '@sabaipics/db';
 import { authRouter } from './routes/auth';
 import { webhookRouter } from './routes/webhooks';
@@ -13,6 +13,7 @@ import { uploadsRouter } from './routes/uploads';
 import { r2Router } from './routes/r2';
 import { participantRouter } from './routes/participant';
 import { ftpRouter } from './routes/ftp';
+import { desktopAuthRouter } from './routes/desktop-auth';
 import type { Env, Bindings } from './types';
 
 // Queue consumers
@@ -71,9 +72,10 @@ const app = new Hono<Env>()
   .route('/admin', adminRouter)
   // FTP routes - FTP JWT auth, no Clerk (must be before Clerk middleware)
   .route('/api/ftp', ftpRouter)
-  .use('/*', createClerkAuth())
+  .use('/*', createAnyAuth())
   .route('/credit-packages', creditsRouter)
   .get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))
+  .route('/desktop/auth', desktopAuthRouter)
   .route('/auth', authRouter)
   .route('/dashboard', dashboardRouter)
   .route('/events', eventsRouter)

@@ -57,6 +57,8 @@ Go to: Repository → Settings → Environments → `<staging|production>`
 - [ ] `ADMIN_API_KEY`
 - [ ] `FTP_JWT_SECRET` (base64-encoded, generate: `openssl rand -base64 32`)
 - [ ] `FTP_PASSWORD_ENCRYPTION_KEY` (base64-encoded 32 bytes, generate: `openssl rand -base64 32`)
+- [ ] `DESKTOP_ACCESS_JWT_SECRET` (base64-encoded, generate: `openssl rand -base64 48`)
+- [ ] `DESKTOP_REFRESH_TOKEN_PEPPER` (base64-encoded, generate: `openssl rand -base64 48`)
 
 **Optional:**
 

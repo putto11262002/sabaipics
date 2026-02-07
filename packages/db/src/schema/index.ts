@@ -14,6 +14,7 @@ export * from './upload-intents';
 export * from './logo-upload-intents';
 export * from './participant-searches';
 export * from './ftp-credentials';
+export * from './desktop-auth';
 
 // Relations
 export * from './relations';

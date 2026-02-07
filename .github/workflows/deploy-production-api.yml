@@ -42,6 +42,8 @@ jobs:
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
           FTP_JWT_SECRET: ${{ secrets.FTP_JWT_SECRET }}
           FTP_PASSWORD_ENCRYPTION_KEY: ${{ secrets.FTP_PASSWORD_ENCRYPTION_KEY }}
+          DESKTOP_ACCESS_JWT_SECRET: ${{ secrets.DESKTOP_ACCESS_JWT_SECRET }}
+          DESKTOP_REFRESH_TOKEN_PEPPER: ${{ secrets.DESKTOP_REFRESH_TOKEN_PEPPER }}
         run: |
           set -euo pipefail
           required=(
@@ -59,6 +61,8 @@ jobs:
             ADMIN_API_KEY
             FTP_JWT_SECRET
             FTP_PASSWORD_ENCRYPTION_KEY
+            DESKTOP_ACCESS_JWT_SECRET
+            DESKTOP_REFRESH_TOKEN_PEPPER
           )
           # LINE secrets are optional until LINE integration is enabled
           optional=(
@@ -111,6 +115,8 @@ jobs:
           echo "${{ secrets.ADMIN_API_KEY }}" | pnpm wrangler secret put ADMIN_API_KEY --env production
           echo "${{ secrets.FTP_JWT_SECRET }}" | pnpm wrangler secret put FTP_JWT_SECRET --env production
           echo "${{ secrets.FTP_PASSWORD_ENCRYPTION_KEY }}" | pnpm wrangler secret put FTP_PASSWORD_ENCRYPTION_KEY --env production
+          echo "${{ secrets.DESKTOP_ACCESS_JWT_SECRET }}" | pnpm wrangler secret put DESKTOP_ACCESS_JWT_SECRET --env production
+          echo "${{ secrets.DESKTOP_REFRESH_TOKEN_PEPPER }}" | pnpm wrangler secret put DESKTOP_REFRESH_TOKEN_PEPPER --env production
           # Optional LINE secrets
           if [[ -n "$LINE_CHANNEL_SECRET" ]]; then
             echo "$LINE_CHANNEL_SECRET" | pnpm wrangler secret put LINE_CHANNEL_SECRET --env production
