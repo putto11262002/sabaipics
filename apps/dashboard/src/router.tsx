@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { SignInPage } from './routes/sign-in';
 import { SignUpPage } from './routes/sign-up';
 import { DesktopAuthPage } from './routes/auth/desktop';
+import { DesktopAuthCompletePage } from './routes/auth/desktop-complete';
 import { DashboardPage } from './routes/dashboard';
 import { CreditSuccessPage } from './routes/credits/success';
 import EventsPage from './routes/events';
@@ -29,6 +30,10 @@ export const router = createBrowserRouter([
   {
     path: '/auth/desktop',
     element: <DesktopAuthPage />,
+  },
+  {
+    path: '/auth/desktop/complete',
+    element: <DesktopAuthCompletePage />,
   },
 
   // Slideshow editor (auth required, no sidebar)
