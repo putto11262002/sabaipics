@@ -64,20 +64,6 @@ struct NikonConnectFlowView: View {
                 )
             }
         }
-        .navigationTitle("Nikon")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    onCancel()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.Theme.mutedForeground)
-                }
-                .buttonStyle(.plain)
-            }
-        }
         .alert(
             "Connection failed",
             isPresented: Binding(get: { errorMessage != nil }, set: { _ in errorMessage = nil })
