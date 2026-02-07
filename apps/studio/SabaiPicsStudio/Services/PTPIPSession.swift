@@ -125,6 +125,12 @@ class PTPIPSession: NSObject {
     // Camera detection
     private var cameraVendor: CameraVendor = .unknown
     private var isSonyPTPIP = false
+    private var cameraNameHint: String? = nil
+
+    // Best-effort DeviceInfo (used to refine vendor detection)
+    private var deviceInfoManufacturer: String? = nil
+    private var deviceInfoVendorExtensionID: UInt32? = nil
+    private var deviceInfoModel: String? = nil
 
     // Configuration
     private let hostName: String
@@ -208,6 +214,7 @@ class PTPIPSession: NSObject {
             let cameraNameData = ackPayloadData.dropFirst(20)
             if let cameraName = String(data: cameraNameData, encoding: .utf16LittleEndian) {
                 print("[PTPIPSession] Connected to: \(cameraName)")
+                cameraNameHint = cameraName
                 cameraVendor = detectCameraVendor(from: cameraName)
                 isSonyPTPIP = isSonyCamera(named: cameraName)
             }
@@ -243,6 +250,9 @@ class PTPIPSession: NSObject {
 
         // Phase 3: Send OpenSession command (required after Init handshake per libgphoto2)
         try await sendOpenSession()
+
+        // Refine vendor detection from DeviceInfo (camera name often omits manufacturer)
+        await updateVendorFromDeviceInfo(cameraNameHint: cameraNameHint)
 
         if isSonyPTPIP {
             print("[PTPIPSession] Initializing Sony SDIO... ")
@@ -316,6 +326,10 @@ class PTPIPSession: NSObject {
         print("[PTPIPSession] Sending OpenSession...")
         try await sendOpenSession()
         print("[PTPIPSession] OpenSession successful")
+
+        // Refine vendor detection from DeviceInfo (camera name often omits manufacturer)
+        cameraNameHint = cameraName
+        await updateVendorFromDeviceInfo(cameraNameHint: cameraName)
 
         if isSonyCamera(named: cameraName) {
             print("[PTPIPSession] Initializing Sony SDIO... ")
@@ -509,6 +523,156 @@ class PTPIPSession: NSObject {
         }
 
         PTPLogger.debug("\(opCode.name) sent", category: PTPLogger.command)
+    }
+
+    /// Read DeviceInfo dataset (ISO 15740) to identify manufacturer/model.
+    ///
+    /// This is more reliable than the PTP/IP Init "camera name" string.
+    private func readDeviceInfoData() async throws -> Data {
+        guard let connection = commandConnection,
+              let txManager = transactionManager else {
+            throw PTPIPSessionError.notConnected
+        }
+
+        var command = await txManager.createCommand()
+        let request = command.getDeviceInfo()
+        let requestData = request.toData()
+
+        let opCode = PTPOperationCode.getDeviceInfo
+        PTPLogger.debug("Sending \(opCode.name) [txID: \(request.transactionID)]", category: PTPLogger.command)
+
+        let (data, response) = try await commandQueue.run { [self] in
+            try await sendData(connection: connection, data: requestData)
+            return try await receiveDataResponse(connection: connection, expectedTransactionID: request.transactionID)
+        }
+
+        guard let responseCode = PTPResponseCode(rawValue: response.responseCode), responseCode.isSuccess else {
+            throw PTPIPSessionError.initializationFailed
+        }
+
+        guard let data else {
+            throw PTPIPSessionError.invalidResponse
+        }
+
+        return data
+    }
+
+    private struct DeviceInfoSummary {
+        let vendorExtensionID: UInt32?
+        let manufacturer: String?
+        let model: String?
+    }
+
+    private func updateVendorFromDeviceInfo(cameraNameHint: String?) async {
+        do {
+            let data = try await readDeviceInfoData()
+            guard let summary = parseDeviceInfoSummary(data) else {
+                PTPLogger.debug("GetDeviceInfo parse failed", category: PTPLogger.session)
+                return
+            }
+
+            deviceInfoManufacturer = summary.manufacturer
+            deviceInfoVendorExtensionID = summary.vendorExtensionID
+            deviceInfoModel = summary.model
+
+            let refined = detectCameraVendor(
+                cameraName: cameraNameHint ?? self.cameraNameHint ?? "",
+                manufacturer: summary.manufacturer
+            )
+
+            if refined != cameraVendor {
+                PTPLogger.info(
+                    "Vendor refined: \(cameraVendor) -> \(refined) (manufacturer=\(summary.manufacturer ?? "n/a"))",
+                    category: PTPLogger.session
+                )
+                cameraVendor = refined
+            }
+
+            // Observed behavior (Nikon Z6, WiFi PTP/IP): the camera can also push standard
+            // PTP events over the event channel, but we still prefer the Nikon polling path
+            // when DeviceInfo Manufacturer indicates Nikon to support bodies/modes that
+            // require Nikon_GetEvent (0x90C7).
+
+            if let manufacturer = summary.manufacturer {
+                print("[PTPIPSession] DeviceInfo: manufacturer=\(manufacturer), model=\(summary.model ?? "n/a"), vendorExtID=\(summary.vendorExtensionID.map { PTPLogger.formatHex($0) } ?? "n/a")")
+            }
+        } catch {
+            // Best-effort only. Session can still operate with name-based heuristics.
+            PTPLogger.debug("GetDeviceInfo failed: \(error)", category: PTPLogger.session)
+        }
+    }
+
+    private func parseDeviceInfoSummary(_ data: Data) -> DeviceInfoSummary? {
+        struct Cursor {
+            var data: Data
+            var offset: Int = 0
+
+            mutating func readU8() -> UInt8? {
+                guard offset + 1 <= data.count else { return nil }
+                let v = data[offset]
+                offset += 1
+                return v
+            }
+
+            mutating func readU16() -> UInt16? {
+                guard offset + 2 <= data.count else { return nil }
+                let raw = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt16.self) }
+                offset += 2
+                return UInt16(littleEndian: raw)
+            }
+
+            mutating func readU32() -> UInt32? {
+                guard offset + 4 <= data.count else { return nil }
+                let raw = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self) }
+                offset += 4
+                return UInt32(littleEndian: raw)
+            }
+
+            mutating func readPTPString() -> String? {
+                guard let len = readU8() else { return nil }
+                if len == 0 {
+                    return ""
+                }
+
+                let byteCount = Int(len) * 2
+                guard offset + byteCount <= data.count else { return nil }
+                let strData = data.subdata(in: offset..<(offset + byteCount))
+                offset += byteCount
+                let s = String(data: strData, encoding: .utf16LittleEndian)
+                return s?.trimmingCharacters(in: CharacterSet(charactersIn: "\u{0000}"))
+            }
+
+            mutating func skipU16Array() -> Bool {
+                guard let count = readU32() else { return false }
+                let bytes = Int(count) * 2
+                guard bytes >= 0, offset + bytes <= data.count else { return false }
+                offset += bytes
+                return true
+            }
+        }
+
+        var c = Cursor(data: data)
+
+        // DeviceInfo dataset (ISO 15740)
+        _ = c.readU16() // StandardVersion
+        let vendorExtID = c.readU32()
+        _ = c.readU16() // VendorExtensionVersion
+        _ = c.readPTPString() // VendorExtensionDesc
+        _ = c.readU16() // FunctionalMode
+
+        // Arrays (UINT16 element arrays)
+        guard c.skipU16Array(), c.skipU16Array(), c.skipU16Array(), c.skipU16Array(), c.skipU16Array() else {
+            return nil
+        }
+
+        let manufacturer = c.readPTPString()
+        let model = c.readPTPString()
+
+        return DeviceInfoSummary(
+            vendorExtensionID: vendorExtID,
+            manufacturer: manufacturer,
+            model: model
+        )
     }
 
     /// Download photo by object handle
@@ -1456,6 +1620,25 @@ class PTPIPSession: NSObject {
     /// Detect camera vendor from camera name
     /// Based on libgphoto2's vendor detection logic
     private func detectCameraVendor(from cameraName: String) -> CameraVendor {
+        return detectCameraVendor(cameraName: cameraName, manufacturer: nil)
+    }
+
+    /// Detect vendor using DeviceInfo manufacturer when available.
+    private func detectCameraVendor(cameraName: String, manufacturer: String?) -> CameraVendor {
+        if let manufacturer {
+            let m = manufacturer.lowercased()
+            if m.contains("canon") {
+                return .canon
+            }
+            if m.contains("nikon") {
+                return .nikon
+            }
+            // Sony typically uses standard PTP events (with additional SDIO init for PTP/IP mode)
+            if m.contains("sony") {
+                return .standard
+            }
+        }
+
         let name = cameraName.lowercased()
 
         // Canon detection
@@ -1470,7 +1653,7 @@ class PTPIPSession: NSObject {
 
         // Sony, Fuji, Olympus, Panasonic use standard PTP
         if name.contains("sony") || name.contains("fuji") ||
-           name.contains("olympus") || name.contains("panasonic") {
+            name.contains("olympus") || name.contains("panasonic") {
             return .standard
         }
 

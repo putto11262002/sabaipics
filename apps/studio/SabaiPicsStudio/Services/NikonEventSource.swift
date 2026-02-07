@@ -39,6 +39,13 @@ final class NikonEventSource: CameraEventSource {
     private var seenHandles = Set<UInt32>()
 
     // Nikon event codes (libgphoto2: ptp.h)
+    //
+    // Observed behavior (Nikon Z6, WiFi PTP/IP): Nikon_GetEvent (0x90C7) returns
+    // standard PTP event codes (0x400x) like ObjectAdded (0x4002) and CaptureComplete
+    // (0x400D), not only Nikon-specific 0xC1xx codes. This means:
+    // - Some Nikon bodies/modes may require polling (hence this event source)
+    // - Even when polling, we must treat standard 0x4002 as "new object".
+    private let ptpObjectAdded: UInt16 = 0x4002
     private let nikonObjectAddedInSDRAM: UInt16 = 0xC101
 
     init(
@@ -175,8 +182,9 @@ final class NikonEventSource: CameraEventSource {
             let code = UInt16(littleEndian: codeLE)
             let param1 = UInt32(littleEndian: param1LE)
 
-            // Photo event: ObjectAddedInSDRAM (0xC101), param1 is object handle.
-            if code == nikonObjectAddedInSDRAM, param1 != 0 {
+            // Photo events: standard ObjectAdded (0x4002) or Nikon ObjectAddedInSDRAM (0xC101).
+            // In both cases param1 is the object handle.
+            if (code == ptpObjectAdded || code == nikonObjectAddedInSDRAM), param1 != 0 {
                 if seenHandles.contains(param1) {
                     continue
                 }
