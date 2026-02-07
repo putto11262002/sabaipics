@@ -17,6 +17,7 @@ struct NikonConnectFlowView: View {
     }
 
     private enum Step: Equatable {
+        case hotspotCheck
         case discovery(preferredRecordID: String?)
     }
 
@@ -24,12 +25,33 @@ struct NikonConnectFlowView: View {
     let onConnected: (ActiveCamera) -> Void
     let onCancel: () -> Void
 
-    @State private var step: Step = .discovery(preferredRecordID: nil)
+    @State private var step: Step = .hotspotCheck
     @State private var errorMessage: String? = nil
 
     var body: some View {
         Group {
             switch step {
+            case .hotspotCheck:
+                NikonHotspotSetupView(
+                    onNext: {
+                        step = .discovery(preferredRecordID: nil)
+                    }
+                )
+                .navigationTitle("Nikon")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            onCancel()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.Theme.mutedForeground)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
             case .discovery(let preferredRecordID):
                 let preferredIP: String? = {
                     guard let preferredRecordID else { return nil }
@@ -48,7 +70,12 @@ struct NikonConnectFlowView: View {
                     },
                     scanConfig: ScanConfig(timeout: 2.0, maxRetries: 2, retryDelay: 0.5, maxWaves: 3, waveDelay: 0),
                     onBack: {
-                        onCancel()
+                        switch startMode {
+                        case .new:
+                            step = .hotspotCheck
+                        case .reconnect:
+                            onCancel()
+                        }
                     },
                     onManualIP: {
                         // Manual IP hidden.
@@ -76,7 +103,11 @@ struct NikonConnectFlowView: View {
             errorMessage = nil
             switch startMode {
             case .new:
-                step = .discovery(preferredRecordID: nil)
+                if WiFiNetworkInfo.currentWiFiIPv4() != nil {
+                    step = .discovery(preferredRecordID: nil)
+                } else {
+                    step = .hotspotCheck
+                }
             case .reconnect(let recordID):
                 step = .discovery(preferredRecordID: recordID)
             }
