@@ -38,6 +38,10 @@ function AppShell() {
   const location = useLocation();
   const { status, startAuth, signOut } = useAuth();
 
+  if (status !== 'signed_in') {
+    return <SignedOutGuard />;
+  }
+
   return (
     <div className="relative h-screen overflow-hidden bg-background">
       <div
@@ -102,6 +106,28 @@ function AppShell() {
             </div>
           </SidebarInset>
         </SidebarProvider>
+      </div>
+    </div>
+  );
+}
+
+function SignedOutGuard() {
+  const { status, error, startAuth } = useAuth();
+
+  return (
+    <div className="h-screen w-screen flex items-center justify-center bg-background">
+      <div className="w-full max-w-sm px-6 py-8 text-center space-y-3">
+        <h1 className="text-base font-semibold">FrameFast</h1>
+        <p className="text-muted-foreground text-sm">Sign in to continue.</p>
+        {error ? <p className="text-destructive text-xs">{error}</p> : null}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={startAuth}
+          disabled={status === 'signing_in'}
+        >
+          {status === 'signing_in' ? 'Signing in...' : 'Sign in'}
+        </Button>
       </div>
     </div>
   );

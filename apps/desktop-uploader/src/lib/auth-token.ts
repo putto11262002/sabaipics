@@ -1,4 +1,4 @@
-const TOKEN_KEY = 'framefast.auth.token';
+const TOKEN_KEY = 'framefast.desktop.refresh_token';
 
 function isTauri() {
   return typeof window !== 'undefined' && '__TAURI__' in window;
@@ -12,7 +12,7 @@ async function tauriInvoke<T>(command: string, args?: Record<string, unknown>) {
   return tauri.core.invoke(command, args) as Promise<T>;
 }
 
-export async function getStoredToken(): Promise<string | null> {
+export async function getStoredRefreshToken(): Promise<string | null> {
   if (isTauri()) {
     try {
       const token = await tauriInvoke<string | null>('get_auth_token');
@@ -24,7 +24,7 @@ export async function getStoredToken(): Promise<string | null> {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-export async function setStoredToken(token: string | null): Promise<void> {
+export async function setStoredRefreshToken(token: string | null): Promise<void> {
   if (isTauri()) {
     if (!token) {
       await tauriInvoke('clear_auth_token');
