@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SignIn, SignedIn, SignedOut, useAuth } from '@sabaipics/auth/react';
+import { useDesktopAuthExchange } from '../../hooks/auth/useDesktopAuthExchange';
 
 function getRedirectUrl() {
   const params = new URLSearchParams(window.location.search);
   return params.get('redirect_url') ?? params.get('redirect') ?? '';
+}
+
+function getFlowMode() {
+  const params = new URLSearchParams(window.location.search);
+  // Backwards compat: existing desktop clients expect `token` in callback.
+  // New clients should pass flow=code to use the safer code-based flow.
+  return params.get('flow') === 'code' ? 'code' : 'token';
 }
 
 function isAllowedRedirect(url: URL) {
@@ -12,37 +20,14 @@ function isAllowedRedirect(url: URL) {
   return isHttp && isLocalhost && url.pathname === '/callback';
 }
 
-function buildReturnUrl(redirectUrl: string, code: string) {
+function buildReturnUrl(redirectUrl: string, params: { code?: string; token?: string }) {
   const url = new URL(redirectUrl);
   if (!isAllowedRedirect(url)) {
     throw new Error('Invalid redirect_url');
   }
-  url.searchParams.set('code', code);
+  if (params.code) url.searchParams.set('code', params.code);
+  if (params.token) url.searchParams.set('token', params.token);
   return url.toString();
-}
-
-async function exchangeDesktopAuthCode(params: { clerkToken: string; deviceName?: string }) {
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/desktop/auth/exchange`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${params.clerkToken}`,
-    },
-    body: JSON.stringify({ deviceName: params.deviceName ?? 'FrameFast Desktop' }),
-  });
-
-  if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try {
-      const json = (await res.json()) as { error?: { message?: string } };
-      message = json?.error?.message ?? message;
-    } catch {
-      // ignore
-    }
-    throw new Error(message);
-  }
-
-  return (await res.json()) as { code: string; expiresAt: number };
 }
 
 export function DesktopAuthPage() {
@@ -50,6 +35,7 @@ export function DesktopAuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const redirectUrl = useMemo(getRedirectUrl, []);
+  const flowMode = useMemo(getFlowMode, []);
 
   useEffect(() => {
     if (!redirectUrl) {
@@ -80,6 +66,7 @@ export function DesktopAuthPage() {
         <DesktopAuthRedirect
           redirectUrl={redirectUrl}
           getToken={getToken}
+          flowMode={flowMode}
           error={error}
           onError={setError}
           attempt={attempt}
@@ -93,6 +80,7 @@ export function DesktopAuthPage() {
 function DesktopAuthRedirect({
   redirectUrl,
   getToken,
+  flowMode,
   error,
   onError,
   attempt,
@@ -100,11 +88,14 @@ function DesktopAuthRedirect({
 }: {
   redirectUrl: string;
   getToken: (options?: { template?: string }) => Promise<string | null>;
+  flowMode: 'code' | 'token';
   error: string | null;
   onError: (value: string | null) => void;
   attempt: number;
   onRetry: () => void;
 }) {
+  const exchange = useDesktopAuthExchange();
+
   useEffect(() => {
     const run = async () => {
       if (!redirectUrl) return;
@@ -115,12 +106,19 @@ function DesktopAuthRedirect({
           return;
         }
 
-        const exchanged = await exchangeDesktopAuthCode({
-          clerkToken,
-          deviceName: 'FrameFast Desktop',
-        });
+        if (flowMode === 'code') {
+          const exchanged = await exchange.mutateAsync({
+            clerkToken,
+            deviceName: 'FrameFast Desktop',
+          });
+          const returnUrl = buildReturnUrl(redirectUrl, { code: exchanged.code });
+          window.location.href = returnUrl;
+          return;
+        }
 
-        const returnUrl = buildReturnUrl(redirectUrl, exchanged.code);
+        // Legacy flow: return Clerk session token directly.
+        // TODO: remove once desktop uploader redeems code.
+        const returnUrl = buildReturnUrl(redirectUrl, { token: clerkToken });
         window.location.href = returnUrl;
       } catch (err) {
         onError(err instanceof Error ? err.message : 'Failed to redirect');
@@ -128,7 +126,7 @@ function DesktopAuthRedirect({
     };
 
     void run();
-  }, [attempt, redirectUrl, getToken, onError]);
+  }, [attempt, redirectUrl, getToken, onError, flowMode, exchange]);
 
   if (error) {
     return (
@@ -137,7 +135,10 @@ function DesktopAuthRedirect({
         <button
           type="button"
           className="text-sm underline text-muted-foreground hover:text-foreground"
-          onClick={onRetry}
+          onClick={() => {
+            exchange.reset();
+            onRetry();
+          }}
         >
           Try again
         </button>
