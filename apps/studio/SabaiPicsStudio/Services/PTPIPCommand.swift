@@ -39,6 +39,9 @@ enum PTPOperationCode: UInt16 {
     case canonEOSGetObject = 0x9104
     case canonEOSRemoteRelease = 0x910F
 
+    // Nikon Extensions
+    case nikonGetEvent = 0x90C7
+
     // Sony Extensions
     case sonySDIOConnect = 0x9201
     case sonyGetSDIOGetExtDeviceInfo = 0x9202
@@ -68,6 +71,7 @@ enum PTPOperationCode: UInt16 {
         case .canonEOSGetStorageInfo: return "Canon_EOS_GetStorageInfo"
         case .canonEOSGetObject: return "Canon_EOS_GetObject"
         case .canonEOSRemoteRelease: return "Canon_EOS_RemoteRelease"
+        case .nikonGetEvent: return "Nikon_GetEvent"
         case .sonySDIOConnect: return "Sony_SDIOConnect"
         case .sonyGetSDIOGetExtDeviceInfo: return "Sony_GetSDIOGetExtDeviceInfo"
         case .sonyGetDevicePropDesc: return "Sony_GetDevicePropDesc"
@@ -322,6 +326,18 @@ struct PTPCommand {
         return PTPIPOperationRequest(
             dataPhaseInfo: 2,  // 2 = PTP_DP_GETDATA (receive data from camera)
             operationCode: PTPOperationCode.canonEOSGetEvent.rawValue,
+            transactionID: nextTransactionID(),
+            parameters: []
+        )
+    }
+
+    /// Build Nikon GetEvent command (for polling events)
+    /// Nikon cameras require polling via Nikon_GetEvent (0x90C7).
+    /// Returns a packed list of events (count + [code,param1] entries).
+    mutating func nikonGetEvent() -> PTPIPOperationRequest {
+        return PTPIPOperationRequest(
+            dataPhaseInfo: 2,  // 2 = PTP_DP_GETDATA (receive data from camera)
+            operationCode: PTPOperationCode.nikonGetEvent.rawValue,
             transactionID: nextTransactionID(),
             parameters: []
         )

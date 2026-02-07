@@ -532,31 +532,23 @@ class CanonEventSource: CameraEventSource {
 
     /// Send data on connection
     private static func sendData(connection: NWConnection, data: Data) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            connection.send(content: data, completion: .contentProcessed { error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-            })
+        do {
+            try await PTPIPIO.sendWithTimeout(connection: connection, data: data, timeout: 2.0)
+        } catch PTPIPIOError.timeout {
+            throw CanonEventSourceError.timeout
         }
     }
 
     /// Receive exact number of bytes from connection
     private static func receiveData(connection: NWConnection, length: Int) async throws -> Data {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
-            connection.receive(minimumIncompleteLength: length, maximumLength: length) { content, _, isComplete, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else if let data = content {
-                    continuation.resume(returning: data)
-                } else if isComplete {
-                    continuation.resume(throwing: CanonEventSourceError.connectionClosed)
-                } else {
-                    continuation.resume(throwing: CanonEventSourceError.invalidResponse)
-                }
-            }
+        do {
+            return try await PTPIPIO.receiveExactWithTimeout(connection: connection, length: length, timeout: 2.0)
+        } catch PTPIPIOError.timeout {
+            throw CanonEventSourceError.timeout
+        } catch PTPIPIOError.connectionClosed {
+            throw CanonEventSourceError.connectionClosed
+        } catch PTPIPIOError.emptyRead {
+            throw CanonEventSourceError.invalidResponse
         }
     }
 
@@ -601,6 +593,7 @@ enum CanonEventSourceError: LocalizedError {
     case invalidResponse
     case transactionMismatch
     case connectionClosed
+    case timeout
 
     var errorDescription: String? {
         switch self {
@@ -608,6 +601,7 @@ enum CanonEventSourceError: LocalizedError {
         case .invalidResponse: return "Invalid response from Canon camera"
         case .transactionMismatch: return "Transaction ID mismatch"
         case .connectionClosed: return "Connection closed"
+        case .timeout: return "Timed out waiting for camera"
         }
     }
 }

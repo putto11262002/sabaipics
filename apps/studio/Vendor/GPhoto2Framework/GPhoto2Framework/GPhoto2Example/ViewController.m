@@ -14,6 +14,75 @@
 #import "ptp-private.h"
 @import gphoto2;
 
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+static BOOL tcp_connect_with_timeout(const char *ip, int port, int timeoutMs) {
+    if (!ip || port <= 0 || port > 65535 || timeoutMs <= 0) {
+        return NO;
+    }
+
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        return NO;
+    }
+
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        close(fd);
+        return NO;
+    }
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons((uint16_t)port);
+    if (inet_pton(AF_INET, ip, &addr.sin_addr) != 1) {
+        close(fd);
+        return NO;
+    }
+
+    int rc = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
+    if (rc == 0) {
+        close(fd);
+        return YES;
+    }
+    if (rc < 0 && errno != EINPROGRESS) {
+        close(fd);
+        return NO;
+    }
+
+    fd_set wfds;
+    FD_ZERO(&wfds);
+    FD_SET(fd, &wfds);
+
+    struct timeval tv;
+    tv.tv_sec = timeoutMs / 1000;
+    tv.tv_usec = (timeoutMs % 1000) * 1000;
+
+    rc = select(fd + 1, NULL, &wfds, NULL, &tv);
+    if (rc <= 0) {
+        close(fd);
+        return NO;
+    }
+
+    int so_error = 0;
+    socklen_t len = sizeof(so_error);
+    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &so_error, &len) < 0) {
+        close(fd);
+        return NO;
+    }
+
+    close(fd);
+    return so_error == 0;
+}
+
 // Sony PTP/IP WiFi Configuration Constants
 // Use the generic PTP/IP camera model entry in libgphoto2.
 #define CANON_WIFI_IP @"192.168.122.1"
@@ -25,6 +94,10 @@
     Camera        *camera;
     GPContext *context;
     dispatch_queue_t eventMonitorQueue;  // Background queue for event monitoring
+
+    // Programmatic UI (bottom panel) to avoid overlapping storyboard controls.
+    UIView *bottomPanel;
+    BOOL customUISetup;
 }
     @property(nonatomic, assign) BOOL connected;
     @property(nonatomic, assign) PTPDeviceInfo deviceInfo;
@@ -44,6 +117,13 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
 
+    self.ipTextField.delegate = self;
+    self.ipTextField.returnKeyType = UIReturnKeyDone;
+
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dismissKeyboard)];
+    tap.cancelsTouchesInView = NO;
+    [self.view addGestureRecognizer:tap];
+
     // Initialize event tracking
     self.eventLog = [NSMutableArray array];
     self.detectedPhotosList = [NSMutableArray array];
@@ -56,7 +136,7 @@
     self.protocol = CANON_PROTOCOL;
     self.cameraModel = CANON_CAMERA_MODEL;
 
-    // Setup custom UI elements
+    // Setup custom UI elements (positioned later in viewDidLayoutSubviews)
     [self setupCustomUI];
 
     // Log startup configuration
@@ -78,6 +158,20 @@
                                 @"Ready to connect...";
 }
 
+- (void)dismissKeyboard {
+    [self.view endEditing:YES];
+}
+
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+    [textField resignFirstResponder];
+    return YES;
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self layoutCustomUI];
+}
+
 #pragma mark - UI Setup
 
 /**
@@ -85,68 +179,122 @@
  * Creates status labels, photo counter, event log, and control buttons
  */
 - (void)setupCustomUI {
-    CGFloat yOffset = 100;
-    CGFloat padding = 10;
-    CGFloat labelHeight = 30;
-    CGFloat screenWidth = self.view.bounds.size.width;
+    if (customUISetup) {
+        return;
+    }
+    customUISetup = YES;
+
+    // Bottom panel container (keeps our controls away from storyboard buttons)
+    bottomPanel = [[UIView alloc] initWithFrame:CGRectZero];
+    bottomPanel.backgroundColor = [[UIColor colorWithWhite:1.0 alpha:0.92] colorWithAlphaComponent:0.92];
+    bottomPanel.layer.cornerRadius = 12;
+    bottomPanel.layer.masksToBounds = YES;
+    [self.view addSubview:bottomPanel];
 
     // Status Label - shows connection state
-    self.statusLabel = [[UILabel alloc] initWithFrame:CGRectMake(padding, yOffset, screenWidth - 2*padding, labelHeight)];
+    self.statusLabel = [[UILabel alloc] initWithFrame:CGRectZero];
     self.statusLabel.text = @"Status: Disconnected";
     self.statusLabel.textAlignment = NSTextAlignmentCenter;
     self.statusLabel.font = [UIFont boldSystemFontOfSize:16];
     self.statusLabel.textColor = [UIColor redColor];
-    [self.view addSubview:self.statusLabel];
-    yOffset += labelHeight + padding;
+    [bottomPanel addSubview:self.statusLabel];
 
     // Photo Count Label - shows number of photos detected
-    self.photoCountLabel = [[UILabel alloc] initWithFrame:CGRectMake(padding, yOffset, screenWidth - 2*padding, labelHeight)];
+    self.photoCountLabel = [[UILabel alloc] initWithFrame:CGRectZero];
     self.photoCountLabel.text = @"Photos Detected: 0";
     self.photoCountLabel.textAlignment = NSTextAlignmentCenter;
     self.photoCountLabel.font = [UIFont systemFontOfSize:14];
-    [self.view addSubview:self.photoCountLabel];
-    yOffset += labelHeight + padding;
+    [bottomPanel addSubview:self.photoCountLabel];
 
     // Event Log Label - shows recent events
-    self.eventLogLabel = [[UILabel alloc] initWithFrame:CGRectMake(padding, yOffset, screenWidth - 2*padding, 60)];
+    self.eventLogLabel = [[UILabel alloc] initWithFrame:CGRectZero];
     self.eventLogLabel.text = @"Event Log:\n(waiting...)";
     self.eventLogLabel.numberOfLines = 0;
     self.eventLogLabel.textAlignment = NSTextAlignmentCenter;
     self.eventLogLabel.font = [UIFont systemFontOfSize:12];
     self.eventLogLabel.textColor = [UIColor darkGrayColor];
-    [self.view addSubview:self.eventLogLabel];
-    yOffset += 70;
+    [bottomPanel addSubview:self.eventLogLabel];
 
     // Event Monitor Button
     self.eventMonitorButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.eventMonitorButton.frame = CGRectMake(padding, yOffset, (screenWidth - 3*padding)/2, 44);
     [self.eventMonitorButton setTitle:@"Start Event Monitor" forState:UIControlStateNormal];
     self.eventMonitorButton.backgroundColor = [UIColor colorWithRed:0.0 green:0.5 blue:0.0 alpha:1.0];
     [self.eventMonitorButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     self.eventMonitorButton.layer.cornerRadius = 8;
     self.eventMonitorButton.enabled = NO;
     [self.eventMonitorButton addTarget:self action:@selector(startEventMonitoring:) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:self.eventMonitorButton];
+    [bottomPanel addSubview:self.eventMonitorButton];
 
     // Stop Monitor Button
     self.stopMonitorButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.stopMonitorButton.frame = CGRectMake((screenWidth - 3*padding)/2 + 2*padding, yOffset, (screenWidth - 3*padding)/2, 44);
     [self.stopMonitorButton setTitle:@"Stop Monitor" forState:UIControlStateNormal];
     self.stopMonitorButton.backgroundColor = [UIColor colorWithRed:0.8 green:0.0 blue:0.0 alpha:1.0];
     [self.stopMonitorButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     self.stopMonitorButton.layer.cornerRadius = 8;
     self.stopMonitorButton.enabled = NO;
     [self.stopMonitorButton addTarget:self action:@selector(stopEventMonitoring:) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:self.stopMonitorButton];
-    yOffset += 54;
+    [bottomPanel addSubview:self.stopMonitorButton];
 
     // Download Progress View
-    self.downloadProgressView = [[UIProgressView alloc] initWithFrame:CGRectMake(padding, yOffset, screenWidth - 2*padding, 2)];
+    self.downloadProgressView = [[UIProgressView alloc] initWithFrame:CGRectZero];
     self.downloadProgressView.progress = 0.0;
     self.downloadProgressView.hidden = YES;
-    [self.view addSubview:self.downloadProgressView];
+    [bottomPanel addSubview:self.downloadProgressView];
 
     NSLog(@"Custom UI elements created successfully");
+}
+
+// Keeps the programmatic UI from covering storyboard controls.
+- (void)layoutCustomUI {
+    if (!customUISetup || !bottomPanel) {
+        return;
+    }
+
+    CGFloat padding = 10;
+    CGFloat panelPadding = 12;
+    CGFloat labelHeight = 22;
+    CGFloat buttonHeight = 40;
+    CGFloat eventLogHeight = 60;
+
+    UIEdgeInsets insets = UIEdgeInsetsZero;
+    if (@available(iOS 11.0, *)) {
+        insets = self.view.safeAreaInsets;
+    }
+
+    CGFloat screenWidth = self.view.bounds.size.width;
+    CGFloat screenHeight = self.view.bounds.size.height;
+
+    CGFloat panelWidth = screenWidth - 2 * padding;
+    CGFloat panelHeight = panelPadding + labelHeight + 6 + labelHeight + 8 + eventLogHeight + 10 + buttonHeight + 10 + 2 + panelPadding;
+    CGFloat panelX = padding;
+    CGFloat panelY = screenHeight - insets.bottom - padding - panelHeight;
+
+    // If something is very small, keep it on-screen.
+    if (panelY < insets.top + padding) {
+        panelY = insets.top + padding;
+    }
+
+    bottomPanel.frame = CGRectMake(panelX, panelY, panelWidth, panelHeight);
+
+    CGFloat x = panelPadding;
+    CGFloat y = panelPadding;
+    CGFloat w = panelWidth - 2 * panelPadding;
+
+    self.statusLabel.frame = CGRectMake(x, y, w, labelHeight);
+    y += labelHeight + 6;
+
+    self.photoCountLabel.frame = CGRectMake(x, y, w, labelHeight);
+    y += labelHeight + 8;
+
+    self.eventLogLabel.frame = CGRectMake(x, y, w, eventLogHeight);
+    y += eventLogHeight + 10;
+
+    CGFloat buttonW = (w - panelPadding) / 2.0;
+    self.eventMonitorButton.frame = CGRectMake(x, y, buttonW, buttonHeight);
+    self.stopMonitorButton.frame = CGRectMake(x + buttonW + panelPadding, y, buttonW, buttonHeight);
+    y += buttonHeight + 10;
+
+    self.downloadProgressView.frame = CGRectMake(x, y, w, 2);
 }
 
 /**
@@ -296,6 +444,15 @@ static void logdumper(GPLogLevel level, const char *domain, const char *str,
     NSLog(@"Configuring ptpip settings...");
     gp_setting_set("ptpip", "hostname", "sabaipics-ipad");
 
+    // Fail fast if the target IP is not reachable on the PTP/IP port.
+    // libgphoto2's connect can block for a while on wrong IPs.
+    const int ptpipPort = 15740;
+    if (!tcp_connect_with_timeout([cameraIP UTF8String], ptpipPort, 1500)) {
+        NSLog(@"ERROR: Preflight failed: cannot connect to %@@%d", cameraIP, ptpipPort);
+        [self logEvent:[NSString stringWithFormat:@"Preflight failed: %@:%d not reachable", cameraIP, ptpipPort]];
+        return GP_ERROR_IO;
+    }
+
     // For Canon, we don't need Fuji mode settings
     // These are commented out but kept for reference
     // gp_setting_set("ptpip", "fuji_mode", "browse");
@@ -325,8 +482,9 @@ static void logdumper(GPLogLevel level, const char *domain, const char *str,
             NSLog(@"Serial Number: %s", params->deviceinfo.SerialNumber);
         }
     } else {
-        NSLog(@"ERROR: Camera initialization failed with code: %d", ret);
-        [self logEvent:[NSString stringWithFormat:@"Connection failed: %d", ret]];
+        const char *errStr = gp_result_as_string(ret);
+        NSLog(@"ERROR: Camera initialization failed with code: %d (%s)", ret, errStr ? errStr : "unknown");
+        [self logEvent:[NSString stringWithFormat:@"Connection failed: %d (%s)", ret, errStr ? errStr : "unknown"]];
     }
 
     NSLog(@"=== Connection Attempt Complete (return code: %d) ===", ret);
@@ -473,16 +631,17 @@ static void logdumper(GPLogLevel level, const char *domain, const char *str,
                         NSLog(@"Connection successful - UI updated");
                     } else {
                         // Connection failed
+                        const char *errStr = gp_result_as_string(ret);
                         NSString *errorMsg = [NSString stringWithFormat:
                             @"Connection Failed!\n\n"
-                            @"Error code: %d\n\n"
+                            @"Error code: %d (%s)\n\n"
                             @"Troubleshooting:\n"
                             @"1. Make sure camera WiFi is enabled\n"
                             @"2. Check iPad is connected to camera's WiFi\n"
                             @"3. Verify camera IP is %@\n"
                             @"4. Try restarting camera WiFi\n"
                             @"5. Check camera is in correct mode",
-                            ret, ip];
+                            ret, (errStr ? errStr : "unknown"), ip];
 
                         self.consoleTextView.text = errorMsg;
                         [self updateStatusLabel:@"Status: Connection Failed" color:[UIColor redColor]];

@@ -19,7 +19,7 @@
 
 #import <UIKit/UIKit.h>
 
-@interface ViewController : UIViewController
+@interface ViewController : UIViewController <UITextFieldDelegate>
 
 // Main Actions
 - (IBAction)connectTouchedPTP:(id)sender;
@@ -50,4 +50,3 @@
 @property (nonatomic, assign) int totalPhotosOnCamera;
 
 @end
-

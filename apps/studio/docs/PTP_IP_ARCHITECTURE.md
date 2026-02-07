@@ -2,7 +2,7 @@
 
 ## Overview
 
-iOS app for professional photographers to wirelessly transfer photos from Sony and Canon cameras via PTP/IP protocol over WiFi.
+iOS app for professional photographers to wirelessly transfer photos from Sony, Canon, and Nikon cameras via PTP/IP protocol over WiFi.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -16,8 +16,9 @@ iOS app for professional photographers to wirelessly transfer photos from Sony a
                               │ WiFi (PTP/IP over TCP port 15740)
                               ▼
                 ┌──────────────────────────┐
-                │  Sony / Canon Camera     │
-                └──────────────────────────┘
+                 │ Sony / Canon / Nikon     │
+                 │         Camera           │
+                 └──────────────────────────┘
 ```
 
 ---
@@ -31,16 +32,20 @@ CaptureTabRootView (owns NavigationStack)
 ├── CaptureHomeView (manufacturer menu + recent cameras list)
 └── .sheet(item: $activeSheet)
     ├── .sony → NavigationStack → SonyConnectFlowView
-    └── .canon → NavigationStack → CanonConnectFlowView
+    ├── .canon → NavigationStack → CanonConnectFlowView
+    └── .nikon → NavigationStack → NikonConnectFlowView
 ```
 
 Each flow is a step machine:
+
 - **Sony:** decision → QR/manual credentials → WiFi join → discovery → select
 - **Canon:** hotspot check → discovery → select
+- **Nikon:** WiFi check (soft gate) → discovery → select
 
 Both share `CameraDiscoveryScreen` for the scanning UI and `CameraDiscoveryViewModel` for state management.
 
 **Why sheets instead of navigation push:**
+
 - SwiftUI tab switches dismiss pushed views, causing stale state and leaked connections
 - Sheets persist across tab switches
 - Each sheet presentation creates fresh view tree
@@ -48,14 +53,15 @@ Both share `CameraDiscoveryScreen` for the scanning UI and `CameraDiscoveryViewM
 
 ### Sheet Lifecycle
 
-| Action | What happens |
-|--------|-------------|
-| **Done/Back on discovery** | `cleanupWithTimeout()` → overlay → disconnect → `onCancel()` → sheet dismisses |
-| **Select camera** | `releaseCamera()` → `onSelect` → `onConnected()` → sheet dismisses |
-| **Tab switch while sheet open** | Sheet stays visible — no dismissal, no cleanup needed |
-| **Swipe-to-dismiss** | Blocked (`.interactiveDismissDisabled(true)`) |
+| Action                          | What happens                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------ |
+| **Done/Back on discovery**      | `cleanupWithTimeout()` → overlay → disconnect → `onCancel()` → sheet dismisses |
+| **Select camera**               | `releaseCamera()` → `onSelect` → `onConnected()` → sheet dismisses             |
+| **Tab switch while sheet open** | Sheet stays visible — no dismissal, no cleanup needed                          |
+| **Swipe-to-dismiss**            | Blocked (`.interactiveDismissDisabled(true)`)                                  |
 
 **SwiftUI single-sheet rule:** Only one `.sheet` modifier per view works. We use `.sheet(item:)` with an `ActiveSheet` enum to support both Sony and Canon sheets from the same view.
+**Note:** Nikon is wired into the same enum-based sheet router.
 
 ---
 
@@ -63,51 +69,52 @@ Both share `CameraDiscoveryScreen` for the scanning UI and `CameraDiscoveryViewM
 
 ### Views
 
-| View | Purpose |
-| --- | --- |
-| `CaptureTabRootView` | Capture tab root, owns sheet presentation for connection flows |
-| `CaptureHomeView` | Manufacturer menu + recent cameras (Sony/Canon sections) |
-| `SonyConnectFlowView` | Sony connection step machine (decision → credentials → join → discover) |
-| `CanonConnectFlowView` | Canon connection step machine (hotspot check → discover) |
-| `CameraDiscoveryScreen` | Shared scanning UI (scanning/found/timedOut/needsNetworkHelp states) |
-| `CaptureSessionSheetView` | Active capture session with photo list |
-| `CaptureStatusBarView` | Inline status bar during active session |
-| `CameraRow` | Reusable camera row for discovery lists |
-| `PhotoListRow` | Photo row for capture session lists |
+| View                      | Purpose                                                                 |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `CaptureTabRootView`      | Capture tab root, owns sheet presentation for connection flows          |
+| `CaptureHomeView`         | Manufacturer menu + recent cameras (Sony/Canon/Nikon sections)          |
+| `SonyConnectFlowView`     | Sony connection step machine (decision → credentials → join → discover) |
+| `CanonConnectFlowView`    | Canon connection step machine (hotspot check → discover)                |
+| `NikonConnectFlowView`    | Nikon connection step machine (WiFi check → discover)                   |
+| `CameraDiscoveryScreen`   | Shared scanning UI (scanning/found/timedOut/needsNetworkHelp states)    |
+| `CaptureSessionSheetView` | Active capture session with photo list                                  |
+| `CaptureStatusBarView`    | Inline status bar during active session                                 |
+| `CameraRow`               | Reusable camera row for discovery lists                                 |
+| `PhotoListRow`            | Photo row for capture session lists                                     |
 
 ### ViewModels
 
-| ViewModel | Purpose |
-| --- | --- |
+| ViewModel                  | Purpose                                                       |
+| -------------------------- | ------------------------------------------------------------- |
 | `CameraDiscoveryViewModel` | Drives discovery UI state, delegates scanning to PTPIPScanner |
-| `SonyWiFiJoinViewModel` | Manages NEHotspotConfiguration WiFi join for Sony |
+| `SonyWiFiJoinViewModel`    | Manages NEHotspotConfiguration WiFi join for Sony             |
 
 ### Models
 
-| Model | Purpose |
-| --- | --- |
-| `DiscoveredCamera` | Camera found during scan (holds prepared PTP/IP session) |
-| `ActiveCamera` | Camera with active session ready for transfer |
-| `CapturedPhoto` | Single transferred photo with metadata |
-| `APCameraConnectionRecord` | Persisted recent camera for reconnect |
+| Model                      | Purpose                                                  |
+| -------------------------- | -------------------------------------------------------- |
+| `DiscoveredCamera`         | Camera found during scan (holds prepared PTP/IP session) |
+| `ActiveCamera`             | Camera with active session ready for transfer            |
+| `CapturedPhoto`            | Single transferred photo with metadata                   |
+| `APCameraConnectionRecord` | Persisted recent camera for reconnect                    |
 
 ### Stores
 
-| Store | Purpose |
-| --- | --- |
-| `CaptureSessionStore` | Owns active TransferSession, drives session UI state |
-| `APCameraConnectionStore` | Persists recent camera records (UserDefaults) |
+| Store                     | Purpose                                              |
+| ------------------------- | ---------------------------------------------------- |
+| `CaptureSessionStore`     | Owns active TransferSession, drives session UI state |
+| `APCameraConnectionStore` | Persists recent camera records (UserDefaults)        |
 
 ### Services
 
-| Service | Purpose |
-| --- | --- |
-| `PTPIPScanner` | Parallel IP scan with full PTP/IP handshake validation |
-| `PTPIPSession` | Protocol session (command + event channels) |
-| `CameraEventSource` | Protocol for vendor-specific event monitoring |
-| `CanonEventSource` | Canon polling (0x9116) with adaptive 50-200ms |
-| `StandardEventSource` | Push events for Sony |
-| `NikonEventSource` | Nikon polling stub (TODO) |
+| Service               | Purpose                                                |
+| --------------------- | ------------------------------------------------------ |
+| `PTPIPScanner`        | Parallel IP scan with full PTP/IP handshake validation |
+| `PTPIPSession`        | Protocol session (command + event channels)            |
+| `CameraEventSource`   | Protocol for vendor-specific event monitoring          |
+| `CanonEventSource`    | Canon polling (0x9116) with adaptive 50-200ms          |
+| `StandardEventSource` | Push events for Sony                                   |
+| `NikonEventSource`    | Nikon polling (0x90C7) with adaptive 50-200ms          |
 
 ---
 
@@ -151,10 +158,10 @@ SonyConnectFlowView / CanonConnectFlowView
 
 ### Scanner API
 
-| Method | Purpose |
-| --- | --- |
+| Method                  | Purpose                                      |
+| ----------------------- | -------------------------------------------- |
 | `scan(targets:config:)` | Start parallel IP scan with PTP/IP handshake |
-| `stop(timeout:)` | Cancel scan, abandon after timeout |
+| `stop(timeout:)`        | Cancel scan, abandon after timeout           |
 
 ### Scan Stages (per IP)
 
@@ -294,6 +301,7 @@ CanonEventSource.cleanup()
 PTPIPSession
     └── eventSource: CameraEventSource (protocol)
            ├── CanonEventSource   → Polling (0x9116), adaptive 50-200ms
+           ├── NikonEventSource   → Polling (0x90C7), adaptive 50-200ms
            └── StandardEventSource → Push events (Sony vendor event 0xC201)
 ```
 
@@ -328,7 +336,7 @@ Camera stores JPEG
        │  PTP Event (vendor-specific)
        ▼
 ┌─────────────────────────────────────────────────────┐
-│ CameraEventSource (Canon/Sony)                       │
+│ CameraEventSource (Canon/Nikon/Sony)                 │
 │   1. Detect photo (polling or push event)           │
 │   2. GetObjectInfo → Check if JPEG or RAW           │
 │   3. If RAW: delegate.didSkipRawFile() → skip       │
@@ -369,13 +377,19 @@ iOS device                                    Camera
    iOS → OpenSession(sessionID)
    iOS ← Response(OK)
 
+3b. DeviceInfo (vendor refinement)
+   iOS → GetDeviceInfo
+   iOS ← Data(DeviceInfo)
+   iOS: cameraVendor derived from DeviceInfo Manufacturer (fallback: cameraName)
+
 4. Vendor-specific init
-   Canon: SetEventMode(1)
-   Sony:  Extra handshake 0x920D after SDIO init
+    Canon: SetEventMode(1)
+    Sony:  Extra handshake 0x920D after SDIO init
 
 5. Photo Detection
-   Canon: polling Canon_GetEvent every 50-200ms
-   Sony:  push events via event channel (0xC201)
+    Canon: polling Canon_GetEvent every 50-200ms
+    Nikon: polling Nikon_GetEvent every 50-200ms
+    Sony:  push events via event channel (0xC201)
 
 6. Photo Download
    Canon: GetObjectInfo → GetObject
@@ -388,11 +402,13 @@ iOS device                                    Camera
 ### Protocol Constants
 
 **Canon-specific:**
+
 - `0x9115` - Canon_EOS_SetEventMode
 - `0x9116` - Canon_EOS_GetEvent
 - `0xC1A7` - ObjectAdded event
 
 **Sony-specific:**
+
 - `0xC201` - Sony vendor ObjectAdded event
 - `0xD215` - objectInMemory device property
 - `0x9209` - GetAllDevicePropData
@@ -401,17 +417,25 @@ iOS device                                    Camera
 - `0xFFFFC001` - In-memory object handle
 
 **Standard PTP:**
+
 - `0x1002` - OpenSession
 - `0x1003` - CloseSession
 - `0x1008` - GetObjectInfo
 - `0x1009` - GetObject
 - `0x2001` - Response OK
 
+**Nikon-specific:**
+
+- `0x90C7` - Nikon_GetEvent (polling)
+- Event payload may include standard PTP events like `0x4002` (ObjectAdded) and `0x400D` (CaptureComplete)
+- Some Nikon bodies/modes may also emit Nikon-specific `0xC101` (ObjectAddedInSDRAM)
+
 ### Canon Compatibility
 
 Validated Canon PTP/IP protocol across generations (EOS 80D 2016 vs R6 Mark II 2022): **byte-for-byte identical** protocol.
 
 All Canon cameras supporting "EOS Utility WiFi connection" use this standardized protocol:
+
 - R-series (15 models): R1, R3, R5, R5 II, R6 III, R6 II, R6, R7, R8, R10, R50, R100, RP
 - DSLRs with WiFi (18+ models): 90D, 80D, 77D, 70D, 6D Mark II, 6D, 5D Mark IV
 - M-series (10 models): M6 II, M50 II, M50, M200, M100, M10, M5, M6, M3
@@ -448,6 +472,9 @@ SabaiPicsStudio/
 │   ├── Canon/
 │   │   ├── CanonConnectFlowView.swift      # Canon connection step machine
 │   │   └── CanonHotspotSetupView.swift     # Hotspot check with soft-gate
+│   ├── Nikon/
+│   │   ├── NikonConnectFlowView.swift      # Nikon connection step machine
+│   │   └── NikonHotspotSetupView.swift     # WiFi setup instructions (soft-gate)
 │   └── Shared/
 │       ├── CameraDiscoveryScreen.swift     # Shared discovery UI
 │       ├── CameraRow.swift                 # Camera row for discovery lists
@@ -467,11 +494,13 @@ SabaiPicsStudio/
 │   ├── Discovery/
 │   │   ├── PTPIPScanner.swift              # PTP/IP handshake scanner
 │   │   └── DiscoveryUIState.swift          # UI state enum
+│   │   └── NikonHotspotDiscovery.swift      # Nikon scan target heuristics
 │   ├── PTPIPSession.swift                  # Protocol session
 │   ├── PTPIPPacket.swift                   # Packet encoding/decoding
 │   ├── PTPIPCommand.swift                  # Command queue
 │   ├── CameraEventSource.swift             # Event source protocol
 │   ├── CanonEventSource.swift              # Canon polling
+│   ├── NikonEventSource.swift              # Nikon polling
 │   ├── StandardEventSource.swift           # Sony push events
 │   ├── APCameraConnectionStore.swift       # Persisted recent cameras
 │   └── WiFiNetworkInfo.swift               # Network helpers
@@ -491,14 +520,15 @@ SabaiPicsStudio/
 
 ## Key Design Decisions
 
-| Decision | Rationale |
-| --- | --- |
-| Sheet-based connection flows | Survives tab switches, full dismissal control, fresh state |
-| Single `.sheet(item:)` with enum | SwiftUI only supports one `.sheet` per view |
-| Session prepared during scan (COMMIT POINT) | Instant connection when user selects |
-| `releaseCamera()` before handing off | Cleanup won't disconnect the selected camera |
-| `withCheckedContinuation` timeout race | `withTaskGroup` blocks on slow tasks even after `cancelAll()` |
-| Adaptive Canon polling (50-200ms) | Fast response, battery-efficient idle |
-| Sony in-memory gating (`0xD215`) | Prevents download before camera is ready |
-| PTPIPScanner replaces NetworkScannerService | Full PTP/IP handshake validation during scan, not just TCP probe |
-| Shared CameraDiscoveryScreen | Same discovery UX for Sony and Canon |
+| Decision                                    | Rationale                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| Sheet-based connection flows                | Survives tab switches, full dismissal control, fresh state          |
+| Single `.sheet(item:)` with enum            | SwiftUI only supports one `.sheet` per view                         |
+| Session prepared during scan (COMMIT POINT) | Instant connection when user selects                                |
+| `releaseCamera()` before handing off        | Cleanup won't disconnect the selected camera                        |
+| `withCheckedContinuation` timeout race      | `withTaskGroup` blocks on slow tasks even after `cancelAll()`       |
+| Adaptive Canon polling (50-200ms)           | Fast response, battery-efficient idle                               |
+| Sony in-memory gating (`0xD215`)            | Prevents download before camera is ready                            |
+| PTPIPScanner replaces NetworkScannerService | Full PTP/IP handshake validation during scan, not just TCP probe    |
+| Shared CameraDiscoveryScreen                | Same discovery UX for Sony/Canon/Nikon                              |
+| Vendor detection via GetDeviceInfo          | Camera name may omit manufacturer (e.g. Nikon Z6 reports `Z_6_...`) |
