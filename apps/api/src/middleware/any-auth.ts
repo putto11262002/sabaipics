@@ -18,6 +18,14 @@ export function createAnyAuth(): MiddlewareHandler<Env> {
   const clerkAuth = createClerkAuth() as unknown as MiddlewareHandler<Env>;
 
   return async (c, next) => {
+    // Public desktop auth endpoints must be callable before the client has any auth.
+    // Only /desktop/auth/exchange requires an authenticated Clerk session.
+    const path = new URL(c.req.url).pathname;
+    if (path.startsWith('/desktop/auth/') && path !== '/desktop/auth/exchange') {
+      c.set('auth', null);
+      return next();
+    }
+
     const authHeader = c.req.header('Authorization');
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);

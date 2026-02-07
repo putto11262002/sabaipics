@@ -44,7 +44,7 @@ type RefreshTxResult =
       ok: true;
       clerkUserId: string;
       desktopSessionId: string;
-      refreshToken: string;
+      refreshToken: string | null;
       refreshExpiresAtMs: number;
     };
 
@@ -239,6 +239,7 @@ export const desktopAuthRouter = new Hono<Env>()
               refreshTokenHash: desktopSessions.refreshTokenHash,
               refreshTokenHashPrev: desktopSessions.refreshTokenHashPrev,
               refreshTokenPrevExpiresAt: desktopSessions.refreshTokenPrevExpiresAt,
+              expiresAt: desktopSessions.expiresAt,
             })
             .from(desktopSessions)
             .where(
@@ -258,6 +259,18 @@ export const desktopAuthRouter = new Hono<Env>()
 
           if (!session?.id) {
             return { ok: false as const };
+          }
+
+          // If the request matched the previous (grace) token, do NOT rotate again.
+          // This prevents a late retry from invalidating the just-issued current token.
+          if (session.refreshTokenHashPrev && session.refreshTokenHashPrev === refreshTokenHash) {
+            return {
+              ok: true as const,
+              clerkUserId: session.clerkUserId as string,
+              desktopSessionId: session.id as string,
+              refreshToken: null,
+              refreshExpiresAtMs: new Date(session.expiresAt as string).getTime(),
+            };
           }
 
           const newRefreshToken = randomTokenBase64Url(48);
@@ -322,6 +335,7 @@ export const desktopAuthRouter = new Hono<Env>()
         accessTokenExpiresAt: access.expiresAtMs,
         refreshToken: rotated.refreshToken,
         refreshTokenExpiresAt: rotated.refreshExpiresAtMs,
+        refreshTokenUnchanged: rotated.refreshToken === null,
       });
     })
       .orTee((e) => e.cause && console.error('[desktop-auth/refresh]', e.code + ':', e.cause))

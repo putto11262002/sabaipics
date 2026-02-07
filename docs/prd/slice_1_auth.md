@@ -128,6 +128,10 @@ Create a new router, e.g. `apps/api/src/routes/desktop-auth.ts`, mounted under `
     - Set new current hash
   - Mint new access token
 
+Rotation grace note:
+
+- If the request matches the previous (grace) refresh token, do not rotate again. Return a new access token and indicate the refresh token is unchanged (client should keep its current refresh token).
+
 4. `POST /desktop/auth/revoke` (public; refresh-token authenticated)
 
 - Input: `{ refreshToken: string }`
