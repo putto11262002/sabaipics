@@ -1160,14 +1160,10 @@ class PTPIPSession: NSObject {
 
     /// Send data to connection
     private func sendData(connection: NWConnection, data: Data) async throws {
-        return try await withCheckedThrowingContinuation { continuation in
-            connection.send(content: data, completion: .contentProcessed { error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-            })
+        do {
+            try await PTPIPIO.sendWithTimeout(connection: connection, data: data, timeout: commandTimeout)
+        } catch PTPIPIOError.timeout {
+            throw PTPIPSessionError.timeout
         }
     }
 
@@ -1385,51 +1381,14 @@ class PTPIPSession: NSObject {
 
     /// Receive data from connection
     private func receiveData(connection: NWConnection, length: Int) async throws -> Data {
-        return try await withCheckedThrowingContinuation { continuation in
-            let lock = OSAllocatedUnfairLock()
-            var resumed = false
-
-            let timeoutTask = Task {
-                try? await Task.sleep(nanoseconds: UInt64(commandTimeout * 1_000_000_000))
-                lock.withLock {
-                    guard !resumed else { return }
-                    resumed = true
-                    continuation.resume(throwing: PTPIPSessionError.timeout)
-                }
-            }
-
-            connection.receive(minimumIncompleteLength: length, maximumLength: length) { content, _, isComplete, error in
-                var shouldResume = false
-                var resumeResult: Result<Data, Error>?
-
-                lock.withLock {
-                    guard !resumed else { return }
-                    resumed = true
-                    shouldResume = true
-
-                    if let error = error {
-                        resumeResult = .failure(error)
-                    } else if isComplete {
-                        resumeResult = .failure(PTPIPSessionError.connectionFailed)
-                    } else if let data = content, !data.isEmpty {
-                        resumeResult = .success(data)
-                    } else {
-                        resumeResult = .failure(PTPIPSessionError.connectionFailed)
-                    }
-                }
-
-                if shouldResume {
-                    timeoutTask.cancel()
-                    if let result = resumeResult {
-                        switch result {
-                        case .success(let data):
-                            continuation.resume(returning: data)
-                        case .failure(let error):
-                            continuation.resume(throwing: error)
-                        }
-                    }
-                }
-            }
+        do {
+            return try await PTPIPIO.receiveExactWithTimeout(connection: connection, length: length, timeout: commandTimeout)
+        } catch PTPIPIOError.timeout {
+            throw PTPIPSessionError.timeout
+        } catch PTPIPIOError.connectionClosed {
+            throw PTPIPSessionError.connectionFailed
+        } catch PTPIPIOError.emptyRead {
+            throw PTPIPSessionError.connectionFailed
         }
     }
 

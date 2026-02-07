@@ -35,6 +35,8 @@ final class NikonEventSource: CameraEventSource {
     private let minPollInterval: TimeInterval = 0.05
     private let maxPollInterval: TimeInterval = 0.2
 
+    private let ioTimeout: TimeInterval = 2.0
+
     // Basic de-dupe (Nikon may emit multiple notifications per capture)
     private var seenHandles = Set<UInt32>()
 
@@ -125,13 +127,23 @@ final class NikonEventSource: CameraEventSource {
         }
 
         // Serialize the entire transaction on the shared command socket.
-        let response = try await commandQueue.run { () async throws -> (data: Data?, response: PTPIPOperationResponse) in
-            var command = await txManager.createCommand()
-            let getEventCommand = command.nikonGetEvent()
-            let commandData = getEventCommand.toData()
+        let response: (data: Data?, response: PTPIPOperationResponse)
+        do {
+            response = try await commandQueue.run { () async throws -> (data: Data?, response: PTPIPOperationResponse) in
+                var command = await txManager.createCommand()
+                let getEventCommand = command.nikonGetEvent()
+                let commandData = getEventCommand.toData()
 
-            try await Self.sendData(connection: connection, data: commandData)
-            return try await Self.receiveDataAndResponse(connection: connection, expectedTransactionID: getEventCommand.transactionID)
+                try await PTPIPIO.sendWithTimeout(connection: connection, data: commandData, timeout: self.ioTimeout)
+                return try await Self.receiveDataAndResponse(
+                    connection: connection,
+                    expectedTransactionID: getEventCommand.transactionID,
+                    timeout: self.ioTimeout
+                )
+            }
+        } catch NikonEventSourceError.timeout {
+            // No response within deadline. Treat as no events (do not fail the session).
+            return false
         }
 
         guard let eventData = response.data, !eventData.isEmpty else {
@@ -233,47 +245,61 @@ final class NikonEventSource: CameraEventSource {
     // MARK: - Network I/O
 
     private static func sendData(connection: NWConnection, data: Data) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            connection.send(content: data, completion: .contentProcessed { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-            })
-        }
+        try await PTPIPIO.sendWithTimeout(connection: connection, data: data, timeout: 2.0)
     }
 
     private static func receiveData(connection: NWConnection, length: Int) async throws -> Data {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
-            connection.receive(minimumIncompleteLength: length, maximumLength: length) { content, _, isComplete, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else if let data = content {
-                    continuation.resume(returning: data)
-                } else if isComplete {
-                    continuation.resume(throwing: NikonEventSourceError.connectionClosed)
-                } else {
-                    continuation.resume(throwing: NikonEventSourceError.invalidResponse)
-                }
+        do {
+            return try await PTPIPIO.receiveExactWithTimeout(connection: connection, length: length, timeout: 2.0)
+        } catch let error as PTPIPIOError {
+            switch error {
+            case .timeout:
+                throw NikonEventSourceError.timeout
+            case .connectionClosed:
+                throw NikonEventSourceError.connectionClosed
+            case .emptyRead:
+                throw NikonEventSourceError.invalidResponse
             }
         }
     }
 
     private static func receiveDataAndResponse(
         connection: NWConnection,
-        expectedTransactionID: UInt32
+        expectedTransactionID: UInt32,
+        timeout: TimeInterval
     ) async throws -> (data: Data?, response: PTPIPOperationResponse) {
         var accumulatedData = Data()
 
         while true {
-            let headerData = try await receiveData(connection: connection, length: 8)
+            let headerData: Data
+            do {
+                headerData = try await PTPIPIO.receiveExactWithTimeout(connection: connection, length: 8, timeout: timeout)
+            } catch PTPIPIOError.timeout {
+                throw NikonEventSourceError.timeout
+            } catch PTPIPIOError.connectionClosed {
+                throw NikonEventSourceError.connectionClosed
+            } catch {
+                throw error
+            }
             guard let header = PTPIPHeader.from(headerData) else {
                 throw NikonEventSourceError.invalidResponse
             }
 
             let payloadLength = Int(header.length) - 8
-            let payloadData = payloadLength > 0 ? try await receiveData(connection: connection, length: payloadLength) : Data()
+            let payloadData: Data
+            if payloadLength > 0 {
+                do {
+                    payloadData = try await PTPIPIO.receiveExactWithTimeout(connection: connection, length: payloadLength, timeout: timeout)
+                } catch PTPIPIOError.timeout {
+                    throw NikonEventSourceError.timeout
+                } catch PTPIPIOError.connectionClosed {
+                    throw NikonEventSourceError.connectionClosed
+                } catch {
+                    throw error
+                }
+            } else {
+                payloadData = Data()
+            }
 
             var fullPacket = headerData
             fullPacket.append(payloadData)
@@ -309,12 +335,14 @@ enum NikonEventSourceError: LocalizedError {
     case invalidResponse
     case transactionMismatch
     case connectionClosed
+    case timeout
 
     var errorDescription: String? {
         switch self {
         case .invalidResponse: return "Invalid response from Nikon camera"
         case .transactionMismatch: return "Transaction ID mismatch"
         case .connectionClosed: return "Connection closed"
+        case .timeout: return "Timed out waiting for camera"
         }
     }
 }
