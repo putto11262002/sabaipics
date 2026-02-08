@@ -21,10 +21,7 @@ final class NikonEventSource: CameraEventSource {
     weak var delegate: CameraEventSourceDelegate?
 
     // Dependencies
-    private weak var commandConnection: NWConnection?
-    private weak var transactionManager: PTPTransactionManager?
-    private let commandQueue: PTPIPCommandQueue
-    private weak var photoOps: PhotoOperationsProvider?
+    private weak var session: PTPIPSession?
 
     // Polling state
     private var pollingTask: Task<Void, Never>?
@@ -34,8 +31,6 @@ final class NikonEventSource: CameraEventSource {
     private var pollInterval: TimeInterval = 0.05
     private let minPollInterval: TimeInterval = 0.05
     private let maxPollInterval: TimeInterval = 0.2
-
-    private let ioTimeout: TimeInterval = 2.0
 
     // Basic de-dupe (Nikon may emit multiple notifications per capture)
     private var seenHandles = Set<UInt32>()
@@ -51,15 +46,9 @@ final class NikonEventSource: CameraEventSource {
     private let nikonObjectAddedInSDRAM: UInt16 = 0xC101
 
     init(
-        commandConnection: NWConnection?,
-        transactionManager: PTPTransactionManager?,
-        commandQueue: PTPIPCommandQueue,
-        photoOps: PhotoOperationsProvider?
+        session: PTPIPSession
     ) {
-        self.commandConnection = commandConnection
-        self.transactionManager = transactionManager
-        self.commandQueue = commandQueue
-        self.photoOps = photoOps
+        self.session = session
     }
 
     // MARK: - CameraEventSource
@@ -83,9 +72,7 @@ final class NikonEventSource: CameraEventSource {
 
     func cleanup() async {
         await stopMonitoring()
-        commandConnection = nil
-        transactionManager = nil
-        photoOps = nil
+        session = nil
         seenHandles.removeAll()
     }
 
@@ -121,28 +108,16 @@ final class NikonEventSource: CameraEventSource {
     }
 
     private func pollNikonEvent() async throws -> Bool {
-        guard let connection = commandConnection,
-              let txManager = transactionManager else {
-            return false
-        }
+        guard let session else { return false }
 
-        // Serialize the entire transaction on the shared command socket.
+        // Execute Nikon_GetEvent (0x90C7) as a single serialized command-channel operation.
+        // Note: we treat session-level timeouts as "no events" for this poll iteration.
         let response: (data: Data?, response: PTPIPOperationResponse)
         do {
-            response = try await commandQueue.run { () async throws -> (data: Data?, response: PTPIPOperationResponse) in
-                var command = await txManager.createCommand()
-                let getEventCommand = command.nikonGetEvent()
-                let commandData = getEventCommand.toData()
-
-                try await PTPIPIO.sendWithTimeout(connection: connection, data: commandData, timeout: self.ioTimeout)
-                return try await Self.receiveDataAndResponse(
-                    connection: connection,
-                    expectedTransactionID: getEventCommand.transactionID,
-                    timeout: self.ioTimeout
-                )
+            response = try await session.executeOperation { command in
+                command.nikonGetEvent()
             }
-        } catch NikonEventSourceError.timeout {
-            // No response within deadline. Treat as no events (do not fail the session).
+        } catch PTPIPSessionError.timeout {
             return false
         }
 
@@ -157,7 +132,7 @@ final class NikonEventSource: CameraEventSource {
 
         for handle in handles {
             if Task.isCancelled { break }
-            await processPhotoHandle(handle)
+            session.enqueueObjectHandle(handle)
         }
 
         return true
@@ -214,121 +189,7 @@ final class NikonEventSource: CameraEventSource {
         return handles
     }
 
-    private func processPhotoHandle(_ handle: UInt32) async {
-        guard let photoOps else { return }
-
-        do {
-            let objectInfo = try await photoOps.getObjectInfo(objectHandle: handle)
-
-            if objectInfo.isRawFile {
-                delegate?.eventSource(self, didSkipRawFile: objectInfo.filename)
-                return
-            }
-
-            if objectInfo.isJpegFile {
-                delegate?.eventSource(
-                    self,
-                    didDetectPhoto: handle,
-                    filename: objectInfo.filename,
-                    captureDate: Date(),
-                    fileSize: Int(objectInfo.objectCompressedSize)
-                )
-
-                let photoData = try await photoOps.downloadPhoto(objectHandle: handle)
-                delegate?.eventSource(self, didCompleteDownload: handle, data: photoData)
-            }
-        } catch {
-            delegate?.eventSource(self, didFailWithError: error)
-        }
-    }
-
-    // MARK: - Network I/O
-
-    private static func sendData(connection: NWConnection, data: Data) async throws {
-        try await PTPIPIO.sendWithTimeout(connection: connection, data: data, timeout: 2.0)
-    }
-
-    private static func receiveData(connection: NWConnection, length: Int) async throws -> Data {
-        do {
-            return try await PTPIPIO.receiveExactWithTimeout(connection: connection, length: length, timeout: 2.0)
-        } catch let error as PTPIPIOError {
-            switch error {
-            case .timeout:
-                throw NikonEventSourceError.timeout
-            case .connectionClosed:
-                throw NikonEventSourceError.connectionClosed
-            case .emptyRead:
-                throw NikonEventSourceError.invalidResponse
-            }
-        }
-    }
-
-    private static func receiveDataAndResponse(
-        connection: NWConnection,
-        expectedTransactionID: UInt32,
-        timeout: TimeInterval
-    ) async throws -> (data: Data?, response: PTPIPOperationResponse) {
-        var accumulatedData = Data()
-
-        while true {
-            let headerData: Data
-            do {
-                headerData = try await PTPIPIO.receiveExactWithTimeout(connection: connection, length: 8, timeout: timeout)
-            } catch PTPIPIOError.timeout {
-                throw NikonEventSourceError.timeout
-            } catch PTPIPIOError.connectionClosed {
-                throw NikonEventSourceError.connectionClosed
-            } catch {
-                throw error
-            }
-            guard let header = PTPIPHeader.from(headerData) else {
-                throw NikonEventSourceError.invalidResponse
-            }
-
-            let payloadLength = Int(header.length) - 8
-            let payloadData: Data
-            if payloadLength > 0 {
-                do {
-                    payloadData = try await PTPIPIO.receiveExactWithTimeout(connection: connection, length: payloadLength, timeout: timeout)
-                } catch PTPIPIOError.timeout {
-                    throw NikonEventSourceError.timeout
-                } catch PTPIPIOError.connectionClosed {
-                    throw NikonEventSourceError.connectionClosed
-                } catch {
-                    throw error
-                }
-            } else {
-                payloadData = Data()
-            }
-
-            var fullPacket = headerData
-            fullPacket.append(payloadData)
-
-            guard let packetType = PTPIPPacketType(rawValue: header.type) else {
-                throw NikonEventSourceError.invalidResponse
-            }
-
-            switch packetType {
-            case .startDataPacket:
-                continue
-            case .dataPacket, .endDataPacket:
-                if payloadData.count > 4 {
-                    accumulatedData.append(payloadData.dropFirst(4))
-                }
-                continue
-            case .operationResponse:
-                guard let response = PTPIPOperationResponse.from(fullPacket) else {
-                    throw NikonEventSourceError.invalidResponse
-                }
-                guard response.transactionID == expectedTransactionID else {
-                    throw NikonEventSourceError.transactionMismatch
-                }
-                return (accumulatedData.isEmpty ? nil : accumulatedData, response)
-            default:
-                throw NikonEventSourceError.invalidResponse
-            }
-        }
-    }
+    // Photo downloads are handled by the session unified photo pipeline.
 }
 
 enum NikonEventSourceError: LocalizedError {

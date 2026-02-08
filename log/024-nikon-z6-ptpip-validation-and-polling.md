@@ -21,3 +21,16 @@ Context: picking up SAB-84 (Nikon Z6 PTP/IP validation) and SAB-31 (implement Ni
     - `apps/studio/SabaiPicsStudio/Services/PTPIPSession.swift` factory now constructs `NikonEventSource(commandConnection, transactionManager, commandQueue, photoOps)`.
 
 - Dev tooling: fixed the vendored GPhoto2Example UI (connect button tap + keyboard dismissal) and added Local Network permission string.
+
+- Refactor: session-owned I/O + unified download pipeline (prep for multi-vendor stability):
+  - `apps/studio/SabaiPicsStudio/Services/PTPIPSession.swift`
+    - Added `executeOperation(...)` as the canonical command-channel boundary (serialized + deadline-based).
+    - Moved standard event-channel monitoring into `PTPIPSession` via `PTPIPEventMonitorDelegate` + `eventObjectAddedStream()`.
+    - Added a unified photo pipeline: vendor strategies enqueue object handles; session does `GetObjectInfo -> RAW filter -> JPEG download -> delegate callbacks`.
+    - Fixed direct-connect flow to start monitoring via `startEventMonitoring()` (avoid missing standard event channel) and to avoid double-start.
+  - `apps/studio/SabaiPicsStudio/Services/StandardEventSource.swift`
+    - No longer owns the event channel; consumes `session.eventObjectAddedStream()` and enqueues handles into the session pipeline.
+  - `apps/studio/SabaiPicsStudio/Services/SonyEventSource.swift`
+    - Sony-only strategy (in-memory handle gating + logical handle synthesis); enqueues jobs into the session pipeline using `maxBytes` partial transfer.
+  - `apps/studio/SabaiPicsStudio/Services/CanonEventSource.swift` + `apps/studio/SabaiPicsStudio/Services/NikonEventSource.swift`
+    - Strategy-only: poll/parse events and enqueue handles into the session pipeline (no per-handle downloads).
