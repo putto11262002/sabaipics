@@ -490,7 +490,8 @@ export const photosRouter = new Hono<Env>()
             await tx.insert(creditLedger).values({
               photographerId: photographer.id,
               amount: -1,
-              type: 'upload',
+              type: 'debit',
+              source: 'upload',
               expiresAt: oldestCredit.expiresAt,
               stripeSessionId: null,
             });

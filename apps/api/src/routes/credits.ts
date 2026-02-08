@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, asc, and } from 'drizzle-orm';
-import { creditPackages, photographers, creditLedger } from '@sabaipics/db';
+import { creditPackages, photographers, creditLedger, promoCodeUsage } from '@sabaipics/db';
 import { requirePhotographer } from '../middleware';
 import type { Env } from '../types';
 import {
@@ -23,6 +23,95 @@ import { topUpSchema } from '../lib/pricing/validation';
  */
 
 export const creditsRouter = new Hono<Env>()
+  /**
+   * GET /credit-packages/promo-code/validate?code=XXX
+   *
+   * Validates a promo code and returns its type (gift or discount) with relevant details.
+   * Public endpoint - no authentication required (validation happens at checkout).
+   */
+  .get('/promo-code/validate', async (c) => {
+    return safeTry(async function* () {
+      const code = c.req.query('code');
+
+      if (!code) {
+        return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'code parameter is required' });
+      }
+
+      const stripe = createStripeClient(c.env);
+
+      // Fetch promo code from Stripe with coupon expanded
+      const promoCodes = yield* ResultAsync.fromPromise(
+        stripe.promotionCodes.list({
+          code,
+          active: true,
+          limit: 1,
+          expand: ['data.promotion.coupon'],
+        }),
+        (cause): HandlerError => ({
+          code: 'BAD_GATEWAY',
+          message: 'Failed to validate promo code',
+          cause,
+        }),
+      );
+
+      if (promoCodes.data.length === 0) {
+        return err<never, HandlerError>({
+          code: 'NOT_FOUND',
+          message: 'Invalid or expired promo code',
+        });
+      }
+
+      const promoCodeObj = promoCodes.data[0];
+      const coupon = promoCodeObj.promotion?.coupon;
+
+      if (!coupon || typeof coupon !== 'object') {
+        return err<never, HandlerError>({
+          code: 'INTERNAL_ERROR',
+          message: 'Coupon data not available',
+        });
+      }
+
+      // Check if it's a gift code (100% off + type=gift)
+      const metadata = coupon.metadata || {};
+      const isGiftCode = coupon.percent_off === 100 && metadata.type === 'gift';
+
+      if (isGiftCode) {
+        // Gift code response
+        const maxAmountThb = parseFloat(metadata.max_amount_thb || '0');
+        const credits = parseInt(metadata.credits || '0', 10);
+        const expiresAt = promoCodeObj.expires_at
+          ? new Date(promoCodeObj.expires_at * 1000).toISOString()
+          : null;
+
+        return ok({
+          type: 'gift' as const,
+          code: promoCodeObj.code,
+          credits,
+          maxAmountThb,
+          expiresAt,
+        });
+      } else {
+        // Discount code response
+        const discountPercent = coupon.percent_off || 0;
+        const discountAmount = coupon.amount_off || 0;
+        const minAmountThb = parseFloat(metadata.min_amount_thb || '0');
+
+        return ok({
+          type: 'discount' as const,
+          code: promoCodeObj.code,
+          discountPercent,
+          discountAmount,
+          discountType: coupon.percent_off ? ('percent' as const) : ('amount' as const),
+          minAmountThb: minAmountThb > 0 ? minAmountThb : null,
+        });
+      }
+    })
+      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
+  })
   /**
    * GET /credit-packages/preview?amount=X
    *
@@ -105,22 +194,98 @@ export const creditsRouter = new Hono<Env>()
         (cause): HandlerError => ({ code: 'BAD_REQUEST', message: 'Invalid request body', cause }),
       );
 
-      // Validate amount
-      const validation = topUpSchema.safeParse(body);
-      if (!validation.success) {
+      const { amount, promoCode } = body;
+
+      // Basic amount validation
+      if (typeof amount !== 'number' || amount <= 0) {
         return err<never, HandlerError>({
           code: 'BAD_REQUEST',
-          message: validation.error.errors[0]?.message || 'Invalid amount',
+          message: 'Amount must be a positive number',
         });
       }
 
-      const { amount } = validation.data;
+      // Initialize Stripe client (used for promo validation and customer management)
+      const stripe = createStripeClient(c.env);
+      let isGiftCode = false;
+      let cachedPromoCode: any = null; // Store for reuse
 
-      // Additional check: Stripe minimum for THB is 10 THB
-      if (amount < 10) {
+      if (promoCode && typeof promoCode === 'string') {
+        const promoCodes = yield* ResultAsync.fromPromise(
+          stripe.promotionCodes.list({
+            code: promoCode,
+            active: true,
+            limit: 1,
+            expand: ['data.promotion.coupon'],
+          }),
+          (cause): HandlerError => ({
+            code: 'BAD_GATEWAY',
+            message: 'Failed to validate promo code',
+            cause,
+          }),
+        );
+
+        if (promoCodes.data.length === 0) {
+          return err<never, HandlerError>({
+            code: 'BAD_REQUEST',
+            message: 'Invalid or expired promo code',
+          });
+        }
+
+        cachedPromoCode = promoCodes.data[0];
+        const coupon = cachedPromoCode.promotion?.coupon;
+        if (coupon && typeof coupon === 'object') {
+          const metadata = coupon.metadata || {};
+          isGiftCode = coupon.percent_off === 100 && metadata.type === 'gift';
+        }
+
+        // Check if photographer has already used this promo code
+        const existingUsage = yield* ResultAsync.fromPromise(
+          db
+            .select()
+            .from(promoCodeUsage)
+            .where(
+              and(
+                eq(promoCodeUsage.photographerId, photographer.id),
+                eq(promoCodeUsage.promoCode, promoCode),
+              ),
+            )
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (existingUsage.length > 0) {
+          return err<never, HandlerError>({
+            code: 'BAD_REQUEST',
+            message: 'You have already used this promo code',
+          });
+        }
+      }
+
+      // Apply appropriate minimum based on type
+      if (isGiftCode) {
+        // Gift codes: Stripe minimum only (20 THB)
+        if (amount < 20) {
+          return err<never, HandlerError>({
+            code: 'BAD_REQUEST',
+            message: 'Amount must be at least 20 THB (Stripe minimum)',
+          });
+        }
+      } else {
+        // Regular top-ups: Business rule (50 THB minimum)
+        const validation = topUpSchema.safeParse(body);
+        if (!validation.success) {
+          return err<never, HandlerError>({
+            code: 'BAD_REQUEST',
+            message: validation.error.errors[0]?.message || 'Invalid amount',
+          });
+        }
+      }
+
+      // Max amount check (applies to both)
+      if (amount > 10000) {
         return err<never, HandlerError>({
           code: 'BAD_REQUEST',
-          message: 'Amount must be at least 10 THB (Stripe minimum)',
+          message: 'Maximum top-up is 10,000 THB',
         });
       }
 
@@ -128,7 +293,6 @@ export const creditsRouter = new Hono<Env>()
       const discount = calculateTieredDiscount(amount);
 
       // Get or create Stripe customer
-      const stripe = createStripeClient(c.env);
       let customer = yield* ResultAsync.fromPromise(
         findCustomerByPhotographerId(stripe, photographer.id),
         (cause): HandlerError => ({
@@ -175,7 +339,69 @@ export const creditsRouter = new Hono<Env>()
 
       const dashboardUrl = c.env.DASHBOARD_FRONTEND_URL;
       const successUrl = `${dashboardUrl}/credits/success`;
-      const cancelUrl = `${dashboardUrl}/credits`;
+
+      // Build cancel URL - include promo code if present so dialog reopens on cancel
+      let cancelUrl = `${dashboardUrl}/dashboard`;
+      if (promoCode && typeof promoCode === 'string') {
+        cancelUrl = `${dashboardUrl}/dashboard?code=${encodeURIComponent(promoCode)}`;
+      }
+
+      // Validate and apply promo code if provided
+      let appliedPromoCode: string | null = null;
+      if (cachedPromoCode) {
+        // Reuse previously fetched promo code
+        const promoCodeObj = cachedPromoCode;
+
+        // Verify promo code is for this customer (if customer-specific)
+        if (promoCodeObj.customer && promoCodeObj.customer !== customer.id) {
+          return err<never, HandlerError>({
+            code: 'BAD_REQUEST',
+            message: 'This promo code is not valid for your account',
+          });
+        }
+
+        // Check if max redemptions reached
+        if (
+          promoCodeObj.max_redemptions &&
+          promoCodeObj.times_redeemed >= promoCodeObj.max_redemptions
+        ) {
+          return err<never, HandlerError>({
+            code: 'BAD_REQUEST',
+            message: 'This promo code has reached its usage limit',
+          });
+        }
+
+        // Get coupon details (should be expanded)
+        const coupon = promoCodeObj.promotion?.coupon;
+
+        // Validate gift code amount (100% off coupons with max_amount_thb)
+        if (coupon && typeof coupon === 'object') {
+          const metadata = coupon.metadata || {};
+          const isGiftCode = coupon.percent_off === 100 && metadata.type === 'gift';
+
+          if (isGiftCode) {
+            const maxAmountThb = parseFloat(metadata.max_amount_thb || '0');
+            const giftCredits = parseInt(metadata.credits || '0', 10);
+
+            if (maxAmountThb > 0 && amount > maxAmountThb) {
+              return err<never, HandlerError>({
+                code: 'BAD_REQUEST',
+                message: `This gift code is only valid for up to ${maxAmountThb} THB (${giftCredits} credits). Please adjust your amount.`,
+              });
+            }
+
+            // For gift codes, ensure exact amount or less
+            if (amount < maxAmountThb * 0.5) {
+              return err<never, HandlerError>({
+                code: 'BAD_REQUEST',
+                message: `This gift code is for ${giftCredits} credits (${maxAmountThb} THB). Please enter the full gift amount.`,
+              });
+            }
+          }
+        }
+
+        appliedPromoCode = promoCodeObj.id; // Store Stripe promo code ID
+      }
 
       // Create product name and description
       const productName = `${discount.creditAmount.toLocaleString()} Credits`;
@@ -202,6 +428,9 @@ export const creditsRouter = new Hono<Env>()
               },
             },
           ],
+          ...(appliedPromoCode && {
+            discounts: [{ promotion_code: appliedPromoCode }],
+          }),
           successUrl,
           cancelUrl,
           metadata: {
@@ -211,6 +440,7 @@ export const creditsRouter = new Hono<Env>()
             discount_percent: discount.discountPercent.toString(),
             final_amount: discount.finalAmount.toString(),
             purchase_type: 'topup',
+            ...(promoCode && { promo_code_applied: promoCode }),
           },
           currency: 'thb',
           mode: 'payment',
@@ -268,7 +498,8 @@ export const creditsRouter = new Hono<Env>()
             and(
               eq(creditLedger.stripeSessionId, sessionId),
               eq(creditLedger.photographerId, photographer.id),
-              eq(creditLedger.type, 'purchase'),
+              eq(creditLedger.type, 'credit'),
+              eq(creditLedger.source, 'purchase'),
             ),
           )
           .limit(1),

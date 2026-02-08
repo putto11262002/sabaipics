@@ -3,6 +3,7 @@ import { useApiClient } from '../../lib/api';
 
 export interface TopUpCheckoutInput {
   amount: number;
+  promoCode?: string;
 }
 
 export interface TopUpCheckoutResult {

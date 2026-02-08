@@ -15,5 +15,13 @@ export interface AuthProviderProps {
  * - Control the auth provider interface
  */
 export function AuthProvider({ children, publishableKey }: AuthProviderProps) {
-	return <ClerkProvider publishableKey={publishableKey}>{children}</ClerkProvider>;
+	return (
+		<ClerkProvider
+			publishableKey={publishableKey}
+			signInFallbackRedirectUrl="/dashboard"
+			signUpFallbackRedirectUrl="/dashboard"
+		>
+			{children}
+		</ClerkProvider>
+	);
 }

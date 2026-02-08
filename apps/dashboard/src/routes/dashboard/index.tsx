@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { differenceInDays, parseISO } from 'date-fns';
 import {
@@ -37,9 +37,26 @@ import {
 import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
 import { Spinner } from '@sabaipics/uiv3/components/spinner';
 import { CreditTopUpDialog } from '../../components/credits/CreditTopUpDialog';
+import { GiftCodeDialog } from '../../components/credits/GiftCodeDialog';
+import { useValidatePromoCode } from '../../hooks/credits/useValidatePromoCode';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@sabaipics/uiv3/components/alert-dialog';
 
 export function DashboardPage() {
   const [creditDialogOpen, setCreditDialogOpen] = useState(false);
+  const [giftDialogOpen, setGiftDialogOpen] = useState(false);
+  const [promoCodeFromUrl, setPromoCodeFromUrl] = useState<string | null>(null);
+  const [giftCode, setGiftCode] = useState<string>('');
+  const [discountCode, setDiscountCode] = useState<string>('');
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const navigate = useNavigate();
   const { data, isLoading, error, refetch, isRefetching } = useDashboardData();
   const { data: eventsData, isLoading: eventsLoading } = useEvents(0, 10);
@@ -47,6 +64,70 @@ export function DashboardPage() {
   const downloadQR = useDownloadQR();
 
   const dashboardData = data?.data;
+
+  // Validate promo code to determine if it's a gift code
+  const validateQuery = useValidatePromoCode(promoCodeFromUrl || '', !!promoCodeFromUrl);
+
+  // Handle promo code from query params (gift or discount codes)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+
+    if (code) {
+      setPromoCodeFromUrl(code);
+      // Keep code in URL - Stripe will redirect back with code on cancel
+    }
+  }, []);
+
+  // Handle back button - close dialogs instead of navigating away
+  useEffect(() => {
+    const handlePopState = () => {
+      if (giftDialogOpen) {
+        setGiftDialogOpen(false);
+        setGiftCode('');
+      } else if (creditDialogOpen) {
+        setCreditDialogOpen(false);
+        setDiscountCode('');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [giftDialogOpen, creditDialogOpen]);
+
+  // Open appropriate dialog when validation completes
+  useEffect(() => {
+    if (validateQuery.isSuccess && promoCodeFromUrl) {
+      const isGiftCode = validateQuery.data?.data?.type === 'gift';
+      if (isGiftCode) {
+        setGiftCode(promoCodeFromUrl);
+        setGiftDialogOpen(true);
+      } else {
+        setDiscountCode(promoCodeFromUrl);
+        setCreditDialogOpen(true);
+      }
+      // Clear the URL code after processing
+      setPromoCodeFromUrl(null);
+    }
+  }, [validateQuery.isSuccess, promoCodeFromUrl, validateQuery.data]);
+
+  // Show error if promo code validation fails
+  useEffect(() => {
+    if (validateQuery.isError && promoCodeFromUrl) {
+      const message = validateQuery.error instanceof Error
+        ? validateQuery.error.message
+        : 'This promo code is invalid or expired';
+
+      setErrorMessage(message);
+      setErrorDialogOpen(true);
+
+      // Clear the code after showing error
+      setPromoCodeFromUrl(null);
+
+      // Clean URL to remove invalid code
+      window.history.replaceState({}, '', '/dashboard');
+    }
+  }, [validateQuery.isError, promoCodeFromUrl, validateQuery.error]);
 
   // Helper to check if credits are expiring soon (within 7 days)
   const isExpiringSoon = (expiry: string | null) => {
@@ -256,11 +337,34 @@ export function DashboardPage() {
         )}
       </div>
 
-      {/* Credit Top-Up Dialog */}
+      {/* Credit Top-Up Dialog (for regular purchases and discount codes) */}
       <CreditTopUpDialog
         open={creditDialogOpen}
         onOpenChange={setCreditDialogOpen}
+        initialPromoCode={discountCode || undefined}
       />
+
+      {/* Gift Code Dialog (for 100% free credit gifts) */}
+      {giftCode && (
+        <GiftCodeDialog
+          open={giftDialogOpen}
+          onOpenChange={setGiftDialogOpen}
+          giftCode={giftCode}
+        />
+      )}
+
+      {/* Error Dialog for invalid/expired promo codes */}
+      <AlertDialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Invalid Promo Code</AlertDialogTitle>
+            <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

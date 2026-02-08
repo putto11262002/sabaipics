@@ -30,7 +30,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 	}
 
 	if (!isSignedIn) {
-		return <Navigate to="/sign-in" state={{ from: location }} replace />;
+		// Preserve complete URL including query params for Clerk redirect
+		const currentUrl = `${location.pathname}${location.search}`;
+		const signInUrl = `/sign-in?redirect_url=${encodeURIComponent(currentUrl)}`;
+
+		return <Navigate to={signInUrl} replace />;
 	}
 
 	return <>{children}</>;
