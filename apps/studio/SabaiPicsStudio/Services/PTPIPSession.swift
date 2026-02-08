@@ -133,6 +133,23 @@ class PTPIPSession: NSObject {
     private var hasStartedEventMonitoring = false
     private var startEventMonitoringTask: Task<Void, Never>?
 
+    // Teardown / disconnect (must be session-owned; strategies should not decide liveness)
+    private enum TeardownReason: Sendable {
+        case userInitiated
+        case transportFailed(channel: String)
+        case transportWaitingTimeout(channel: String)
+        case eventChannelDisconnected
+        case eventChannelError
+    }
+
+    private var teardownTask: Task<Void, Never>?
+    private var hasNotifiedDisconnect = false
+
+    private var commandWaitingTask: Task<Void, Never>?
+    private var eventWaitingTask: Task<Void, Never>?
+    private var isCommandWaiting = false
+    private var isEventWaiting = false
+
     // Unified photo pipeline (consume handles -> GetObjectInfo -> download)
     private struct PhotoJob: Sendable {
         let logicalHandle: UInt32
@@ -176,6 +193,101 @@ class PTPIPSession: NSObject {
     }
 
     // MARK: - Connection Management
+
+    private enum TransportChannel: String, Sendable {
+        case command
+        case event
+    }
+
+    private func installTransportStateHandlers() {
+        commandConnection?.stateUpdateHandler = { [weak self] state in
+            Task { @MainActor in
+                await self?.handleTransportState(state, channel: .command)
+            }
+        }
+
+        eventConnection?.stateUpdateHandler = { [weak self] state in
+            Task { @MainActor in
+                await self?.handleTransportState(state, channel: .event)
+            }
+        }
+    }
+
+    @MainActor
+    private func handleTransportState(_ state: NWConnection.State, channel: TransportChannel) async {
+        if teardownTask != nil {
+            return
+        }
+
+        switch state {
+        case .ready:
+            clearWaiting(channel: channel)
+        case .waiting:
+            setWaiting(channel: channel)
+        case .failed:
+            await teardownOnce(reason: .transportFailed(channel: channel.rawValue))
+        case .cancelled:
+            // Cancellation can happen during normal teardown.
+            await teardownOnce(reason: .transportFailed(channel: channel.rawValue))
+        default:
+            break
+        }
+    }
+
+    @MainActor
+    private func setWaiting(channel: TransportChannel) {
+        let graceSeconds: TimeInterval = 3.0
+
+        switch channel {
+        case .command:
+            if isCommandWaiting { return }
+            isCommandWaiting = true
+            commandWaitingTask?.cancel()
+            commandWaitingTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(graceSeconds * 1_000_000_000))
+                await self?.waitingGraceElapsed(channel: .command)
+            }
+        case .event:
+            if isEventWaiting { return }
+            isEventWaiting = true
+            eventWaitingTask?.cancel()
+            eventWaitingTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(graceSeconds * 1_000_000_000))
+                await self?.waitingGraceElapsed(channel: .event)
+            }
+        }
+    }
+
+    @MainActor
+    private func clearWaiting(channel: TransportChannel) {
+        switch channel {
+        case .command:
+            isCommandWaiting = false
+            commandWaitingTask?.cancel()
+            commandWaitingTask = nil
+        case .event:
+            isEventWaiting = false
+            eventWaitingTask?.cancel()
+            eventWaitingTask = nil
+        }
+    }
+
+    @MainActor
+    private func waitingGraceElapsed(channel: TransportChannel) async {
+        guard teardownTask == nil else { return }
+
+        switch channel {
+        case .command:
+            guard isCommandWaiting else { return }
+        case .event:
+            guard isEventWaiting else { return }
+        }
+
+        // Only treat waiting as a disconnect when monitoring is active.
+        guard hasStartedEventMonitoring else { return }
+
+        await teardownOnce(reason: .transportWaitingTimeout(channel: channel.rawValue))
+    }
 
     /// Connect to camera and establish PTP/IP session
     /// Performs complete Init handshake, then opens PTP session
@@ -247,6 +359,10 @@ class PTPIPSession: NSObject {
 
         // Wait for event connection to be ready
         try await waitForEventConnection(eventConnection, timeout: 5.0)
+
+        // Install disconnect detection handlers after the event connection is ready.
+        // (waitForEventConnection temporarily uses stateUpdateHandler)
+        installTransportStateHandlers()
 
         // Phase 2: Send Init Event Request on event channel
         let initEvtRequest = PTPIPInitEventRequest(connectionNumber: connectionNum)
@@ -332,6 +448,8 @@ class PTPIPSession: NSObject {
         self.commandConnection = commandConnection
         self.eventConnection = eventConnection
         self.connectionNumber = connectionNumber
+
+        installTransportStateHandlers()
 
         // Detect camera vendor from name
         cameraVendor = detectCameraVendor(from: cameraName)
@@ -452,7 +570,28 @@ class PTPIPSession: NSObject {
     /// Disconnect and clean up session
     /// Based on libgphoto2's session teardown pattern
     func disconnect() async {
-        guard isConnected else { return }
+        await teardownOnce(reason: .userInitiated)
+    }
+
+    @MainActor
+    private func teardownOnce(reason: TeardownReason) async {
+        if let teardownTask {
+            await teardownTask.value
+            return
+        }
+
+        teardownTask = Task { @MainActor [weak self] in
+            await self?.performTeardown(reason: reason)
+        }
+
+        await teardownTask?.value
+    }
+
+    @MainActor
+    private func performTeardown(reason: TeardownReason) async {
+        if hasNotifiedDisconnect {
+            return
+        }
 
         // Prevent event-monitor callbacks from surfacing disconnect during teardown.
         isConnected = false
@@ -463,8 +602,12 @@ class PTPIPSession: NSObject {
 
         startEventChannelMonitoringTask?.cancel()
         startEventChannelMonitoringTask = nil
+        isEventChannelMonitoring = false
 
-        print("[PTPIPSession] Disconnecting... CALLED FROM:")
+        clearWaiting(channel: .command)
+        clearWaiting(channel: .event)
+
+        print("[PTPIPSession] Disconnecting (reason: \(reason))... CALLED FROM:")
         Thread.callStackSymbols.prefix(10).forEach { print("  \($0)") }
 
         // Vendor-specific cleanup BEFORE CloseSession (per libgphoto2)
@@ -477,11 +620,13 @@ class PTPIPSession: NSObject {
         await stopEventChannelMonitoring()
         stopPhotoPipeline()
 
-        // Send CloseSession command after vendor cleanup
-        do {
-            try await sendCloseSession()
-        } catch {
-            // Continue with cleanup even if CloseSession fails
+        // Send CloseSession command after vendor cleanup (best-effort)
+        if case .userInitiated = reason {
+            do {
+                try await sendCloseSession()
+            } catch {
+                // Continue with cleanup even if CloseSession fails
+            }
         }
 
         // Clean up downloader
@@ -501,9 +646,9 @@ class PTPIPSession: NSObject {
         transactionManager = nil
 
         print("[PTPIPSession] Disconnected")
-
         PTPLogger.info("Session disconnected", category: PTPLogger.session)
 
+        hasNotifiedDisconnect = true
         delegate?.sessionDidDisconnect(self)
     }
 
@@ -1747,16 +1892,14 @@ extension PTPIPSession: PTPIPEventMonitorDelegate {
 
     nonisolated func eventMonitor(_ monitor: PTPIPEventMonitor, didFailWithError error: Error) {
         Task { @MainActor in
-            // Session owns disconnect/error policy; surface as session error for now.
-            self.delegate?.session(self, didFailWithError: error)
+            // Event channel errors usually mean the transport is unhealthy; teardown the session.
+            await self.teardownOnce(reason: .eventChannelError)
         }
     }
 
     nonisolated func eventMonitorDidDisconnect(_ monitor: PTPIPEventMonitor) {
         Task { @MainActor in
-            guard self.isConnected else { return }
-            self.isConnected = false
-            self.delegate?.sessionDidDisconnect(self)
+            await self.teardownOnce(reason: .eventChannelDisconnected)
         }
     }
 }

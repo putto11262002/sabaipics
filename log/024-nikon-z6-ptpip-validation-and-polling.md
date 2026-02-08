@@ -34,3 +34,9 @@ Context: picking up SAB-84 (Nikon Z6 PTP/IP validation) and SAB-31 (implement Ni
     - Sony-only strategy (in-memory handle gating + logical handle synthesis); enqueues jobs into the session pipeline using `maxBytes` partial transfer.
   - `apps/studio/SabaiPicsStudio/Services/CanonEventSource.swift` + `apps/studio/SabaiPicsStudio/Services/NikonEventSource.swift`
     - Strategy-only: poll/parse events and enqueue handles into the session pipeline (no per-handle downloads).
+
+- Disconnect detection: session-owned teardown + transport signals (no strategy involvement)
+  - `apps/studio/SabaiPicsStudio/Services/PTPIPSession.swift`
+    - Added `teardownOnce(reason:)` to make disconnect teardown idempotent and safe when triggered by transport callbacks.
+    - Added NWConnection state handlers for command/event channels; `.failed/.cancelled` and long `.waiting` trigger teardown (only after monitoring started).
+    - Event channel disconnect/error now triggers session teardown instead of only flipping `isConnected`.
