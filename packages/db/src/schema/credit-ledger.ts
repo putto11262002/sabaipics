@@ -10,9 +10,20 @@ import { sql } from "drizzle-orm";
 import { timestamptz, createdAtCol } from "./common";
 import { photographers } from "./photographers";
 
-// Enum for credit ledger entry types (DBSCHEMA-001)
-export const creditLedgerTypes = ["purchase", "upload"] as const;
+// Enum for credit ledger entry types - Direction (DBSCHEMA-001)
+export const creditLedgerTypes = ["credit", "debit"] as const;
 export type CreditLedgerType = (typeof creditLedgerTypes)[number];
+
+// Enum for credit ledger sources - Where credits came from
+export const creditLedgerSources = [
+  "purchase",
+  "gift",
+  "discount",
+  "upload",
+  "refund",
+  "admin_adjustment",
+] as const;
+export type CreditLedgerSource = (typeof creditLedgerSources)[number];
 
 export const creditLedger = pgTable(
   "credit_ledger",
@@ -23,8 +34,10 @@ export const creditLedger = pgTable(
     photographerId: uuid("photographer_id")
       .notNull()
       .references(() => photographers.id, { onDelete: "restrict" }),
-    amount: integer("amount").notNull(), // Positive for purchase, negative for deduction
-    type: text("type", { enum: creditLedgerTypes }).notNull(),
+    amount: integer("amount").notNull(), // Positive for credit, negative for debit
+    type: text("type", { enum: creditLedgerTypes }).notNull(), // Direction: credit or debit
+    source: text("source", { enum: creditLedgerSources }).notNull(), // Source: where from
+    promoCode: text("promo_code"), // Nullable, promo code used (if any)
     stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
     expiresAt: timestamptz("expires_at").notNull(),
     createdAt: createdAtCol(),

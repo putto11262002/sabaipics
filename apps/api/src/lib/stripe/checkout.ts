@@ -51,6 +51,8 @@ export interface CreateCheckoutParams {
   mode?: "payment" | "subscription" | "setup";
   /** Currency code (default: 'thb') */
   currency?: string;
+  /** Pre-applied discounts (promotion codes or coupons) */
+  discounts?: Array<{ promotion_code: string } | { coupon: string }>;
 }
 
 /**
@@ -107,6 +109,7 @@ export async function createCheckoutSession({
   metadata = {},
   mode = "payment",
   currency = "thb",
+  discounts,
 }: CreateCheckoutParams): Promise<CheckoutSessionResult> {
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
@@ -129,8 +132,10 @@ export async function createCheckoutSession({
     metadata,
     // Collect billing address for invoices
     billing_address_collection: "auto",
-    // Allow promotion codes if you set them up in Stripe
-    allow_promotion_codes: true,
+    // Pre-apply discounts (promotion codes or coupons)
+    ...(discounts && discounts.length > 0 && { discounts }),
+    // Allow manual promotion code entry (only if not pre-applying a discount)
+    ...(!discounts || discounts.length === 0) && { allow_promotion_codes: true },
   });
 
   if (!session.url) {
