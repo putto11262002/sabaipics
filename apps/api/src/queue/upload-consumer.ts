@@ -244,7 +244,8 @@ async function processUpload(
         await tx.insert(creditLedger).values({
           photographerId: intent.photographerId,
           amount: -1,
-          type: 'upload',
+          type: 'debit',
+          source: 'upload',
           expiresAt: oldestCredit.expiresAt,
           stripeSessionId: null,
         });

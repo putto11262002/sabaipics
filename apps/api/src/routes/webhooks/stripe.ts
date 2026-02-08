@@ -113,11 +113,16 @@ export async function fulfillCheckout(
         return; // Exit transaction without inserting
       }
 
+      // Extract promo code from metadata
+      const promoCodeApplied = metadata.promo_code_applied;
+
       // Insert credit ledger entry
       await tx.insert(creditLedger).values({
         photographerId,
         amount: credits,
-        type: "purchase",
+        type: "credit",
+        source: "purchase",
+        promoCode: promoCodeApplied && typeof promoCodeApplied === 'string' ? promoCodeApplied : null,
         stripeSessionId: session.id,
         expiresAt: addMonths(new Date(), 6).toISOString(),
       });
@@ -127,7 +132,6 @@ export async function fulfillCheckout(
       );
 
       // Record promo code usage if a code was applied
-      const promoCodeApplied = metadata.promo_code_applied;
       if (promoCodeApplied && typeof promoCodeApplied === 'string') {
         await tx.insert(promoCodeUsage).values({
           photographerId,

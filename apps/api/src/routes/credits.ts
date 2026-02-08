@@ -498,7 +498,8 @@ export const creditsRouter = new Hono<Env>()
             and(
               eq(creditLedger.stripeSessionId, sessionId),
               eq(creditLedger.photographerId, photographer.id),
-              eq(creditLedger.type, 'purchase'),
+              eq(creditLedger.type, 'credit'),
+              eq(creditLedger.source, 'purchase'),
             ),
           )
           .limit(1),
