@@ -6,7 +6,6 @@ import { SignUpPage } from './routes/sign-up';
 import { DesktopAuthPage } from './routes/auth/desktop';
 import { DashboardPage } from './routes/dashboard';
 import { CreditSuccessPage } from './routes/credits/success';
-import { CreditSuccessTestPage } from './routes/credits/success-test';
 import EventsPage from './routes/events';
 import EventDetailLayout from './routes/events/[id]/layout';
 import EventDetailsTab from './routes/events/[id]/details';
@@ -63,10 +62,6 @@ export const router = createBrowserRouter([
       {
         path: 'success',
         element: <CreditSuccessPage />,
-      },
-      {
-        path: 'success-test',
-        element: <CreditSuccessTestPage />,
       },
     ],
   },

@@ -6,7 +6,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { timestamptz, createdAtCol } from "./common";
+import { createdAtCol } from "./common";
 import { photographers } from "./photographers";
 
 /**
