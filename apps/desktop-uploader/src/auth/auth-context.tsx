@@ -1,6 +1,7 @@
 import React from 'react';
 import { start, cancel, onUrl, onInvalidUrl } from '@fabianlars/tauri-plugin-oauth';
 import { open } from '@tauri-apps/plugin-shell';
+import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { getStoredRefreshToken, setStoredRefreshToken } from '../lib/auth-token';
 
 type AuthStatus = 'signed_out' | 'signing_in' | 'signed_in' | 'error';
@@ -137,11 +138,76 @@ function shouldRefresh(expiresAt: number | null | undefined) {
   return Date.now() + 60_000 >= expiresAt;
 }
 
+function extractDesktopAuthCode(urlString: string): { code: string; url: string } | null {
+  try {
+    const url = new URL(urlString);
+    if (url.protocol !== 'framefast:') return null;
+    const code = url.searchParams.get('code') ?? '';
+    if (!code) return null;
+    return { code, url: url.toString() };
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<AuthState>(loadStoredAuth);
   const portRef = React.useRef<number | null>(null);
+  const stateRef = React.useRef<AuthState>(state);
   const refreshTokenRef = React.useRef<string | null>(null);
   const refreshInFlightRef = React.useRef<Promise<string | null> | null>(null);
+  const redeemInFlightRef = React.useRef<Promise<void> | null>(null);
+
+  React.useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  const handleAuthCode = React.useCallback((params: { code: string; sourceUrl?: string }) => {
+    // Ignore old deep links when already authenticated.
+    if (stateRef.current.status === 'signed_in') {
+      return;
+    }
+
+    // Deduplicate concurrent redeem attempts.
+    if (redeemInFlightRef.current) {
+      return;
+    }
+
+    setState({ status: 'signing_in' });
+
+    redeemInFlightRef.current = redeemDesktopAuthCode({
+      code: params.code,
+      deviceName: 'FrameFast Desktop',
+    })
+      .then((tokens) => {
+        refreshTokenRef.current = tokens.refreshToken;
+        const nextState: AuthState = {
+          status: 'signed_in',
+          callbackUrl: params.sourceUrl,
+          params: { refreshToken: tokens.refreshToken },
+          accessToken: tokens.accessToken,
+          accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+        };
+        setState(nextState);
+        storeAuth(nextState);
+      })
+      .catch((err) => {
+        setState((prev) => {
+          if (prev.status === 'signed_in') return prev;
+          return {
+            status: 'error',
+            error: err instanceof Error ? err.message : 'Failed to redeem code',
+          };
+        });
+      })
+      .finally(() => {
+        redeemInFlightRef.current = null;
+        if (portRef.current) {
+          cancel(portRef.current);
+          portRef.current = null;
+        }
+      });
+  }, []);
 
   React.useEffect(() => {
     const setup = async () => {
@@ -171,33 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        setState({ status: 'signing_in' });
-
-        void redeemDesktopAuthCode({ code, deviceName: 'FrameFast Desktop' })
-          .then((tokens) => {
-            refreshTokenRef.current = tokens.refreshToken;
-            const nextState: AuthState = {
-              status: 'signed_in',
-              callbackUrl: parsed.toString(),
-              params: { refreshToken: tokens.refreshToken },
-              accessToken: tokens.accessToken,
-              accessTokenExpiresAt: tokens.accessTokenExpiresAt,
-            };
-            setState(nextState);
-            storeAuth(nextState);
-          })
-          .catch((err) => {
-            setState({
-              status: 'error',
-              error: err instanceof Error ? err.message : 'Failed to redeem code',
-            });
-          })
-          .finally(() => {
-            if (portRef.current) {
-              cancel(portRef.current);
-              portRef.current = null;
-            }
-          });
+        handleAuthCode({ code, sourceUrl: parsed.toString() });
       });
 
       const unlistenInvalid = await onInvalidUrl((url) => {
@@ -215,6 +255,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       teardownPromise.then((teardown) => teardown?.());
     };
   }, []);
+
+  React.useEffect(() => {
+    let unlisten: null | (() => void) = null;
+
+    const setup = async () => {
+      try {
+        const startUrls = await getCurrent();
+        if (startUrls) {
+          for (const url of startUrls) {
+            const extracted = extractDesktopAuthCode(url);
+            if (extracted) {
+              handleAuthCode({ code: extracted.code, sourceUrl: extracted.url });
+              break;
+            }
+          }
+        }
+      } catch {
+        // Deep links may not be available in dev (e.g. macOS requires installed bundle).
+      }
+
+      try {
+        unlisten = await onOpenUrl((urls) => {
+          for (const url of urls) {
+            const extracted = extractDesktopAuthCode(url);
+            if (extracted) {
+              handleAuthCode({ code: extracted.code, sourceUrl: extracted.url });
+              return;
+            }
+          }
+        });
+      } catch {
+        // ignore
+      }
+    };
+
+    void setup();
+    return () => {
+      unlisten?.();
+    };
+  }, [handleAuthCode]);
 
   React.useEffect(() => {
     const load = async () => {
