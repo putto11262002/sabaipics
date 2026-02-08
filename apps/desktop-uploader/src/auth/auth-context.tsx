@@ -153,13 +153,32 @@ function extractDesktopAuthCode(urlString: string): { code: string; url: string 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<AuthState>(loadStoredAuth);
   const portRef = React.useRef<number | null>(null);
+  const stateRef = React.useRef<AuthState>(state);
   const refreshTokenRef = React.useRef<string | null>(null);
   const refreshInFlightRef = React.useRef<Promise<string | null> | null>(null);
+  const redeemInFlightRef = React.useRef<Promise<void> | null>(null);
+
+  React.useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const handleAuthCode = React.useCallback((params: { code: string; sourceUrl?: string }) => {
+    // Ignore old deep links when already authenticated.
+    if (stateRef.current.status === 'signed_in') {
+      return;
+    }
+
+    // Deduplicate concurrent redeem attempts.
+    if (redeemInFlightRef.current) {
+      return;
+    }
+
     setState({ status: 'signing_in' });
 
-    void redeemDesktopAuthCode({ code: params.code, deviceName: 'FrameFast Desktop' })
+    redeemInFlightRef.current = redeemDesktopAuthCode({
+      code: params.code,
+      deviceName: 'FrameFast Desktop',
+    })
       .then((tokens) => {
         refreshTokenRef.current = tokens.refreshToken;
         const nextState: AuthState = {
@@ -173,12 +192,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         storeAuth(nextState);
       })
       .catch((err) => {
-        setState({
-          status: 'error',
-          error: err instanceof Error ? err.message : 'Failed to redeem code',
+        setState((prev) => {
+          if (prev.status === 'signed_in') return prev;
+          return {
+            status: 'error',
+            error: err instanceof Error ? err.message : 'Failed to redeem code',
+          };
         });
       })
       .finally(() => {
+        redeemInFlightRef.current = null;
         if (portRef.current) {
           cancel(portRef.current);
           portRef.current = null;
