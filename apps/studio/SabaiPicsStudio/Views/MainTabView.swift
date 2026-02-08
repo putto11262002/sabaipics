@@ -68,7 +68,7 @@ struct MainTabView: View {
                 downloadsCount: captureSessionStore.stats.downloadsCount,
                 lastFilename: captureSessionStore.stats.lastFilename,
                 recentDownloads: captureSessionStore.recentDownloads,
-                transferSession: captureSessionStore.transferSession,
+                captureSession: captureSessionStore.captureSession,
                 isDisconnecting: isDisconnecting,
                 onDisconnect: {
                     captureSessionStore.disconnect()

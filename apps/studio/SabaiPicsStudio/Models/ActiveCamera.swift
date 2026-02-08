@@ -6,8 +6,7 @@
 //  Transfer Session Architecture - Core Type
 //
 //  Represents a camera with an ACTIVE PTP/IP session (OpenSession completed).
-//  This is the ONLY type that can be used to create a TransferSession.
-//  Type safety ensures we cannot transfer photos without an established session.
+//  This type is used to create a capture session controller (UI + sinks).
 //
 
 import Foundation
@@ -21,7 +20,7 @@ import Foundation
 /// 4. SetEventMode (for Canon)
 ///
 /// Both auto-discovery and manual IP paths must produce this type
-/// before a TransferSession can be created.
+/// before a capture session can be created.
 ///
 /// Usage:
 /// ```swift
@@ -33,8 +32,8 @@ import Foundation
 ///     session: session
 /// )
 ///
-/// // Now create transfer session
-/// let transfer = TransferSession(camera: activeCamera)
+/// // Now create capture session
+/// let controller = CaptureSessionController(activeCamera: activeCamera)
 /// ```
 struct ActiveCamera {
     /// Camera display name (e.g., "Canon EOS R5")
@@ -68,7 +67,7 @@ struct ActiveCamera {
     // MARK: - Session Control
 
     /// Start event monitoring (begins photo detection)
-    /// Call this when TransferSession takes ownership
+    /// Call this when a capture session takes ownership
     @MainActor
     func startMonitoring() {
         session.startEventMonitoring()
