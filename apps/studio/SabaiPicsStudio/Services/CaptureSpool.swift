@@ -9,7 +9,9 @@ import Foundation
 
 /// Local staging area (spool) for captured photos.
 ///
-/// Default location: Library/Caches (safe to delete; not backed up).
+/// Default location: Library/Application Support (reliable; app-controlled purge).
+///
+/// Note: we explicitly exclude the spool directory from iCloud backup.
 ///
 /// The spool is intentionally separate from UI retention:
 /// - UI may keep only the last N photos in memory.
@@ -32,8 +34,8 @@ actor CaptureSpool {
         self.fileManager = fileManager
         self.sessionID = sessionID
 
-        let caches = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        self.baseDirectory = caches
+        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        self.baseDirectory = appSupport
             .appendingPathComponent("sabaipics", isDirectory: true)
             .appendingPathComponent("capture-spool", isDirectory: true)
             .appendingPathComponent(sessionID.uuidString, isDirectory: true)
@@ -80,7 +82,15 @@ actor CaptureSpool {
     private func ensureSessionDirectory() throws {
         guard !didCreateSessionDirectory else { return }
         try fileManager.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
+        try excludeFromBackup(directory: baseDirectory)
         didCreateSessionDirectory = true
+    }
+
+    private func excludeFromBackup(directory: URL) throws {
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var url = directory
+        try url.setResourceValues(values)
     }
 
     private func sanitizeFilename(_ input: String) -> String {

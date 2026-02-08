@@ -8,7 +8,7 @@ Changes
 
 - Added a local "spool" (staging area) that writes downloaded photo bytes to disk and returns a file URL.
   - `apps/studio/SabaiPicsStudio/Services/CaptureSpool.swift`
-  - Default location: `Library/Caches/sabaipics/capture-spool/<session-id>/...`
+  - Default location: `Library/Application Support/sabaipics/capture-spool/<session-id>/...` (excluded from iCloud backup)
   - Exposes `store(...) -> Item(url, bytes, createdAt)` and deletion helpers (`deleteFile`, `deleteSession`).
 
 - CapturedPhoto now tracks the local file URL.
