@@ -3,88 +3,207 @@
 //  SabaiPicsStudio
 //
 //  Created: 2026-01-20
-//  Nikon event polling implementation (STUB)
+//  Nikon event polling implementation
 //
-//  Nikon cameras require polling with Nikon_GetEvent (0x90C7)
-//  This is currently a stub that falls back to StandardEventSource
-//
-//  TODO: Implement Nikon_GetEvent polling (0x90C7)
-//  TODO: Parse Nikon event format (different from Canon)
-//  TODO: Handle Nikon-specific event types
-//  TODO: Test with actual Nikon camera
+//  Nikon cameras require polling with Nikon_GetEvent (0x90C7) on the command channel.
+//  Event payload format (from libgphoto2 ptp-pack.c ptp_unpack_Nikon_EC):
+//    u16 count
+//    repeated count times:
+//      u16 eventCode
+//      u32 param1
 //
 
 import Foundation
 import Network
 
-// MARK: - Nikon Event Source (Stub)
-
-/// Nikon event polling implementation
-/// Currently a STUB - falls back to standard PTP event channel
-/// Nikon cameras may not work correctly until proper polling is implemented
 @MainActor
-class NikonEventSource: CameraEventSource {
-    weak var delegate: CameraEventSourceDelegate? {
-        didSet {
-            // Forward delegate to fallback
-            fallbackSource.delegate = delegate
+final class NikonEventSource: CameraEventSource {
+    weak var delegate: CameraEventSourceDelegate?
+
+    // Dependencies
+    private weak var session: PTPIPSession?
+
+    // Polling state
+    private var pollingTask: Task<Void, Never>?
+    private var isMonitoring = false
+
+    // Adaptive polling intervals (match Canon pattern)
+    private var pollInterval: TimeInterval = 0.05
+    private let minPollInterval: TimeInterval = 0.05
+    private let maxPollInterval: TimeInterval = 0.2
+
+    // Basic de-dupe (Nikon may emit multiple notifications per capture)
+    private var seenHandles = Set<UInt32>()
+
+    // Nikon event codes (libgphoto2: ptp.h)
+    //
+    // Observed behavior (Nikon Z6, WiFi PTP/IP): Nikon_GetEvent (0x90C7) returns
+    // standard PTP event codes (0x400x) like ObjectAdded (0x4002) and CaptureComplete
+    // (0x400D), not only Nikon-specific 0xC1xx codes. This means:
+    // - Some Nikon bodies/modes may require polling (hence this event source)
+    // - Even when polling, we must treat standard 0x4002 as "new object".
+    private let ptpObjectAdded: UInt16 = 0x4002
+    private let nikonObjectAddedInSDRAM: UInt16 = 0xC101
+
+    init(
+        session: PTPIPSession
+    ) {
+        self.session = session
+    }
+
+    // MARK: - CameraEventSource
+
+    func startMonitoring() async {
+        guard !isMonitoring else { return }
+        isMonitoring = true
+
+        pollingTask = Task { [weak self] in
+            await self?.pollingLoop()
         }
     }
 
-    // Fallback to standard events (will likely not work for Nikon)
-    private let fallbackSource: StandardEventSource
-
-    /// Initialize Nikon event source
-    /// - Parameters:
-    ///   - eventConnection: Event channel connection
-    ///   - photoOps: Provider for photo operations
-    init(eventConnection: NWConnection?, photoOps: PhotoOperationsProvider?) {
-        // Use standard event source as fallback
-        // TODO: Replace with proper Nikon polling implementation
-        self.fallbackSource = StandardEventSource(eventConnection: eventConnection, photoOps: photoOps)
-
-        print("[NikonEventSource] ⚠️ Nikon polling not implemented - using standard event channel (may not work)")
-    }
-
-    // MARK: - CameraEventSource Protocol
-
-    func startMonitoring() async {
-        print("[NikonEventSource] Starting monitoring (fallback to standard events)")
-        print("[NikonEventSource] ⚠️ TODO: Implement Nikon_GetEvent (0x90C7) polling")
-
-        // Fall back to standard event channel
-        // Nikon cameras may not send events this way
-        await fallbackSource.startMonitoring()
-    }
-
     func stopMonitoring() async {
-        await fallbackSource.stopMonitoring()
+        guard isMonitoring else { return }
+        isMonitoring = false
+        pollingTask?.cancel()
+        await pollingTask?.value
+        pollingTask = nil
     }
 
     func cleanup() async {
-        await fallbackSource.cleanup()
+        await stopMonitoring()
+        session = nil
+        seenHandles.removeAll()
     }
+
+    // MARK: - Polling
+
+    private func pollingLoop() async {
+        pollInterval = minPollInterval
+        PTPLogger.info("Nikon polling started (50-200ms)", category: PTPLogger.event)
+
+        while isMonitoring {
+            do {
+                let foundEvents = try await pollNikonEvent()
+
+                if foundEvents {
+                    pollInterval = minPollInterval
+                    continue
+                }
+
+                try await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
+
+                let newInterval = min(pollInterval + 0.05, maxPollInterval)
+                pollInterval = newInterval
+            } catch is CancellationError {
+                break
+            } catch {
+                PTPLogger.error("Nikon poll error: \(error)", category: PTPLogger.event)
+                delegate?.eventSource(self, didFailWithError: error)
+                try? await Task.sleep(nanoseconds: UInt64(maxPollInterval * 1_000_000_000))
+            }
+        }
+
+        PTPLogger.info("Nikon polling stopped", category: PTPLogger.event)
+    }
+
+    private func pollNikonEvent() async throws -> Bool {
+        guard let session else { return false }
+
+        // Execute Nikon_GetEvent (0x90C7) as a single serialized command-channel operation.
+        // Note: we treat session-level timeouts as "no events" for this poll iteration.
+        let response: (data: Data?, response: PTPIPOperationResponse)
+        do {
+            response = try await session.executeOperation { command in
+                command.nikonGetEvent()
+            }
+        } catch PTPIPSessionError.timeout {
+            return false
+        }
+
+        guard let eventData = response.data, !eventData.isEmpty else {
+            return false
+        }
+
+        let handles = parseNikonEvents(eventData)
+        if handles.isEmpty {
+            return false
+        }
+
+        for handle in handles {
+            if Task.isCancelled { break }
+            session.enqueueObjectHandle(handle)
+        }
+
+        return true
+    }
+
+    // MARK: - Nikon event parsing
+
+    private func parseNikonEvents(_ data: Data) -> [UInt32] {
+        // Format from libgphoto2 ptp_unpack_Nikon_EC
+        // u16 count, then count entries of 6 bytes: u16 code, u32 param1
+
+        PTPLogger.data(data, caption: "nikon/getevent/data", category: PTPLogger.event)
+
+        guard data.count >= 2 else { return [] }
+
+        let cntLE: UInt16 = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 0, as: UInt16.self) }
+        let count = Int(UInt16(littleEndian: cntLE))
+        if count == 0 { return [] }
+
+        let maxCount = (data.count - 2) / 6
+        if count > maxCount {
+            PTPLogger.debug("Nikon GetEvent invalid count=\(count) max=\(maxCount)", category: PTPLogger.event)
+            return []
+        }
+
+        var handles: [UInt32] = []
+        handles.reserveCapacity(count)
+
+        for i in 0..<count {
+            let base = 2 + i * 6
+            let codeLE: UInt16 = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: base, as: UInt16.self) }
+            let param1LE: UInt32 = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: base + 2, as: UInt32.self) }
+
+            let code = UInt16(littleEndian: codeLE)
+            let param1 = UInt32(littleEndian: param1LE)
+
+            // Photo events: standard ObjectAdded (0x4002) or Nikon ObjectAddedInSDRAM (0xC101).
+            // In both cases param1 is the object handle.
+            if (code == ptpObjectAdded || code == nikonObjectAddedInSDRAM), param1 != 0 {
+                if seenHandles.contains(param1) {
+                    continue
+                }
+                seenHandles.insert(param1)
+                PTPLogger.info("Nikon photo detected: handle=\(PTPLogger.formatHex(param1))", category: PTPLogger.event)
+                handles.append(param1)
+            } else {
+                PTPLogger.debug(
+                    "Nikon event code=\(PTPLogger.formatHex(code)) param1=\(PTPLogger.formatHex(param1))",
+                    category: PTPLogger.event
+                )
+            }
+        }
+
+        return handles
+    }
+
+    // Photo downloads are handled by the session unified photo pipeline.
 }
 
-// MARK: - Nikon Polling Implementation Notes
-//
-// When implementing proper Nikon polling:
-//
-// 1. Operation Code: 0x90C7 (Nikon_GetEvent)
-//
-// 2. Event Format (from libgphoto2):
-//    - Different from Canon's packed structure
-//    - Nikon uses standard PTP event format with vendor extensions
-//
-// 3. Polling Interval:
-//    - Similar adaptive pattern to Canon (50-200ms)
-//    - May need adjustment based on camera model
-//
-// 4. Event Types to Handle:
-//    - 0xC101: ObjectAdded (Nikon)
-//    - 0xC102: ObjectRemoved (Nikon)
-//    - Other Nikon-specific events
-//
-// 5. Reference:
-//    - libgphoto2/camlibs/ptp2/ptp.c: ptp_nikon_check_event()
-//    - libgphoto2/camlibs/ptp2/ptp-pack.c: ptp_unpack_Nikon_EC()
+enum NikonEventSourceError: LocalizedError {
+    case invalidResponse
+    case transactionMismatch
+    case connectionClosed
+    case timeout
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidResponse: return "Invalid response from Nikon camera"
+        case .transactionMismatch: return "Transaction ID mismatch"
+        case .connectionClosed: return "Connection closed"
+        case .timeout: return "Timed out waiting for camera"
+        }
+    }
+}

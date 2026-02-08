@@ -4,6 +4,25 @@ iOS Studio architecture changes. See `ARCHITECTURE.md` for current design.
 
 ---
 
+## 2026-02-07
+
+### Update 29: Nikon Z6 PTP/IP Support (SAB-84, SAB-31)
+
+**Status:** Implemented and validated on Nikon Z6
+
+Added Nikon connection UX + protocol support, and documented Nikon-specific behavior observed in the field.
+
+- Nikon connection flow: WiFi setup instructions (soft gate) → discovery → select
+- Recent Nikon cache + reconnect (network-key heuristic)
+- Nikon event polling implemented via `Nikon_GetEvent (0x90C7)`
+- Vendor detection refined via `GetDeviceInfo.Manufacturer` (camera init name may omit manufacturer)
+
+**Field note (Nikon Z6):** `Nikon_GetEvent` returned standard PTP event codes (not only Nikon `0xC1xx`). We treat standard `0x4002 (ObjectAdded)` as the primary photo-handle trigger.
+
+**Files:** NikonConnectFlowView.swift, NikonHotspotSetupView.swift, NikonHotspotDiscovery.swift, NikonEventSource.swift, PTPIPSession.swift
+
+---
+
 ## 2026-02-06
 
 ### Update 28: Cleanup Timeout Race Fix

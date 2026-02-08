@@ -112,4 +112,13 @@ protocol CameraEventSource: AnyObject {
     /// Calls `stopMonitoring()` and releases any held references (connections,
     /// delegates, etc.). After cleanup, the event source cannot be reused.
     func cleanup() async
+
+    /// Whether this event source consumes the standard PTP event channel.
+    ///
+    /// When true, the session should start the event-channel monitor before starting the source.
+    var usesEventChannel: Bool { get }
+}
+
+extension CameraEventSource {
+    var usesEventChannel: Bool { false }
 }

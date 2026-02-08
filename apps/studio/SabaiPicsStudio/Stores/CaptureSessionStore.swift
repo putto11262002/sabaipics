@@ -71,7 +71,29 @@ final class CaptureSessionStore: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] (message: String?) in
                 guard let message, !message.isEmpty else { return }
+                // Prefer returning to idle on unexpected disconnect.
+                // (We still publish the error so it can be logged/observed.)
                 self?.state = .error(message)
+            }
+            .store(in: &cancellables)
+
+        session.$isActive
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] (isActive: Bool) in
+                guard let self else { return }
+                guard isActive == false else { return }
+
+                // TransferSession ended (user disconnect or unexpected disconnect).
+                // We prefer auto-return to idle and clear the live session UI.
+                self.disconnectTask?.cancel()
+                self.cancellables.removeAll()
+                self.transferSession = nil
+                self.activeCamera = nil
+                self.state = .idle
+                self.isDetailsPresented = false
+                self.stats = Stats()
+                self.recentDownloads = []
             }
             .store(in: &cancellables)
     }

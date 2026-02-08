@@ -1,39 +1,40 @@
-//  CanonHotspotSetupView.swift
+//  NikonHotspotSetupView.swift
 //  SabaiPicsStudio
 //
-//  Personal Hotspot setup instructions for Canon/Nikon cameras.
+//  Nikon WiFi setup instructions.
+//
 
 import SwiftUI
 
-struct CanonHotspotSetupView: View {
+struct NikonHotspotSetupView: View {
     let onNext: () -> Void
 
-    @State private var showHotspotWarning = false
+    @State private var showWiFiWarning = false
 
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
 
-            Image(systemName: "personalhotspot")
+            Image(systemName: "wifi")
                 .font(.system(size: 48))
                 .foregroundStyle(Color.Theme.primary)
 
-            Text("Enable Personal Hotspot")
+            Text("Connect to Nikon Wi-Fi")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(Color.Theme.foreground)
 
-            Text("Your camera connects through this iPhone's Personal Hotspot. Enable it in **Settings** before continuing.")
+            Text("Join your camera's Wi-Fi network in **Settings**, then continue to scan for the camera.")
                 .font(.subheadline)
                 .foregroundColor(Color.Theme.mutedForeground)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
             Button("Continue") {
-                if NetworkScannerService.isHotspotActive() {
+                if WiFiNetworkInfo.currentWiFiIPv4() != nil {
                     onNext()
                 } else {
-                    showHotspotWarning = true
+                    showWiFiWarning = true
                 }
             }
             .buttonStyle(.compact)
@@ -41,20 +42,20 @@ struct CanonHotspotSetupView: View {
 
             Spacer()
         }
-        .alert("Hotspot not detected", isPresented: $showHotspotWarning) {
+        .alert("Wi-Fi not detected", isPresented: $showWiFiWarning) {
             Button("Cancel", role: .cancel) {}
             Button("Continue anyway") { onNext() }
         } message: {
-            Text("Personal Hotspot doesn't appear to be active. You can continue, but the camera may not be found.")
+            Text("You're not on a local Wi-Fi network. You can continue, but the camera may not be found.")
         }
     }
 }
 
 #if DEBUG
 
-#Preview("Canon Hotspot Setup") {
+#Preview("Nikon Hotspot Setup") {
     NavigationStack {
-        CanonHotspotSetupView(onNext: {})
+        NikonHotspotSetupView(onNext: {})
     }
 }
 

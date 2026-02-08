@@ -35,10 +35,7 @@ class CanonEventSource: CameraEventSource {
     weak var delegate: CameraEventSourceDelegate?
 
     // Dependencies
-    private weak var commandConnection: NWConnection?
-    private weak var transactionManager: PTPTransactionManager?
-    private let commandQueue: PTPIPCommandQueue
-    private weak var photoOps: PhotoOperationsProvider?
+    private weak var session: PTPIPSession?
 
     // Polling state
     private var pollingTask: Task<Void, Never>?
@@ -51,19 +48,24 @@ class CanonEventSource: CameraEventSource {
 
     /// Initialize Canon event source
     /// - Parameters:
-    ///   - commandConnection: Command channel connection
-    ///   - transactionManager: Transaction manager for creating commands
-    ///   - photoOps: Provider for photo operations (getObjectInfo, downloadPhoto)
+    ///   - session: Active PTP/IP session (owns command channel I/O)
     init(
-        commandConnection: NWConnection?,
-        transactionManager: PTPTransactionManager?,
-        commandQueue: PTPIPCommandQueue,
-        photoOps: PhotoOperationsProvider?
+        session: PTPIPSession
     ) {
-        self.commandConnection = commandConnection
-        self.transactionManager = transactionManager
-        self.commandQueue = commandQueue
-        self.photoOps = photoOps
+        self.session = session
+    }
+
+    private var photoOps: PhotoOperationsProvider? {
+        session
+    }
+
+    private func execute(
+        _ buildRequest: @escaping @Sendable (inout PTPCommand) -> PTPIPOperationRequest
+    ) async throws -> (data: Data?, response: PTPIPOperationResponse) {
+        guard let session else {
+            throw CanonEventSourceError.notConnected
+        }
+        return try await session.executeOperation(buildRequest)
     }
 
     // MARK: - CameraEventSource Protocol
@@ -102,9 +104,7 @@ class CanonEventSource: CameraEventSource {
             print("[CanonEventSource] Skipping drain/disable due to forced stop")
         }
 
-        commandConnection = nil
-        transactionManager = nil
-        photoOps = nil
+        session = nil
     }
 
     private func stopMonitoring(graceful: Bool) async -> Bool {
@@ -119,8 +119,6 @@ class CanonEventSource: CameraEventSource {
             }
         }
 
-        // Force stop: cancel connection and task to avoid hanging I/O
-        commandConnection?.cancel()
         pollingTask?.cancel()
         await pollingTask?.value
         pollingTask = nil
@@ -152,22 +150,13 @@ class CanonEventSource: CameraEventSource {
     /// From libgphoto2: ptp_check_eos_events() + while(ptp_get_one_eos_event()) loop
     /// This ensures no events are left in the queue before closing the session
     private func drainPendingEvents() async {
-        guard let connection = commandConnection,
-               let txManager = transactionManager else {
-            return
-        }
+        guard session != nil else { return }
         
         print("[CanonEventSource] Draining pending events...")
         
-        // Poll once with a short timeout to drain any pending events
         do {
-            try await commandQueue.run {
-                var command = await txManager.createCommand()
-                let getEventCmd = command.canonGetEvent()
-                let getEventData = getEventCmd.toData()
-
-                try await Self.sendData(connection: connection, data: getEventData)
-                _ = try await Self.receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCmd.transactionID)
+            _ = try await execute { command in
+                command.canonGetEvent()
             }
             
             print("[CanonEventSource] Pending events drained")
@@ -181,22 +170,16 @@ class CanonEventSource: CameraEventSource {
     /// From libgphoto2: Called during camera_exit to tell camera we're done monitoring
     /// This is the inverse of SetEventMode(1) called during initializeCanonEOS()
     private func disableEventMode() async {
-        guard let connection = commandConnection,
-              let txManager = transactionManager else {
-            return
-        }
+        guard session != nil else { return }
         
         print("[CanonEventSource] Disabling event mode (SetEventMode(0))...")
         
         do {
-            let response = try await commandQueue.run { () async throws -> PTPIPOperationResponse in
-                var command = await txManager.createCommand()
-                let setEventModeCmd = command.canonSetEventMode(mode: 0)  // 0 = disable
-                let eventModeData = setEventModeCmd.toData()
-
-                try await Self.sendData(connection: connection, data: eventModeData)
-                return try await Self.receiveResponse(connection: connection, expectedTransactionID: setEventModeCmd.transactionID)
+            let result = try await execute { command in
+                command.canonSetEventMode(mode: 0)
             }
+
+            let response = result.response
             
             if let responseCode = PTPResponseCode(rawValue: response.responseCode), responseCode.isSuccess {
                 print("[CanonEventSource] Event mode disabled successfully")
@@ -216,21 +199,17 @@ class CanonEventSource: CameraEventSource {
     /// Without SetEventMode(1), GetEvent always returns empty (8-byte terminator)
     /// NOTE: We intentionally skip SetRemoteMode to avoid taking over camera control
     func initializeCanonEOS() async throws {
-        guard let connection = commandConnection,
-              let txManager = transactionManager else {
+        guard session != nil else {
             throw CanonEventSourceError.notConnected
         }
 
-        let eventModeResponse = try await commandQueue.run { () async throws -> PTPIPOperationResponse in
+        let eventModeResult = try await execute { command in
             // SetEventMode(1) - Enable event reporting (CRITICAL!)
             // NOTE: We skip SetRemoteMode because we only want to monitor events
-            var command = await txManager.createCommand()
-            let setEventModeCmd = command.canonSetEventMode(mode: 1)
-            let eventModeData = setEventModeCmd.toData()
-
-            try await Self.sendData(connection: connection, data: eventModeData)
-            return try await Self.receiveResponse(connection: connection, expectedTransactionID: setEventModeCmd.transactionID)
+            command.canonSetEventMode(mode: 1)
         }
+
+        let eventModeResponse = eventModeResult.response
 
         if let responseCode = PTPResponseCode(rawValue: eventModeResponse.responseCode), !responseCode.isSuccess {
             print("[CanonEventSource] WARNING: SetEventMode failed - events may not work")
@@ -238,13 +217,8 @@ class CanonEventSource: CameraEventSource {
 
         // Flush initial event queue (per libgphoto2 ptp_check_eos_events)
         do {
-            try await commandQueue.run {
-                var command2 = await txManager.createCommand()
-                let getEventCmd = command2.canonGetEvent()
-                let getEventData = getEventCmd.toData()
-
-                try await Self.sendData(connection: connection, data: getEventData)
-                _ = try await Self.receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCmd.transactionID)
+            _ = try await execute { command in
+                command.canonGetEvent()
             }
         } catch {
             // Non-fatal - initial flush can fail
@@ -313,20 +287,15 @@ class CanonEventSource: CameraEventSource {
     /// Filters out RAW files and only downloads JPEGs
     /// - Returns: true if events were found (photos detected), false if empty
     private func pollCanonEvent() async throws -> Bool {
-        guard let connection = commandConnection,
-              let txManager = transactionManager else {
+        guard session != nil else { return false }
+
+        let response: (data: Data?, response: PTPIPOperationResponse)
+        do {
+            response = try await execute { command in
+                command.canonGetEvent()
+            }
+        } catch PTPIPSessionError.timeout {
             return false
-        }
-
-        // Canon GetEvent must not interleave with other PTP/IP commands on the shared command socket.
-        // Use the shared commandQueue to serialize the entire send/receive transaction.
-        let response = try await commandQueue.run { () async throws -> (data: Data?, response: PTPIPOperationResponse) in
-            var command = await txManager.createCommand()
-            let getEventCommand = command.canonGetEvent()
-            let commandData = getEventCommand.toData()
-
-            try await Self.sendData(connection: connection, data: commandData)
-            return try await Self.receiveCanonEventResponse(connection: connection, expectedTransactionID: getEventCommand.transactionID)
         }
 
         // Parse events from response data
@@ -340,64 +309,16 @@ class CanonEventSource: CameraEventSource {
             return false  // No photos in events
         }
 
-        // Download photos SEQUENTIALLY (PTP/IP commands must be serialized)
-        // Filter out RAW files - only download JPEGs
+        // Strategy-only: enqueue handles into the session unified photo pipeline.
         for handle in photosToDownload {
             if Task.isCancelled { break }
-            await processPhotoHandle(handle)
+            session?.enqueueObjectHandle(handle)
         }
 
         return true  // Events were found and processed
     }
 
-    /// Process a single photo handle - get info, filter, download
-    private func processPhotoHandle(_ handle: UInt32) async {
-        guard let photoOps = photoOps else { return }
-
-        // Get object info to check file type
-        do {
-            let objectInfo = try await photoOps.getObjectInfo(objectHandle: handle)
-
-            // Skip RAW files
-            if objectInfo.isRawFile {
-                print("[CanonEventSource] Skipping RAW file: \(objectInfo.filename) (format: 0x\(String(format: "%04X", objectInfo.objectFormat)))")
-                delegate?.eventSource(self, didSkipRawFile: objectInfo.filename)
-                return
-            }
-
-            // Only download JPEG files
-            if objectInfo.isJpegFile {
-                print("[CanonEventSource] Downloading JPEG: \(objectInfo.filename)")
-
-                // Phase 1: Notify photo detected with metadata (before download)
-                // Note: PTP captureDate is a string, use current time as approximation
-                delegate?.eventSource(
-                    self,
-                    didDetectPhoto: handle,
-                    filename: objectInfo.filename,
-                    captureDate: Date(), // Use current time since PTP date is string format
-                    fileSize: Int(objectInfo.objectCompressedSize)
-                )
-
-                // Phase 2: Download photo
-                let photoData = try await photoOps.downloadPhoto(objectHandle: handle)
-                print("[CanonEventSource] Photo 0x\(String(format: "%08X", handle)) downloaded (\(photoData.count) bytes)")
-
-                // Phase 3: Notify download complete
-                delegate?.eventSource(
-                    self,
-                    didCompleteDownload: handle,
-                    data: photoData
-                )
-            } else {
-                // Unknown format - log and skip
-                print("[CanonEventSource] Skipping unknown format: \(objectInfo.filename) (format: 0x\(String(format: "%04X", objectInfo.objectFormat)))")
-            }
-        } catch {
-            print("[CanonEventSource] Failed to get object info for 0x\(String(format: "%08X", handle)): \(error)")
-            delegate?.eventSource(self, didFailWithError: error)
-        }
-    }
+    // Photo downloads are handled by the session unified photo pipeline.
 
     // MARK: - Canon Event Parsing
 
@@ -532,31 +453,23 @@ class CanonEventSource: CameraEventSource {
 
     /// Send data on connection
     private static func sendData(connection: NWConnection, data: Data) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            connection.send(content: data, completion: .contentProcessed { error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-            })
+        do {
+            try await PTPIPIO.sendWithTimeout(connection: connection, data: data, timeout: 2.0)
+        } catch PTPIPIOError.timeout {
+            throw CanonEventSourceError.timeout
         }
     }
 
     /// Receive exact number of bytes from connection
     private static func receiveData(connection: NWConnection, length: Int) async throws -> Data {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
-            connection.receive(minimumIncompleteLength: length, maximumLength: length) { content, _, isComplete, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else if let data = content {
-                    continuation.resume(returning: data)
-                } else if isComplete {
-                    continuation.resume(throwing: CanonEventSourceError.connectionClosed)
-                } else {
-                    continuation.resume(throwing: CanonEventSourceError.invalidResponse)
-                }
-            }
+        do {
+            return try await PTPIPIO.receiveExactWithTimeout(connection: connection, length: length, timeout: 2.0)
+        } catch PTPIPIOError.timeout {
+            throw CanonEventSourceError.timeout
+        } catch PTPIPIOError.connectionClosed {
+            throw CanonEventSourceError.connectionClosed
+        } catch PTPIPIOError.emptyRead {
+            throw CanonEventSourceError.invalidResponse
         }
     }
 
@@ -601,6 +514,7 @@ enum CanonEventSourceError: LocalizedError {
     case invalidResponse
     case transactionMismatch
     case connectionClosed
+    case timeout
 
     var errorDescription: String? {
         switch self {
@@ -608,6 +522,7 @@ enum CanonEventSourceError: LocalizedError {
         case .invalidResponse: return "Invalid response from Canon camera"
         case .transactionMismatch: return "Transaction ID mismatch"
         case .connectionClosed: return "Connection closed"
+        case .timeout: return "Timed out waiting for camera"
         }
     }
 }

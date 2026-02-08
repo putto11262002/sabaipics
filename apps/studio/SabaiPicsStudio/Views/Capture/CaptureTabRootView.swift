@@ -11,11 +11,13 @@ struct CaptureTabRootView: View {
     private enum ActiveSheet: Identifiable {
         case sony(SonyConnectFlowView.StartMode)
         case canon(CanonConnectFlowView.StartMode)
+        case nikon(NikonConnectFlowView.StartMode)
 
         var id: String {
             switch self {
             case .sony: return "sony"
             case .canon: return "canon"
+            case .nikon: return "nikon"
             }
         }
     }
@@ -23,10 +25,15 @@ struct CaptureTabRootView: View {
     @State private var activeSheet: ActiveSheet? = nil
     @State private var recentSony: [APCameraConnectionRecord] = []
     @State private var recentCanon: [APCameraConnectionRecord] = []
+    @State private var recentNikon: [APCameraConnectionRecord] = []
 
     @State private var pendingSonyReconnectID: String? = nil
     @State private var pendingSonyReconnectSSID: String? = nil
     @State private var isShowingSonyReconnectAlert: Bool = false
+
+    @State private var pendingNikonReconnectID: String? = nil
+    @State private var pendingNikonReconnectSSID: String? = nil
+    @State private var isShowingNikonReconnectAlert: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -39,11 +46,12 @@ struct CaptureTabRootView: View {
                     case .canon:
                         activeSheet = .canon(.new)
                     case .nikon:
-                        break // TODO: Nikon flow
+                        activeSheet = .nikon(.new)
                     }
                 },
                 recentSony: recentSony,
                 recentCanon: recentCanon,
+                recentNikon: recentNikon,
                 onReconnect: { manufacturer, id in
                     guard sessionStore.state == .idle else { return }
                     switch manufacturer.lowercased() {
@@ -51,6 +59,8 @@ struct CaptureTabRootView: View {
                         handleSonyReconnect(id: id)
                     case "canon":
                         handleCanonReconnect(id: id)
+                    case "nikon":
+                        handleNikonReconnect(id: id)
                     default:
                         break
                     }
@@ -60,6 +70,8 @@ struct CaptureTabRootView: View {
                     case "sony":
                         APCameraConnectionStore.shared.deleteRecord(id: id)
                     case "canon":
+                        APCameraConnectionStore.shared.deleteRecord(id: id)
+                    case "nikon":
                         APCameraConnectionStore.shared.deleteRecord(id: id)
                     default:
                         break
@@ -95,6 +107,24 @@ struct CaptureTabRootView: View {
         } message: {
             Text("Make sure you are connected to \(pendingSonyReconnectSSID ?? "the camera Wi-Fi").")
         }
+        // MARK: Nikon reconnect alert
+        .alert("Reconnect Nikon", isPresented: $isShowingNikonReconnectAlert) {
+            Button("Cancel", role: .cancel) {
+                pendingNikonReconnectID = nil
+                pendingNikonReconnectSSID = nil
+            }
+            Button("OK") {
+                guard let id = pendingNikonReconnectID else { return }
+                pendingNikonReconnectID = nil
+                pendingNikonReconnectSSID = nil
+                isShowingNikonReconnectAlert = false
+                DispatchQueue.main.async {
+                    activeSheet = .nikon(.reconnect(recordID: id))
+                }
+            }
+        } message: {
+            Text("Make sure you are connected to \(pendingNikonReconnectSSID ?? "the camera Wi-Fi").")
+        }
     }
 
     // MARK: - Sheet content
@@ -120,6 +150,22 @@ struct CaptureTabRootView: View {
         case .canon(let startMode):
             NavigationStack {
                 CanonConnectFlowView(
+                    startMode: startMode,
+                    onConnected: { activeCamera in
+                        sessionStore.start(activeCamera: activeCamera)
+                        activeSheet = nil
+                        reloadRecent()
+                    },
+                    onCancel: {
+                        activeSheet = nil
+                        reloadRecent()
+                    }
+                )
+            }
+
+        case .nikon(let startMode):
+            NavigationStack {
+                NikonConnectFlowView(
                     startMode: startMode,
                     onConnected: { activeCamera in
                         sessionStore.start(activeCamera: activeCamera)
@@ -176,11 +222,27 @@ struct CaptureTabRootView: View {
         }
     }
 
+    private func handleNikonReconnect(id: String) {
+        let recordID = UUID(uuidString: id)
+        let record = APCameraConnectionStore.shared.listRecords(manufacturer: .nikon)
+            .first(where: { $0.id == recordID })
+
+        if let currentKey = WiFiNetworkInfo.currentNetworkKey(), currentKey == record?.networkKey {
+            activeSheet = .nikon(.reconnect(recordID: id))
+            return
+        }
+
+        pendingNikonReconnectID = id
+        pendingNikonReconnectSSID = record?.ssid
+        isShowingNikonReconnectAlert = true
+    }
+
     // MARK: - Data
 
     private func reloadRecent() {
         recentSony = APCameraConnectionStore.shared.listRecords(manufacturer: .sony)
         recentCanon = APCameraConnectionStore.shared.listRecords(manufacturer: .canon)
+        recentNikon = APCameraConnectionStore.shared.listRecords(manufacturer: .nikon)
     }
 }
 

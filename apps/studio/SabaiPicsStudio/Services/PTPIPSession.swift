@@ -122,9 +122,54 @@ class PTPIPSession: NSObject {
     private var photoDownloader: PTPIPPhotoDownloader?
     private var transactionManager: PTPTransactionManager?
 
+    // Standard PTP push events (event channel)
+    private let eventMonitor = PTPIPEventMonitor()
+    private var eventObjectAddedStreamInstance: AsyncStream<UInt32>?
+    private var eventObjectAddedStreamContinuation: AsyncStream<UInt32>.Continuation?
+
+    private var isEventChannelMonitoring = false
+    private var startEventChannelMonitoringTask: Task<Void, Never>?
+
+    private var hasStartedEventMonitoring = false
+    private var startEventMonitoringTask: Task<Void, Never>?
+
+    // Teardown / disconnect (must be session-owned; strategies should not decide liveness)
+    private enum TeardownReason: Sendable {
+        case userInitiated
+        case transportFailed(channel: String)
+        case transportWaitingTimeout(channel: String)
+        case eventChannelDisconnected
+        case eventChannelError
+    }
+
+    private var teardownTask: Task<Void, Never>?
+    private var hasNotifiedDisconnect = false
+
+    private var commandWaitingTask: Task<Void, Never>?
+    private var eventWaitingTask: Task<Void, Never>?
+    private var isCommandWaiting = false
+    private var isEventWaiting = false
+
+    // Unified photo pipeline (consume handles -> GetObjectInfo -> download)
+    private struct PhotoJob: Sendable {
+        let logicalHandle: UInt32
+        let downloadHandle: UInt32
+        let objectInfo: PTPObjectInfo?
+        let maxBytes: UInt32?
+    }
+    private var photoJobContinuation: AsyncStream<PhotoJob>.Continuation?
+    private var photoJobTask: Task<Void, Never>?
+    private var seenLogicalHandles = Set<UInt32>()
+
     // Camera detection
     private var cameraVendor: CameraVendor = .unknown
     private var isSonyPTPIP = false
+    private var cameraNameHint: String? = nil
+
+    // Best-effort DeviceInfo (used to refine vendor detection)
+    private var deviceInfoManufacturer: String? = nil
+    private var deviceInfoVendorExtensionID: UInt32? = nil
+    private var deviceInfoModel: String? = nil
 
     // Configuration
     private let hostName: String
@@ -148,6 +193,101 @@ class PTPIPSession: NSObject {
     }
 
     // MARK: - Connection Management
+
+    private enum TransportChannel: String, Sendable {
+        case command
+        case event
+    }
+
+    private func installTransportStateHandlers() {
+        commandConnection?.stateUpdateHandler = { [weak self] state in
+            Task { @MainActor in
+                await self?.handleTransportState(state, channel: .command)
+            }
+        }
+
+        eventConnection?.stateUpdateHandler = { [weak self] state in
+            Task { @MainActor in
+                await self?.handleTransportState(state, channel: .event)
+            }
+        }
+    }
+
+    @MainActor
+    private func handleTransportState(_ state: NWConnection.State, channel: TransportChannel) async {
+        if teardownTask != nil {
+            return
+        }
+
+        switch state {
+        case .ready:
+            clearWaiting(channel: channel)
+        case .waiting:
+            setWaiting(channel: channel)
+        case .failed:
+            await teardownOnce(reason: .transportFailed(channel: channel.rawValue))
+        case .cancelled:
+            // Cancellation can happen during normal teardown.
+            await teardownOnce(reason: .transportFailed(channel: channel.rawValue))
+        default:
+            break
+        }
+    }
+
+    @MainActor
+    private func setWaiting(channel: TransportChannel) {
+        let graceSeconds: TimeInterval = 3.0
+
+        switch channel {
+        case .command:
+            if isCommandWaiting { return }
+            isCommandWaiting = true
+            commandWaitingTask?.cancel()
+            commandWaitingTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(graceSeconds * 1_000_000_000))
+                await self?.waitingGraceElapsed(channel: .command)
+            }
+        case .event:
+            if isEventWaiting { return }
+            isEventWaiting = true
+            eventWaitingTask?.cancel()
+            eventWaitingTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(graceSeconds * 1_000_000_000))
+                await self?.waitingGraceElapsed(channel: .event)
+            }
+        }
+    }
+
+    @MainActor
+    private func clearWaiting(channel: TransportChannel) {
+        switch channel {
+        case .command:
+            isCommandWaiting = false
+            commandWaitingTask?.cancel()
+            commandWaitingTask = nil
+        case .event:
+            isEventWaiting = false
+            eventWaitingTask?.cancel()
+            eventWaitingTask = nil
+        }
+    }
+
+    @MainActor
+    private func waitingGraceElapsed(channel: TransportChannel) async {
+        guard teardownTask == nil else { return }
+
+        switch channel {
+        case .command:
+            guard isCommandWaiting else { return }
+        case .event:
+            guard isEventWaiting else { return }
+        }
+
+        // Only treat waiting as a disconnect when monitoring is active.
+        guard hasStartedEventMonitoring else { return }
+
+        await teardownOnce(reason: .transportWaitingTimeout(channel: channel.rawValue))
+    }
 
     /// Connect to camera and establish PTP/IP session
     /// Performs complete Init handshake, then opens PTP session
@@ -208,6 +348,7 @@ class PTPIPSession: NSObject {
             let cameraNameData = ackPayloadData.dropFirst(20)
             if let cameraName = String(data: cameraNameData, encoding: .utf16LittleEndian) {
                 print("[PTPIPSession] Connected to: \(cameraName)")
+                cameraNameHint = cameraName
                 cameraVendor = detectCameraVendor(from: cameraName)
                 isSonyPTPIP = isSonyCamera(named: cameraName)
             }
@@ -218,6 +359,10 @@ class PTPIPSession: NSObject {
 
         // Wait for event connection to be ready
         try await waitForEventConnection(eventConnection, timeout: 5.0)
+
+        // Install disconnect detection handlers after the event connection is ready.
+        // (waitForEventConnection temporarily uses stateUpdateHandler)
+        installTransportStateHandlers()
 
         // Phase 2: Send Init Event Request on event channel
         let initEvtRequest = PTPIPInitEventRequest(connectionNumber: connectionNum)
@@ -244,6 +389,9 @@ class PTPIPSession: NSObject {
         // Phase 3: Send OpenSession command (required after Init handshake per libgphoto2)
         try await sendOpenSession()
 
+        // Refine vendor detection from DeviceInfo (camera name often omits manufacturer)
+        await updateVendorFromDeviceInfo(cameraNameHint: cameraNameHint)
+
         if isSonyPTPIP {
             print("[PTPIPSession] Initializing Sony SDIO... ")
             try await initializeSonySDIO()
@@ -267,14 +415,13 @@ class PTPIPSession: NSObject {
             try await canonSource.initializeCanonEOS()
         }
 
-        await eventSource?.startMonitoring()
-
         isConnected = true
-        print("[PTPIPSession] Session ready")
+        print("[PTPIPSession] Session prepared (starting monitoring)")
 
-        PTPLogger.info("Session connected and ready (vendor: \(cameraVendor))", category: PTPLogger.session)
+        PTPLogger.info("Session prepared (vendor: \(cameraVendor))", category: PTPLogger.session)
 
-        delegate?.sessionDidConnect(self)
+        // Start event monitoring immediately for direct-connect flows.
+        startEventMonitoring()
     }
 
     /// Prepare session with pre-authenticated connections (SAB-23)
@@ -302,6 +449,8 @@ class PTPIPSession: NSObject {
         self.eventConnection = eventConnection
         self.connectionNumber = connectionNumber
 
+        installTransportStateHandlers()
+
         // Detect camera vendor from name
         cameraVendor = detectCameraVendor(from: cameraName)
         print("[PTPIPSession] Camera: \(cameraName) (vendor: \(cameraVendor))")
@@ -316,6 +465,10 @@ class PTPIPSession: NSObject {
         print("[PTPIPSession] Sending OpenSession...")
         try await sendOpenSession()
         print("[PTPIPSession] OpenSession successful")
+
+        // Refine vendor detection from DeviceInfo (camera name often omits manufacturer)
+        cameraNameHint = cameraName
+        await updateVendorFromDeviceInfo(cameraNameHint: cameraName)
 
         if isSonyCamera(named: cameraName) {
             print("[PTPIPSession] Initializing Sony SDIO... ")
@@ -358,16 +511,34 @@ class PTPIPSession: NSObject {
             return
         }
 
+        guard !hasStartedEventMonitoring else {
+            return
+        }
+        hasStartedEventMonitoring = true
+
         print("[PTPIPSession] Starting event monitoring...")
 
-        // Start event source monitoring
-        Task {
-            await eventSource?.startMonitoring()
-            print("[PTPIPSession] Event monitoring started for vendor: \(cameraVendor)")
-        }
+        // Start unified photo pipeline
+        startPhotoPipelineIfNeeded()
 
-        // NOW notify delegate that session is fully ready
-        delegate?.sessionDidConnect(self)
+        startEventMonitoringTask?.cancel()
+        startEventMonitoringTask = Task { [weak self] in
+            guard let self else { return }
+
+            // If the selected strategy consumes the event channel, bring up the event monitor
+            // before starting the strategy to avoid missing early ObjectAdded pushes.
+            if (self.eventSource?.usesEventChannel ?? false), let eventConnection = self.eventConnection {
+                _ = self.eventObjectAddedStream()
+                await self.startEventChannelMonitoring(connection: eventConnection)
+                self.isEventChannelMonitoring = true
+            }
+
+            await self.eventSource?.startMonitoring()
+            print("[PTPIPSession] Event monitoring started for vendor: \(self.cameraVendor)")
+
+            // Notify delegate that monitoring is active.
+            self.delegate?.sessionDidConnect(self)
+        }
     }
 
     /// Connect using pre-authenticated connections from NetworkScannerService (SAB-23)
@@ -399,9 +570,44 @@ class PTPIPSession: NSObject {
     /// Disconnect and clean up session
     /// Based on libgphoto2's session teardown pattern
     func disconnect() async {
-        guard isConnected else { return }
+        await teardownOnce(reason: .userInitiated)
+    }
 
-        print("[PTPIPSession] Disconnecting... CALLED FROM:")
+    @MainActor
+    private func teardownOnce(reason: TeardownReason) async {
+        if let teardownTask {
+            await teardownTask.value
+            return
+        }
+
+        teardownTask = Task { @MainActor [weak self] in
+            await self?.performTeardown(reason: reason)
+        }
+
+        await teardownTask?.value
+    }
+
+    @MainActor
+    private func performTeardown(reason: TeardownReason) async {
+        if hasNotifiedDisconnect {
+            return
+        }
+
+        // Prevent event-monitor callbacks from surfacing disconnect during teardown.
+        isConnected = false
+
+        hasStartedEventMonitoring = false
+        startEventMonitoringTask?.cancel()
+        startEventMonitoringTask = nil
+
+        startEventChannelMonitoringTask?.cancel()
+        startEventChannelMonitoringTask = nil
+        isEventChannelMonitoring = false
+
+        clearWaiting(channel: .command)
+        clearWaiting(channel: .event)
+
+        print("[PTPIPSession] Disconnecting (reason: \(reason))... CALLED FROM:")
         Thread.callStackSymbols.prefix(10).forEach { print("  \($0)") }
 
         // Vendor-specific cleanup BEFORE CloseSession (per libgphoto2)
@@ -410,11 +616,17 @@ class PTPIPSession: NSObject {
             await source.cleanup()
         }
 
-        // Send CloseSession command after vendor cleanup
-        do {
-            try await sendCloseSession()
-        } catch {
-            // Continue with cleanup even if CloseSession fails
+        // Stop event channel monitor and photo pipeline
+        await stopEventChannelMonitoring()
+        stopPhotoPipeline()
+
+        // Send CloseSession command after vendor cleanup (best-effort)
+        if case .userInitiated = reason {
+            do {
+                try await sendCloseSession()
+            } catch {
+                // Continue with cleanup even if CloseSession fails
+            }
         }
 
         // Clean up downloader
@@ -433,11 +645,10 @@ class PTPIPSession: NSObject {
         photoDownloader = nil
         transactionManager = nil
 
-        isConnected = false
         print("[PTPIPSession] Disconnected")
-
         PTPLogger.info("Session disconnected", category: PTPLogger.session)
 
+        hasNotifiedDisconnect = true
         delegate?.sessionDidDisconnect(self)
     }
 
@@ -509,6 +720,156 @@ class PTPIPSession: NSObject {
         }
 
         PTPLogger.debug("\(opCode.name) sent", category: PTPLogger.command)
+    }
+
+    /// Read DeviceInfo dataset (ISO 15740) to identify manufacturer/model.
+    ///
+    /// This is more reliable than the PTP/IP Init "camera name" string.
+    private func readDeviceInfoData() async throws -> Data {
+        guard let connection = commandConnection,
+              let txManager = transactionManager else {
+            throw PTPIPSessionError.notConnected
+        }
+
+        var command = await txManager.createCommand()
+        let request = command.getDeviceInfo()
+        let requestData = request.toData()
+
+        let opCode = PTPOperationCode.getDeviceInfo
+        PTPLogger.debug("Sending \(opCode.name) [txID: \(request.transactionID)]", category: PTPLogger.command)
+
+        let (data, response) = try await commandQueue.run { [self] in
+            try await sendData(connection: connection, data: requestData)
+            return try await receiveDataResponse(connection: connection, expectedTransactionID: request.transactionID)
+        }
+
+        guard let responseCode = PTPResponseCode(rawValue: response.responseCode), responseCode.isSuccess else {
+            throw PTPIPSessionError.initializationFailed
+        }
+
+        guard let data else {
+            throw PTPIPSessionError.invalidResponse
+        }
+
+        return data
+    }
+
+    private struct DeviceInfoSummary {
+        let vendorExtensionID: UInt32?
+        let manufacturer: String?
+        let model: String?
+    }
+
+    private func updateVendorFromDeviceInfo(cameraNameHint: String?) async {
+        do {
+            let data = try await readDeviceInfoData()
+            guard let summary = parseDeviceInfoSummary(data) else {
+                PTPLogger.debug("GetDeviceInfo parse failed", category: PTPLogger.session)
+                return
+            }
+
+            deviceInfoManufacturer = summary.manufacturer
+            deviceInfoVendorExtensionID = summary.vendorExtensionID
+            deviceInfoModel = summary.model
+
+            let refined = detectCameraVendor(
+                cameraName: cameraNameHint ?? self.cameraNameHint ?? "",
+                manufacturer: summary.manufacturer
+            )
+
+            if refined != cameraVendor {
+                PTPLogger.info(
+                    "Vendor refined: \(cameraVendor) -> \(refined) (manufacturer=\(summary.manufacturer ?? "n/a"))",
+                    category: PTPLogger.session
+                )
+                cameraVendor = refined
+            }
+
+            // Observed behavior (Nikon Z6, WiFi PTP/IP): the camera can also push standard
+            // PTP events over the event channel, but we still prefer the Nikon polling path
+            // when DeviceInfo Manufacturer indicates Nikon to support bodies/modes that
+            // require Nikon_GetEvent (0x90C7).
+
+            if let manufacturer = summary.manufacturer {
+                print("[PTPIPSession] DeviceInfo: manufacturer=\(manufacturer), model=\(summary.model ?? "n/a"), vendorExtID=\(summary.vendorExtensionID.map { PTPLogger.formatHex($0) } ?? "n/a")")
+            }
+        } catch {
+            // Best-effort only. Session can still operate with name-based heuristics.
+            PTPLogger.debug("GetDeviceInfo failed: \(error)", category: PTPLogger.session)
+        }
+    }
+
+    private func parseDeviceInfoSummary(_ data: Data) -> DeviceInfoSummary? {
+        struct Cursor {
+            var data: Data
+            var offset: Int = 0
+
+            mutating func readU8() -> UInt8? {
+                guard offset + 1 <= data.count else { return nil }
+                let v = data[offset]
+                offset += 1
+                return v
+            }
+
+            mutating func readU16() -> UInt16? {
+                guard offset + 2 <= data.count else { return nil }
+                let raw = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt16.self) }
+                offset += 2
+                return UInt16(littleEndian: raw)
+            }
+
+            mutating func readU32() -> UInt32? {
+                guard offset + 4 <= data.count else { return nil }
+                let raw = data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self) }
+                offset += 4
+                return UInt32(littleEndian: raw)
+            }
+
+            mutating func readPTPString() -> String? {
+                guard let len = readU8() else { return nil }
+                if len == 0 {
+                    return ""
+                }
+
+                let byteCount = Int(len) * 2
+                guard offset + byteCount <= data.count else { return nil }
+                let strData = data.subdata(in: offset..<(offset + byteCount))
+                offset += byteCount
+                let s = String(data: strData, encoding: .utf16LittleEndian)
+                return s?.trimmingCharacters(in: CharacterSet(charactersIn: "\u{0000}"))
+            }
+
+            mutating func skipU16Array() -> Bool {
+                guard let count = readU32() else { return false }
+                let bytes = Int(count) * 2
+                guard bytes >= 0, offset + bytes <= data.count else { return false }
+                offset += bytes
+                return true
+            }
+        }
+
+        var c = Cursor(data: data)
+
+        // DeviceInfo dataset (ISO 15740)
+        _ = c.readU16() // StandardVersion
+        let vendorExtID = c.readU32()
+        _ = c.readU16() // VendorExtensionVersion
+        _ = c.readPTPString() // VendorExtensionDesc
+        _ = c.readU16() // FunctionalMode
+
+        // Arrays (UINT16 element arrays)
+        guard c.skipU16Array(), c.skipU16Array(), c.skipU16Array(), c.skipU16Array(), c.skipU16Array() else {
+            return nil
+        }
+
+        let manufacturer = c.readPTPString()
+        let model = c.readPTPString()
+
+        return DeviceInfoSummary(
+            vendorExtensionID: vendorExtID,
+            manufacturer: manufacturer,
+            model: model
+        )
     }
 
     /// Download photo by object handle
@@ -992,18 +1353,40 @@ class PTPIPSession: NSObject {
         }
     }
 
+    // MARK: - Command Execution
+
+    /// Execute a single PTP operation on the shared command channel.
+    ///
+    /// This is the preferred boundary for all command-channel I/O:
+    /// - serializes access via `commandQueue`
+    /// - allocates transaction IDs via `transactionManager`
+    /// - uses deadlines in `sendData` / `receiveData`
+    func executeOperation(
+        _ buildRequest: @escaping @Sendable (inout PTPCommand) -> PTPIPOperationRequest
+    ) async throws -> (data: Data?, response: PTPIPOperationResponse) {
+        guard let connection = commandConnection,
+              let txManager = transactionManager else {
+            throw PTPIPSessionError.notConnected
+        }
+
+        return try await commandQueue.run { [self] in
+            var command = await txManager.createCommand()
+            let request = buildRequest(&command)
+            let requestData = request.toData()
+
+            try await sendData(connection: connection, data: requestData)
+            return try await receiveDataResponse(connection: connection, expectedTransactionID: request.transactionID)
+        }
+    }
+
     // MARK: - Helper Methods
 
     /// Send data to connection
     private func sendData(connection: NWConnection, data: Data) async throws {
-        return try await withCheckedThrowingContinuation { continuation in
-            connection.send(content: data, completion: .contentProcessed { error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-            })
+        do {
+            try await PTPIPIO.sendWithTimeout(connection: connection, data: data, timeout: commandTimeout)
+        } catch PTPIPIOError.timeout {
+            throw PTPIPSessionError.timeout
         }
     }
 
@@ -1221,51 +1604,14 @@ class PTPIPSession: NSObject {
 
     /// Receive data from connection
     private func receiveData(connection: NWConnection, length: Int) async throws -> Data {
-        return try await withCheckedThrowingContinuation { continuation in
-            let lock = OSAllocatedUnfairLock()
-            var resumed = false
-
-            let timeoutTask = Task {
-                try? await Task.sleep(nanoseconds: UInt64(commandTimeout * 1_000_000_000))
-                lock.withLock {
-                    guard !resumed else { return }
-                    resumed = true
-                    continuation.resume(throwing: PTPIPSessionError.timeout)
-                }
-            }
-
-            connection.receive(minimumIncompleteLength: length, maximumLength: length) { content, _, isComplete, error in
-                var shouldResume = false
-                var resumeResult: Result<Data, Error>?
-
-                lock.withLock {
-                    guard !resumed else { return }
-                    resumed = true
-                    shouldResume = true
-
-                    if let error = error {
-                        resumeResult = .failure(error)
-                    } else if isComplete {
-                        resumeResult = .failure(PTPIPSessionError.connectionFailed)
-                    } else if let data = content, !data.isEmpty {
-                        resumeResult = .success(data)
-                    } else {
-                        resumeResult = .failure(PTPIPSessionError.connectionFailed)
-                    }
-                }
-
-                if shouldResume {
-                    timeoutTask.cancel()
-                    if let result = resumeResult {
-                        switch result {
-                        case .success(let data):
-                            continuation.resume(returning: data)
-                        case .failure(let error):
-                            continuation.resume(throwing: error)
-                        }
-                    }
-                }
-            }
+        do {
+            return try await PTPIPIO.receiveExactWithTimeout(connection: connection, length: length, timeout: commandTimeout)
+        } catch PTPIPIOError.timeout {
+            throw PTPIPSessionError.timeout
+        } catch PTPIPIOError.connectionClosed {
+            throw PTPIPSessionError.connectionFailed
+        } catch PTPIPIOError.emptyRead {
+            throw PTPIPSessionError.connectionFailed
         }
     }
 
@@ -1456,6 +1802,25 @@ class PTPIPSession: NSObject {
     /// Detect camera vendor from camera name
     /// Based on libgphoto2's vendor detection logic
     private func detectCameraVendor(from cameraName: String) -> CameraVendor {
+        return detectCameraVendor(cameraName: cameraName, manufacturer: nil)
+    }
+
+    /// Detect vendor using DeviceInfo manufacturer when available.
+    private func detectCameraVendor(cameraName: String, manufacturer: String?) -> CameraVendor {
+        if let manufacturer {
+            let m = manufacturer.lowercased()
+            if m.contains("canon") {
+                return .canon
+            }
+            if m.contains("nikon") {
+                return .nikon
+            }
+            // Sony typically uses standard PTP events (with additional SDIO init for PTP/IP mode)
+            if m.contains("sony") {
+                return .standard
+            }
+        }
+
         let name = cameraName.lowercased()
 
         // Canon detection
@@ -1470,7 +1835,7 @@ class PTPIPSession: NSObject {
 
         // Sony, Fuji, Olympus, Panasonic use standard PTP
         if name.contains("sony") || name.contains("fuji") ||
-           name.contains("olympus") || name.contains("panasonic") {
+            name.contains("olympus") || name.contains("panasonic") {
             return .standard
         }
 
@@ -1489,25 +1854,16 @@ class PTPIPSession: NSObject {
     private func createEventSource(for vendor: CameraVendor) -> CameraEventSource {
         switch vendor {
         case .canon:
-            return CanonEventSource(
-                commandConnection: commandConnection,
-                transactionManager: transactionManager,
-                commandQueue: commandQueue,
-                photoOps: self
-            )
+            return CanonEventSource(session: self)
 
         case .nikon:
-            return NikonEventSource(
-                eventConnection: eventConnection,
-                photoOps: self
-            )
+            return NikonEventSource(session: self)
 
         case .standard, .unknown:
-            return StandardEventSource(
-                eventConnection: eventConnection,
-                photoOps: self,
-                allowPolling: !isSonyPTPIP
-            )
+            if isSonyPTPIP {
+                return SonyEventSource(session: self)
+            }
+            return StandardEventSource(session: self, allowPolling: true)
         }
     }
 
@@ -1521,6 +1877,192 @@ class PTPIPSession: NSObject {
     /// Is session currently connected
     var connected: Bool {
         return isConnected
+    }
+}
+
+// MARK: - Standard Event Channel
+
+@MainActor
+extension PTPIPSession: PTPIPEventMonitorDelegate {
+    nonisolated func eventMonitor(_ monitor: PTPIPEventMonitor, didReceiveObjectAdded objectHandle: UInt32) {
+        Task { @MainActor in
+            self.eventObjectAddedStreamContinuation?.yield(objectHandle)
+        }
+    }
+
+    nonisolated func eventMonitor(_ monitor: PTPIPEventMonitor, didFailWithError error: Error) {
+        Task { @MainActor in
+            // Event channel errors usually mean the transport is unhealthy; teardown the session.
+            await self.teardownOnce(reason: .eventChannelError)
+        }
+    }
+
+    nonisolated func eventMonitorDidDisconnect(_ monitor: PTPIPEventMonitor) {
+        Task { @MainActor in
+            await self.teardownOnce(reason: .eventChannelDisconnected)
+        }
+    }
+}
+
+extension PTPIPSession {
+    private func startEventChannelMonitoringIfNeeded() {
+        guard isConnected, hasStartedEventMonitoring else { return }
+        guard !isEventChannelMonitoring else { return }
+        guard let eventConnection else { return }
+
+        isEventChannelMonitoring = true
+
+        startEventChannelMonitoringTask?.cancel()
+        startEventChannelMonitoringTask = Task { [weak self] in
+            guard let self else { return }
+            await self.startEventChannelMonitoring(connection: eventConnection)
+        }
+    }
+
+    func startEventChannelMonitoring(connection: NWConnection) async {
+        await eventMonitor.setDelegate(self)
+        await eventMonitor.startMonitoring(connection: connection)
+    }
+
+    func stopEventChannelMonitoring() async {
+        startEventChannelMonitoringTask?.cancel()
+        startEventChannelMonitoringTask = nil
+        isEventChannelMonitoring = false
+
+        await eventMonitor.stopMonitoring()
+        await eventMonitor.setDelegate(nil)
+        eventObjectAddedStreamContinuation?.finish()
+        eventObjectAddedStreamContinuation = nil
+        eventObjectAddedStreamInstance = nil
+    }
+
+    /// Standard event-channel ObjectAdded stream.
+    ///
+    /// Lazily starts the event-channel monitor when monitoring is active.
+    func eventObjectAddedStream() -> AsyncStream<UInt32> {
+        if let existing = eventObjectAddedStreamInstance {
+            startEventChannelMonitoringIfNeeded()
+            return existing
+        }
+
+        let stream = AsyncStream<UInt32> { continuation in
+            self.eventObjectAddedStreamContinuation = continuation
+        }
+
+        eventObjectAddedStreamInstance = stream
+        startEventChannelMonitoringIfNeeded()
+        return stream
+    }
+}
+
+// MARK: - Unified Photo Pipeline
+
+extension PTPIPSession {
+    private func startPhotoPipelineIfNeeded() {
+        guard photoJobTask == nil else { return }
+
+        let stream = AsyncStream<PhotoJob> { continuation in
+            self.photoJobContinuation = continuation
+        }
+
+        photoJobTask = Task { [weak self] in
+            guard let self else { return }
+            for await job in stream {
+                if Task.isCancelled { break }
+                await self.processPhotoJob(job)
+            }
+        }
+    }
+
+    private func stopPhotoPipeline() {
+        photoJobContinuation?.finish()
+        photoJobContinuation = nil
+        photoJobTask?.cancel()
+        photoJobTask = nil
+        seenLogicalHandles.removeAll()
+    }
+
+    /// Entry point for vendor strategies to report a new object handle.
+    /// The unified photo pipeline will fetch ObjectInfo, filter, and download.
+    func enqueueObjectHandle(_ handle: UInt32) {
+        enqueuePhotoJob(
+            logicalHandle: handle,
+            downloadHandle: handle,
+            objectInfo: nil,
+            maxBytes: nil
+        )
+    }
+
+    /// Entry point for vendor strategies that already resolved ObjectInfo and/or need
+    /// a different logical handle than the download handle (e.g. Sony in-memory).
+    func enqueueDetectedPhoto(
+        logicalHandle: UInt32,
+        downloadHandle: UInt32,
+        objectInfo: PTPObjectInfo,
+        maxBytes: UInt32?
+    ) {
+        enqueuePhotoJob(
+            logicalHandle: logicalHandle,
+            downloadHandle: downloadHandle,
+            objectInfo: objectInfo,
+            maxBytes: maxBytes
+        )
+    }
+
+    private func enqueuePhotoJob(
+        logicalHandle: UInt32,
+        downloadHandle: UInt32,
+        objectInfo: PTPObjectInfo?,
+        maxBytes: UInt32?
+    ) {
+        guard !seenLogicalHandles.contains(logicalHandle) else { return }
+        seenLogicalHandles.insert(logicalHandle)
+        photoJobContinuation?.yield(
+            PhotoJob(
+                logicalHandle: logicalHandle,
+                downloadHandle: downloadHandle,
+                objectInfo: objectInfo,
+                maxBytes: maxBytes
+            )
+        )
+    }
+
+    private func processPhotoJob(_ job: PhotoJob) async {
+        do {
+            let info: PTPObjectInfo
+            if let provided = job.objectInfo {
+                info = provided
+            } else {
+                info = try await getObjectInfo(objectHandle: job.downloadHandle)
+            }
+
+            if info.isRawFile {
+                delegate?.session(self, didSkipRawFile: info.filename)
+                return
+            }
+
+            guard info.isJpegFile else {
+                return
+            }
+
+            delegate?.session(
+                self,
+                didDetectPhoto: job.logicalHandle,
+                filename: info.filename,
+                captureDate: Date(),
+                fileSize: Int(info.objectCompressedSize)
+            )
+
+            let data: Data
+            if let maxBytes = job.maxBytes {
+                data = try await downloadPhoto(objectHandle: job.downloadHandle, maxBytes: maxBytes)
+            } else {
+                data = try await downloadPhoto(objectHandle: job.downloadHandle)
+            }
+            delegate?.session(self, didCompleteDownload: job.logicalHandle, data: data)
+        } catch {
+            delegate?.session(self, didFailWithError: error)
+        }
     }
 }
 
