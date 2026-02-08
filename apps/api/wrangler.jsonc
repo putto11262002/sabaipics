@@ -138,6 +138,10 @@
   "env": {
     // Staging environment - auto-deploy from master
     "staging": {
+ "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1 // optional. default = 1.
+  },
       "images": {
         "binding": "IMAGES",
       },
