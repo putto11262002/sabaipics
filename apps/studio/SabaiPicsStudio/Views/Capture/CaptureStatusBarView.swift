@@ -54,10 +54,12 @@ struct CaptureStatusBarView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Color.Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.Theme.border, lineWidth: 1)
         )
         .shadow(color: Color.Theme.foreground.opacity(0.08), radius: 10, x: 0, y: 4)

@@ -17,73 +17,28 @@ struct MainTabView: View {
     @State private var selectedTab: Tab = .events
     @StateObject private var captureSessionStore = CaptureSessionStore()
     @State private var captureSheetDetent: PresentationDetent = .large
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @EnvironmentObject private var coordinator: AppCoordinator
     @EnvironmentObject private var uploadStatusStore: UploadStatusStore
 
     var body: some View {
-        GeometryReader { proxy in
-            TabView(selection: $selectedTab) {
-                EventsHomeView()
-                    .tabItem {
-                        Label("Events", systemImage: "calendar")
-                    }
-                    .tag(Tab.events)
-
-                CaptureTabRootView(sessionStore: captureSessionStore)
-                    .tabItem {
-                        Label("Capture", systemImage: "camera.circle.fill")
-                    }
-                    .tag(Tab.capture)
-
-                ProfileView()
-                    .tabItem {
-                        Label("Profile", systemImage: "person.crop.circle")
-                    }
-                    .tag(Tab.profile)
-            }
-            .overlay(alignment: .bottom) {
-                if captureSessionStore.state != .idle {
-                    if let liveSession = captureSessionStore.captureSession {
-                        CaptureStatusBarLiveView(
-                            status: statusForBar,
-                            cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
-                            downloadsCount: captureSessionStore.stats.downloadsCount,
-                            lastFilename: captureSessionStore.stats.lastFilename,
-                            session: liveSession,
-                            stateByJobId: uploadStatusStore.stateByJobId,
-                            onOpen: {
-                                captureSheetDetent = .large
-                                captureSessionStore.isDetailsPresented = true
-                            },
-                            onDisconnect: {
-                                captureSessionStore.disconnect()
-                            }
-                        )
-                        .padding(.horizontal, 16)
-                        // Keep the bar above the system TabView bar.
-                        .padding(.bottom, proxy.safeAreaInsets.bottom + tabBarClearance)
-                    } else {
-                        CaptureStatusBarView(
-                            status: statusForBar,
-                            cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
-                            downloadsCount: captureSessionStore.stats.downloadsCount,
-                            lastFilename: captureSessionStore.stats.lastFilename,
-                            uploadedCount: 0,
-                            onOpen: {
-                                captureSheetDetent = .large
-                                captureSessionStore.isDetailsPresented = true
-                            },
-                            onDisconnect: {
-                                captureSessionStore.disconnect()
-                            }
-                        )
-                        .padding(.horizontal, 16)
-                        // Keep the bar above the system TabView bar.
-                        .padding(.bottom, proxy.safeAreaInsets.bottom + tabBarClearance)
-                    }
+        TabView(selection: $selectedTab) {
+            tabContent(EventsHomeView())
+                .tabItem {
+                    Label("Events", systemImage: "calendar")
                 }
-            }
+                .tag(Tab.events)
+
+            tabContent(CaptureTabRootView(sessionStore: captureSessionStore))
+                .tabItem {
+                    Label("Capture", systemImage: "camera.circle.fill")
+                }
+                .tag(Tab.capture)
+
+            tabContent(ProfileView())
+                .tabItem {
+                    Label("Profile", systemImage: "person.crop.circle")
+                }
+                .tag(Tab.profile)
         }
         .onAppear {
             captureSessionStore.configure(
@@ -109,10 +64,6 @@ struct MainTabView: View {
         }
     }
 
-    private var tabBarClearance: CGFloat {
-        horizontalSizeClass == .regular ? 72 : 56
-    }
-
     private var isDisconnecting: Bool {
         if case .connecting = captureSessionStore.state { return true }
         return false
@@ -128,6 +79,57 @@ struct MainTabView: View {
             return .active
         case .error(let message):
             return .error(message)
+        }
+    }
+
+    @ViewBuilder
+    private func tabContent<Content: View>(_ content: Content) -> some View {
+        content.safeAreaInset(edge: .bottom, spacing: 0) {
+            statusBarInset
+        }
+    }
+
+    @ViewBuilder
+    private var statusBarInset: some View {
+        if captureSessionStore.state != .idle {
+            if let liveSession = captureSessionStore.captureSession {
+                CaptureStatusBarLiveView(
+                    status: statusForBar,
+                    cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
+                    downloadsCount: captureSessionStore.stats.downloadsCount,
+                    lastFilename: captureSessionStore.stats.lastFilename,
+                    session: liveSession,
+                    stateByJobId: uploadStatusStore.stateByJobId,
+                    onOpen: {
+                        captureSheetDetent = .large
+                        captureSessionStore.isDetailsPresented = true
+                    },
+                    onDisconnect: {
+                        captureSessionStore.disconnect()
+                    }
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+            } else {
+                CaptureStatusBarView(
+                    status: statusForBar,
+                    cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
+                    downloadsCount: captureSessionStore.stats.downloadsCount,
+                    lastFilename: captureSessionStore.stats.lastFilename,
+                    uploadedCount: 0,
+                    onOpen: {
+                        captureSheetDetent = .large
+                        captureSessionStore.isDetailsPresented = true
+                    },
+                    onDisconnect: {
+                        captureSessionStore.disconnect()
+                    }
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+            }
         }
     }
 }
