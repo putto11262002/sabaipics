@@ -41,13 +41,37 @@ final class CaptureSessionStore: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var controller: CaptureSessionController?
 
+    private var uploadManager: UploadManager?
+    private var eventIdProvider: (() async -> String?)?
+
+    func configure(uploadManager: UploadManager, eventIdProvider: @escaping () async -> String?) {
+        self.uploadManager = uploadManager
+        self.eventIdProvider = eventIdProvider
+    }
+
     func start(activeCamera: ActiveCamera) {
         disconnectTask?.cancel()
         cancellables.removeAll()
         self.activeCamera = activeCamera
         self.recentDownloads = []
 
-        controller = CaptureSessionController(activeCamera: activeCamera)
+        controller = CaptureSessionController(activeCamera: activeCamera) { ui in
+            var sinks: [AnyCaptureEventSink] = []
+            if let uploadManager, let eventIdProvider {
+                sinks.append(
+                    UploadQueueSink(
+                        uploadManager: uploadManager,
+                        eventIdProvider: eventIdProvider,
+                        onEnqueued: { objectHandle, jobId in
+                            await MainActor.run {
+                                ui.linkUploadJob(objectHandle: objectHandle, jobId: jobId)
+                            }
+                        }
+                    ).asSink()
+                )
+            }
+            return sinks
+        }
         let ui = controller!.ui
 
         self.captureSession = ui

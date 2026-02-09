@@ -11,12 +11,14 @@ import Foundation
 /// This sink does not perform network uploads; it only enqueues durable jobs.
 struct UploadQueueSink: Sendable {
     let uploadManager: UploadManager
-    let eventIdProvider: @Sendable () -> String?
+    let eventIdProvider: @Sendable () async -> String?
+    let onEnqueued: @Sendable (_ objectHandle: UInt32, _ jobId: String) async -> Void
 
     func asSink() -> AnyCaptureEventSink {
-        AnyCaptureEventSink { [uploadManager, eventIdProvider] event in
+        AnyCaptureEventSink { [uploadManager, eventIdProvider, onEnqueued] event in
             guard case .downloadedToSpool(let completed) = event else { return }
-            guard let eventId = eventIdProvider() else {
+            guard let eventId = await eventIdProvider() else {
+                print("[UploadQueueSink] No selected eventId; skipping enqueue for \(completed.filename)")
                 return
             }
 
@@ -31,7 +33,9 @@ struct UploadQueueSink: Sendable {
             )
 
             do {
-                _ = try await uploadManager.enqueue(request)
+                let jobId = try await uploadManager.enqueue(request)
+                print("[UploadQueueSink] Enqueued upload job \(jobId) for \(completed.filename) -> event \(eventId)")
+                await onEnqueued(completed.objectHandle, jobId)
             } catch {
                 print("[UploadQueueSink] Failed to enqueue upload job: \(error)")
             }

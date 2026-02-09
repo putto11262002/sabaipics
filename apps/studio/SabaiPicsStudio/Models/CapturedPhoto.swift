@@ -37,6 +37,7 @@ class CapturedPhoto: Identifiable, ObservableObject, Equatable {
     @Published var data: Data
     @Published var image: PlatformImage?
     @Published var fileURL: URL?
+    @Published var uploadJobId: String?
     @Published var status: DownloadStatus
     @Published var isDownloading: Bool
     let fileSize: Int
@@ -52,6 +53,7 @@ class CapturedPhoto: Identifiable, ObservableObject, Equatable {
         self.data = data
         self.image = CapturedPhoto.makeImage(from: data)
         self.fileURL = nil
+        self.uploadJobId = nil
         self.captureDate = captureDate
         self.status = .completed
         self.isDownloading = false
@@ -66,6 +68,7 @@ class CapturedPhoto: Identifiable, ObservableObject, Equatable {
         let imageData = CapturedPhoto.makeJPEGData(from: image) ?? Data()
         self.data = imageData
         self.fileURL = nil
+        self.uploadJobId = nil
         self.captureDate = captureDate
         self.status = .completed
         self.isDownloading = false
@@ -86,6 +89,7 @@ class CapturedPhoto: Identifiable, ObservableObject, Equatable {
         self.data = Data()
         self.image = nil
         self.fileURL = nil
+        self.uploadJobId = nil
         self.status = .downloading
         self.isDownloading = isDownloading
         self.fileSize = fileSize

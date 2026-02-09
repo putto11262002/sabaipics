@@ -55,6 +55,18 @@ final class CaptureUISink: ObservableObject {
         }
     }
 
+    func linkUploadJob(objectHandle: UInt32, jobId: String) {
+        if let photo = pendingDownloads[objectHandle] {
+            photo.uploadJobId = jobId
+            return
+        }
+
+        let idHex = String(format: "%08X", objectHandle)
+        if let photo = photos.first(where: { $0.id == idHex }) {
+            photo.uploadJobId = jobId
+        }
+    }
+
     private func handleDetected(_ detected: CaptureDetected) {
         let photo = CapturedPhoto(
             id: String(format: "%08X", detected.objectHandle),

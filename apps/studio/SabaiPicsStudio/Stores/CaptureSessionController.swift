@@ -24,7 +24,7 @@ final class CaptureSessionController: ObservableObject {
 
     private var detectedByHandle: [UInt32: CaptureDetected] = [:]
 
-    init(activeCamera: ActiveCamera) {
+    init(activeCamera: ActiveCamera, makeExtraSinks: (CaptureUISink) -> [AnyCaptureEventSink] = { _ in [] }) {
         self.camera = activeCamera
         self.cameraName = activeCamera.name
         self.cameraIP = activeCamera.ipAddress
@@ -32,16 +32,17 @@ final class CaptureSessionController: ObservableObject {
         self.ui = CaptureUISink(startedAt: Date(), maxPhotosInMemory: 200)
         self.spool = CaptureSpool()
 
-        self.pipeline = CaptureEventPipeline(
-            spool: spool,
-            sinks: [
-                AnyCaptureEventSink { [weak ui] (event: CapturePipelineEvent) in
-                    await MainActor.run {
-                        ui?.handle(event)
-                    }
+        var sinks: [AnyCaptureEventSink] = []
+        sinks.append(
+            AnyCaptureEventSink { [weak ui] (event: CapturePipelineEvent) in
+                await MainActor.run {
+                    ui?.handle(event)
                 }
-            ]
+            }
         )
+        sinks.append(contentsOf: makeExtraSinks(self.ui))
+
+        self.pipeline = CaptureEventPipeline(spool: spool, sinks: sinks)
 
         // Bind PTP session delegate
         activeCamera.session.delegate = self
