@@ -1,0 +1,142 @@
+/**
+ * Image normalization utilities.
+ *
+ * Two implementations with identical Result shapes:
+ * - normalizeWithPhoton: in-Worker Wasm processing (no network dependency)
+ * - normalizeWithCfImages: Cloudflare Images API (external service)
+ */
+
+import { PhotonImage, SamplingFilter, resize } from '@cf-wasm/photon/workerd';
+import { Result, ResultAsync, ok, err } from 'neverthrow';
+import { extractJpegDimensions } from './jpeg';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export type NormalizeResult = {
+  bytes: ArrayBuffer;
+  width: number;
+  height: number;
+};
+
+export type NormalizeError = {
+  stage: string;
+  cause: unknown;
+};
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const MAX_WIDTH = 4000;
+const JPEG_QUALITY = 90;
+
+// =============================================================================
+// Photon (Wasm) Normalizer
+// =============================================================================
+
+const safeNewFromBytes = Result.fromThrowable(
+  (bytes: Uint8Array) => PhotonImage.new_from_byteslice(bytes),
+  (cause): NormalizeError => ({ stage: 'photon_decode', cause }),
+);
+
+const safeResize = Result.fromThrowable(
+  (img: PhotonImage, w: number, h: number) => resize(img, w, h, SamplingFilter.Lanczos3),
+  (cause): NormalizeError => ({ stage: 'photon_resize', cause }),
+);
+
+const safeEncodeJpeg = Result.fromThrowable(
+  (img: PhotonImage) => ({
+    jpegBytes: img.get_bytes_jpeg(JPEG_QUALITY),
+    width: img.get_width(),
+    height: img.get_height(),
+  }),
+  (cause): NormalizeError => ({ stage: 'photon_encode', cause }),
+);
+
+export function normalizeWithPhoton(
+  imageBytes: ArrayBuffer,
+): Result<NormalizeResult, NormalizeError> {
+  let inputImage: PhotonImage | null = null;
+  let resizedImage: PhotonImage | null = null;
+
+  const cleanup = () => {
+    if (resizedImage) resizedImage.free();
+    if (inputImage) inputImage.free();
+  };
+
+  return safeNewFromBytes(new Uint8Array(imageBytes))
+    .andThen((img) => {
+      inputImage = img;
+      const origWidth = img.get_width();
+
+      if (origWidth > MAX_WIDTH) {
+        const scale = MAX_WIDTH / origWidth;
+        const newHeight = Math.round(img.get_height() * scale);
+        return safeResize(img, MAX_WIDTH, newHeight).map((resized) => {
+          resizedImage = resized;
+          return resized;
+        });
+      }
+
+      // No resize needed — use input directly for re-encode
+      return ok(img);
+    })
+    .andThen((img) => safeEncodeJpeg(img))
+    .map(({ jpegBytes, width, height }) => {
+      const result: NormalizeResult = { bytes: jpegBytes.buffer as ArrayBuffer, width, height };
+      cleanup();
+      return result;
+    })
+    .mapErr((error) => {
+      cleanup();
+      return error;
+    });
+}
+
+// =============================================================================
+// CF Images Normalizer
+// =============================================================================
+
+const safeExtractDimensions = Result.fromThrowable(
+  (bytes: ArrayBuffer) => {
+    const dims = extractJpegDimensions(bytes);
+    if (!dims) throw new Error('Failed to extract dimensions from normalized JPEG');
+    return dims;
+  },
+  (cause): NormalizeError => ({ stage: 'cf_images_extract_dimensions', cause }),
+);
+
+export function normalizeWithCfImages(
+  imageBytes: ArrayBuffer,
+  images: ImagesBinding,
+): ResultAsync<NormalizeResult, NormalizeError> {
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(imageBytes));
+      controller.close();
+    },
+  });
+
+  return ResultAsync.fromPromise(
+    images
+      .input(stream)
+      .transform({ width: MAX_WIDTH, fit: 'scale-down' })
+      .output({ format: 'image/jpeg', quality: JPEG_QUALITY }),
+    (cause): NormalizeError => ({ stage: 'cf_images_transform', cause }),
+  )
+    .andThen((transformResponse) =>
+      ResultAsync.fromPromise(
+        transformResponse.response().arrayBuffer(),
+        (cause): NormalizeError => ({ stage: 'cf_images_read_response', cause }),
+      ),
+    )
+    .andThen((normalizedBytes) =>
+      safeExtractDimensions(normalizedBytes).map((dims) => ({
+        bytes: normalizedBytes,
+        width: dims.width,
+        height: dims.height,
+      })),
+    );
+}
