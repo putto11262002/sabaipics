@@ -50,6 +50,27 @@
       "when": 1770229208489,
       "tag": "0006_silky_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770435686369,
+      "tag": "0007_tiresome_nick_fury",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1770448033980,
+      "tag": "0008_amazing_dust",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1770600718889,
+      "tag": "0009_silent_payback",
+      "breakpoints": true
     }
   ]
 }

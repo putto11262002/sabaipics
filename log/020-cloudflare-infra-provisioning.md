@@ -13,11 +13,17 @@ Previously this lived in multiple scripts under `scripts/infra/*` and an API-loc
 - Script: `scripts/infra/cloudflare-provision.sh`
 - Provisions per environment (`dev`, `staging`, `production`):
   - Cloudflare Queues (including DLQs)
+    - `dev`: only `r2-notification-proxy` (all other queues are locally simulated by wrangler dev)
+    - `staging`/`production`: photo-processing, rekognition-cleanup, upload-processing, logo-processing (each with DLQ)
   - R2 photos bucket
   - R2 CORS rules (from `scripts/infra/r2-cors.json`)
-  - R2 event notifications for `uploads/`
-    - `dev` delivers to `r2-notification-proxy`
-    - `staging`/`production` deliver to `upload-processing*`
+  - R2 event notifications:
+    - `uploads/` prefix (photo uploads):
+      - `dev` → `r2-notification-proxy`
+      - `staging`/`production` → `upload-processing-{env}`
+    - `logos/` prefix (logo uploads):
+      - `dev` → `r2-notification-proxy`
+      - `staging`/`production` → `logo-processing-{env}`
   - Optional R2 custom domain wiring with `--with-domains` and `R2_ZONE_ID`
 
 Run locally:

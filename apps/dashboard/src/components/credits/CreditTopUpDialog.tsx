@@ -14,14 +14,18 @@ import {
   TableCell,
   TableRow,
 } from '@sabaipics/uiv3/components/table';
-import { Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@sabaipics/uiv3/components/alert';
+import { Loader2, CheckCircle2, XCircle, AlertCircle, X } from 'lucide-react';
 import { calculateTieredDiscount } from '../../lib/credits/discount';
 import { useTopUpCheckout } from '../../hooks/credits/useTopUpCheckout';
+import { useValidatePromoCode } from '../../hooks/credits/useValidatePromoCode';
+import { useDebounce } from '../../hooks/useDebounce';
 
 interface CreditTopUpDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialAmount?: number | null;
+  initialPromoCode?: string | null;
 }
 
 const MIN_AMOUNT = 50;
@@ -32,13 +36,32 @@ export function CreditTopUpDialog({
   open,
   onOpenChange,
   initialAmount,
+  initialPromoCode,
 }: CreditTopUpDialogProps) {
   const [amount, setAmount] = useState(initialAmount || 50);
+  const [promoCode, setPromoCode] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const checkoutMutation = useTopUpCheckout();
 
-  // Calculate discount instantly (no API call needed!)
+  // Debounce promo code input for validation
+  const debouncedPromoCode = useDebounce(promoCode, 500);
+  const validateQuery = useValidatePromoCode(
+    debouncedPromoCode,
+    open && debouncedPromoCode.length > 0
+  );
+
+  const promoData = validateQuery.data?.data;
+  const isDiscountCode = promoData?.type === 'discount';
+  const isValidPromo = validateQuery.isSuccess && isDiscountCode;
+
+  // Check if amount meets minimum requirement
+  const minAmountRequired = isValidPromo && promoData ? promoData.minAmountThb || MIN_AMOUNT : MIN_AMOUNT;
+  const meetsMinimum = amount >= minAmountRequired;
+  const canApplyDiscount = isValidPromo && meetsMinimum;
+
+  // Calculate preview with promo code discount
   const preview = useMemo(() => {
-    // Always show preview, even if amount is invalid (will show zeros)
+    // Base calculation
     if (amount < MIN_AMOUNT || amount > MAX_AMOUNT || amount === 0) {
       return {
         originalAmount: amount,
@@ -47,31 +70,61 @@ export function CreditTopUpDialog({
         bonusCredits: 0,
         creditAmount: 0,
         effectiveRate: 0,
+        promoDiscount: 0,
       };
     }
-    return calculateTieredDiscount(amount);
-  }, [amount]);
 
-  // Reset amount when dialog opens with initialAmount
+    const base = calculateTieredDiscount(amount);
+
+    // Apply promo code discount only if valid AND meets minimum
+    if (canApplyDiscount && promoData) {
+      let promoDiscount = 0;
+
+      if (promoData.discountType === 'percent') {
+        promoDiscount = Math.round(amount * (promoData.discountPercent / 100));
+      } else {
+        promoDiscount = Math.min(promoData.discountAmount / 100, amount); // Convert satang to THB
+      }
+
+      return {
+        ...base,
+        promoDiscount,
+        finalAmount: base.finalAmount - promoDiscount,
+      };
+    }
+
+    return { ...base, promoDiscount: 0 };
+  }, [amount, canApplyDiscount, promoData]);
+
+  // Reset amount when dialog opens
   useEffect(() => {
     if (open && initialAmount) {
       setAmount(initialAmount);
     }
   }, [open, initialAmount]);
 
+  // Set promo code when dialog opens
+  useEffect(() => {
+    if (open && initialPromoCode) {
+      setPromoCode(initialPromoCode);
+    }
+  }, [open, initialPromoCode]);
+
   const handleCheckout = async () => {
     try {
-      const result = await checkoutMutation.mutateAsync({ amount });
+      const result = await checkoutMutation.mutateAsync({
+        amount,
+        promoCode: promoCode || undefined,
+      });
       window.location.href = result.checkoutUrl;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create checkout';
-      alert(message);
+      setErrorMessage(message);
     }
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
-    // Allow empty input (user is typing)
     if (value === '') {
       setAmount(0);
       return;
@@ -81,6 +134,7 @@ export function CreditTopUpDialog({
   };
 
   const isValidAmount = amount >= MIN_AMOUNT && amount <= MAX_AMOUNT;
+  const canCheckout = isValidAmount && !errorMessage;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -129,6 +183,115 @@ export function CreditTopUpDialog({
             ))}
           </div>
 
+          {/* Promo Code Input */}
+          <div className="space-y-2">
+            <Label htmlFor="promoCode" className="text-sm font-medium">
+              Discount Code (Optional)
+            </Label>
+            <div className="relative">
+              <Input
+                id="promoCode"
+                type="text"
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                placeholder="Enter discount code"
+                disabled={!!initialPromoCode}
+                className={initialPromoCode ? 'bg-muted pr-10' : 'pr-10'}
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {promoCode && !initialPromoCode && (
+                  <>
+                    {/* Clear button */}
+                    <button
+                      type="button"
+                      onClick={() => setPromoCode('')}
+                      className="hover:bg-muted rounded-sm p-0.5 transition-colors"
+                      aria-label="Clear code"
+                    >
+                      <X className="size-4 text-muted-foreground hover:text-foreground" />
+                    </button>
+
+                    {/* Status icon */}
+                    {validateQuery.isLoading && (
+                      <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                    )}
+                    {validateQuery.isSuccess && isValidPromo && meetsMinimum && (
+                      <CheckCircle2 className="size-4 text-green-600" />
+                    )}
+                    {validateQuery.isError && (
+                      <XCircle className="size-4 text-destructive" />
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Promo Code Status Messages */}
+            {promoCode && !initialPromoCode && (
+              <>
+                {/* Valid and applied */}
+                {validateQuery.isSuccess && isValidPromo && meetsMinimum && promoData && (
+                  <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                    <CheckCircle2 className="size-3" />
+                    {promoData.discountType === 'percent'
+                      ? `${promoData.discountPercent}% off applied!`
+                      : `${promoData.discountAmount / 100} THB off applied!`}
+                  </p>
+                )}
+
+                {/* Invalid code */}
+                {validateQuery.isError && (
+                  <p className="text-xs text-destructive font-medium flex items-center gap-1">
+                    <XCircle className="size-3" />
+                    Invalid or expired discount code
+                  </p>
+                )}
+
+                {/* Wrong type (gift code) */}
+                {validateQuery.isSuccess && !isDiscountCode && (
+                  <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                    <AlertCircle className="size-3" />
+                    This is a gift code, not a discount code
+                  </p>
+                )}
+              </>
+            )}
+
+            {initialPromoCode && (
+              <p className="text-xs text-green-600 font-medium">
+                Discount code applied!
+              </p>
+            )}
+          </div>
+
+          {/* Base Minimum Alert (50 THB) */}
+          {!isValidAmount && amount > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>
+                Minimum purchase is {MIN_AMOUNT} THB
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Promo Code Minimum Warning */}
+          {isValidPromo && !meetsMinimum && isValidAmount && promoData && (
+            <Alert variant="warning">
+              <AlertCircle className="size-4" />
+              <AlertDescription>
+                Enter at least {minAmountRequired} THB to use this discount code
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Checkout Error Alert */}
+          {errorMessage && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
+
           {/* Preview Table */}
           <div className="rounded-lg overflow-hidden">
             <Table>
@@ -143,12 +306,20 @@ export function CreditTopUpDialog({
                   <TableCell className="text-muted-foreground">Bonus credits:</TableCell>
                   <TableCell
                     className={`text-right font-medium ${
-                      preview.bonusCredits > 0 ? 'text-green-600' : 'text-muted-foreground'
+                      preview.bonusCredits > 0 ? 'text-info' : 'text-muted-foreground'
                     }`}
                   >
                     {preview.bonusCredits > 0 ? `+${preview.bonusCredits}` : '0'} ({preview.discountPercent}%)
                   </TableCell>
                 </TableRow>
+                {preview.promoDiscount > 0 && (
+                  <TableRow>
+                    <TableCell className="text-muted-foreground">Promo discount:</TableCell>
+                    <TableCell className="text-right font-medium text-success">
+                      -{preview.promoDiscount.toLocaleString()} ฿
+                    </TableCell>
+                  </TableRow>
+                )}
                 <TableRow>
                   <TableCell className="font-medium">You pay:</TableCell>
                   <TableCell className="text-right font-bold">
@@ -162,7 +333,7 @@ export function CreditTopUpDialog({
           {/* Checkout Button */}
           <Button
             onClick={handleCheckout}
-            disabled={checkoutMutation.isPending || !isValidAmount}
+            disabled={checkoutMutation.isPending || !canCheckout}
             className="w-full"
             size="lg"
           >

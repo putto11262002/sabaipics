@@ -17,12 +17,11 @@ import { apiError, type HandlerError } from '../lib/error';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { generatePresignedPutUrl } from '../lib/r2/presign';
 import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
+import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 
 // =============================================================================
 // Constants
 // =============================================================================
-
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
 const PRESIGN_TTL_SECONDS = 300; // 5 minutes
 
@@ -41,7 +40,7 @@ const presignRequestSchema = z.object({
     .number()
     .int('Content length must be an integer')
     .positive('Content length must be positive')
-    .max(MAX_FILE_SIZE, `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024} MB`),
+    .max(PHOTO_MAX_FILE_SIZE, `File size must be less than ${PHOTO_MAX_FILE_SIZE / 1024 / 1024} MB`),
   filename: z.string().optional(),
 });
 
@@ -192,7 +191,6 @@ export const uploadsRouter = new Hono<Env>()
             errorCode: uploadIntents.errorCode,
             errorMessage: uploadIntents.errorMessage,
             photoId: uploadIntents.photoId,
-            uploadedAt: uploadIntents.uploadedAt,
             completedAt: uploadIntents.completedAt,
             expiresAt: uploadIntents.expiresAt,
           })
@@ -212,7 +210,6 @@ export const uploadsRouter = new Hono<Env>()
           errorCode: i.errorCode,
           errorMessage: i.errorMessage,
           photoId: i.photoId,
-          uploadedAt: i.uploadedAt ?? null,
           completedAt: i.completedAt ?? null,
           expiresAt: i.expiresAt,
         })),

@@ -15,7 +15,6 @@ const IMAGE_SIGNATURES = {
   png: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
   gif: [0x47, 0x49, 0x46, 0x38],
   webp: { riff: [0x52, 0x49, 0x46, 0x46], webp: [0x57, 0x45, 0x42, 0x50] },
-  heic: { ftyp: [0x66, 0x74, 0x79, 0x70] }, // starts at offset 4
 } as const;
 
 function matchesSignature(bytes: Uint8Array, signature: readonly number[], offset = 0): boolean {
@@ -24,7 +23,7 @@ function matchesSignature(bytes: Uint8Array, signature: readonly number[], offse
 
 /**
  * Validates image magic bytes and returns the detected MIME type.
- * Supports JPEG, PNG, GIF, WebP, and HEIC/HEIF.
+ * Supports JPEG, PNG, GIF, and WebP.
  */
 export function validateImageMagicBytes(bytes: Uint8Array): { valid: boolean; detectedType?: string } {
   // JPEG
@@ -46,10 +45,5 @@ export function validateImageMagicBytes(bytes: Uint8Array): { valid: boolean; de
   ) {
     return { valid: true, detectedType: 'image/webp' };
   }
-  // HEIC/HEIF (....ftyp at offset 4)
-  if (matchesSignature(bytes, IMAGE_SIGNATURES.heic.ftyp, 4)) {
-    return { valid: true, detectedType: 'image/heic' };
-  }
-
   return { valid: false };
 }

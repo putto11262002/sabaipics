@@ -13,8 +13,7 @@ import { photographers } from './photographers';
 
 // Status enum for logo upload intent lifecycle
 export const logoUploadIntentStatuses = [
-  'pending', // presign issued, waiting for upload
-  'uploaded', // R2 object exists, processing
+  'pending', // presign issued, waiting for upload or being processed
   'completed', // logo uploaded and event.logo_r2_key updated
   'failed', // validation failed, object deleted
   'expired', // presign expired, never uploaded
@@ -53,7 +52,6 @@ export const logoUploadIntents = pgTable(
     // Timestamps
     createdAt: createdAtCol(),
     expiresAt: timestamptz('expires_at').notNull(), // presign URL expiry
-    uploadedAt: timestamptz('uploaded_at'), // when R2 object created
     completedAt: timestamptz('completed_at'), // when event.logo_r2_key updated
   },
   (table) => [

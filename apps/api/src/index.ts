@@ -1,6 +1,7 @@
+import * as Sentry from '@sentry/cloudflare';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { createClerkAuth } from '@sabaipics/auth/middleware';
+import { createAnyAuth } from './middleware/any-auth';
 import { createDbHttp, createDbTx } from '@sabaipics/db';
 import { authRouter } from './routes/auth';
 import { webhookRouter } from './routes/webhooks';
@@ -13,12 +14,14 @@ import { uploadsRouter } from './routes/uploads';
 import { r2Router } from './routes/r2';
 import { participantRouter } from './routes/participant';
 import { ftpRouter } from './routes/ftp';
+import { desktopAuthRouter } from './routes/desktop-auth';
 import type { Env, Bindings } from './types';
 
 // Queue consumers
 import { queue as photoQueue } from './queue/photo-consumer';
 import { queue as cleanupQueue } from './queue/cleanup-consumer';
 import { queue as uploadQueue } from './queue/upload-consumer';
+import logoUploadConsumer from './queue/logo-upload-consumer';
 
 // Cron handlers
 import { scheduled } from './crons';
@@ -70,9 +73,10 @@ const app = new Hono<Env>()
   .route('/admin', adminRouter)
   // FTP routes - FTP JWT auth, no Clerk (must be before Clerk middleware)
   .route('/api/ftp', ftpRouter)
-  .use('/*', createClerkAuth())
+  .use('/*', createAnyAuth())
   .route('/credit-packages', creditsRouter)
   .get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))
+  .route('/desktop/auth', desktopAuthRouter)
   .route('/auth', authRouter)
   .route('/dashboard', dashboardRouter)
   .route('/events', eventsRouter)
@@ -87,20 +91,32 @@ const app = new Hono<Env>()
 export type AppType = typeof app;
 
 // Export worker with fetch, queue, and scheduled handlers
-export default {
-  fetch: app.fetch,
-  queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
-    // Route by queue name prefix (handles -dev, -staging, etc.)
-    if (batch.queue.startsWith('photo-processing')) {
-      return photoQueue(batch as MessageBatch<any>, env, ctx);
-    }
-    if (batch.queue.startsWith('rekognition-cleanup')) {
-      return cleanupQueue(batch as MessageBatch<any>, env);
-    }
-    if (batch.queue.startsWith('upload-processing')) {
-      return uploadQueue(batch as MessageBatch<any>, env, ctx);
-    }
-    console.error('[Queue] Unknown queue:', batch.queue);
+// Sentry.withSentry wraps all handlers (fetch, queue, scheduled) for error capture
+export default Sentry.withSentry(
+  (env: Bindings) => ({
+    dsn: env.SENTRY_DSN,
+    environment: env.NODE_ENV,
+    tracesSampleRate: env.NODE_ENV === 'production' ? 0.1 : 1.0,
+    debug: env.NODE_ENV === 'staging',
+  }),
+  {
+    fetch: app.fetch,
+    queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
+      // Route by queue name prefix (handles -dev, -staging, etc.)
+      if (batch.queue.startsWith('photo-processing')) {
+        return photoQueue(batch as MessageBatch<any>, env, ctx);
+      }
+      if (batch.queue.startsWith('rekognition-cleanup')) {
+        return cleanupQueue(batch as MessageBatch<any>, env);
+      }
+      if (batch.queue.startsWith('upload-processing')) {
+        return uploadQueue(batch as MessageBatch<any>, env, ctx);
+      }
+      if (batch.queue.startsWith('logo-processing')) {
+        return logoUploadConsumer.queue(batch as MessageBatch<any>, env);
+      }
+      console.error('[Queue] Unknown queue:', batch.queue);
+    },
+    scheduled,
   },
-  scheduled,
-};
+);

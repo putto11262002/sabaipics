@@ -49,7 +49,7 @@ export function UploadStep({ onFileSelect, onBack }: UploadStepProps) {
             <input
               ref={inputRef}
               type="file"
-              accept="image/jpeg,image/png,image/heic,image/heif,image/webp"
+              accept="image/jpeg,image/png,image/webp"
               capture="user"
               onChange={handleChange}
               className="hidden"

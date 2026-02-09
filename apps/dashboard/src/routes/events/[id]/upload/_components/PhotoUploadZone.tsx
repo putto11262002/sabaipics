@@ -4,9 +4,9 @@ import { Button } from "@sabaipics/uiv3/components/button";
 import { Alert, AlertDescription } from "@sabaipics/uiv3/components/alert";
 import { cn } from "@sabaipics/uiv3/lib/utils";
 
-const ACCEPTED_FORMATS = ["image/jpeg", "image/png", "image/heic", "image/webp"];
-const ACCEPTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".heic", ".webp"];
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const ACCEPTED_FORMATS = ["image/jpeg", "image/png", "image/webp"];
+const ACCEPTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 interface ValidationError {
   file: File;
@@ -21,12 +21,12 @@ interface PhotoUploadZoneProps {
 function validateFile(file: File): string | null {
   // Check file type
   if (!ACCEPTED_FORMATS.includes(file.type.toLowerCase())) {
-    return "Accepted formats: JPEG, PNG, HEIC, WebP";
+    return "Accepted formats: JPEG, PNG, WebP";
   }
 
   // Check file size
   if (file.size > MAX_FILE_SIZE) {
-    return "Maximum file size is 20MB";
+    return "Maximum file size is 10MB";
   }
 
   return null;
@@ -137,7 +137,7 @@ export function PhotoUploadZone({
             {isDragging ? "Drop photos here" : "Drag photos here or click to browse"}
           </p>
           <p className="text-sm text-muted-foreground">
-            Accepted formats: JPEG, PNG, HEIC, WebP (max 20MB each)
+            Accepted formats: JPEG, PNG, WebP (max 10MB each)
           </p>
         </div>
         <input

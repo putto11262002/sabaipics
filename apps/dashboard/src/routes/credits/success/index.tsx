@@ -1,25 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams, Link } from "react-router";
+import { useSearchParams, useNavigate } from "react-router";
+import { useEffect } from "react";
 import {
   CheckCircle2,
   AlertCircle,
-  ArrowLeft,
-  LayoutDashboard,
 } from "lucide-react";
-import { Button } from "@sabaipics/uiv3/components/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@sabaipics/uiv3/components/empty";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@sabaipics/uiv3/components/alert";
 import { Spinner } from "@sabaipics/uiv3/components/spinner";
 import { useApiClient } from "../../../lib/api";
 
@@ -33,6 +18,7 @@ export function CreditSuccessPage() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get("session_id");
   const { getToken } = useApiClient();
+  const navigate = useNavigate();
 
   // Use React Query for automatic polling
   const {
@@ -79,40 +65,32 @@ export function CreditSuccessPage() {
     retry: false, // Don't retry on error, just continue polling
   });
 
+  // Auto-redirect to dashboard after success
+  useEffect(() => {
+    if (purchaseStatus?.fulfilled && purchaseStatus.credits !== null) {
+      const timer = setTimeout(() => {
+        navigate("/dashboard");
+      }, 3000); // Redirect after 3 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [purchaseStatus?.fulfilled, purchaseStatus?.credits, navigate]);
+
   // Invalid session state - no sessionId provided
   if (!sessionId) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <header className="border-b">
-          <div className="container mx-auto flex h-16 items-center gap-4 px-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to="/dashboard">
-                <ArrowLeft className="size-5" />
-              </Link>
-            </Button>
-            <div>
-              <h1 className="text-lg font-semibold">Purchase Status</h1>
-            </div>
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="text-center space-y-6 max-w-md">
+          <div className="flex justify-center">
+            <AlertCircle className="size-16 text-destructive" />
           </div>
-        </header>
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
-          <Empty className="max-w-md">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <AlertCircle className="size-5 text-destructive" />
-              </EmptyMedia>
-              <EmptyTitle>Invalid session</EmptyTitle>
-              <EmptyDescription>
-                No checkout session found. If you completed a purchase, your
-                credits will still be added to your account.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button asChild>
-                <Link to="/dashboard">Return to Dashboard</Link>
-              </Button>
-            </EmptyContent>
-          </Empty>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold">Invalid session</h1>
+            <p className="text-muted-foreground">
+              No checkout session found. If you completed a purchase, your
+              credits will still be added to your account.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -121,36 +99,20 @@ export function CreditSuccessPage() {
   // Success state - webhook fulfilled
   if (purchaseStatus?.fulfilled && purchaseStatus.credits !== null) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <header className="border-b">
-          <div className="container mx-auto flex h-16 items-center gap-4 px-4">
-            <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle2 className="size-5" />
-              <span className="text-sm font-medium">Payment confirmed</span>
-            </div>
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="text-center space-y-8 max-w-md">
+          <div className="flex justify-center">
+            <CheckCircle2 className="size-24 text-success" strokeWidth={1.5} />
           </div>
-        </header>
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
-          <Empty className="max-w-md">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <CheckCircle2 className="size-5 text-green-600" />
-              </EmptyMedia>
-              <EmptyTitle>Credits added!</EmptyTitle>
-              <EmptyDescription>
-                +{purchaseStatus.credits.toLocaleString()} credits have been
-                added to your account.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/dashboard">
-                  <LayoutDashboard className="mr-2 size-4" />
-                  Dashboard
-                </Link>
-              </Button>
-            </EmptyContent>
-          </Empty>
+          <div className="space-y-4">
+            <h1 className="text-4xl font-bold">Success!</h1>
+            <p className="text-lg text-muted-foreground">
+              +{purchaseStatus.credits.toLocaleString()} credits added to your account
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Redirecting to dashboard...
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -159,44 +121,22 @@ export function CreditSuccessPage() {
   // Loading state - waiting for webhook
   if (isLoading || (!purchaseStatus?.fulfilled && sessionId)) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <header className="border-b">
-          <div className="container mx-auto flex h-16 items-center gap-4 px-4">
-            <div className="flex items-center gap-2">
-              <Spinner className="size-5" />
-              <span className="text-sm text-muted-foreground">
-                Processing your purchase...
-              </span>
-            </div>
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="text-center space-y-6 max-w-md">
+          <div className="flex justify-center">
+            <Spinner className="size-16 text-primary" />
           </div>
-        </header>
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
-          <Empty className="max-w-md">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Spinner className="size-16 text-primary" />
-              </EmptyMedia>
-              <EmptyTitle>Confirming payment...</EmptyTitle>
-              <EmptyDescription>
-                We're adding credits to your account. This usually takes a few
-                seconds.
-              </EmptyDescription>
-            </EmptyHeader>
-            {error && (
-              <EmptyContent>
-                <Alert variant="destructive">
-                  <AlertCircle className="size-4" />
-                  <AlertTitle>Connection issue</AlertTitle>
-                  <AlertDescription>
-                    {(error as Error).message}
-                  </AlertDescription>
-                </Alert>
-                <div className="text-xs text-muted-foreground mt-2">
-                  Retrying...
-                </div>
-              </EmptyContent>
-            )}
-          </Empty>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold">Confirming payment...</h1>
+            <p className="text-muted-foreground">
+              We're adding credits to your account. This usually takes a few seconds.
+            </p>
+          </div>
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 text-sm text-destructive">
+              {(error as Error).message}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -204,40 +144,17 @@ export function CreditSuccessPage() {
 
   // Fallback / timeout state
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b">
-        <div className="container mx-auto flex h-16 items-center gap-4 px-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link to="/dashboard">
-              <ArrowLeft className="size-5" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-lg font-semibold">Dashboard</h1>
-          </div>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="text-center space-y-6 max-w-md">
+        <div className="flex justify-center">
+          <CheckCircle2 className="size-16 text-success" />
         </div>
-      </header>
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
-        <Empty className="max-w-md">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <CheckCircle2 className="size-16 text-green-600" />
-            </EmptyMedia>
-            <EmptyTitle>Purchase successful!</EmptyTitle>
-            <EmptyDescription>
-              Thank you for your purchase. Your credits will appear in your
-              account shortly.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button variant="outline" asChild>
-              <Link to="/dashboard">
-                <LayoutDashboard className="size-4" />
-                Dashboard
-              </Link>
-            </Button>
-          </EmptyContent>
-        </Empty>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold">Purchase successful!</h1>
+          <p className="text-muted-foreground">
+            Thank you for your purchase. Your credits will appear in your account shortly.
+          </p>
+        </div>
       </div>
     </div>
   );

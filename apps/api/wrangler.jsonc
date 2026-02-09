@@ -24,6 +24,7 @@
     "CLEANUP_BATCH_SIZE": "10",
     "HARD_DELETE_GRACE_DAYS": "30",
     "HARD_DELETE_BATCH_SIZE": "5",
+    "SENTRY_DSN": "",
   },
 
   // R2 bucket for photo storage
@@ -55,6 +56,10 @@
         "queue": "upload-processing-dev",
         "binding": "UPLOAD_QUEUE",
       },
+      {
+        "queue": "logo-processing-dev",
+        "binding": "LOGO_QUEUE",
+      },
     ],
     "consumers": [
       {
@@ -80,6 +85,14 @@
         "max_retries": 3,
         "max_concurrency": 4,
         "dead_letter_queue": "upload-processing-dlq-dev",
+      },
+      {
+        "queue": "logo-processing-dev",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "max_concurrency": 1,
+        "dead_letter_queue": "logo-processing-dlq-dev",
       },
     ],
   },
@@ -126,6 +139,10 @@
   "env": {
     // Staging environment - auto-deploy from master
     "staging": {
+ "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1 // optional. default = 1.
+  },
       "images": {
         "binding": "IMAGES",
       },
@@ -144,6 +161,7 @@
         "CLEANUP_BATCH_SIZE": "10",
         "HARD_DELETE_GRACE_DAYS": "30",
         "HARD_DELETE_BATCH_SIZE": "5",
+        "SENTRY_DSN": "https://fa797a451625d1341a655aabbc83ff6c@o4508085109850112.ingest.us.sentry.io/4510853502402560",
       },
       "routes": [
         {
@@ -172,6 +190,10 @@
             "queue": "upload-processing-staging",
             "binding": "UPLOAD_QUEUE",
           },
+          {
+            "queue": "logo-processing-staging",
+            "binding": "LOGO_QUEUE",
+          },
         ],
         "consumers": [
           {
@@ -197,6 +219,14 @@
             "max_retries": 3,
             "max_concurrency": 4,
             "dead_letter_queue": "upload-processing-dlq-staging",
+          },
+          {
+            "queue": "logo-processing-staging",
+            "max_batch_size": 5,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "max_concurrency": 1,
+            "dead_letter_queue": "logo-processing-dlq-staging",
           },
         ],
       },
@@ -255,6 +285,7 @@
         "CLEANUP_BATCH_SIZE": "10",
         "HARD_DELETE_GRACE_DAYS": "30",
         "HARD_DELETE_BATCH_SIZE": "5",
+        "SENTRY_DSN": "",
       },
       "routes": [
         {
@@ -283,6 +314,10 @@
             "queue": "upload-processing",
             "binding": "UPLOAD_QUEUE",
           },
+          {
+            "queue": "logo-processing",
+            "binding": "LOGO_QUEUE",
+          },
         ],
         "consumers": [
           {
@@ -308,6 +343,14 @@
             "max_retries": 3,
             "max_concurrency": 4,
             "dead_letter_queue": "upload-processing-dlq",
+          },
+          {
+            "queue": "logo-processing",
+            "max_batch_size": 5,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "max_concurrency": 1,
+            "dead_letter_queue": "logo-processing-dlq",
           },
         ],
       },

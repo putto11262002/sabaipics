@@ -65,16 +65,7 @@ async function processLogoUpload(
       return err<never, LogoProcessingError>({ type: 'expired', key, intentId: intent.id });
     }
 
-    // Step 3: Update intent status to 'uploaded'
-    yield* ResultAsync.fromPromise(
-      db
-        .update(logoUploadIntents)
-        .set({ status: 'uploaded', uploadedAt: event.eventTime })
-        .where(eq(logoUploadIntents.id, intent.id)),
-      (cause): LogoProcessingError => ({ type: 'database', operation: 'update_status', cause }),
-    );
-
-    // Step 4: HEAD request to check size without downloading
+    // Step 3: HEAD request to check size without downloading
     const headResult = yield* ResultAsync.fromPromise(
       env.PHOTOS_BUCKET.head(key),
       (cause): LogoProcessingError => ({ type: 'r2', operation: 'head', cause }),

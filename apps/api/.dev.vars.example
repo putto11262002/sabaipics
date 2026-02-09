@@ -54,6 +54,12 @@ STRIPE_WEBHOOK_SECRET=whsec_xxxxx
 # Generate a secure random string for admin operations
 ADMIN_API_KEY=admin-dev-key-change-in-production
 
+# Desktop uploader auth (SabaiPics-issued desktop session)
+# - DESKTOP_ACCESS_JWT_SECRET: HS256 signing secret for short-lived desktop access JWTs
+# - DESKTOP_REFRESH_TOKEN_PEPPER: Secret pepper used to HMAC-hash one-time codes and refresh tokens
+DESKTOP_ACCESS_JWT_SECRET=desktop-access-jwt-secret-change-me
+DESKTOP_REFRESH_TOKEN_PEPPER=desktop-refresh-token-pepper-change-me
+
 # LINE Messaging API Credentials
 # Get from: LINE Developers Console → Your Channel → Basic settings / Messaging API tab
 # Channel Secret: Basic settings → Channel secret

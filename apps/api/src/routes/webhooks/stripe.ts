@@ -18,7 +18,7 @@
 import { Hono } from "hono";
 import type Stripe from "stripe";
 import { addMonths } from "date-fns";
-import { creditLedger, type Database, type DatabaseTx } from "@sabaipics/db";
+import { creditLedger, promoCodeUsage, type Database, type DatabaseTx } from "@sabaipics/db";
 import { eq } from "drizzle-orm";
 import {
   createStripeClient,
@@ -113,11 +113,16 @@ export async function fulfillCheckout(
         return; // Exit transaction without inserting
       }
 
+      // Extract promo code from metadata
+      const promoCodeApplied = metadata.promo_code_applied;
+
       // Insert credit ledger entry
       await tx.insert(creditLedger).values({
         photographerId,
         amount: credits,
-        type: "purchase",
+        type: "credit",
+        source: "purchase",
+        promoCode: promoCodeApplied && typeof promoCodeApplied === 'string' ? promoCodeApplied : null,
         stripeSessionId: session.id,
         expiresAt: addMonths(new Date(), 6).toISOString(),
       });
@@ -125,6 +130,19 @@ export async function fulfillCheckout(
       console.log(
         `[Stripe Fulfillment] Added ${credits} credits for photographer ${photographerId} (session: ${session.id})`
       );
+
+      // Record promo code usage if a code was applied
+      if (promoCodeApplied && typeof promoCodeApplied === 'string') {
+        await tx.insert(promoCodeUsage).values({
+          photographerId,
+          promoCode: promoCodeApplied,
+          stripeSessionId: session.id,
+        });
+
+        console.log(
+          `[Stripe Fulfillment] Recorded promo code usage: ${promoCodeApplied} for photographer ${photographerId}`
+        );
+      }
     });
 
     // Check if actually fulfilled or skipped (duplicate)

@@ -14,6 +14,12 @@ export const slideshowBlockSchema: z.ZodType<SlideshowBlock> = z.lazy(() =>
     enabled: z.boolean(),
     props: z.record(z.any()),
     children: z.array(slideshowBlockSchema).optional(),
+    position: z
+      .object({
+        x: z.number().min(0).max(100),
+        y: z.number().min(0).max(100),
+      })
+      .optional(),
   }),
 );
 
@@ -41,6 +47,6 @@ export const slideshowPhotosQuerySchema = z.object({
     .number()
     .int('Limit must be an integer')
     .min(1, 'Limit must be at least 1')
-    .max(50, 'Limit must not exceed 50')
+    .max(100, 'Limit must not exceed 100')
     .default(20),
 });

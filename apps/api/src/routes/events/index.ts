@@ -256,7 +256,71 @@ export const eventsRouter = new Hono<Env>()
         );
     },
   )
+  // PUT /events/:id - Update event name/subtitle
+  .put(
+    '/:id',
+    requirePhotographer(),
+    zValidator('param', eventParamsSchema),
+    zValidator(
+      'json',
+      z.object({
+        name: z.string().min(1).max(200).optional(),
+        subtitle: z.string().max(500).nullish(),
+      }),
+    ),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id } = c.req.valid('param');
+      const body = c.req.valid('json');
 
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db.select().from(activeEvents).where(eq(activeEvents.id, id)).limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!event || event.photographerId !== photographer.id) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const updates: Partial<{ name: string; subtitle: string | null }> = {};
+        if (body.name !== undefined) updates.name = body.name;
+        if (body.subtitle !== undefined) updates.subtitle = body.subtitle ?? null;
+
+        if (Object.keys(updates).length === 0) {
+          return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'No fields to update' });
+        }
+
+        const [updated] = yield* ResultAsync.fromPromise(
+          db.update(events).set(updates).where(eq(events.id, id)).returning(),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        return ok({
+          data: {
+            id: updated.id,
+            name: updated.name,
+            subtitle: updated.subtitle,
+            logoUrl: updated.logoR2Key ? `${c.env.PHOTO_R2_BASE_URL}/${updated.logoR2Key}` : null,
+            startDate: updated.startDate,
+            endDate: updated.endDate,
+            qrCodeUrl: null,
+            rekognitionCollectionId: updated.rekognitionCollectionId,
+            expiresAt: updated.expiresAt,
+            createdAt: updated.createdAt,
+          },
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] PUT /:id', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // GET /events/:id/qr-download - Download QR code as PNG
   .get(
     '/:id/qr-download',
     requirePhotographer(),
@@ -449,7 +513,7 @@ export const eventsRouter = new Hono<Env>()
         // Generate upload ID and R2 key
         const uploadId = crypto.randomUUID();
         const timestamp = Date.now();
-        const r2Key = `${eventId}/logo/${uploadId}-${timestamp}`;
+        const r2Key = `logos/${uploadId}-${timestamp}`;
 
         // Generate presigned URL (5 minutes expiry)
         const PRESIGN_EXPIRY_SECONDS = 5 * 60;
@@ -547,7 +611,6 @@ export const eventsRouter = new Hono<Env>()
               status: logoUploadIntents.status,
               errorCode: logoUploadIntents.errorCode,
               errorMessage: logoUploadIntents.errorMessage,
-              uploadedAt: logoUploadIntents.uploadedAt,
               completedAt: logoUploadIntents.completedAt,
               expiresAt: logoUploadIntents.expiresAt,
             })
@@ -581,7 +644,6 @@ export const eventsRouter = new Hono<Env>()
             errorCode: intent.errorCode,
             errorMessage: intent.errorMessage,
             logoUrl,
-            uploadedAt: intent.uploadedAt,
             completedAt: intent.completedAt,
             expiresAt: intent.expiresAt,
           },
