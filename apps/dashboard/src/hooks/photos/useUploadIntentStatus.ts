@@ -20,7 +20,7 @@ export type UploadIntentStatus = UploadIntent['status'];
 
 /**
  * Mapped intent status for UI
- * - uploading: still uploading to R2 or processing in queue (pending/uploaded)
+ * - uploading: still uploading to R2 or processing in queue (pending)
  * - completed: photo record created, has photoId - switch to photo status polling
  * - failed: upload failed or expired
  */
@@ -39,14 +39,13 @@ export interface MappedUploadIntent {
  * Maps API intent status to simplified UI status
  *
  * API statuses → UI statuses:
- * - pending/uploaded → uploading (still in upload flow)
+ * - pending → uploading (still in upload flow)
  * - completed → completed (has photoId, switch to photo polling)
  * - failed/expired → failed
  */
 function mapIntentStatus(status: UploadIntentStatus): MappedIntentStatus {
   switch (status) {
     case 'pending':
-    case 'uploaded':
       return 'uploading';
     case 'completed':
       return 'completed';

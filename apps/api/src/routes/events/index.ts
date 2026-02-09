@@ -611,7 +611,6 @@ export const eventsRouter = new Hono<Env>()
               status: logoUploadIntents.status,
               errorCode: logoUploadIntents.errorCode,
               errorMessage: logoUploadIntents.errorMessage,
-              uploadedAt: logoUploadIntents.uploadedAt,
               completedAt: logoUploadIntents.completedAt,
               expiresAt: logoUploadIntents.expiresAt,
             })
@@ -645,7 +644,6 @@ export const eventsRouter = new Hono<Env>()
             errorCode: intent.errorCode,
             errorMessage: intent.errorMessage,
             logoUrl,
-            uploadedAt: intent.uploadedAt,
             completedAt: intent.completedAt,
             expiresAt: intent.expiresAt,
           },

@@ -192,7 +192,6 @@ export const uploadsRouter = new Hono<Env>()
             errorCode: uploadIntents.errorCode,
             errorMessage: uploadIntents.errorMessage,
             photoId: uploadIntents.photoId,
-            uploadedAt: uploadIntents.uploadedAt,
             completedAt: uploadIntents.completedAt,
             expiresAt: uploadIntents.expiresAt,
           })
@@ -212,7 +211,6 @@ export const uploadsRouter = new Hono<Env>()
           errorCode: i.errorCode,
           errorMessage: i.errorMessage,
           photoId: i.photoId,
-          uploadedAt: i.uploadedAt ?? null,
           completedAt: i.completedAt ?? null,
           expiresAt: i.expiresAt,
         })),

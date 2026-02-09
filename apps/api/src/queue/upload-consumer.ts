@@ -10,6 +10,7 @@
  * 6. Enqueue for face detection
  */
 
+import * as Sentry from '@sentry/cloudflare';
 import type { R2EventMessage } from '../types/r2-event';
 import type { Bindings } from '../types';
 import type { PhotoJob } from '../types/photo-job';
@@ -31,6 +32,70 @@ type UploadProcessingError =
   | { type: 'normalization'; key: string; intentId: string; cause: unknown }
   | { type: 'r2'; operation: string; cause: unknown }
   | { type: 'insufficient_credits'; key: string; intentId: string };
+
+// =============================================================================
+// Sentry Helpers
+// =============================================================================
+
+/** Capture a non-retryable upload error to Sentry */
+function captureUploadError(
+  errorType: string,
+  context: {
+    intentId?: string;
+    photographerId?: string;
+    eventId?: string;
+    r2Key?: string;
+    fileSize?: number | null;
+    contentType?: string;
+    extra?: Record<string, unknown>;
+  },
+): void {
+  Sentry.withScope((scope) => {
+    scope.setTag('error_type', errorType);
+    scope.setTag('queue', 'upload-processing');
+    if (context.intentId) scope.setTag('intent_id', context.intentId);
+    if (context.photographerId) scope.setTag('photographer_id', context.photographerId);
+    if (context.eventId) scope.setTag('event_id', context.eventId);
+    if (context.r2Key) scope.setExtra('r2_key', context.r2Key);
+    if (context.fileSize != null) scope.setExtra('file_size', context.fileSize);
+    if (context.contentType) scope.setExtra('content_type', context.contentType);
+    if (context.extra) {
+      for (const [k, v] of Object.entries(context.extra)) {
+        scope.setExtra(k, v);
+      }
+    }
+    scope.setLevel('error');
+    Sentry.captureMessage(`Upload failed: ${errorType}`);
+  });
+}
+
+/** Capture a retryable upload error to Sentry (warning level) */
+function captureUploadWarning(
+  errorType: string,
+  context: {
+    intentId?: string;
+    photographerId?: string;
+    eventId?: string;
+    r2Key?: string;
+    extra?: Record<string, unknown>;
+  },
+): void {
+  Sentry.withScope((scope) => {
+    scope.setTag('error_type', errorType);
+    scope.setTag('queue', 'upload-processing');
+    if (context.intentId) scope.setTag('intent_id', context.intentId);
+    if (context.photographerId) scope.setTag('photographer_id', context.photographerId);
+    if (context.eventId) scope.setTag('event_id', context.eventId);
+    if (context.r2Key) scope.setExtra('r2_key', context.r2Key);
+    if (context.extra) {
+      for (const [k, v] of Object.entries(context.extra)) {
+        scope.setExtra(k, v);
+      }
+    }
+    scope.setLevel('warning');
+    Sentry.captureMessage(`Upload warning: ${errorType}`);
+  });
+}
 
 // =============================================================================
 // Constants
@@ -59,35 +124,34 @@ async function processUpload(
     );
 
     if (!intent) {
-      // Orphan upload - cleanup handled by queue handler
-      console.warn(`[upload-consumer] Orphan upload: ${key}`);
+      captureUploadWarning('orphan', { r2Key: key });
       return err<never, UploadProcessingError>({ type: 'orphan', key });
     }
 
+    // Intent context available from here — used in all Sentry captures below
+    const intentCtx = {
+      intentId: intent.id,
+      photographerId: intent.photographerId,
+      eventId: intent.eventId,
+      r2Key: key,
+      fileSize: intent.contentLength,
+      contentType: intent.contentType,
+    };
+
     // Step 2: Check if intent expired
     if (new Date(intent.expiresAt) < new Date(event.eventTime)) {
-      // Cleanup handled by queue handler
-      console.warn(`[upload-consumer] Expired intent: ${intent.id}`);
+      captureUploadWarning('expired', intentCtx);
       return err<never, UploadProcessingError>({ type: 'expired', key, intentId: intent.id });
     }
 
-    // Step 3: Update intent status to 'uploaded'
-    yield* ResultAsync.fromPromise(
-      db
-        .update(uploadIntents)
-        .set({ status: 'uploaded', uploadedAt: event.eventTime })
-        .where(eq(uploadIntents.id, intent.id)),
-      (cause): UploadProcessingError => ({ type: 'database', operation: 'update_status', cause }),
-    );
-
-    // Step 4: HEAD request first to check size without downloading
+    // Step 3: HEAD request first to check size without downloading
     const headResult = yield* ResultAsync.fromPromise(
       env.PHOTOS_BUCKET.head(key),
       (cause): UploadProcessingError => ({ type: 'r2', operation: 'head', cause }),
     );
 
     if (!headResult) {
-      console.warn(`[upload-consumer] Object not found: ${key}`);
+      captureUploadError('r2_object_not_found', intentCtx);
       return err<never, UploadProcessingError>({
         type: 'r2',
         operation: 'head',
@@ -95,9 +159,13 @@ async function processUpload(
       });
     }
 
-    // Step 5: Validate file size from HEAD before downloading
+    // Step 4: Validate file size from HEAD before downloading
     if (headResult.size > MAX_FILE_SIZE) {
-      // Cleanup handled by queue handler
+      captureUploadError('invalid_file', {
+        ...intentCtx,
+        fileSize: headResult.size,
+        extra: { reason: 'size_exceeded', max_size: MAX_FILE_SIZE },
+      });
       return err<never, UploadProcessingError>({
         type: 'invalid_file',
         key,
@@ -107,7 +175,7 @@ async function processUpload(
       });
     }
 
-    // Step 6: Now safe to GET the full object
+    // Step 5: Now safe to GET the full object
     const r2Object = yield* ResultAsync.fromPromise(
       env.PHOTOS_BUCKET.get(key),
       (cause): UploadProcessingError => ({ type: 'r2', operation: 'get', cause }),
@@ -123,10 +191,13 @@ async function processUpload(
 
     const imageBytes = await r2Object.arrayBuffer();
 
-    // Step 7: Validate magic bytes
+    // Step 6: Validate magic bytes
     const magicValidation = validateImageMagicBytes(new Uint8Array(imageBytes.slice(0, 16)));
     if (!magicValidation.valid) {
-      // Cleanup handled by queue handler
+      captureUploadError('invalid_file', {
+        ...intentCtx,
+        extra: { reason: 'invalid_magic_bytes' },
+      });
       return err<never, UploadProcessingError>({
         type: 'invalid_file',
         key,
@@ -136,7 +207,7 @@ async function processUpload(
       });
     }
 
-    // Step 8: Normalize image to JPEG using CF Images binding directly
+    // Step 7: Normalize image to JPEG using CF Images binding directly
     // Convert ArrayBuffer to ReadableStream for CF Images API
     const stream = new ReadableStream({
       start(controller) {
@@ -171,7 +242,10 @@ async function processUpload(
     // Extract dimensions from normalized JPEG
     const dimensions = extractJpegDimensions(normalizedBytes);
     if (!dimensions) {
-      // Cleanup handled by queue handler
+      captureUploadError('normalization', {
+        ...intentCtx,
+        extra: { cause: 'Failed to extract dimensions from normalized JPEG' },
+      });
       return err<never, UploadProcessingError>({
         type: 'normalization',
         key,
@@ -183,11 +257,11 @@ async function processUpload(
     const { width, height } = dimensions;
     const fileSize = normalizedBytes.byteLength;
 
-    // Step 9: Generate final photo ID and key
+    // Step 8: Generate final photo ID and key
     const photoId = crypto.randomUUID();
     const finalR2Key = `${intent.eventId}/${photoId}.jpg`;
 
-    // Step 10: Upload normalized image to final location
+    // Step 9: Upload normalized image to final location
     yield* ResultAsync.fromPromise(
       env.PHOTOS_BUCKET.put(finalR2Key, normalizedBytes, {
         httpMetadata: { contentType: 'image/jpeg' },
@@ -195,7 +269,7 @@ async function processUpload(
       (cause): UploadProcessingError => ({ type: 'r2', operation: 'put_normalized', cause }),
     );
 
-    // Step 11: Credit deduction + photo creation (transactional)
+    // Step 10: Credit deduction + photo creation (transactional)
     const dbTx = createDbTx(env.DATABASE_URL);
 
     const photo = yield* ResultAsync.fromPromise(
@@ -282,16 +356,21 @@ async function processUpload(
       (cause): UploadProcessingError => {
         const msg = cause instanceof Error ? cause.message : '';
         if (msg === 'INSUFFICIENT_CREDITS') {
+          captureUploadError('insufficient_credits', intentCtx);
           return { type: 'insufficient_credits', key, intentId: intent.id };
         }
+        captureUploadError('database', {
+          ...intentCtx,
+          extra: { operation: 'transaction', cause: String(cause) },
+        });
         return { type: 'database', operation: 'transaction', cause };
       },
     );
 
-    // Step 12: Delete original upload (keep only normalized)
+    // Step 11: Delete original upload (keep only normalized)
     await env.PHOTOS_BUCKET.delete(key);
 
-    // Step 13: Enqueue for face detection
+    // Step 12: Enqueue for face detection
     yield* ResultAsync.fromPromise(
       env.PHOTO_QUEUE.send({
         photo_id: photo.id,
@@ -377,7 +456,9 @@ export async function queue(
             break;
 
           case 'normalization':
-            await env.PHOTOS_BUCKET.delete(error.key);
+            // Mark as failed so users see the error, but keep R2 object intact
+            // and retry. If retry succeeds, the transaction overwrites to 'completed'.
+            // If all retries exhaust, the intent is already 'failed' (not stuck 'pending').
             await db
               .update(uploadIntents)
               .set({
