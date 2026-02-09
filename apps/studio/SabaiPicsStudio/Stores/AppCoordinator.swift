@@ -18,15 +18,18 @@ class AppCoordinator: ObservableObject {
     ///
     /// For now this is driven from the Events tab and persisted in UserDefaults.
     @Published private(set) var selectedEventId: String?
+    @Published private(set) var selectedEventName: String?
 
     let connectivityStore: ConnectivityStore
     let uploadManager: UploadManager
     let uploadStatusStore: UploadStatusStore
 
     private static let selectedEventDefaultsKey = "SelectedEventId"
+    private static let selectedEventNameDefaultsKey = "SelectedEventName"
 
     init() {
         self.selectedEventId = UserDefaults.standard.string(forKey: Self.selectedEventDefaultsKey)
+        self.selectedEventName = UserDefaults.standard.string(forKey: Self.selectedEventNameDefaultsKey)
 
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
 
@@ -44,13 +47,20 @@ class AppCoordinator: ObservableObject {
         uploadStatusStore.start()
     }
 
-    func selectEvent(id: String?) {
+    func selectEvent(id: String?, name: String?) {
         selectedEventId = id
+        selectedEventName = name
 
         if let id {
             UserDefaults.standard.set(id, forKey: Self.selectedEventDefaultsKey)
         } else {
             UserDefaults.standard.removeObject(forKey: Self.selectedEventDefaultsKey)
+        }
+
+        if let name {
+            UserDefaults.standard.set(name, forKey: Self.selectedEventNameDefaultsKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.selectedEventNameDefaultsKey)
         }
     }
 }

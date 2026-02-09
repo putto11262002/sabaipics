@@ -95,8 +95,8 @@ struct CaptureTabRootView: View {
                         pendingActiveSheet = nil
                         isShowingEventPicker = false
                     },
-                    onConfirm: { eventId in
-                        coordinator.selectEvent(id: eventId)
+                    onConfirm: { eventId, eventName in
+                        coordinator.selectEvent(id: eventId, name: eventName)
                         let next = pendingActiveSheet
                         pendingActiveSheet = nil
                         isShowingEventPicker = false

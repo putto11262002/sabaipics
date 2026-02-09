@@ -98,6 +98,7 @@ struct MainTabView: View {
                     cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
                     downloadsCount: captureSessionStore.stats.downloadsCount,
                     lastFilename: captureSessionStore.stats.lastFilename,
+                    eventName: coordinator.selectedEventName,
                     session: liveSession,
                     stateByJobId: uploadStatusStore.stateByJobId,
                     onOpen: {
@@ -118,6 +119,7 @@ struct MainTabView: View {
                     downloadsCount: captureSessionStore.stats.downloadsCount,
                     lastFilename: captureSessionStore.stats.lastFilename,
                     uploadedCount: 0,
+                    eventName: coordinator.selectedEventName,
                     onOpen: {
                         captureSheetDetent = .large
                         captureSessionStore.isDetailsPresented = true
@@ -139,6 +141,7 @@ private struct CaptureStatusBarLiveView: View {
     let cameraName: String
     let downloadsCount: Int
     let lastFilename: String?
+    let eventName: String?
     @ObservedObject var session: CaptureUISink
     let stateByJobId: [String: UploadJobState]
     let onOpen: () -> Void
@@ -151,6 +154,7 @@ private struct CaptureStatusBarLiveView: View {
             downloadsCount: downloadsCount,
             lastFilename: lastFilename,
             uploadedCount: uploadedCount,
+            eventName: eventName,
             onOpen: onOpen,
             onDisconnect: onDisconnect
         )

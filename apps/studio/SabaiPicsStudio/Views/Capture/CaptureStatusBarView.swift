@@ -15,6 +15,7 @@ struct CaptureStatusBarView: View {
     let downloadsCount: Int
     let lastFilename: String?
     let uploadedCount: Int
+    let eventName: String?
     let onOpen: () -> Void
     let onDisconnect: () -> Void
 
@@ -33,6 +34,7 @@ struct CaptureStatusBarView: View {
                         .font(.caption)
                         .foregroundStyle(Color.Theme.mutedForeground)
                         .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
 
@@ -76,6 +78,9 @@ struct CaptureStatusBarView: View {
         case .connecting:
             return "Working…"
         case .active:
+            if let eventName, !eventName.isEmpty {
+                return eventName
+            }
             return "Tap to view"
         case .error(let message):
             return message
@@ -183,6 +188,7 @@ private struct PipelineCluster: View {
             downloadsCount: 12,
             lastFilename: "DSC01234.JPG",
             uploadedCount: 9,
+            eventName: "Bangkok Wedding",
             onOpen: {},
             onDisconnect: {}
         )

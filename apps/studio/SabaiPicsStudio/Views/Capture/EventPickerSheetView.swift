@@ -11,7 +11,7 @@ struct EventPickerSheetView: View {
 
     let preselectedEventId: String?
     let onCancel: () -> Void
-    let onConfirm: (_ eventId: String) -> Void
+    let onConfirm: (_ eventId: String, _ eventName: String) -> Void
 
     @State private var selectedEventId: String? = nil
 
@@ -37,8 +37,8 @@ struct EventPickerSheetView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Continue") {
-                        guard let id = selectedEventId else { return }
-                        onConfirm(id)
+                        guard let selectedEvent else { return }
+                        onConfirm(selectedEvent.id, selectedEvent.name)
                     }
                     .disabled(selectedEventId == nil)
                 }
@@ -52,6 +52,11 @@ struct EventPickerSheetView: View {
                 }
             }
         }
+    }
+
+    private var selectedEvent: Event? {
+        guard let selectedEventId else { return nil }
+        return viewModel.events.first { $0.id == selectedEventId }
     }
 
     private var list: some View {

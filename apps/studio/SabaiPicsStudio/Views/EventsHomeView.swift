@@ -86,7 +86,6 @@ struct EventsHomeView: View {
                 UploadStatsCardsRow(
                     pendingJobs: uploadStatusStore.summary.inFlight,
                     activeEvents: activeEventsCount,
-                    syncedEvents: syncedEventsCount,
                     totalEvents: viewModel.events.count
                 )
                 .padding(.horizontal, 16)
@@ -135,11 +134,6 @@ struct EventsHomeView: View {
         }
     }
 
-    private var syncedEventsCount: Int {
-        uploadByEventId.values.reduce(into: 0) { acc, s in
-            if s.pending == 0 && s.completed > 0 { acc += 1 }
-        }
-    }
 
     // MARK: - Skeleton View
 
@@ -248,18 +242,9 @@ private struct UploadStatusHeaderView: View {
 
     var body: some View {
         let leftText = isOnline ? "Online" : "Offline"
-        let rightText: String
-        if isOnline {
-            rightText = pendingCount > 0 ? "Syncing · \(pendingCount) left" : "Up to date"
-        } else {
-            rightText = pendingCount > 0 ? "Uploads paused · \(pendingCount) pending" : "Uploads paused"
-        }
 
         let interfaceIcon = interfaceIconName(isOnline: isOnline, interface: interface)
         let interfaceTint: Color = isOnline ? Color.Theme.success : Color.Theme.warning
-
-        let syncIcon = pendingCount > 0 ? "arrow.up.circle.fill" : "checkmark.circle.fill"
-        let syncTint: Color = pendingCount > 0 ? Color.Theme.primary : Color.Theme.success
 
         return HStack(spacing: 10) {
             HStack(spacing: 6) {
@@ -267,22 +252,6 @@ private struct UploadStatusHeaderView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(interfaceTint)
                 Text(leftText)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.Theme.foreground)
-            }
-
-            Divider()
-                .frame(height: 16)
-
-            HStack(spacing: 6) {
-                Image(systemName: syncIcon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(syncTint)
-                if isOnline && pendingCount > 0 {
-                    ProgressView()
-                        .controlSize(.mini)
-                }
-                Text(rightText)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.Theme.foreground)
             }
@@ -316,7 +285,6 @@ private struct UploadStatusHeaderView: View {
 private struct UploadStatsCardsRow: View {
     let pendingJobs: Int
     let activeEvents: Int
-    let syncedEvents: Int
     let totalEvents: Int
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -324,37 +292,38 @@ private struct UploadStatsCardsRow: View {
     var body: some View {
         let columns: [GridItem] = {
             if horizontalSizeClass == .regular {
-                return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
+                return Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
             }
             return Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
         }()
 
         return LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
-            UploadStatCard(
-                icon: "tray.and.arrow.up",
-                iconTint: Color.Theme.primary,
-                title: "Pending",
-                value: String(pendingJobs)
-            )
+            UploadSyncCard(pendingJobs: pendingJobs)
             UploadStatCard(
                 icon: "calendar.badge.clock",
                 iconTint: Color.Theme.warning,
-                title: "Active",
+                title: "Active events",
                 value: String(activeEvents)
             )
-            UploadStatCard(
-                icon: "checkmark.seal.fill",
-                iconTint: Color.Theme.success,
-                title: "Synced",
-                value: String(syncedEvents)
-            )
-            UploadStatCard(
-                icon: "calendar",
-                iconTint: Color.Theme.mutedForeground,
-                title: "Events",
-                value: String(totalEvents)
-            )
         }
+    }
+}
+
+private struct UploadSyncCard: View {
+    let pendingJobs: Int
+
+    var body: some View {
+        let isSynced = pendingJobs == 0
+        let icon = isSynced ? "tray.and.arrow.up.fill" : "arrow.triangle.2.circlepath"
+        let tint: Color = isSynced ? Color.Theme.success : Color.Theme.warning
+        let title = isSynced ? "Synced" : "Syncing"
+
+        return UploadStatCard(
+            icon: icon,
+            iconTint: tint,
+            title: title,
+            value: "\(pendingJobs)"
+        )
     }
 }
 
@@ -374,10 +343,12 @@ private struct UploadStatCard: View {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(iconTint)
+                Spacer(minLength: 8)
                 Text(value)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(Color.Theme.foreground)
             }
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
@@ -422,21 +393,17 @@ private struct UploadEventSyncIndicator: View {
 
         if pending > 0 {
             let tint: Color = isOnline ? Color.Theme.primary : Color.Theme.warning
-            HStack(spacing: 6) {
-                if isOnline {
-                    ProgressView()
-                        .controlSize(.mini)
-                }
-                Text("\(pending) left")
-                    .font(.caption.weight(.semibold))
+            if isOnline {
+                ProgressView()
+                    .controlSize(.mini)
+                    .tint(tint)
+                    .accessibilityLabel("Syncing")
+            } else {
+                Image(systemName: "minus")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .accessibilityLabel("Pending")
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(tint.opacity(0.10))
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(tint.opacity(0.25), lineWidth: 1))
-            .foregroundStyle(tint)
-            .accessibilityLabel("\(pending) left to sync")
         } else if completed > 0 {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 16, weight: .semibold))
@@ -502,7 +469,6 @@ private struct OfflineEventsPlaceholderView: View {
         UploadStatsCardsRow(
             pendingJobs: 7,
             activeEvents: 2,
-            syncedEvents: 18,
             totalEvents: 10
         )
         List {
@@ -544,7 +510,6 @@ private struct OfflineEventsPlaceholderView: View {
         UploadStatsCardsRow(
             pendingJobs: 7,
             activeEvents: 0,
-            syncedEvents: 0,
             totalEvents: 0
         )
         OfflineEventsPlaceholderView()
