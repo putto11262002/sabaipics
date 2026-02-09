@@ -45,6 +45,10 @@
 	<string>FrameFast Studio needs access to detect and download photos from your professional camera via USB or WiFi.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>FrameFast Studio needs local network access to discover and connect to cameras on your WiFi network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_ptpip._tcp</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

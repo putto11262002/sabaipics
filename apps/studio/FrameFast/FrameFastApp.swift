@@ -24,6 +24,15 @@ struct FrameFastApp: App {
                 .task {
                     await configureAndLoadClerk()
                 }
+                .onAppear {
+                    // Request local network permission on first launch
+                    if !LocalNetworkPermissionChecker.likelyHasPermission() {
+                        LocalNetworkPermissionChecker.triggerPermissionPrompt {
+                            LocalNetworkPermissionChecker.markPermissionGranted()
+                            print("[SabaiPicsStudioApp] Local network permission granted")
+                        }
+                    }
+                }
         }
     }
 

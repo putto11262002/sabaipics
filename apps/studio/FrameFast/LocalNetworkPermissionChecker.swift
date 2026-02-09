@@ -36,8 +36,8 @@ class LocalNetworkPermissionChecker {
 
                 print("[LocalNetworkPermissionChecker] Permission check completed: \(state)")
 
-                // Give iOS time to process permission grant
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // Give iOS time to process permission grant (2s for fresh installs)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     completion()
                 }
 
