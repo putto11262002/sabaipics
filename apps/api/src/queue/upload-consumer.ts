@@ -19,7 +19,7 @@ import { uploadIntents, photos, creditLedger, photographers } from '@sabaipics/d
 import { eq, and, gt, asc, sql } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
 import { validateImageMagicBytes } from '../lib/images';
-import { normalizeWithPhoton, normalizeWithCfImages } from '../lib/images/normalize';
+import { normalizeWithPhoton } from '../lib/images/normalize';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 
 // =============================================================================
@@ -106,7 +106,6 @@ function captureUploadWarning(
 async function processUpload(
   env: Bindings,
   event: R2EventMessage,
-  usePhoton: boolean,
 ): Promise<Result<void, UploadProcessingError>> {
   return safeTry(async function* () {
     const { key, size } = event.object;
@@ -204,21 +203,16 @@ async function processUpload(
       });
     }
 
-    // Step 7: Normalize image to JPEG
-    // 50/50 A/B: photon (in-Worker Wasm) vs CF Images (external service)
-    const normalizationMethod = usePhoton ? 'photon_wasm' : 'cf_images';
+    // Step 7: Normalize image to JPEG using photon (in-Worker Wasm)
+    console.log(`[upload-consumer] Normalizing with photon_wasm: ${key}`);
 
-    console.log(`[upload-consumer] Normalizing with ${normalizationMethod}: ${key}`);
-
-    const normalizeResult = usePhoton
-      ? normalizeWithPhoton(imageBytes)
-      : await normalizeWithCfImages(imageBytes, env.IMAGES);
+    const normalizeResult = normalizeWithPhoton(imageBytes);
 
     if (normalizeResult.isErr()) {
       captureUploadWarning('normalization', {
         ...intentCtx,
         extra: {
-          normalization_method: normalizationMethod,
+          normalization_method: 'photon_wasm',
           stage: normalizeResult.error.stage,
           cause: normalizeResult.error.cause instanceof Error
             ? normalizeResult.error.cause.message
@@ -377,10 +371,6 @@ export async function queue(
 ): Promise<void> {
   if (batch.messages.length === 0) return;
 
-  // 50/50 A/B: decide normalization method per batch
-  const usePhoton = Math.random() < 0.5;
-  console.log(`[upload-consumer] Batch normalization method: ${usePhoton ? 'photon_wasm' : 'cf_images'}`);
-
   for (const message of batch.messages) {
     const event = message.body;
 
@@ -396,7 +386,7 @@ export async function queue(
       continue;
     }
 
-    const result = await processUpload(env, event, usePhoton);
+    const result = await processUpload(env, event);
     const db = createDb(env.DATABASE_URL);
 
     result.match(
