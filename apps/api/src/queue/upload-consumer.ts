@@ -456,9 +456,17 @@ export async function queue(
             break;
 
           case 'normalization':
-            // Retryable — don't delete R2, don't update status.
-            // Intent stays 'pending', queue will retry up to max_retries.
-            // If all retries exhausted, message goes to DLQ for investigation.
+            // Mark as failed so users see the error, but keep R2 object intact
+            // and retry. If retry succeeds, the transaction overwrites to 'completed'.
+            // If all retries exhaust, the intent is already 'failed' (not stuck 'pending').
+            await db
+              .update(uploadIntents)
+              .set({
+                status: 'failed',
+                errorCode: 'normalization_failed',
+                errorMessage: 'Image processing failed',
+              })
+              .where(eq(uploadIntents.id, error.intentId));
             message.retry();
             break;
 
