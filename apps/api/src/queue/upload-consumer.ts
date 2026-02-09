@@ -221,22 +221,34 @@ async function processUpload(
       env.IMAGES.input(stream)
         .transform({ width: 4000, fit: 'scale-down' })
         .output({ format: 'image/jpeg', quality: 90 }),
-      (cause): UploadProcessingError => ({
-        type: 'normalization',
-        key,
-        intentId: intent.id,
-        cause,
-      }),
+      (cause): UploadProcessingError => {
+        captureUploadWarning('normalization', {
+          ...intentCtx,
+          extra: {
+            stage: 'cf_images_transform',
+            cause: cause instanceof Error ? cause.message : String(cause),
+            detectedType: magicValidation.detectedType,
+            originalSize: imageBytes.byteLength,
+          },
+        });
+        return { type: 'normalization', key, intentId: intent.id, cause };
+      },
     );
 
     const normalizedBytes = yield* ResultAsync.fromPromise(
       transformResponse.response().arrayBuffer(),
-      (cause): UploadProcessingError => ({
-        type: 'normalization',
-        key,
-        intentId: intent.id,
-        cause,
-      }),
+      (cause): UploadProcessingError => {
+        captureUploadWarning('normalization', {
+          ...intentCtx,
+          extra: {
+            stage: 'cf_images_read_response',
+            cause: cause instanceof Error ? cause.message : String(cause),
+            detectedType: magicValidation.detectedType,
+            originalSize: imageBytes.byteLength,
+          },
+        });
+        return { type: 'normalization', key, intentId: intent.id, cause };
+      },
     );
 
     // Extract dimensions from normalized JPEG
@@ -244,7 +256,13 @@ async function processUpload(
     if (!dimensions) {
       captureUploadError('normalization', {
         ...intentCtx,
-        extra: { cause: 'Failed to extract dimensions from normalized JPEG' },
+        extra: {
+          stage: 'extract_dimensions',
+          cause: 'Failed to extract dimensions from normalized JPEG',
+          normalizedSize: normalizedBytes.byteLength,
+          detectedType: magicValidation.detectedType,
+          originalSize: imageBytes.byteLength,
+        },
       });
       return err<never, UploadProcessingError>({
         type: 'normalization',
