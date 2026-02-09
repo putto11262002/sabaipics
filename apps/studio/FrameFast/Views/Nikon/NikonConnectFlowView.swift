@@ -68,7 +68,7 @@ struct NikonConnectFlowView: View {
                     makeScanTargets: { preferredIP in
                         NikonHotspotDiscovery.candidateIPs(preferredIP: preferredIP)
                     },
-                    scanConfig: ScanConfig(timeout: 2.0, maxRetries: 2, retryDelay: 0.5, maxWaves: 3, waveDelay: 0),
+                    scanConfig: ScanConfig(timeout: 5.0, maxRetries: 2, retryDelay: 0.5, maxWaves: 3, waveDelay: 0),
                     onBack: {
                         switch startMode {
                         case .new:

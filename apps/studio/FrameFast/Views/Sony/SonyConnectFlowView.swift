@@ -108,7 +108,7 @@ struct SonyConnectFlowView: View {
                     makeScanTargets: { preferredIP in
                         SonyAPDiscovery.candidateIPs(preferredIP: preferredIP)
                     },
-                    scanConfig: ScanConfig(timeout: 1.0, maxRetries: 2, retryDelay: 0.2, maxWaves: 3, waveDelay: 0),
+                    scanConfig: ScanConfig(timeout: 5.0, maxRetries: 2, retryDelay: 0.2, maxWaves: 3, waveDelay: 0),
                     onBack: {
                         switch backTarget {
                         case .decision:

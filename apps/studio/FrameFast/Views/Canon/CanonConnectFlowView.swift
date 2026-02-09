@@ -1,16 +1,15 @@
 //  CanonConnectFlowView.swift
 //  FrameFast
 //
-//  Canon connection flow: hotspot check → discovery → select camera.
+//  Canon connection flow: AP setup → discovery → select camera.
 
 import SwiftUI
 
 /// Canon connection flow that returns an `ActiveCamera` on success.
 ///
-/// Canon cameras connect to the iPhone's Personal Hotspot, so no WiFi
-/// credentials step is needed (unlike Sony). The flow is:
-/// 1. Check if hotspot is active → show setup instructions if not
-/// 2. Scan the hotspot subnet (172.20.10.2–20) for PTP/IP cameras
+/// Canon cameras use their own AP hotspot, so the flow is:
+/// 1. Show setup instructions to connect to camera's AP
+/// 2. Scan the camera AP subnet for PTP/IP cameras
 /// 3. User selects a camera → hand back ActiveCamera
 struct CanonConnectFlowView: View {
     enum StartMode: Equatable {
@@ -19,7 +18,7 @@ struct CanonConnectFlowView: View {
     }
 
     private enum Step: Equatable {
-        case hotspotCheck
+        case apSetup
         case discovery(preferredRecordID: String?)
     }
 
@@ -27,14 +26,14 @@ struct CanonConnectFlowView: View {
     let onConnected: (ActiveCamera) -> Void
     let onCancel: () -> Void
 
-    @State private var step: Step = .hotspotCheck
+    @State private var step: Step = .apSetup
     @State private var errorMessage: String? = nil
 
     var body: some View {
         Group {
             switch step {
-            case .hotspotCheck:
-                CanonHotspotSetupView(
+            case .apSetup:
+                CanonAPSetupView(
                     onNext: {
                         step = .discovery(preferredRecordID: nil)
                     }
@@ -65,19 +64,14 @@ struct CanonConnectFlowView: View {
                 CameraDiscoveryScreen(
                     preferredIP: preferredIP,
                     showsManualIP: true,
-                    makeScanTargets: { _ in
-                        CanonHotspotDiscovery.candidateIPs()
+                    makeScanTargets: { preferredIP in
+                        CanonAPDiscovery.candidateIPs(preferredIP: preferredIP)
                     },
-                    scanConfig: ScanConfig(timeout: 2.0, maxRetries: 2, retryDelay: 0.5, maxWaves: 3, waveDelay: 0),
-                    preflight: {
-                        NetworkScannerService.isHotspotActive()
-                            ? .ok
-                            : .needsNetworkHelp(.notOnLocalNetwork)
-                    },
+                    scanConfig: ScanConfig(timeout: 5.0, maxRetries: 2, retryDelay: 0.5, maxWaves: 3, waveDelay: 0),
                     onBack: {
                         switch startMode {
                         case .new:
-                            step = .hotspotCheck
+                            step = .apSetup
                         case .reconnect:
                             onCancel()
                         }
@@ -105,11 +99,7 @@ struct CanonConnectFlowView: View {
             errorMessage = nil
             switch startMode {
             case .new:
-                if NetworkScannerService.isHotspotActive() {
-                    step = .discovery(preferredRecordID: nil)
-                } else {
-                    step = .hotspotCheck
-                }
+                step = .apSetup
             case .reconnect(let recordID):
                 step = .discovery(preferredRecordID: recordID)
             }
@@ -149,7 +139,7 @@ struct CanonConnectFlowView: View {
             cameraName: activeCamera.name,
             ssid: nil,
             cameraId: nil,
-            connectionMode: .personalHotspot
+            connectionMode: .cameraHotspot
         )
 
         await MainActor.run {
