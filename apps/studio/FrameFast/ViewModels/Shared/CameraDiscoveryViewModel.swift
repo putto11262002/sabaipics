@@ -74,6 +74,16 @@ final class CameraDiscoveryViewModel: ObservableObject {
             return
         }
 
+        // Request local network permission before scanning (contextual timing - user initiated)
+        if !LocalNetworkPermissionChecker.likelyHasPermission() {
+            LocalNetworkPermissionChecker.triggerPermissionPrompt {
+                LocalNetworkPermissionChecker.markPermissionGranted()
+                print("[CameraDiscoveryViewModel] Local network permission granted")
+            }
+            // Give iOS time to process permission before starting scan
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+        }
+
         state = .scanning
         cameras = []
 
