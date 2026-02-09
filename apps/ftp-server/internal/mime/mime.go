@@ -10,8 +10,6 @@ var extensionToMIME = map[string]string{
 	".jpg":  "image/jpeg",
 	".jpeg": "image/jpeg",
 	".png":  "image/png",
-	".heic": "image/heic",
-	".heif": "image/heif",
 	".webp": "image/webp",
 }
 

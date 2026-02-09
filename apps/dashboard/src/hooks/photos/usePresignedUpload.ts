@@ -42,8 +42,6 @@ export function usePresignedUpload() {
             contentType: file.type as
               | 'image/jpeg'
               | 'image/png'
-              | 'image/heic'
-              | 'image/heif'
               | 'image/webp',
             contentLength: file.size,
           },

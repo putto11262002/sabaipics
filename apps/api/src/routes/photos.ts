@@ -34,27 +34,19 @@ const listPhotosBodySchema = z.object({
   status: z.array(z.enum(photoStatuses)).optional(),
 });
 
-// Photo upload validation
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
-const ALLOWED_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/heic',
-  'image/heif',
-  'image/webp',
-] as const;
+import { PHOTO_MAX_FILE_SIZE, PHOTO_ALLOWED_MIME_TYPES } from '../lib/upload/constants';
 
 const uploadPhotoSchema = z.object({
   file: z
     .instanceof(File)
     .refine((file) => file.size > 0, 'File cannot be empty')
     .refine(
-      (file) => file.size <= MAX_FILE_SIZE,
-      `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024} MB`,
+      (file) => file.size <= PHOTO_MAX_FILE_SIZE,
+      `File size must be less than ${PHOTO_MAX_FILE_SIZE / 1024 / 1024} MB`,
     )
     .refine(
-      (file) => ALLOWED_MIME_TYPES.includes(file.type as (typeof ALLOWED_MIME_TYPES)[number]),
-      `File type must be one of: ${ALLOWED_MIME_TYPES.join(', ')}`,
+      (file) => PHOTO_ALLOWED_MIME_TYPES.includes(file.type as (typeof PHOTO_ALLOWED_MIME_TYPES)[number]),
+      `File type must be one of: ${PHOTO_ALLOWED_MIME_TYPES.join(', ')}`,
     ),
   eventId: z.string().uuid('Invalid event ID format'),
 });

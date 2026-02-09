@@ -18,7 +18,9 @@ import { createDb, createDbTx } from '@sabaipics/db';
 import { uploadIntents, photos, creditLedger, photographers } from '@sabaipics/db';
 import { eq, and, gt, asc, sql } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
-import { extractJpegDimensions, validateImageMagicBytes } from '../lib/images';
+import { validateImageMagicBytes } from '../lib/images';
+import { normalizeWithPhoton, normalizeWithCfImages } from '../lib/images/normalize';
+import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 
 // =============================================================================
 // Types
@@ -98,18 +100,13 @@ function captureUploadWarning(
 }
 
 // =============================================================================
-// Constants
-// =============================================================================
-
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
-
-// =============================================================================
 // Processing
 // =============================================================================
 
 async function processUpload(
   env: Bindings,
   event: R2EventMessage,
+  usePhoton: boolean,
 ): Promise<Result<void, UploadProcessingError>> {
   return safeTry(async function* () {
     const { key, size } = event.object;
@@ -160,11 +157,11 @@ async function processUpload(
     }
 
     // Step 4: Validate file size from HEAD before downloading
-    if (headResult.size > MAX_FILE_SIZE) {
+    if (headResult.size > PHOTO_MAX_FILE_SIZE) {
       captureUploadError('invalid_file', {
         ...intentCtx,
         fileSize: headResult.size,
-        extra: { reason: 'size_exceeded', max_size: MAX_FILE_SIZE },
+        extra: { reason: 'size_exceeded', max_size: PHOTO_MAX_FILE_SIZE },
       });
       return err<never, UploadProcessingError>({
         type: 'invalid_file',
@@ -207,59 +204,25 @@ async function processUpload(
       });
     }
 
-    // Step 7: Normalize image to JPEG using CF Images binding directly
-    // Convert ArrayBuffer to ReadableStream for CF Images API
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(new Uint8Array(imageBytes));
-        controller.close();
-      },
-    });
+    // Step 7: Normalize image to JPEG
+    // 50/50 A/B: photon (in-Worker Wasm) vs CF Images (external service)
+    const normalizationMethod = usePhoton ? 'photon_wasm' : 'cf_images';
 
-    // Transform using CF Images API (same options as V1 upload)
-    const transformResponse = yield* ResultAsync.fromPromise(
-      env.IMAGES.input(stream)
-        .transform({ width: 4000, fit: 'scale-down' })
-        .output({ format: 'image/jpeg', quality: 90 }),
-      (cause): UploadProcessingError => {
-        captureUploadWarning('normalization', {
-          ...intentCtx,
-          extra: {
-            stage: 'cf_images_transform',
-            cause: cause instanceof Error ? cause.message : String(cause),
-            detectedType: magicValidation.detectedType,
-            originalSize: imageBytes.byteLength,
-          },
-        });
-        return { type: 'normalization', key, intentId: intent.id, cause };
-      },
-    );
+    console.log(`[upload-consumer] Normalizing with ${normalizationMethod}: ${key}`);
 
-    const normalizedBytes = yield* ResultAsync.fromPromise(
-      transformResponse.response().arrayBuffer(),
-      (cause): UploadProcessingError => {
-        captureUploadWarning('normalization', {
-          ...intentCtx,
-          extra: {
-            stage: 'cf_images_read_response',
-            cause: cause instanceof Error ? cause.message : String(cause),
-            detectedType: magicValidation.detectedType,
-            originalSize: imageBytes.byteLength,
-          },
-        });
-        return { type: 'normalization', key, intentId: intent.id, cause };
-      },
-    );
+    const normalizeResult = usePhoton
+      ? normalizeWithPhoton(imageBytes)
+      : await normalizeWithCfImages(imageBytes, env.IMAGES);
 
-    // Extract dimensions from normalized JPEG
-    const dimensions = extractJpegDimensions(normalizedBytes);
-    if (!dimensions) {
-      captureUploadError('normalization', {
+    if (normalizeResult.isErr()) {
+      captureUploadWarning('normalization', {
         ...intentCtx,
         extra: {
-          stage: 'extract_dimensions',
-          cause: 'Failed to extract dimensions from normalized JPEG',
-          normalizedSize: normalizedBytes.byteLength,
+          normalization_method: normalizationMethod,
+          stage: normalizeResult.error.stage,
+          cause: normalizeResult.error.cause instanceof Error
+            ? normalizeResult.error.cause.message
+            : String(normalizeResult.error.cause),
           detectedType: magicValidation.detectedType,
           originalSize: imageBytes.byteLength,
         },
@@ -268,11 +231,11 @@ async function processUpload(
         type: 'normalization',
         key,
         intentId: intent.id,
-        cause: 'Failed to extract dimensions from normalized JPEG',
+        cause: normalizeResult.error.cause,
       });
     }
 
-    const { width, height } = dimensions;
+    const { bytes: normalizedBytes, width, height } = normalizeResult.value;
     const fileSize = normalizedBytes.byteLength;
 
     // Step 8: Generate final photo ID and key
@@ -414,6 +377,10 @@ export async function queue(
 ): Promise<void> {
   if (batch.messages.length === 0) return;
 
+  // 50/50 A/B: decide normalization method per batch
+  const usePhoton = Math.random() < 0.5;
+  console.log(`[upload-consumer] Batch normalization method: ${usePhoton ? 'photon_wasm' : 'cf_images'}`);
+
   for (const message of batch.messages) {
     const event = message.body;
 
@@ -429,7 +396,7 @@ export async function queue(
       continue;
     }
 
-    const result = await processUpload(env, event);
+    const result = await processUpload(env, event, usePhoton);
     const db = createDb(env.DATABASE_URL);
 
     result.match(
