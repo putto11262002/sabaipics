@@ -97,6 +97,7 @@ export default Sentry.withSentry(
     dsn: env.SENTRY_DSN,
     environment: env.NODE_ENV,
     tracesSampleRate: env.NODE_ENV === 'production' ? 0.1 : 1.0,
+    debug: env.NODE_ENV === 'staging',
   }),
   {
     fetch: app.fetch,
