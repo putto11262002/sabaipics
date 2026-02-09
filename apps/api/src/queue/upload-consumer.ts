@@ -115,7 +115,10 @@ async function processUpload(
 
     // Step 1: Find matching upload intent
     const intent = yield* ResultAsync.fromPromise(
-      db.query.uploadIntents.findFirst({ where: eq(uploadIntents.r2Key, key) }),
+      Sentry.startSpan(
+        { name: 'upload.find_intent', op: 'db.query' },
+        () => db.query.uploadIntents.findFirst({ where: eq(uploadIntents.r2Key, key) }),
+      ),
       (cause): UploadProcessingError => ({ type: 'database', operation: 'find_intent', cause }),
     );
 
@@ -142,7 +145,10 @@ async function processUpload(
 
     // Step 3: HEAD request first to check size without downloading
     const headResult = yield* ResultAsync.fromPromise(
-      env.PHOTOS_BUCKET.head(key),
+      Sentry.startSpan(
+        { name: 'upload.r2_fetch', op: 'r2.get' },
+        () => env.PHOTOS_BUCKET.head(key),
+      ),
       (cause): UploadProcessingError => ({ type: 'r2', operation: 'head', cause }),
     );
 
@@ -206,7 +212,21 @@ async function processUpload(
     // Step 7: Normalize image to JPEG using photon (in-Worker Wasm)
     console.log(`[upload-consumer] Normalizing with photon_wasm: ${key}`);
 
-    const normalizeResult = normalizeWithPhoton(imageBytes);
+    const normalizeResult = Sentry.startSpan(
+      { name: 'upload.normalize', op: 'image.process' },
+      (span) => {
+        span.setAttribute('upload.original_size', imageBytes.byteLength);
+        const result = normalizeWithPhoton(imageBytes);
+        if (result.isOk()) {
+          span.setAttribute('upload.width', result.value.width);
+          span.setAttribute('upload.height', result.value.height);
+          span.setAttribute('upload.file_size', result.value.bytes.byteLength);
+        } else {
+          span.setAttribute('upload.error_stage', result.error.stage);
+        }
+        return result;
+      },
+    );
 
     if (normalizeResult.isErr()) {
       captureUploadWarning('normalization', {
@@ -238,9 +258,12 @@ async function processUpload(
 
     // Step 9: Upload normalized image to final location
     yield* ResultAsync.fromPromise(
-      env.PHOTOS_BUCKET.put(finalR2Key, normalizedBytes, {
-        httpMetadata: { contentType: 'image/jpeg' },
-      }),
+      Sentry.startSpan(
+        { name: 'upload.r2_put', op: 'r2.put' },
+        () => env.PHOTOS_BUCKET.put(finalR2Key, normalizedBytes, {
+          httpMetadata: { contentType: 'image/jpeg' },
+        }),
+      ),
       (cause): UploadProcessingError => ({ type: 'r2', operation: 'put_normalized', cause }),
     );
 
@@ -248,7 +271,9 @@ async function processUpload(
     const dbTx = createDbTx(env.DATABASE_URL);
 
     const photo = yield* ResultAsync.fromPromise(
-      dbTx.transaction(async (tx) => {
+      Sentry.startSpan(
+        { name: 'upload.transaction', op: 'db.transaction' },
+        () => dbTx.transaction(async (tx) => {
         // Lock photographer row
         await tx
           .select({ id: photographers.id })
@@ -328,6 +353,7 @@ async function processUpload(
 
         return newPhoto;
       }),
+      ),
       (cause): UploadProcessingError => {
         const msg = cause instanceof Error ? cause.message : '';
         if (msg === 'INSUFFICIENT_CREDITS') {
@@ -347,11 +373,14 @@ async function processUpload(
 
     // Step 12: Enqueue for face detection
     yield* ResultAsync.fromPromise(
-      env.PHOTO_QUEUE.send({
-        photo_id: photo.id,
-        event_id: intent.eventId,
-        r2_key: photo.r2Key,
-      } as PhotoJob),
+      Sentry.startSpan(
+        { name: 'upload.enqueue', op: 'queue.send' },
+        () => env.PHOTO_QUEUE.send({
+          photo_id: photo.id,
+          event_id: intent.eventId,
+          r2_key: photo.r2Key,
+        } as PhotoJob),
+      ),
       (cause): UploadProcessingError => ({ type: 'r2', operation: 'enqueue', cause }),
     );
 
@@ -386,7 +415,21 @@ export async function queue(
       continue;
     }
 
-    const result = await processUpload(env, event);
+    const result = await Sentry.startSpan(
+      { name: 'upload.process', op: 'queue.process' },
+      async (rootSpan) => {
+        const r = await processUpload(env, event);
+        rootSpan.setAttribute('upload.r2_key', event.object.key);
+        r.match(
+          () => rootSpan.setAttribute('upload.status', 'ok'),
+          (error) => {
+            rootSpan.setAttribute('upload.status', 'error');
+            rootSpan.setAttribute('upload.error_type', error.type);
+          },
+        );
+        return r;
+      },
+    );
     const db = createDb(env.DATABASE_URL);
 
     result.match(
