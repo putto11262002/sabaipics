@@ -393,30 +393,34 @@ actor UploadManager {
             throw UploadManagerError.localFileMissing
         }
 
-        guard let putUrlString = job.putUrl, let putURL = URL(string: putUrlString) else {
-            throw UploadManagerError.missingPresign
-        }
-
-        // If presign is expired, re-presign.
+        var activeJob = job
+        // If presign is expired, re-presign and continue with the refreshed job.
         if let expiresAt = job.expiresAt, isExpired(expiresAtISO8601: expiresAt) {
             print("[UploadManager] job=\(job.id) presign expired; refreshing")
             try await ensurePresigned(job)
-            return
+            guard let refreshed = try await store.fetch(jobId: job.id) else {
+                throw UploadManagerError.missingPresign
+            }
+            activeJob = refreshed
         }
 
-        try await store.markState(jobId: job.id, state: .uploading, nextAttemptAt: now, attemptsDelta: 0, lastError: nil)
+        try await store.markState(jobId: activeJob.id, state: .uploading, nextAttemptAt: now, attemptsDelta: 0, lastError: nil)
 
-        var request = URLRequest(url: putURL)
+        guard let refreshedPutUrl = activeJob.putUrl, let refreshedPutURL = URL(string: refreshedPutUrl) else {
+            throw UploadManagerError.missingPresign
+        }
+
+        var request = URLRequest(url: refreshedPutURL)
         request.httpMethod = "PUT"
 
-        if let requiredHeadersJSON = job.requiredHeadersJSON,
+        if let requiredHeadersJSON = activeJob.requiredHeadersJSON,
            let required = try decodeHeadersJSON(requiredHeadersJSON) {
             for (k, v) in required {
                 request.setValue(v, forHTTPHeaderField: k)
             }
         } else {
-            request.setValue(job.contentType, forHTTPHeaderField: "Content-Type")
-            request.setValue(String(job.contentLength), forHTTPHeaderField: "Content-Length")
+            request.setValue(activeJob.contentType, forHTTPHeaderField: "Content-Type")
+            request.setValue(String(activeJob.contentLength), forHTTPHeaderField: "Content-Length")
             request.setValue("*", forHTTPHeaderField: "If-None-Match")
         }
 
@@ -428,9 +432,9 @@ actor UploadManager {
             throw UploadManagerError.http(statusCode: http.statusCode)
         }
 
-        print("[UploadManager] job=\(job.id) upload OK status=\(http.statusCode)")
+        print("[UploadManager] job=\(activeJob.id) upload OK status=\(http.statusCode)")
 
-        try await store.markState(jobId: job.id, state: .uploaded, nextAttemptAt: Date().timeIntervalSince1970, attemptsDelta: 0, lastError: nil)
+        try await store.markState(jobId: activeJob.id, state: .uploaded, nextAttemptAt: Date().timeIntervalSince1970, attemptsDelta: 0, lastError: nil)
     }
 
     private func checkCompletion(_ job: UploadJobRecord) async throws {
