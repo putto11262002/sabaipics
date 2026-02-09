@@ -58,6 +58,11 @@ const safeEncodeJpeg = Result.fromThrowable(
   (cause): NormalizeError => ({ stage: 'photon_encode', cause }),
 );
 
+const safeFree = Result.fromThrowable(
+  (img: PhotonImage) => img.free(),
+  (cause) => cause,
+);
+
 export function normalizeWithPhoton(
   imageBytes: ArrayBuffer,
 ): Result<NormalizeResult, NormalizeError> {
@@ -65,8 +70,14 @@ export function normalizeWithPhoton(
   let resizedImage: PhotonImage | null = null;
 
   const cleanup = () => {
-    if (resizedImage) resizedImage.free();
-    if (inputImage) inputImage.free();
+    if (resizedImage) {
+      safeFree(resizedImage);
+      resizedImage = null;
+    }
+    if (inputImage) {
+      safeFree(inputImage);
+      inputImage = null;
+    }
   };
 
   return safeNewFromBytes(new Uint8Array(imageBytes))
