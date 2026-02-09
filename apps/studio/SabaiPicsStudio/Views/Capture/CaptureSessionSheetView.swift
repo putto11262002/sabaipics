@@ -184,6 +184,7 @@ struct CaptureSessionSheetView: View {
 
 private struct CaptureSessionPhotosView: View {
     @ObservedObject var session: CaptureUISink
+    @EnvironmentObject private var uploadStatusStore: UploadStatusStore
 
     var body: some View {
         ScrollView {
@@ -194,7 +195,7 @@ private struct CaptureSessionPhotosView: View {
                     } else {
                         ForEach(session.photos) { photo in
                             VStack(spacing: 0) {
-                                PhotoListRow(photo: photo)
+                                PhotoListRow(photo: photo, uploadState: photo.uploadJobId.flatMap { uploadStatusStore.stateByJobId[$0] })
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 10)
 

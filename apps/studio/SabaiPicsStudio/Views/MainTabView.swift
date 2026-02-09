@@ -18,6 +18,8 @@ struct MainTabView: View {
     @StateObject private var captureSessionStore = CaptureSessionStore()
     @State private var captureSheetDetent: PresentationDetent = .large
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @EnvironmentObject private var coordinator: AppCoordinator
+    @EnvironmentObject private var uploadStatusStore: UploadStatusStore
 
     var body: some View {
         GeometryReader { proxy in
@@ -42,24 +44,52 @@ struct MainTabView: View {
             }
             .overlay(alignment: .bottom) {
                 if captureSessionStore.state != .idle {
-                    CaptureStatusBarView(
-                        status: statusForBar,
-                        cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
-                        downloadsCount: captureSessionStore.stats.downloadsCount,
-                        lastFilename: captureSessionStore.stats.lastFilename,
-                        onOpen: {
-                            captureSheetDetent = .large
-                            captureSessionStore.isDetailsPresented = true
-                        },
-                        onDisconnect: {
-                            captureSessionStore.disconnect()
-                        }
-                    )
-                    .padding(.horizontal, 16)
-                    // Keep the bar above the system TabView bar.
-                    .padding(.bottom, proxy.safeAreaInsets.bottom + tabBarClearance)
+                    if let liveSession = captureSessionStore.captureSession {
+                        CaptureStatusBarLiveView(
+                            status: statusForBar,
+                            cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
+                            downloadsCount: captureSessionStore.stats.downloadsCount,
+                            lastFilename: captureSessionStore.stats.lastFilename,
+                            session: liveSession,
+                            stateByJobId: uploadStatusStore.stateByJobId,
+                            onOpen: {
+                                captureSheetDetent = .large
+                                captureSessionStore.isDetailsPresented = true
+                            },
+                            onDisconnect: {
+                                captureSessionStore.disconnect()
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                        // Keep the bar above the system TabView bar.
+                        .padding(.bottom, proxy.safeAreaInsets.bottom + tabBarClearance)
+                    } else {
+                        CaptureStatusBarView(
+                            status: statusForBar,
+                            cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
+                            downloadsCount: captureSessionStore.stats.downloadsCount,
+                            lastFilename: captureSessionStore.stats.lastFilename,
+                            uploadedCount: 0,
+                            onOpen: {
+                                captureSheetDetent = .large
+                                captureSessionStore.isDetailsPresented = true
+                            },
+                            onDisconnect: {
+                                captureSessionStore.disconnect()
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                        // Keep the bar above the system TabView bar.
+                        .padding(.bottom, proxy.safeAreaInsets.bottom + tabBarClearance)
+                    }
                 }
             }
+        }
+        .onAppear {
+            captureSessionStore.configure(
+                uploadManager: coordinator.uploadManager,
+                eventIdProvider: { await MainActor.run { coordinator.selectedEventId } }
+            )
         }
         .sheet(isPresented: $captureSessionStore.isDetailsPresented) {
             CaptureSessionSheetView(
@@ -98,6 +128,39 @@ struct MainTabView: View {
             return .active
         case .error(let message):
             return .error(message)
+        }
+    }
+}
+
+private struct CaptureStatusBarLiveView: View {
+    let status: CaptureStatusBarView.Status
+    let cameraName: String
+    let downloadsCount: Int
+    let lastFilename: String?
+    @ObservedObject var session: CaptureUISink
+    let stateByJobId: [String: UploadJobState]
+    let onOpen: () -> Void
+    let onDisconnect: () -> Void
+
+    var body: some View {
+        CaptureStatusBarView(
+            status: status,
+            cameraName: cameraName,
+            downloadsCount: downloadsCount,
+            lastFilename: lastFilename,
+            uploadedCount: uploadedCount,
+            onOpen: onOpen,
+            onDisconnect: onDisconnect
+        )
+    }
+
+    private var uploadedCount: Int {
+        // Count only this session's downloaded photos that have completed server processing.
+        session.photos.reduce(into: 0) { acc, photo in
+            guard case .completed = photo.status else { return }
+            guard let jobId = photo.uploadJobId else { return }
+            guard stateByJobId[jobId] == .completed else { return }
+            acc += 1
         }
     }
 }
