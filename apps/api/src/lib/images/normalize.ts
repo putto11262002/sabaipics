@@ -47,11 +47,14 @@ const safeResize = Result.fromThrowable(
 );
 
 const safeEncodeJpeg = Result.fromThrowable(
-  (img: PhotonImage) => ({
-    jpegBytes: img.get_bytes_jpeg(JPEG_QUALITY),
-    width: img.get_width(),
-    height: img.get_height(),
-  }),
+  (img: PhotonImage) => {
+    const jpegView = img.get_bytes_jpeg(JPEG_QUALITY);
+    // Copy bytes out of Wasm memory before freeing — the Uint8Array from
+    // get_bytes_jpeg is a view into the Wasm linear memory and becomes
+    // invalid once the PhotonImage is freed.
+    const bytes = jpegView.slice().buffer as ArrayBuffer;
+    return { bytes, width: img.get_width(), height: img.get_height() };
+  },
   (cause): NormalizeError => ({ stage: 'photon_encode', cause }),
 );
 
@@ -84,8 +87,7 @@ export function normalizeWithPhoton(
       return ok(img);
     })
     .andThen((img) => safeEncodeJpeg(img))
-    .map(({ jpegBytes, width, height }) => {
-      const result: NormalizeResult = { bytes: jpegBytes.buffer as ArrayBuffer, width, height };
+    .map((result) => {
       cleanup();
       return result;
     })
