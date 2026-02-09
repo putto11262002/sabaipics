@@ -33,6 +33,7 @@ actor UploadManager {
     private let api: UploadsAPIClient
     private let fileManager: FileManager
     private let connectivity: ConnectivityService
+    private let backgroundSession: BackgroundUploadSessionManager
     private var workerTask: Task<Void, Never>?
     private var started = false
 
@@ -41,11 +42,12 @@ actor UploadManager {
     private let maxConcurrentJobs = 3
     private var inProgressJobIds = Set<String>()
 
-    init(baseURL: String, connectivity: ConnectivityService, fileManager: FileManager = .default) {
+    init(baseURL: String, connectivity: ConnectivityService, backgroundSession: BackgroundUploadSessionManager, fileManager: FileManager = .default) {
         self.fileManager = fileManager
         self.api = UploadsAPIClient(baseURL: baseURL)
         self.store = UploadQueueStore(dbURL: UploadManager.defaultDBURL(fileManager: fileManager))
         self.connectivity = connectivity
+        self.backgroundSession = backgroundSession
     }
 
     func start() {
@@ -55,7 +57,25 @@ actor UploadManager {
         print("[UploadManager] start()")
 
         workerTask = Task { [weak self] in
+            await self?.recoverStaleJobs()
             await self?.workerLoop()
+        }
+    }
+
+    /// Re-run crash recovery (safe to call multiple times).
+    func resume() async {
+        await recoverStaleJobs()
+    }
+
+    private func recoverStaleJobs() async {
+        let staleThreshold = Date().timeIntervalSince1970
+        do {
+            let recovered = try await store.resetStaleUploadingJobs(staleBefore: staleThreshold)
+            if recovered > 0 {
+                print("[UploadManager] Recovered \(recovered) stale uploading job(s)")
+            }
+        } catch {
+            print("[UploadManager] Failed to recover stale jobs: \(error)")
         }
     }
 
@@ -188,7 +208,7 @@ actor UploadManager {
             }
 
             if !(await connectivity.snapshot().isOnline) {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                await waitForOnline()
                 continue
             }
 
@@ -229,6 +249,17 @@ actor UploadManager {
         inProgressJobIds.remove(jobId)
     }
 
+    private func waitForOnline() async {
+        print("[UploadManager] Offline; waiting for connectivity...")
+        let stream = await connectivity.stream()
+        for await state in stream {
+            if state.isOnline {
+                print("[UploadManager] Back online")
+                return
+            }
+        }
+    }
+
     private func process(_ job: UploadJobRecord) async {
         do {
             switch job.state {
@@ -243,15 +274,22 @@ actor UploadManager {
                 print("[UploadManager] job=\(job.id) upload")
                 try await upload(updated)
 
+                // Re-fetch after upload: upload() may have refreshed the presign internally.
+                guard let postUpload = try await store.fetch(jobId: job.id) else {
+                    throw UploadManagerError.missingJob
+                }
                 print("[UploadManager] job=\(job.id) poll")
-                try await checkCompletion(updated)
+                try await checkCompletion(postUpload)
 
             case .presigned:
                 print("[UploadManager] job=\(job.id) upload (presigned)")
                 try await upload(job)
 
+                guard let postUpload = try await store.fetch(jobId: job.id) else {
+                    throw UploadManagerError.missingJob
+                }
                 print("[UploadManager] job=\(job.id) poll")
-                try await checkCompletion(job)
+                try await checkCompletion(postUpload)
 
             case .uploaded, .awaitingCompletion:
                 print("[UploadManager] job=\(job.id) poll (already uploaded)")
@@ -424,10 +462,7 @@ actor UploadManager {
             request.setValue("*", forHTTPHeaderField: "If-None-Match")
         }
 
-        let (_, response) = try await URLSession.shared.upload(for: request, fromFile: fileURL)
-        guard let http = response as? HTTPURLResponse else {
-            throw UploadManagerError.badResponse
-        }
+        let http = try await backgroundSession.upload(request: request, fileURL: fileURL, taskDescription: activeJob.id)
         guard (200...299).contains(http.statusCode) else {
             throw UploadManagerError.http(statusCode: http.statusCode)
         }

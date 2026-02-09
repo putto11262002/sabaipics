@@ -10,8 +10,10 @@ import Clerk
 
 @main
 struct FrameFastApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var coordinator = AppCoordinator()
     @State private var clerk = Clerk.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -23,6 +25,19 @@ struct FrameFastApp: App {
                 .tint(Color.Theme.primary)
                 .task {
                     await configureAndLoadClerk()
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    switch newPhase {
+                    case .active:
+                        Task { await coordinator.uploadManager.resume() }
+                        coordinator.uploadStatusStore.start()
+                    case .background:
+                        coordinator.uploadStatusStore.stop()
+                    case .inactive:
+                        break
+                    @unknown default:
+                        break
+                    }
                 }
         }
     }
@@ -59,4 +74,22 @@ struct FrameFastApp: App {
             coordinator.appInitialized = true
         }
     }
+}
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        guard identifier == BackgroundUploadSessionManager.sessionIdentifier else {
+            completionHandler()
+            return
+        }
+        // The background session manager is recreated on launch via AppCoordinator.
+        // Store the handler; it will be called by BackgroundUploadSessionManager.urlSessionDidFinishEvents.
+        AppDelegate.pendingBackgroundCompletionHandler = completionHandler
+    }
+
+    static var pendingBackgroundCompletionHandler: (() -> Void)?
 }

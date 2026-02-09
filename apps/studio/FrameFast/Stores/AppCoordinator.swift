@@ -23,6 +23,7 @@ class AppCoordinator: ObservableObject {
     let connectivityStore: ConnectivityStore
     let uploadManager: UploadManager
     let uploadStatusStore: UploadStatusStore
+    let backgroundSession: BackgroundUploadSessionManager
 
     private static let selectedEventDefaultsKey = "SelectedEventId"
     private static let selectedEventNameDefaultsKey = "SelectedEventName"
@@ -34,11 +35,19 @@ class AppCoordinator: ObservableObject {
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
 
         let connectivityService = ConnectivityService()
+        let bgSession = BackgroundUploadSessionManager.create()
         self.connectivityStore = ConnectivityStore(service: connectivityService)
-        self.uploadManager = UploadManager(baseURL: baseURL, connectivity: connectivityService)
+        self.backgroundSession = bgSession
+        self.uploadManager = UploadManager(baseURL: baseURL, connectivity: connectivityService, backgroundSession: bgSession)
         self.uploadStatusStore = UploadStatusStore(uploadManager: uploadManager)
 
         connectivityStore.start()
+
+        // Wire any pending background session completion handler from a system relaunch.
+        if let pending = AppDelegate.pendingBackgroundCompletionHandler {
+            bgSession.systemCompletionHandler = pending
+            AppDelegate.pendingBackgroundCompletionHandler = nil
+        }
 
         Task {
             await uploadManager.start()
