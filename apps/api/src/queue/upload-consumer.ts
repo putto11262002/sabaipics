@@ -114,12 +114,12 @@ async function processUpload(
     console.log(`[upload-consumer] Processing: ${key}, size: ${size}`);
 
     // Step 1: Find matching upload intent
-    const intent = yield* Sentry.startSpan(
-      { name: 'upload.find_intent', op: 'db.query' },
-      () => ResultAsync.fromPromise(
-        db.query.uploadIntents.findFirst({ where: eq(uploadIntents.r2Key, key) }),
-        (cause): UploadProcessingError => ({ type: 'database', operation: 'find_intent', cause }),
+    const intent = yield* ResultAsync.fromPromise(
+      Sentry.startSpan(
+        { name: 'upload.find_intent', op: 'db.query' },
+        () => db.query.uploadIntents.findFirst({ where: eq(uploadIntents.r2Key, key) }),
       ),
+      (cause): UploadProcessingError => ({ type: 'database', operation: 'find_intent', cause }),
     );
 
     if (!intent) {
@@ -144,12 +144,12 @@ async function processUpload(
     }
 
     // Step 3: HEAD request first to check size without downloading
-    const headResult = yield* Sentry.startSpan(
-      { name: 'upload.r2_fetch', op: 'r2.get' },
-      () => ResultAsync.fromPromise(
-        env.PHOTOS_BUCKET.head(key),
-        (cause): UploadProcessingError => ({ type: 'r2', operation: 'head', cause }),
+    const headResult = yield* ResultAsync.fromPromise(
+      Sentry.startSpan(
+        { name: 'upload.r2_fetch', op: 'r2.get' },
+        () => env.PHOTOS_BUCKET.head(key),
       ),
+      (cause): UploadProcessingError => ({ type: 'r2', operation: 'head', cause }),
     );
 
     if (!headResult) {
@@ -257,23 +257,23 @@ async function processUpload(
     const finalR2Key = `${intent.eventId}/${photoId}.jpg`;
 
     // Step 9: Upload normalized image to final location
-    yield* Sentry.startSpan(
-      { name: 'upload.r2_put', op: 'r2.put' },
-      () => ResultAsync.fromPromise(
-        env.PHOTOS_BUCKET.put(finalR2Key, normalizedBytes, {
+    yield* ResultAsync.fromPromise(
+      Sentry.startSpan(
+        { name: 'upload.r2_put', op: 'r2.put' },
+        () => env.PHOTOS_BUCKET.put(finalR2Key, normalizedBytes, {
           httpMetadata: { contentType: 'image/jpeg' },
         }),
-        (cause): UploadProcessingError => ({ type: 'r2', operation: 'put_normalized', cause }),
       ),
+      (cause): UploadProcessingError => ({ type: 'r2', operation: 'put_normalized', cause }),
     );
 
     // Step 10: Credit deduction + photo creation (transactional)
     const dbTx = createDbTx(env.DATABASE_URL);
 
-    const photo = yield* Sentry.startSpan(
-      { name: 'upload.transaction', op: 'db.transaction' },
-      () => ResultAsync.fromPromise(
-        dbTx.transaction(async (tx) => {
+    const photo = yield* ResultAsync.fromPromise(
+      Sentry.startSpan(
+        { name: 'upload.transaction', op: 'db.transaction' },
+        () => dbTx.transaction(async (tx) => {
         // Lock photographer row
         await tx
           .select({ id: photographers.id })
@@ -353,6 +353,7 @@ async function processUpload(
 
         return newPhoto;
       }),
+      ),
       (cause): UploadProcessingError => {
         const msg = cause instanceof Error ? cause.message : '';
         if (msg === 'INSUFFICIENT_CREDITS') {
@@ -365,23 +366,22 @@ async function processUpload(
         });
         return { type: 'database', operation: 'transaction', cause };
       },
-      ),
     );
 
     // Step 11: Delete original upload (keep only normalized)
     await env.PHOTOS_BUCKET.delete(key);
 
     // Step 12: Enqueue for face detection
-    yield* Sentry.startSpan(
-      { name: 'upload.enqueue', op: 'queue.send' },
-      () => ResultAsync.fromPromise(
-        env.PHOTO_QUEUE.send({
+    yield* ResultAsync.fromPromise(
+      Sentry.startSpan(
+        { name: 'upload.enqueue', op: 'queue.send' },
+        () => env.PHOTO_QUEUE.send({
           photo_id: photo.id,
           event_id: intent.eventId,
           r2_key: photo.r2Key,
         } as PhotoJob),
-        (cause): UploadProcessingError => ({ type: 'r2', operation: 'enqueue', cause }),
       ),
+      (cause): UploadProcessingError => ({ type: 'r2', operation: 'enqueue', cause }),
     );
 
     console.log(`[upload-consumer] Completed: ${photo.id}`);
