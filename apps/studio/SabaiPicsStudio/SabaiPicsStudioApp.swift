@@ -17,6 +17,8 @@ struct SabaiPicsStudioApp: App {
         WindowGroup {
             RootFlowView()
                 .environmentObject(coordinator)
+                .environmentObject(coordinator.uploadStatusStore)
+                .environmentObject(coordinator.connectivityStore)
                 .environment(\.clerk, clerk)
                 .tint(Color.Theme.primary)
                 .task {

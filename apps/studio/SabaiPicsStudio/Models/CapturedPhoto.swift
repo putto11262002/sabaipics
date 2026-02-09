@@ -13,6 +13,14 @@
 import Foundation
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+typealias PlatformImage = UIImage
+#elseif canImport(AppKit)
+import AppKit
+typealias PlatformImage = NSImage
+#endif
+
 /// Download status for a photo
 enum DownloadStatus {
     case downloading
@@ -27,7 +35,9 @@ class CapturedPhoto: Identifiable, ObservableObject, Equatable {
     @Published var name: String
     let captureDate: Date
     @Published var data: Data
-    @Published var image: UIImage?
+    @Published var image: PlatformImage?
+    @Published var fileURL: URL?
+    @Published var uploadJobId: String?
     @Published var status: DownloadStatus
     @Published var isDownloading: Bool
     let fileSize: Int
@@ -41,7 +51,9 @@ class CapturedPhoto: Identifiable, ObservableObject, Equatable {
         self.id = UUID().uuidString
         self.name = name
         self.data = data
-        self.image = UIImage(data: data)
+        self.image = CapturedPhoto.makeImage(from: data)
+        self.fileURL = nil
+        self.uploadJobId = nil
         self.captureDate = captureDate
         self.status = .completed
         self.isDownloading = false
@@ -49,13 +61,14 @@ class CapturedPhoto: Identifiable, ObservableObject, Equatable {
     }
 
     /// Initialize with UIImage (legacy support)
-    init(name: String, image: UIImage, captureDate: Date = Date()) {
+    init(name: String, image: PlatformImage, captureDate: Date = Date()) {
         self.id = UUID().uuidString
         self.name = name
         self.image = image
-        // Convert UIImage to JPEG data
-        let imageData = image.jpegData(compressionQuality: 0.9) ?? Data()
+        let imageData = CapturedPhoto.makeJPEGData(from: image) ?? Data()
         self.data = imageData
+        self.fileURL = nil
+        self.uploadJobId = nil
         self.captureDate = captureDate
         self.status = .completed
         self.isDownloading = false
@@ -75,8 +88,34 @@ class CapturedPhoto: Identifiable, ObservableObject, Equatable {
         self.captureDate = captureDate
         self.data = Data()
         self.image = nil
+        self.fileURL = nil
+        self.uploadJobId = nil
         self.status = .downloading
         self.isDownloading = isDownloading
         self.fileSize = fileSize
+    }
+
+    private static func makeImage(from data: Data) -> PlatformImage? {
+        #if canImport(UIKit)
+        return UIImage(data: data)
+        #elseif canImport(AppKit)
+        return NSImage(data: data)
+        #else
+        return nil
+        #endif
+    }
+
+    private static func makeJPEGData(from image: PlatformImage) -> Data? {
+        #if canImport(UIKit)
+        return (image as UIImage).jpegData(compressionQuality: 0.9)
+        #elseif canImport(AppKit)
+        guard let tiff = (image as NSImage).tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff) else {
+            return nil
+        }
+        return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.9])
+        #else
+        return nil
+        #endif
     }
 }

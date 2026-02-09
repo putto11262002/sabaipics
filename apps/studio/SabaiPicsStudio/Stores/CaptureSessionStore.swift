@@ -34,11 +34,20 @@ final class CaptureSessionStore: ObservableObject {
     @Published private(set) var activeCamera: ActiveCamera? = nil
     @Published private(set) var stats: Stats = Stats()
     @Published private(set) var recentDownloads: [DownloadItem] = []
-    @Published private(set) var transferSession: TransferSession? = nil
+    @Published private(set) var captureSession: CaptureUISink? = nil
     @Published var isDetailsPresented: Bool = false
 
     private var disconnectTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
+    private var controller: CaptureSessionController?
+
+    private var uploadManager: UploadManager?
+    private var eventIdProvider: (() async -> String?)?
+
+    func configure(uploadManager: UploadManager, eventIdProvider: @escaping () async -> String?) {
+        self.uploadManager = uploadManager
+        self.eventIdProvider = eventIdProvider
+    }
 
     func start(activeCamera: ActiveCamera) {
         disconnectTask?.cancel()
@@ -46,28 +55,45 @@ final class CaptureSessionStore: ObservableObject {
         self.activeCamera = activeCamera
         self.recentDownloads = []
 
-        // Create a live transfer session so photo feed updates in real time.
-        let session = TransferSession(camera: activeCamera)
-        self.transferSession = session
+        controller = CaptureSessionController(activeCamera: activeCamera) { ui in
+            var sinks: [AnyCaptureEventSink] = []
+            if let uploadManager, let eventIdProvider {
+                sinks.append(
+                    UploadQueueSink(
+                        uploadManager: uploadManager,
+                        eventIdProvider: eventIdProvider,
+                        onEnqueued: { objectHandle, jobId in
+                            await MainActor.run {
+                                ui.linkUploadJob(objectHandle: objectHandle, jobId: jobId)
+                            }
+                        }
+                    ).asSink()
+                )
+            }
+            return sinks
+        }
+        let ui = controller!.ui
+
+        self.captureSession = ui
 
         self.state = .active
-        self.stats = Stats(downloadsCount: session.completedDownloadsCount, lastFilename: session.lastCompletedFilename, startedAt: session.startedAt)
+        self.stats = Stats(downloadsCount: ui.completedDownloadsCount, lastFilename: ui.lastCompletedFilename, startedAt: ui.startedAt)
 
-        session.$completedDownloadsCount
+        ui.$completedDownloadsCount
             .receive(on: DispatchQueue.main)
             .sink { [weak self] count in
                 self?.stats.downloadsCount = count
             }
             .store(in: &cancellables)
 
-        session.$lastCompletedFilename
+        ui.$lastCompletedFilename
             .receive(on: DispatchQueue.main)
             .sink { [weak self] filename in
                 self?.stats.lastFilename = filename
             }
             .store(in: &cancellables)
 
-        session.$errorMessage
+        ui.$errorMessage
             .receive(on: DispatchQueue.main)
             .sink { [weak self] (message: String?) in
                 guard let message, !message.isEmpty else { return }
@@ -77,19 +103,20 @@ final class CaptureSessionStore: ObservableObject {
             }
             .store(in: &cancellables)
 
-        session.$isActive
+        ui.$isActive
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] (isActive: Bool) in
                 guard let self else { return }
                 guard isActive == false else { return }
 
-                // TransferSession ended (user disconnect or unexpected disconnect).
+                // Capture session ended (user disconnect or unexpected disconnect).
                 // We prefer auto-return to idle and clear the live session UI.
                 self.disconnectTask?.cancel()
                 self.cancellables.removeAll()
-                self.transferSession = nil
+                self.captureSession = nil
                 self.activeCamera = nil
+                self.controller = nil
                 self.state = .idle
                 self.isDetailsPresented = false
                 self.stats = Stats()
@@ -102,14 +129,15 @@ final class CaptureSessionStore: ObservableObject {
         disconnectTask?.cancel()
         cancellables.removeAll()
 
-        if let session = transferSession {
+        if let controller {
             state = .connecting
             disconnectTask = Task { [weak self] in
-                await session.end()
+                await controller.end()
                 await MainActor.run {
                     guard let self else { return }
-                    self.transferSession = nil
+                    self.captureSession = nil
                     self.activeCamera = nil
+                    self.controller = nil
                     self.state = .idle
                     self.isDetailsPresented = false
                     self.stats = Stats()
@@ -124,7 +152,8 @@ final class CaptureSessionStore: ObservableObject {
             isDetailsPresented = false
             stats = Stats()
             recentDownloads = []
-            transferSession = nil
+            captureSession = nil
+            controller = nil
             return
         }
 
@@ -133,7 +162,8 @@ final class CaptureSessionStore: ObservableObject {
             await camera.disconnect()
             guard let self else { return }
             self.activeCamera = nil
-            self.transferSession = nil
+            self.captureSession = nil
+            self.controller = nil
             self.state = .idle
             self.isDetailsPresented = false
             self.stats = Stats()

@@ -11,8 +11,8 @@
 //
 //  When user selects this camera:
 //  1. Session is extracted and wrapped in ActiveCamera
-//  2. ActiveCamera is passed to TransferSession
-//  3. TransferSession starts event monitoring
+//  2. ActiveCamera is passed to capture session controller
+//  3. CaptureSessionController starts event monitoring
 //
 //  Non-selected cameras are disconnected during cleanup.
 //

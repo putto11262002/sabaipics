@@ -7,6 +7,7 @@ import SwiftUI
 
 struct PhotoListRow: View {
     @ObservedObject var photo: CapturedPhoto
+    let uploadState: UploadJobState?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -41,33 +42,62 @@ struct PhotoListRow: View {
 
             Spacer()
 
-            downloadStatusView
+            HStack(spacing: 10) {
+                pipelineStatusView
+            }
         }
     }
 
     @ViewBuilder
-    private var downloadStatusView: some View {
-        switch photo.status {
-        case .downloading:
+    private var pipelineStatusView: some View {
+        // Single status badge for the whole pipeline.
+        if case .downloading = photo.status {
             ProgressView()
-                .scaleEffect(0.8)
-
-        case .completed:
-            Image(systemName: "arrow.down.circle.fill")
-                .foregroundColor(Color.Theme.primary)
-                .font(.title3)
-
-        case .failed:
-            VStack(alignment: .trailing, spacing: 2) {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .foregroundColor(Color.Theme.destructive)
+                .controlSize(.small)
+        } else if let uploadState {
+            switch uploadState {
+            case .queued, .presigned:
+                Image(systemName: "arrow.up.circle")
+                    .foregroundStyle(Color.Theme.mutedForeground)
                     .font(.title3)
-                Text("Failed")
-                    .font(.caption2)
-                    .foregroundColor(Color.Theme.destructive)
+
+            case .uploading:
+                ProgressView()
+                    .controlSize(.small)
+
+            case .uploaded, .awaitingCompletion:
+                Image(systemName: "hourglass")
+                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .font(.title3)
+
+            case .completed:
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Color.Theme.success)
+                    .font(.title3)
+
+            case .failed:
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(Color.Theme.warning)
+                    .font(.title3)
+
+            case .terminalFailed:
+                Image(systemName: "xmark.octagon.fill")
+                    .foregroundStyle(Color.Theme.destructive)
+                    .font(.title3)
             }
+        } else if case .completed = photo.status {
+            // Download completed but not enqueued (should be rare with forced event selection)
+            Image(systemName: "arrow.down.circle.fill")
+                .foregroundStyle(Color.Theme.primary)
+                .font(.title3)
+        } else if case .failed = photo.status {
+            Image(systemName: "exclamationmark.circle.fill")
+                .foregroundStyle(Color.Theme.destructive)
+                .font(.title3)
         }
     }
+
+    // downloadStatusView removed in favor of a single pipelineStatusView
 
     private func formatFileSize(_ bytes: Int) -> String {
         let formatter = ByteCountFormatter()

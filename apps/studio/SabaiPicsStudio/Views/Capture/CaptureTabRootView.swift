@@ -5,6 +5,7 @@ import SwiftUI
 
 struct CaptureTabRootView: View {
     @ObservedObject var sessionStore: CaptureSessionStore
+    @EnvironmentObject private var coordinator: AppCoordinator
 
     // MARK: - Sheet
 
@@ -23,6 +24,8 @@ struct CaptureTabRootView: View {
     }
 
     @State private var activeSheet: ActiveSheet? = nil
+    @State private var pendingActiveSheet: ActiveSheet? = nil
+    @State private var isShowingEventPicker: Bool = false
     @State private var recentSony: [APCameraConnectionRecord] = []
     @State private var recentCanon: [APCameraConnectionRecord] = []
     @State private var recentNikon: [APCameraConnectionRecord] = []
@@ -42,11 +45,11 @@ struct CaptureTabRootView: View {
                     guard sessionStore.state == .idle else { return }
                     switch manufacturer {
                     case .sony:
-                        activeSheet = .sony(.new)
+                        requestStartCapture(sheet: .sony(.new))
                     case .canon:
-                        activeSheet = .canon(.new)
+                        requestStartCapture(sheet: .canon(.new))
                     case .nikon:
-                        activeSheet = .nikon(.new)
+                        requestStartCapture(sheet: .nikon(.new))
                     }
                 },
                 recentSony: recentSony,
@@ -85,6 +88,30 @@ struct CaptureTabRootView: View {
                     .interactiveDismissDisabled(true)
                     .presentationDragIndicator(.hidden)
             }
+            .sheet(isPresented: $isShowingEventPicker) {
+                EventPickerSheetView(
+                    preselectedEventId: coordinator.selectedEventId,
+                    onCancel: {
+                        pendingActiveSheet = nil
+                        isShowingEventPicker = false
+                    },
+                    onConfirm: { eventId, eventName in
+                        coordinator.selectEvent(id: eventId, name: eventName)
+                        let next = pendingActiveSheet
+                        pendingActiveSheet = nil
+                        isShowingEventPicker = false
+
+                        // Open connect flow after event selection.
+                        if let next {
+                            DispatchQueue.main.async {
+                                activeSheet = next
+                            }
+                        }
+                    }
+                )
+                .interactiveDismissDisabled(true)
+                .presentationDragIndicator(.hidden)
+            }
             .onAppear {
                 reloadRecent()
             }
@@ -101,7 +128,7 @@ struct CaptureTabRootView: View {
                 pendingSonyReconnectSSID = nil
                 isShowingSonyReconnectAlert = false
                 DispatchQueue.main.async {
-                    activeSheet = .sony(.reconnect(recordID: id))
+                    requestStartCapture(sheet: .sony(.reconnect(recordID: id)))
                 }
             }
         } message: {
@@ -119,12 +146,17 @@ struct CaptureTabRootView: View {
                 pendingNikonReconnectSSID = nil
                 isShowingNikonReconnectAlert = false
                 DispatchQueue.main.async {
-                    activeSheet = .nikon(.reconnect(recordID: id))
+                    requestStartCapture(sheet: .nikon(.reconnect(recordID: id)))
                 }
             }
         } message: {
             Text("Make sure you are connected to \(pendingNikonReconnectSSID ?? "the camera Wi-Fi").")
         }
+    }
+
+    private func requestStartCapture(sheet: ActiveSheet) {
+        pendingActiveSheet = sheet
+        isShowingEventPicker = true
     }
 
     // MARK: - Sheet content
@@ -193,19 +225,19 @@ struct CaptureTabRootView: View {
         case .cameraHotspot, .unknown, .sameWifi:
             if let ssid = record?.ssid, !ssid.isEmpty {
                 if let currentKey = WiFiNetworkInfo.currentNetworkKey(), currentKey == record?.networkKey {
-                    activeSheet = .sony(.reconnect(recordID: id))
+                    requestStartCapture(sheet: .sony(.reconnect(recordID: id)))
                 } else {
                     pendingSonyReconnectID = id
                     pendingSonyReconnectSSID = ssid
                     isShowingSonyReconnectAlert = true
                 }
             } else {
-                activeSheet = .sony(.reconnect(recordID: id))
+                requestStartCapture(sheet: .sony(.reconnect(recordID: id)))
             }
 
         case .personalHotspot:
             // Shouldn't happen for Sony, but treat as generic scan.
-            activeSheet = .sony(.reconnect(recordID: id))
+            requestStartCapture(sheet: .sony(.reconnect(recordID: id)))
         }
     }
 
@@ -216,9 +248,9 @@ struct CaptureTabRootView: View {
         let mode = record?.connectionMode ?? .unknown
         if mode == .personalHotspot {
             // Show Canon setup sheet first; user can continue to discovery.
-            activeSheet = .canon(.new)
+            requestStartCapture(sheet: .canon(.new))
         } else {
-            activeSheet = .canon(.reconnect(recordID: id))
+            requestStartCapture(sheet: .canon(.reconnect(recordID: id)))
         }
     }
 
@@ -228,7 +260,7 @@ struct CaptureTabRootView: View {
             .first(where: { $0.id == recordID })
 
         if let currentKey = WiFiNetworkInfo.currentNetworkKey(), currentKey == record?.networkKey {
-            activeSheet = .nikon(.reconnect(recordID: id))
+            requestStartCapture(sheet: .nikon(.reconnect(recordID: id)))
             return
         }
 
@@ -250,6 +282,7 @@ struct CaptureTabRootView: View {
 
 #Preview("Capture Tab") {
     CaptureTabRootView(sessionStore: CaptureSessionStore())
+        .environmentObject(AppCoordinator())
 }
 
 #endif

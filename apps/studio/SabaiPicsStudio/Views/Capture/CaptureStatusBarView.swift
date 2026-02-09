@@ -14,6 +14,8 @@ struct CaptureStatusBarView: View {
     let cameraName: String
     let downloadsCount: Int
     let lastFilename: String?
+    let uploadedCount: Int
+    let eventName: String?
     let onOpen: () -> Void
     let onDisconnect: () -> Void
 
@@ -32,37 +34,34 @@ struct CaptureStatusBarView: View {
                         .font(.caption)
                         .foregroundStyle(Color.Theme.mutedForeground)
                         .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
 
             Spacer(minLength: 10)
+
+            PipelineCluster(downloadsCount: downloadsCount, uploadedCount: uploadedCount)
 
             Button {
                 onDisconnect()
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 26, height: 26)
+                    .padding(8)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 5)
-            .background(Color.Theme.destructive.opacity(0.12))
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(Color.Theme.destructive.opacity(0.35), lineWidth: 1)
-            )
             .foregroundStyle(Color.Theme.destructive)
             .accessibilityLabel("Disconnect")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Color.Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.Theme.border, lineWidth: 1)
         )
         .shadow(color: Color.Theme.foreground.opacity(0.08), radius: 10, x: 0, y: 4)
@@ -79,10 +78,10 @@ struct CaptureStatusBarView: View {
         case .connecting:
             return "Working…"
         case .active:
-            if let lastFilename, !lastFilename.isEmpty {
-                return "\(downloadsCount) saved • \(lastFilename)"
+            if let eventName, !eventName.isEmpty {
+                return eventName
             }
-            return "\(downloadsCount) saved"
+            return "Tap to view"
         case .error(let message):
             return message
         }
@@ -117,6 +116,67 @@ struct CaptureStatusBarView: View {
     }
 }
 
+private struct PipelineCluster: View {
+    let downloadsCount: Int
+    let uploadedCount: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            clusterPill(icon: "arrow.down.circle.fill", text: "\(downloadsCount)")
+                .foregroundStyle(Color.Theme.primary)
+
+            uploadPill
+        }
+    }
+
+    private var uploadPill: some View {
+        let total = max(downloadsCount, 0)
+        let uploaded = min(max(uploadedCount, 0), total)
+
+        guard total > 0 else {
+            return AnyView(EmptyView())
+        }
+
+        let tint: Color = Color.Theme.primary
+        let isComplete = uploaded == total
+
+        return AnyView(
+            HStack(spacing: 6) {
+                if !isComplete {
+                    ProgressView()
+                        .controlSize(.mini)
+                } else {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                Text("\(uploaded)/\(total)")
+                    .font(.caption.weight(.semibold))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(tint.opacity(0.10))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(tint.opacity(0.25), lineWidth: 1))
+            .foregroundStyle(tint)
+            .accessibilityLabel("Uploads \(uploaded) of \(total)")
+        )
+    }
+
+    private func clusterPill(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+            Text(text)
+                .font(.caption.weight(.semibold))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.Theme.primary.opacity(0.10))
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(Color.Theme.primary.opacity(0.25), lineWidth: 1))
+    }
+}
+
 #if DEBUG
 
 #Preview("Capture Status Bar") {
@@ -127,6 +187,8 @@ struct CaptureStatusBarView: View {
             cameraName: "Sony A7 IV",
             downloadsCount: 12,
             lastFilename: "DSC01234.JPG",
+            uploadedCount: 9,
+            eventName: "Bangkok Wedding",
             onOpen: {},
             onDisconnect: {}
         )

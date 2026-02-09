@@ -51,7 +51,7 @@ enum AppState: Equatable {
     case connecting(ip: String)
 
     /// Active transfer session (main capture view)
-    /// Associated TransferSession is managed by AppCoordinator
+    /// Associated capture session is managed by CaptureSessionStore
     case transferring
 
     /// Error state with message

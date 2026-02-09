@@ -9,7 +9,7 @@ struct CaptureSessionSheetView: View {
     let downloadsCount: Int
     let lastFilename: String?
     let recentDownloads: [CaptureSessionStore.DownloadItem]
-    let transferSession: TransferSession?
+    let captureSession: CaptureUISink?
     let isDisconnecting: Bool
     let onDisconnect: () -> Void
 
@@ -26,8 +26,8 @@ struct CaptureSessionSheetView: View {
                     .padding(.bottom, 12)
                     .background(Color.Theme.background)
 
-                if let transferSession {
-                    CaptureSessionPhotosView(session: transferSession)
+                if let captureSession {
+                    CaptureSessionPhotosView(session: captureSession)
                     .safeAreaPadding(.bottom, bottomActionBarHeight)
                 } else {
                     VStack(spacing: 12) {
@@ -183,7 +183,8 @@ struct CaptureSessionSheetView: View {
 }
 
 private struct CaptureSessionPhotosView: View {
-    @ObservedObject var session: TransferSession
+    @ObservedObject var session: CaptureUISink
+    @EnvironmentObject private var uploadStatusStore: UploadStatusStore
 
     var body: some View {
         ScrollView {
@@ -194,7 +195,7 @@ private struct CaptureSessionPhotosView: View {
                     } else {
                         ForEach(session.photos) { photo in
                             VStack(spacing: 0) {
-                                PhotoListRow(photo: photo)
+                                PhotoListRow(photo: photo, uploadState: photo.uploadJobId.flatMap { uploadStatusStore.stateByJobId[$0] })
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 10)
 
@@ -308,7 +309,7 @@ private struct CaptureSessionPhotosView: View {
         downloadsCount: 12,
         lastFilename: "DSC01234.JPG",
         recentDownloads: [],
-        transferSession: nil,
+        captureSession: nil,
         isDisconnecting: false,
         onDisconnect: {}
     )
