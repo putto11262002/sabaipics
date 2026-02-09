@@ -899,7 +899,7 @@ static void logdumper(GPLogLevel level, const char *domain, const char *str,
 
     // Create background queue for event monitoring
     if (!eventMonitorQueue) {
-        eventMonitorQueue = dispatch_queue_create("com.sabaipics.eventmonitor", DISPATCH_QUEUE_SERIAL);
+        eventMonitorQueue = dispatch_queue_create("com.framefast.eventmonitor", DISPATCH_QUEUE_SERIAL);
     }
 
     // Start event loop on background queue
