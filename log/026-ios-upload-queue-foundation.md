@@ -37,3 +37,10 @@ Notes
 
 - Upload queue is session-independent (not owned by capture UI). It should run globally.
 - Local deletion policy: only after upload intent status is `completed`.
+
+Update: 2026-02-09
+
+- Centralized connectivity monitoring via `ConnectivityService` + `ConnectivityStore`.
+  - `apps/studio/SabaiPicsStudio/Services/ConnectivityService.swift`
+  - `apps/studio/SabaiPicsStudio/Stores/ConnectivityStore.swift`
+- `UploadManager` now uses `ConnectivityService` (single source of truth) instead of owning its own `NWPathMonitor`.

@@ -5,7 +5,6 @@
 //
 
 import Foundation
-import Network
 
 actor UploadManager {
     struct Summary: Sendable {
@@ -33,10 +32,7 @@ actor UploadManager {
     private let store: UploadQueueStore
     private let api: UploadsAPIClient
     private let fileManager: FileManager
-    private let pathMonitor: NWPathMonitor
-    private let pathMonitorQueue = DispatchQueue(label: "sabaipics.upload.pathmonitor")
-
-    private var isOnline: Bool = true
+    private let connectivity: ConnectivityService
     private var workerTask: Task<Void, Never>?
     private var started = false
 
@@ -45,11 +41,11 @@ actor UploadManager {
     private let maxConcurrentJobs = 3
     private var inProgressJobIds = Set<String>()
 
-    init(baseURL: String, fileManager: FileManager = .default) {
+    init(baseURL: String, connectivity: ConnectivityService, fileManager: FileManager = .default) {
         self.fileManager = fileManager
         self.api = UploadsAPIClient(baseURL: baseURL)
         self.store = UploadQueueStore(dbURL: UploadManager.defaultDBURL(fileManager: fileManager))
-        self.pathMonitor = NWPathMonitor()
+        self.connectivity = connectivity
     }
 
     func start() {
@@ -57,13 +53,6 @@ actor UploadManager {
         started = true
 
         print("[UploadManager] start()")
-
-        pathMonitor.pathUpdateHandler = { [weak self] path in
-            Task { [weak self] in
-                await self?.setOnline(path.status == .satisfied)
-            }
-        }
-        pathMonitor.start(queue: pathMonitorQueue)
 
         workerTask = Task { [weak self] in
             await self?.workerLoop()
@@ -75,7 +64,6 @@ actor UploadManager {
         started = false
         workerTask?.cancel()
         workerTask = nil
-        pathMonitor.cancel()
     }
 
     func enqueue(_ request: EnqueueRequest) async throws -> String {
@@ -119,13 +107,6 @@ actor UploadManager {
 
     // MARK: - Internals
 
-    private func setOnline(_ online: Bool) {
-        if isOnline != online {
-            print("[UploadManager] online=\(online)")
-        }
-        isOnline = online
-    }
-
     private func workerLoop() async {
         print("[UploadManager] workerLoop started")
         while !Task.isCancelled {
@@ -133,7 +114,7 @@ actor UploadManager {
                 break
             }
 
-            if !isOnline {
+            if !(await connectivity.snapshot().isOnline) {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 continue
             }

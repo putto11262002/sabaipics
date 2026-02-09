@@ -19,6 +19,7 @@ class AppCoordinator: ObservableObject {
     /// For now this is driven from the Events tab and persisted in UserDefaults.
     @Published private(set) var selectedEventId: String?
 
+    let connectivityStore: ConnectivityStore
     let uploadManager: UploadManager
     let uploadStatusStore: UploadStatusStore
 
@@ -28,8 +29,13 @@ class AppCoordinator: ObservableObject {
         self.selectedEventId = UserDefaults.standard.string(forKey: Self.selectedEventDefaultsKey)
 
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
-        self.uploadManager = UploadManager(baseURL: baseURL)
+
+        let connectivityService = ConnectivityService()
+        self.connectivityStore = ConnectivityStore(service: connectivityService)
+        self.uploadManager = UploadManager(baseURL: baseURL, connectivity: connectivityService)
         self.uploadStatusStore = UploadStatusStore(uploadManager: uploadManager)
+
+        connectivityStore.start()
 
         Task {
             await uploadManager.start()
