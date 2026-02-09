@@ -8,6 +8,8 @@ import SwiftUI
 struct CanonAPSetupView: View {
     let onNext: () -> Void
 
+    @State private var showWiFiWarning = false
+
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
@@ -21,19 +23,29 @@ struct CanonAPSetupView: View {
                 .fontWeight(.semibold)
                 .foregroundColor(Color.Theme.foreground)
 
-            Text("Connect to your Canon camera's WiFi network (DIRECT-...) in **Settings** before continuing.")
+            Text("Connect to your Canon camera's WiFi network in **Settings** before continuing.")
                 .font(.subheadline)
                 .foregroundColor(Color.Theme.mutedForeground)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
             Button("Continue") {
-                onNext()
+                if WiFiNetworkInfo.currentWiFiIPv4() != nil {
+                    onNext()
+                } else {
+                    showWiFiWarning = true
+                }
             }
             .buttonStyle(.compact)
             .padding(.top, 4)
 
             Spacer()
+        }
+        .alert("WiFi not detected", isPresented: $showWiFiWarning) {
+            Button("Cancel", role: .cancel) {}
+            Button("Continue anyway") { onNext() }
+        } message: {
+            Text("You don't appear to be connected to a WiFi network. Make sure you're connected to your camera's WiFi before continuing.")
         }
     }
 }

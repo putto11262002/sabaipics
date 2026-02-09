@@ -107,8 +107,8 @@ struct CameraDiscoveryScreen: View {
                 )
             case .needsNetworkHelp:
                 CameraDiscoveryNetworkHelpView(
-                    title: "No network connection",
-                    message: "Connect to WiFi to discover cameras.",
+                    title: "Not connected to camera WiFi",
+                    message: "Go to Settings › WiFi and connect to your camera's network, then try again.",
                     bullets: [],
                     onRetry: {
                         Task { await viewModel.retry(preferredIP: preferredIP) }
