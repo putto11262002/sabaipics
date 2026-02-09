@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/cloudflare';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { createAnyAuth } from './middleware/any-auth';
@@ -90,23 +91,31 @@ const app = new Hono<Env>()
 export type AppType = typeof app;
 
 // Export worker with fetch, queue, and scheduled handlers
-export default {
-  fetch: app.fetch,
-  queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
-    // Route by queue name prefix (handles -dev, -staging, etc.)
-    if (batch.queue.startsWith('photo-processing')) {
-      return photoQueue(batch as MessageBatch<any>, env, ctx);
-    }
-    if (batch.queue.startsWith('rekognition-cleanup')) {
-      return cleanupQueue(batch as MessageBatch<any>, env);
-    }
-    if (batch.queue.startsWith('upload-processing')) {
-      return uploadQueue(batch as MessageBatch<any>, env, ctx);
-    }
-    if (batch.queue.startsWith('logo-processing')) {
-      return logoUploadConsumer.queue(batch as MessageBatch<any>, env);
-    }
-    console.error('[Queue] Unknown queue:', batch.queue);
+// Sentry.withSentry wraps all handlers (fetch, queue, scheduled) for error capture
+export default Sentry.withSentry(
+  (env: Bindings) => ({
+    dsn: env.SENTRY_DSN,
+    environment: env.NODE_ENV,
+    tracesSampleRate: env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  }),
+  {
+    fetch: app.fetch,
+    queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
+      // Route by queue name prefix (handles -dev, -staging, etc.)
+      if (batch.queue.startsWith('photo-processing')) {
+        return photoQueue(batch as MessageBatch<any>, env, ctx);
+      }
+      if (batch.queue.startsWith('rekognition-cleanup')) {
+        return cleanupQueue(batch as MessageBatch<any>, env);
+      }
+      if (batch.queue.startsWith('upload-processing')) {
+        return uploadQueue(batch as MessageBatch<any>, env, ctx);
+      }
+      if (batch.queue.startsWith('logo-processing')) {
+        return logoUploadConsumer.queue(batch as MessageBatch<any>, env);
+      }
+      console.error('[Queue] Unknown queue:', batch.queue);
+    },
+    scheduled,
   },
-  scheduled,
-};
+);

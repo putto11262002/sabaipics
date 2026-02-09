@@ -7,8 +7,7 @@ import { photos } from './photos';
 
 // Status enum for upload intent lifecycle
 export const uploadIntentStatuses = [
-  'pending', // presign issued, waiting for upload
-  'uploaded', // R2 object exists, processing
+  'pending', // presign issued, waiting for upload or being processed
   'completed', // photo created successfully
   'failed', // validation failed, object deleted
   'expired', // presign expired, never uploaded
@@ -53,7 +52,6 @@ export const uploadIntents = pgTable(
     // Timestamps
     createdAt: createdAtCol(),
     expiresAt: timestamptz('expires_at').notNull(), // presign URL expiry
-    uploadedAt: timestamptz('uploaded_at'), // when R2 object created
     completedAt: timestamptz('completed_at'), // when photo created
   },
   (table) => [

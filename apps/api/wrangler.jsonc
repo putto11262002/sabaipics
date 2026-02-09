@@ -24,6 +24,7 @@
     "CLEANUP_BATCH_SIZE": "10",
     "HARD_DELETE_GRACE_DAYS": "30",
     "HARD_DELETE_BATCH_SIZE": "5",
+    "SENTRY_DSN": "",
   },
 
   // R2 bucket for photo storage
@@ -160,6 +161,7 @@
         "CLEANUP_BATCH_SIZE": "10",
         "HARD_DELETE_GRACE_DAYS": "30",
         "HARD_DELETE_BATCH_SIZE": "5",
+        "SENTRY_DSN": "https://fa797a451625d1341a655aabbc83ff6c@o4508085109850112.ingest.us.sentry.io/4510853502402560",
       },
       "routes": [
         {
@@ -283,6 +285,7 @@
         "CLEANUP_BATCH_SIZE": "10",
         "HARD_DELETE_GRACE_DAYS": "30",
         "HARD_DELETE_BATCH_SIZE": "5",
+        "SENTRY_DSN": "",
       },
       "routes": [
         {
