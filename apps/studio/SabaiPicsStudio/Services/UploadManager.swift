@@ -8,6 +8,20 @@ import Foundation
 import Network
 
 actor UploadManager {
+    struct Summary: Sendable {
+        let queued: Int
+        let presigned: Int
+        let uploading: Int
+        let uploaded: Int
+        let awaitingCompletion: Int
+        let completed: Int
+        let failed: Int
+        let terminalFailed: Int
+
+        var inFlight: Int {
+            queued + presigned + uploading + uploaded + awaitingCompletion + failed
+        }
+    }
     struct EnqueueRequest: Sendable {
         let eventId: String
         let localFileURL: URL
@@ -26,6 +40,11 @@ actor UploadManager {
     private var workerTask: Task<Void, Never>?
     private var started = false
 
+    private let maxRetryAttempts = 8
+
+    private let maxConcurrentJobs = 3
+    private var inProgressJobIds = Set<String>()
+
     init(baseURL: String, fileManager: FileManager = .default) {
         self.fileManager = fileManager
         self.api = UploadsAPIClient(baseURL: baseURL)
@@ -36,6 +55,8 @@ actor UploadManager {
     func start() {
         guard !started else { return }
         started = true
+
+        print("[UploadManager] start()")
 
         pathMonitor.pathUpdateHandler = { [weak self] path in
             Task { [weak self] in
@@ -50,6 +71,7 @@ actor UploadManager {
     }
 
     func stop() {
+        print("[UploadManager] stop()")
         started = false
         workerTask?.cancel()
         workerTask = nil
@@ -57,22 +79,55 @@ actor UploadManager {
     }
 
     func enqueue(_ request: EnqueueRequest) async throws -> String {
-        try await store.enqueue(
+        let id = try await store.enqueue(
             eventId: request.eventId,
             localFileURL: request.localFileURL,
             filename: request.filename,
             contentType: request.contentType,
             contentLength: request.contentLength
         )
+
+        print("[UploadManager] enqueue job=\(id) file=\(request.filename) bytes=\(request.contentLength) event=\(request.eventId)")
+        return id
+    }
+
+    func summary() async -> Summary {
+        do {
+            let counts = try await store.fetchCountsByState()
+            return Summary(
+                queued: counts[.queued] ?? 0,
+                presigned: counts[.presigned] ?? 0,
+                uploading: counts[.uploading] ?? 0,
+                uploaded: counts[.uploaded] ?? 0,
+                awaitingCompletion: counts[.awaitingCompletion] ?? 0,
+                completed: counts[.completed] ?? 0,
+                failed: counts[.failed] ?? 0,
+                terminalFailed: counts[.terminalFailed] ?? 0
+            )
+        } catch {
+            return Summary(queued: 0, presigned: 0, uploading: 0, uploaded: 0, awaitingCompletion: 0, completed: 0, failed: 0, terminalFailed: 0)
+        }
+    }
+
+    func recentJobStates(limit: Int = 500) async -> [String: UploadJobState] {
+        do {
+            return try await store.fetchRecentJobStates(limit: limit)
+        } catch {
+            return [:]
+        }
     }
 
     // MARK: - Internals
 
     private func setOnline(_ online: Bool) {
+        if isOnline != online {
+            print("[UploadManager] online=\(online)")
+        }
         isOnline = online
     }
 
     private func workerLoop() async {
+        print("[UploadManager] workerLoop started")
         while !Task.isCancelled {
             if !started {
                 break
@@ -85,9 +140,26 @@ actor UploadManager {
 
             let now = Date().timeIntervalSince1970
             do {
-                if let job = try await store.fetchNextRunnable(now: now) {
-                    await process(job)
-                    continue
+                while inProgressJobIds.count < maxConcurrentJobs {
+                    guard let job = try await store.fetchNextRunnable(now: now) else {
+                        break
+                    }
+
+                    if inProgressJobIds.contains(job.id) {
+                        break
+                    }
+
+                    // Prevent immediately picking the same job again while it is running.
+                    try await store.markClaimed(jobId: job.id)
+
+                    let nextAt = Date(timeIntervalSince1970: job.nextAttemptAt)
+                    print("[UploadManager] picked job=\(job.id) state=\(job.state.rawValue) attempts=\(job.attempts) next=\(nextAt) lastError=\(job.lastError ?? "-")")
+
+                    inProgressJobIds.insert(job.id)
+                    Task { [weak self] in
+                        await self?.process(job)
+                        await self?.jobFinished(job.id)
+                    }
                 }
             } catch {
                 print("[UploadManager] Queue fetch error: \(error)")
@@ -95,52 +167,134 @@ actor UploadManager {
 
             try? await Task.sleep(nanoseconds: 400_000_000)
         }
+
+        print("[UploadManager] workerLoop stopped")
+    }
+
+    private func jobFinished(_ jobId: String) {
+        inProgressJobIds.remove(jobId)
     }
 
     private func process(_ job: UploadJobRecord) async {
-        // File may have been deleted externally; fail fast.
-        guard let fileURL = URL(string: job.localFileURL) else {
-            try? await store.markState(jobId: job.id, state: .failed, nextAttemptAt: Date().timeIntervalSince1970 + 60, attemptsDelta: 1, lastError: "Invalid file URL")
-            return
-        }
-
-        guard fileManager.fileExists(atPath: fileURL.path) else {
-            try? await store.markState(jobId: job.id, state: .failed, nextAttemptAt: Date().timeIntervalSince1970 + 60, attemptsDelta: 1, lastError: "File missing")
-            return
-        }
-
         do {
             switch job.state {
             case .queued, .failed:
+                print("[UploadManager] job=\(job.id) presign")
                 try await ensurePresigned(job)
-                try await upload(jobId: job.id)
-                try await pollUntilCompleted(jobId: job.id)
+
+                guard let updated = try await store.fetch(jobId: job.id) else {
+                    throw UploadManagerError.missingJob
+                }
+
+                print("[UploadManager] job=\(job.id) upload")
+                try await upload(updated)
+
+                print("[UploadManager] job=\(job.id) poll")
+                try await checkCompletion(updated)
 
             case .presigned:
-                try await upload(jobId: job.id)
-                try await pollUntilCompleted(jobId: job.id)
+                print("[UploadManager] job=\(job.id) upload (presigned)")
+                try await upload(job)
+
+                print("[UploadManager] job=\(job.id) poll")
+                try await checkCompletion(job)
 
             case .uploaded, .awaitingCompletion:
-                try await pollUntilCompleted(jobId: job.id)
+                print("[UploadManager] job=\(job.id) poll (already uploaded)")
+                try await checkCompletion(job)
 
-            case .uploading, .completed:
+            case .uploading, .completed, .terminalFailed:
                 break
             }
         } catch {
-            let (delay, message) = backoff(job: job, error: error)
+            let classification = classify(error)
+            let attempts = job.attempts + 1
+
+            if attempts >= maxRetryAttempts || classification.disposition == .terminal {
+                print("[UploadManager] job=\(job.id) terminal error=\(classification.message)")
+                try? await store.markState(
+                    jobId: job.id,
+                    state: .terminalFailed,
+                    nextAttemptAt: farFuture(),
+                    attemptsDelta: 1,
+                    lastError: classification.message
+                )
+                return
+            }
+
+            let delay = classification.retryAfterSeconds.map(TimeInterval.init) ?? backoffSeconds(attempt: attempts)
+            print("[UploadManager] job=\(job.id) error=\(classification.message) retryIn=\(delay)s")
             try? await store.markState(
                 jobId: job.id,
                 state: .failed,
                 nextAttemptAt: Date().timeIntervalSince1970 + delay,
                 attemptsDelta: 1,
-                lastError: message
+                lastError: classification.message
             )
         }
+    }
+
+    private enum FailureDisposition {
+        case retryable
+        case terminal
+    }
+
+    private struct FailureClassification {
+        let disposition: FailureDisposition
+        let message: String
+        let retryAfterSeconds: Int?
+    }
+
+    private func classify(_ error: Error) -> FailureClassification {
+        if let e = error as? UploadsAPIError {
+            switch e {
+            case .http(_, let code, let message, let retryAfter):
+                let msg = [code, message].compactMap { $0 }.joined(separator: ": ")
+                return FailureClassification(
+                    disposition: e.isRetryable ? .retryable : .terminal,
+                    message: msg.isEmpty ? e.localizedDescription : msg,
+                    retryAfterSeconds: retryAfter
+                )
+            default:
+                return FailureClassification(
+                    disposition: e.isRetryable ? .retryable : .terminal,
+                    message: e.localizedDescription,
+                    retryAfterSeconds: nil
+                )
+            }
+        }
+
+        if let e = error as? UploadManagerError {
+            switch e {
+            case .invalidFileURL, .missingJob, .localFileMissing:
+                return FailureClassification(disposition: .terminal, message: e.localizedDescription, retryAfterSeconds: nil)
+            case .remoteFailed:
+                // Server-side processing failure for this intent.
+                return FailureClassification(disposition: .terminal, message: e.localizedDescription, retryAfterSeconds: nil)
+            default:
+                return FailureClassification(disposition: .retryable, message: e.localizedDescription, retryAfterSeconds: nil)
+            }
+        }
+
+        if let urlError = error as? URLError {
+            return FailureClassification(disposition: .retryable, message: urlError.localizedDescription, retryAfterSeconds: nil)
+        }
+
+        return FailureClassification(disposition: .retryable, message: error.localizedDescription, retryAfterSeconds: nil)
+    }
+
+    private func backoffSeconds(attempt: Int) -> TimeInterval {
+        min(pow(2.0, Double(max(attempt, 1))), 60.0)
+    }
+
+    private func farFuture() -> TimeInterval {
+        Date(timeIntervalSinceNow: 60 * 60 * 24 * 365).timeIntervalSince1970
     }
 
     private func ensurePresigned(_ job: UploadJobRecord) async throws {
         // If we already have an uploadId, prefer re-presign (rotates key) so we can retry safely.
         if let uploadId = job.uploadId {
+            print("[UploadManager] job=\(job.id) repressign uploadId=\(uploadId)")
             let presigned = try await api.repressign(uploadId: uploadId)
             try await store.markPresigned(
                 jobId: job.id,
@@ -153,6 +307,7 @@ actor UploadManager {
             return
         }
 
+        print("[UploadManager] job=\(job.id) presign event=\(job.eventId)")
         let presigned = try await api.presign(
             eventId: job.eventId,
             contentType: job.contentType,
@@ -170,14 +325,18 @@ actor UploadManager {
         )
     }
 
-    private func upload(jobId: String) async throws {
+    private func upload(_ job: UploadJobRecord) async throws {
         let now = Date().timeIntervalSince1970
-        guard let job = try await store.fetchNextRunnable(now: now), job.id == jobId else {
-            return
+
+        // File is required only for the actual PUT upload.
+        guard let fileURL = URL(string: job.localFileURL) else {
+            print("[UploadManager] job=\(job.id) invalid localFileURL=\(job.localFileURL)")
+            throw UploadManagerError.invalidFileURL
         }
 
-        guard let fileURL = URL(string: job.localFileURL) else {
-            throw UploadManagerError.invalidFileURL
+        guard fileManager.fileExists(atPath: fileURL.path) else {
+            print("[UploadManager] job=\(job.id) file missing: \(fileURL.path)")
+            throw UploadManagerError.localFileMissing
         }
 
         guard let putUrlString = job.putUrl, let putURL = URL(string: putUrlString) else {
@@ -186,6 +345,7 @@ actor UploadManager {
 
         // If presign is expired, re-presign.
         if let expiresAt = job.expiresAt, isExpired(expiresAtISO8601: expiresAt) {
+            print("[UploadManager] job=\(job.id) presign expired; refreshing")
             try await ensurePresigned(job)
             return
         }
@@ -214,54 +374,42 @@ actor UploadManager {
             throw UploadManagerError.http(statusCode: http.statusCode)
         }
 
+        print("[UploadManager] job=\(job.id) upload OK status=\(http.statusCode)")
+
         try await store.markState(jobId: job.id, state: .uploaded, nextAttemptAt: Date().timeIntervalSince1970, attemptsDelta: 0, lastError: nil)
     }
 
-    private func pollUntilCompleted(jobId: String) async throws {
+    private func checkCompletion(_ job: UploadJobRecord) async throws {
         let now = Date().timeIntervalSince1970
-        guard let job = try await store.fetchNextRunnable(now: now), job.id == jobId else {
-            return
-        }
-
         guard let uploadId = job.uploadId else {
             throw UploadManagerError.missingUploadId
         }
 
         try await store.markState(jobId: job.id, state: .awaitingCompletion, nextAttemptAt: now, attemptsDelta: 0, lastError: nil)
 
-        let maxPollSeconds: TimeInterval = 45
-        let deadline = Date().addingTimeInterval(maxPollSeconds)
-
-        while Date() < deadline {
-            if Task.isCancelled { return }
-            let statuses = try await api.fetchStatus(uploadIds: [uploadId])
-            if let status = statuses.first(where: { $0.uploadId == uploadId }) {
-                switch status.status {
-                case "completed":
-                    try await finalizeCompleted(job: job)
-                    return
-                case "failed":
-                    throw UploadManagerError.remoteFailed(message: status.errorMessage)
-                case "expired":
-                    // Re-presign and retry.
-                    try await ensurePresigned(job)
-                    return
-                default:
-                    break
-                }
+        let statuses = try await api.fetchStatus(uploadIds: [uploadId])
+        if let status = statuses.first(where: { $0.uploadId == uploadId }) {
+            switch status.status {
+            case "completed":
+                print("[UploadManager] job=\(job.id) status=completed")
+                try await finalizeCompleted(job: job)
+                return
+            case "failed":
+                print("[UploadManager] job=\(job.id) status=failed")
+                throw UploadManagerError.remoteFailed(message: status.errorMessage)
+            case "expired":
+                print("[UploadManager] job=\(job.id) status=expired")
+                // Re-presign and retry.
+                try await ensurePresigned(job)
+                return
+            default:
+                print("[UploadManager] job=\(job.id) status=\(status.status)")
+                break
             }
-
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
         }
 
-        // Not completed yet: schedule a later poll.
-        try await store.markState(
-            jobId: job.id,
-            state: .awaitingCompletion,
-            nextAttemptAt: Date().timeIntervalSince1970 + 5,
-            attemptsDelta: 0,
-            lastError: nil
-        )
+        // Not completed yet: schedule a later poll and move on.
+        try await store.markState(jobId: job.id, state: .awaitingCompletion, nextAttemptAt: Date().timeIntervalSince1970 + 5, attemptsDelta: 0, lastError: nil)
     }
 
     private func finalizeCompleted(job: UploadJobRecord) async throws {
@@ -279,14 +427,12 @@ actor UploadManager {
             print("[UploadManager] Cleanup failed: \(error)")
         }
 
+        print("[UploadManager] job=\(job.id) completed; local file deleted")
+
         try await store.markState(jobId: job.id, state: .completed, nextAttemptAt: Date().timeIntervalSince1970, attemptsDelta: 0, lastError: nil)
     }
 
-    private func backoff(job: UploadJobRecord, error: Error) -> (TimeInterval, String) {
-        let attempts = max(job.attempts + 1, 1)
-        let delay = min(pow(2.0, Double(attempts)), 60.0)
-        return (delay, error.localizedDescription)
-    }
+    // backoff() replaced by classify() + backoffSeconds(attempt:)
 
     private func isExpired(expiresAtISO8601: String) -> Bool {
         let f = ISO8601DateFormatter()
@@ -317,7 +463,9 @@ actor UploadManager {
 }
 
 enum UploadManagerError: Error, LocalizedError {
+    case missingJob
     case invalidFileURL
+    case localFileMissing
     case missingPresign
     case missingUploadId
     case badResponse
@@ -326,8 +474,12 @@ enum UploadManagerError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .missingJob:
+            return "Upload job missing"
         case .invalidFileURL:
             return "Invalid file URL"
+        case .localFileMissing:
+            return "Local file missing"
         case .missingPresign:
             return "Missing presign URL"
         case .missingUploadId:

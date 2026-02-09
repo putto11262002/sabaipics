@@ -26,7 +26,7 @@ Changes
     - enqueue jobs (from spooled file URLs)
     - presign/re-presign
     - upload to R2 via presigned PUT
-    - poll status until `completed` then delete local file
+    - poll status until `completed` then delete local file (backend lifecycle: `pending -> completed|failed|expired`)
     - retry/backoff and pause when offline (NWPathMonitor)
 
 - Added `UploadQueueSink` adapter (capture pipeline -> upload queue).

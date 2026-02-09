@@ -7,7 +7,71 @@
 import Foundation
 import Clerk
 
-// Uses APIError from EventsAPIClient.swift
+struct APIErrorEnvelope: Decodable, Sendable {
+    struct Payload: Decodable, Sendable {
+        let code: String
+        let message: String
+    }
+
+    let error: Payload
+}
+
+enum UploadsAPIError: Error, LocalizedError {
+    case notAuthenticated
+    case invalidURL
+    case noToken
+    case networkError(Error)
+    case decodingError(Error)
+    case http(statusCode: Int, code: String?, message: String?, retryAfterSeconds: Int?)
+
+    var errorDescription: String? {
+        switch self {
+        case .notAuthenticated:
+            return "Not authenticated"
+        case .invalidURL:
+            return "Invalid URL"
+        case .noToken:
+            return "No authentication token available"
+        case .networkError(let error):
+            return "Network error: \(error.localizedDescription)"
+        case .decodingError(let error):
+            return "Failed to decode response: \(error.localizedDescription)"
+        case .http(let statusCode, let code, let message, _):
+            let suffix = [code, message].compactMap { $0 }.joined(separator: ": ")
+            return suffix.isEmpty ? "HTTP \(statusCode)" : "HTTP \(statusCode): \(suffix)"
+        }
+    }
+
+    var isRetryable: Bool {
+        switch self {
+        case .http(let statusCode, let code, _, _):
+            // Prefer semantic API codes when present.
+            if let code {
+                switch code {
+                case "INTERNAL_ERROR", "BAD_GATEWAY", "SERVICE_UNAVAILABLE", "RATE_LIMITED":
+                    return true
+                default:
+                    break
+                }
+            }
+
+            // Fallback to status code mapping.
+            if statusCode == 429 { return true }
+            if (500...599).contains(statusCode) { return true }
+            return false
+
+        case .networkError:
+            return true
+
+        case .decodingError:
+            // Usually indicates a backend contract issue; retrying may not help, but don't hard-stop.
+            return true
+
+        case .notAuthenticated, .noToken, .invalidURL:
+            return false
+        }
+    }
+}
 
 struct UploadPresignResponse: Decodable, Sendable {
     struct DataPayload: Decodable, Sendable {
@@ -45,7 +109,7 @@ actor UploadsAPIClient {
 
     func presign(eventId: String, contentType: String, contentLength: Int, filename: String?) async throws -> UploadPresignResponse.DataPayload {
         guard let url = URL(string: "\(baseURL)/uploads/presign") else {
-            throw APIError.invalidURL
+            throw UploadsAPIError.invalidURL
         }
 
         var request = try await buildAuthenticatedRequest(url: url)
@@ -68,7 +132,7 @@ actor UploadsAPIClient {
 
     func repressign(uploadId: String) async throws -> UploadPresignResponse.DataPayload {
         guard let url = URL(string: "\(baseURL)/uploads/\(uploadId)/presign") else {
-            throw APIError.invalidURL
+            throw UploadsAPIError.invalidURL
         }
 
         var request = try await buildAuthenticatedRequest(url: url)
@@ -82,7 +146,7 @@ actor UploadsAPIClient {
     func fetchStatus(uploadIds: [String]) async throws -> [UploadStatusResponse.Item] {
         let ids = uploadIds.joined(separator: ",")
         guard let url = URL(string: "\(baseURL)/uploads/status?ids=\(ids)") else {
-            throw APIError.invalidURL
+            throw UploadsAPIError.invalidURL
         }
 
         let request = try await buildAuthenticatedRequest(url: url)
@@ -96,11 +160,11 @@ actor UploadsAPIClient {
         let session = await MainActor.run { Clerk.shared.session }
 
         guard let session else {
-            throw APIError.notAuthenticated
+            throw UploadsAPIError.notAuthenticated
         }
 
         guard let token = try await session.getToken() else {
-            throw APIError.noToken
+            throw UploadsAPIError.noToken
         }
 
         let jwt = token.jwt
@@ -115,22 +179,29 @@ actor UploadsAPIClient {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.networkError(URLError(.badServerResponse))
+            throw UploadsAPIError.networkError(URLError(.badServerResponse))
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            let errorMessage = try? JSONDecoder().decode([String: String].self, from: data)
+            let envelope = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data)
+            let retryAfter = httpResponse.value(forHTTPHeaderField: "Retry-After").flatMap { Int($0) }
             if let responseBody = String(data: data, encoding: .utf8) {
                 print("[UploadsAPI Error] HTTP \(httpResponse.statusCode): \(responseBody)")
             }
-            throw APIError.httpError(statusCode: httpResponse.statusCode, message: errorMessage?["message"])
+
+            throw UploadsAPIError.http(
+                statusCode: httpResponse.statusCode,
+                code: envelope?.error.code,
+                message: envelope?.error.message,
+                retryAfterSeconds: retryAfter
+            )
         }
 
         do {
             let decoder = JSONDecoder()
             return try decoder.decode(T.self, from: data)
         } catch {
-            throw APIError.decodingError(error)
+            throw UploadsAPIError.decodingError(error)
         }
     }
 }

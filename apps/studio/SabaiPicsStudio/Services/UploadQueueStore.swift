@@ -17,6 +17,7 @@ enum UploadJobState: String, Sendable {
     case awaitingCompletion
     case completed
     case failed
+    case terminalFailed
 }
 
 struct UploadJobRecord: Sendable {
@@ -175,6 +176,61 @@ actor UploadQueueStore {
         return try readJob(stmt: stmt)
     }
 
+    func markClaimed(jobId: String, holdSeconds: TimeInterval = 10) throws {
+        try openAndMigrateIfNeeded()
+        let now = Date().timeIntervalSince1970
+
+        let sql = """
+        UPDATE upload_jobs
+        SET updated_at = ?,
+            next_attempt_at = ?
+        WHERE id = ?;
+        """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_double(stmt, 1, now)
+        sqlite3_bind_double(stmt, 2, now + holdSeconds)
+        sqlite3_bind_text(stmt, 3, jobId, -1, SQLITE_TRANSIENT)
+
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw UploadQueueStoreError.stepFailed(message: lastErrorMessage())
+        }
+    }
+
+    func fetch(jobId: String) throws -> UploadJobRecord? {
+        try openAndMigrateIfNeeded()
+
+        let sql = """
+        SELECT
+          id, created_at, updated_at, next_attempt_at, attempts, state,
+          event_id, local_file_url, filename, content_type, content_length,
+          upload_id, put_url, object_key, expires_at, required_headers_json,
+          last_error
+        FROM upload_jobs
+        WHERE id = ?
+        LIMIT 1;
+        """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, jobId, -1, SQLITE_TRANSIENT)
+
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            return nil
+        }
+
+        return try readJob(stmt: stmt)
+    }
+
     func markPresigned(
         jobId: String,
         uploadId: String,
@@ -232,6 +288,59 @@ actor UploadQueueStore {
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw UploadQueueStoreError.stepFailed(message: lastErrorMessage())
         }
+    }
+
+    func fetchCountsByState() throws -> [UploadJobState: Int] {
+        try openAndMigrateIfNeeded()
+
+        let sql = "SELECT state, COUNT(*) FROM upload_jobs GROUP BY state;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        var result: [UploadJobState: Int] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let stateC = sqlite3_column_text(stmt, 0) else { continue }
+            let stateRaw = String(cString: stateC)
+            let count = Int(sqlite3_column_int(stmt, 1))
+            if let state = UploadJobState(rawValue: stateRaw) {
+                result[state] = count
+            }
+        }
+        return result
+    }
+
+    func fetchRecentJobStates(limit: Int) throws -> [String: UploadJobState] {
+        try openAndMigrateIfNeeded()
+
+        let sql = """
+        SELECT id, state
+        FROM upload_jobs
+        ORDER BY updated_at DESC
+        LIMIT ?;
+        """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_int(stmt, 1, Int32(limit))
+
+        var result: [String: UploadJobState] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let idC = sqlite3_column_text(stmt, 0) else { continue }
+            guard let stateC = sqlite3_column_text(stmt, 1) else { continue }
+            let id = String(cString: idC)
+            let stateRaw = String(cString: stateC)
+            if let state = UploadJobState(rawValue: stateRaw) {
+                result[id] = state
+            }
+        }
+        return result
     }
 
     // MARK: - Internals
