@@ -9,6 +9,10 @@ export type Bindings = Cloudflare.Env & {
   FTP_JWT_SECRET_PREVIOUS?: string;
   DESKTOP_ACCESS_JWT_SECRET: string;
   DESKTOP_REFRESH_TOKEN_PEPPER: string;
+  // Apple IAP
+  APPLE_ROOT_CA_CERT: string;
+  APPLE_BUNDLE_ID: string;
+  APPLE_ENVIRONMENT: string;
 };
 
 export type Variables = AuthVariables & {

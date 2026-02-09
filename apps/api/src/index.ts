@@ -8,6 +8,7 @@ import { webhookRouter } from './routes/webhooks';
 import { adminRouter } from './routes/admin';
 import { dashboardRouter } from './routes/dashboard/route';
 import { creditsRouter } from './routes/credits';
+import { appleCreditsRouter } from './routes/apple-credits';
 import { eventsRouter } from './routes/events';
 import { photosRouter } from './routes/photos';
 import { uploadsRouter } from './routes/uploads';
@@ -75,6 +76,7 @@ const app = new Hono<Env>()
   .route('/api/ftp', ftpRouter)
   .use('/*', createAnyAuth())
   .route('/credit-packages', creditsRouter)
+  .route('/apple', appleCreditsRouter)
   .get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))
   .route('/desktop/auth', desktopAuthRouter)
   .route('/auth', authRouter)
