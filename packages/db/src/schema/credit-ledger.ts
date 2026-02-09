@@ -22,6 +22,7 @@ export const creditLedgerSources = [
   "upload",
   "refund",
   "admin_adjustment",
+  "apple_purchase",
 ] as const;
 export type CreditLedgerSource = (typeof creditLedgerSources)[number];
 
@@ -38,7 +39,8 @@ export const creditLedger = pgTable(
     type: text("type", { enum: creditLedgerTypes }).notNull(), // Direction: credit or debit
     source: text("source", { enum: creditLedgerSources }).notNull(), // Source: where from
     promoCode: text("promo_code"), // Nullable, promo code used (if any)
-    stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
+    stripeSessionId: text("stripe_session_id"), // Nullable, only for Stripe purchases
+    appleTransactionId: text("apple_transaction_id"), // Nullable, only for Apple IAP purchases
     expiresAt: timestamptz("expires_at").notNull(),
     createdAt: createdAtCol(),
   },
@@ -50,6 +52,9 @@ export const creditLedger = pgTable(
     index("credit_ledger_stripe_session_idx").on(table.stripeSessionId),
     // Unique constraint for idempotency - prevents duplicate credit grants
     unique("credit_ledger_stripe_session_unique").on(table.stripeSessionId),
+    index("credit_ledger_apple_transaction_idx").on(table.appleTransactionId),
+    // Unique constraint for idempotency - prevents duplicate Apple IAP credit grants
+    unique("credit_ledger_apple_transaction_unique").on(table.appleTransactionId),
   ]
 );
 

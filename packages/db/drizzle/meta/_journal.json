@@ -71,6 +71,13 @@
       "when": 1770600718889,
       "tag": "0009_silent_payback",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1770658638164,
+      "tag": "0010_clammy_power_man",
+      "breakpoints": true
     }
   ]
 }
