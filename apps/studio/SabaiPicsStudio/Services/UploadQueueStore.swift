@@ -312,6 +312,33 @@ actor UploadQueueStore {
         return result
     }
 
+    func fetchCountsByEventAndState() throws -> [String: [UploadJobState: Int]] {
+        try openAndMigrateIfNeeded()
+
+        let sql = "SELECT event_id, state, COUNT(*) FROM upload_jobs GROUP BY event_id, state;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        var result: [String: [UploadJobState: Int]] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let eventC = sqlite3_column_text(stmt, 0) else { continue }
+            guard let stateC = sqlite3_column_text(stmt, 1) else { continue }
+            let eventId = String(cString: eventC)
+            let stateRaw = String(cString: stateC)
+            let count = Int(sqlite3_column_int(stmt, 2))
+            guard let state = UploadJobState(rawValue: stateRaw) else { continue }
+
+            var counts = result[eventId] ?? [:]
+            counts[state] = count
+            result[eventId] = counts
+        }
+
+        return result
+    }
+
     func fetchRecentJobStates(limit: Int) throws -> [String: UploadJobState] {
         try openAndMigrateIfNeeded()
 

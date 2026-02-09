@@ -105,6 +105,79 @@ actor UploadManager {
         }
     }
 
+    struct EventSummary: Sendable, Identifiable {
+        let eventId: String
+        let completed: Int
+        let pending: Int
+
+        var id: String { eventId }
+        var total: Int { completed + pending }
+    }
+
+    func activeEventSummaries(limit: Int = 20) async -> [EventSummary] {
+        do {
+            let byEvent = try await store.fetchCountsByEventAndState()
+            var result: [EventSummary] = []
+            result.reserveCapacity(byEvent.count)
+
+            for (eventId, counts) in byEvent {
+                let completed = counts[.completed] ?? 0
+                let queued = counts[.queued] ?? 0
+                let presigned = counts[.presigned] ?? 0
+                let uploading = counts[.uploading] ?? 0
+                let uploaded = counts[.uploaded] ?? 0
+                let awaiting = counts[.awaitingCompletion] ?? 0
+                let failed = counts[.failed] ?? 0
+                let pending = queued + presigned + uploading + uploaded + awaiting + failed
+
+                guard pending > 0 else { continue }
+                result.append(EventSummary(eventId: eventId, completed: completed, pending: pending))
+            }
+
+            result.sort { a, b in
+                if a.pending != b.pending { return a.pending > b.pending }
+                if a.completed != b.completed { return a.completed > b.completed }
+                return a.eventId < b.eventId
+            }
+
+            if result.count > limit {
+                result.removeLast(result.count - limit)
+            }
+
+            return result
+        } catch {
+            return []
+        }
+    }
+
+    func eventSummaries(eventIds: [String]) async -> [String: EventSummary] {
+        guard !eventIds.isEmpty else { return [:] }
+        do {
+            let byEvent = try await store.fetchCountsByEventAndState()
+            var result: [String: EventSummary] = [:]
+            result.reserveCapacity(eventIds.count)
+
+            for eventId in eventIds {
+                let counts = byEvent[eventId] ?? [:]
+
+                let completed = counts[.completed] ?? 0
+                let queued = counts[.queued] ?? 0
+                let presigned = counts[.presigned] ?? 0
+                let uploading = counts[.uploading] ?? 0
+                let uploaded = counts[.uploaded] ?? 0
+                let awaiting = counts[.awaitingCompletion] ?? 0
+                let failed = counts[.failed] ?? 0
+                let pending = queued + presigned + uploading + uploaded + awaiting + failed
+
+                result[eventId] = EventSummary(eventId: eventId, completed: completed, pending: pending)
+            }
+
+            return result
+        } catch {
+            return [:]
+        }
+    }
+
     // MARK: - Internals
 
     private func workerLoop() async {
