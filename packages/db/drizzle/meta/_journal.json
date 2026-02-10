@@ -85,6 +85,13 @@
       "when": 1770690841774,
       "tag": "0011_cool_betty_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1770708220917,
+      "tag": "0012_sticky_kinsey_walden",
+      "breakpoints": true
     }
   ]
 }
