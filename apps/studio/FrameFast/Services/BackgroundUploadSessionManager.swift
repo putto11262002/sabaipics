@@ -14,8 +14,16 @@ final class BackgroundUploadSessionManager: NSObject, URLSessionDelegate, URLSes
     private let lock = NSLock()
     private var continuations: [Int: CheckedContinuation<HTTPURLResponse, Error>] = [:]
 
+    enum BackgroundUploadError: Error {
+        case badResponse
+    }
+
     /// Set by AppDelegate when the system relaunches the app for background session events.
     var systemCompletionHandler: (() -> Void)?
+
+    /// Called when a background URLSession task completes but there is no awaiting continuation.
+    /// This happens for "fire-and-forget" uploads and for tasks created before an app relaunch.
+    var onOrphanUploadCompletion: (@Sendable (_ jobId: String, _ result: Result<HTTPURLResponse, Error>) -> Void)?
 
     private override init() {
         super.init()
@@ -32,6 +40,20 @@ final class BackgroundUploadSessionManager: NSObject, URLSessionDelegate, URLSes
 
         manager.session = URLSession(configuration: config, delegate: manager, delegateQueue: nil)
         return manager
+    }
+
+    func getAllTasks() async -> [URLSessionTask] {
+        await withCheckedContinuation { continuation in
+            session.getAllTasks { tasks in
+                continuation.resume(returning: tasks)
+            }
+        }
+    }
+
+    func startUpload(request: URLRequest, fileURL: URL, taskDescription: String? = nil) {
+        let task = session.uploadTask(with: request, fromFile: fileURL)
+        task.taskDescription = taskDescription
+        task.resume()
     }
 
     func upload(request: URLRequest, fileURL: URL, taskDescription: String? = nil) async throws -> HTTPURLResponse {
@@ -56,15 +78,23 @@ final class BackgroundUploadSessionManager: NSObject, URLSessionDelegate, URLSes
 
         if let error {
             continuation?.resume(throwing: error)
+            if continuation == nil, let jobId = task.taskDescription {
+                onOrphanUploadCompletion?(jobId, .failure(error))
+            }
         } else if let http = task.response as? HTTPURLResponse {
             continuation?.resume(returning: http)
+            if continuation == nil, let jobId = task.taskDescription {
+                onOrphanUploadCompletion?(jobId, .success(http))
+            }
         } else {
-            continuation?.resume(throwing: UploadManagerError.badResponse)
+            continuation?.resume(throwing: BackgroundUploadError.badResponse)
+            if continuation == nil, let jobId = task.taskDescription {
+                onOrphanUploadCompletion?(jobId, .failure(BackgroundUploadError.badResponse))
+            }
         }
 
         // If continuation is nil, this is an orphan task (app was relaunched).
-        // Crash recovery in UploadManager.start() handles these by resetting
-        // stale `uploading` jobs to `failed` for re-processing.
+        // UploadManager can reconcile completion via onOrphanUploadCompletion.
     }
 
     // MARK: - URLSessionDelegate

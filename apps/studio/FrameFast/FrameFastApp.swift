@@ -42,6 +42,10 @@ struct FrameFastApp: App {
                     }
                 }
         }
+        .backgroundTask(.processing(AppCoordinator.bgDrainTaskIdentifier)) {
+            await coordinator.uploadManager.drainOnce()
+            await coordinator.scheduleBackgroundDrainIfNeeded()
+        }
     }
 
     private func configureAndLoadClerk() async {
@@ -79,31 +83,7 @@ struct FrameFastApp: App {
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate {
-    func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
-    ) -> Bool {
-        // BGTask handler must be registered before app finishes launching.
-        BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: AppCoordinator.bgDrainTaskIdentifier,
-            using: nil
-        ) { task in
-            guard let bgTask = task as? BGProcessingTask else {
-                task.setTaskCompleted(success: false)
-                return
-            }
-            guard let coordinator = AppDelegate.sharedCoordinator else {
-                print("[AppDelegate] BGTask fired but coordinator not yet available")
-                bgTask.setTaskCompleted(success: false)
-                return
-            }
-            coordinator.handleUploadDrain(task: bgTask)
-        }
-        return true
-    }
-
-    /// Coordinator reference set during AppCoordinator.init().
-    @MainActor static weak var sharedCoordinator: AppCoordinator?
+    @MainActor static weak var sharedBackgroundSession: BackgroundUploadSessionManager?
 
     func application(
         _ application: UIApplication,
@@ -115,10 +95,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             return
         }
 
-        // If the coordinator is already initialized (app was already running),
+        // If the session manager is already initialized (app was already running),
         // wire the handler directly. Otherwise store it for init() to pick up.
-        if let coordinator = AppDelegate.sharedCoordinator {
-            coordinator.backgroundSession.systemCompletionHandler = completionHandler
+        if let session = AppDelegate.sharedBackgroundSession {
+            session.systemCompletionHandler = completionHandler
         } else {
             AppDelegate.pendingBackgroundCompletionHandler = completionHandler
         }

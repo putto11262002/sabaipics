@@ -50,9 +50,9 @@ class AppCoordinator: ObservableObject {
             AppDelegate.pendingBackgroundCompletionHandler = nil
         }
 
-        // Make coordinator accessible to the BGTask handler registered in AppDelegate.
-        // This runs during @StateObject init, before the BGTask handler can fire.
-        AppDelegate.sharedCoordinator = self
+        // Make the background session manager accessible to AppDelegate so it can
+        // wire background URLSession completion handlers while the app is running.
+        AppDelegate.sharedBackgroundSession = bgSession
 
         Task {
             await uploadManager.start()
@@ -81,34 +81,6 @@ class AppCoordinator: ObservableObject {
             print("[AppCoordinator] Scheduled background drain (\(s.inFlight) pending)")
         } catch {
             print("[AppCoordinator] Failed to schedule background drain: \(error)")
-        }
-    }
-
-    nonisolated func handleUploadDrain(task: BGProcessingTask) {
-        print("[AppCoordinator] BGTask started")
-
-        let drainTask = Task {
-            await uploadManager.drainOnce()
-        }
-
-        task.expirationHandler = {
-            print("[AppCoordinator] BGTask expiring, cancelling drain")
-            drainTask.cancel()
-        }
-
-        Task { [uploadManager] in
-            _ = await drainTask.result
-
-            let remaining = await uploadManager.summary().inFlight
-            let success = !drainTask.isCancelled && remaining == 0
-            print("[AppCoordinator] BGTask done, cancelled=\(drainTask.isCancelled) remaining=\(remaining)")
-
-            task.setTaskCompleted(success: success)
-
-            // Re-schedule if there are still pending jobs.
-            if remaining > 0 {
-                await self.scheduleBackgroundDrainIfNeeded()
-            }
         }
     }
 

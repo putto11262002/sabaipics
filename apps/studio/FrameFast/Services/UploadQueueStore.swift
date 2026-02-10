@@ -308,6 +308,26 @@ actor UploadQueueStore {
         return Int(sqlite3_changes(db))
     }
 
+    func fetchUploadingJobIds(updatedBefore: TimeInterval) throws -> [String] {
+        try openAndMigrateIfNeeded()
+
+        let sql = "SELECT id FROM upload_jobs WHERE state = 'uploading' AND updated_at < ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_double(stmt, 1, updatedBefore)
+
+        var result: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let idC = sqlite3_column_text(stmt, 0) else { continue }
+            result.append(String(cString: idC))
+        }
+        return result
+    }
+
     func delete(jobId: String) throws {
         try openAndMigrateIfNeeded()
 
