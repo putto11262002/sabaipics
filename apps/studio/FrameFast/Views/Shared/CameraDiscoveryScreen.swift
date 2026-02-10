@@ -67,11 +67,7 @@ struct CameraDiscoveryScreen: View {
                     .padding(.vertical, 16)
                 }
             case .timedOut:
-                CameraDiscoveryNotFoundView(
-                    title: "No camera found",
-                    message: "Make sure your camera is turned on and connected to the network.",
-                    bullets: [],
-                    iconSystemName: "camera.metering.unknown",
+                CameraDiscoveryTimedOutView(
                     showsManualIP: showsManualIP,
                     onRetry: {
                         Task { await viewModel.retry(preferredIP: preferredIP) }
@@ -83,23 +79,37 @@ struct CameraDiscoveryScreen: View {
                         }
                     }
                 )
-            case .error:
-                CameraDiscoveryNotFoundView(
-                    title: "Connection failed",
-                    message: "Unable to connect to camera. Check your connection and try again.",
-                    bullets: [],
-                    iconSystemName: "exclamationmark.triangle",
-                    showsManualIP: showsManualIP,
-                    onRetry: {
-                        Task { await viewModel.retry(preferredIP: preferredIP) }
-                    },
-                    onManualIP: {
-                        Task {
-                            await viewModel.cleanupWithTimeout()
-                            onManualIP()
+            case .error(let kind):
+                if kind == .localNetworkDenied {
+                    CameraDiscoveryLocalNetworkDeniedView(
+                        title: "Allow Local Network access",
+                        message: "FrameFast Studio needs Local Network access to discover and connect to cameras on your WiFi network.",
+                        bullets: [
+                            "If you see a permission prompt, tap Allow",
+                            "If you previously denied, enable it in Settings → Privacy & Security → Local Network"
+                        ],
+                        onRetry: {
+                            Task { await viewModel.retry(preferredIP: preferredIP) }
                         }
-                    }
-                )
+                    )
+                } else {
+                    CameraDiscoveryNotFoundView(
+                        title: "Connection failed",
+                        message: "Unable to connect to camera. Check your connection and try again.",
+                        bullets: [],
+                        iconSystemName: "exclamationmark.triangle",
+                        showsManualIP: showsManualIP,
+                        onRetry: {
+                            Task { await viewModel.retry(preferredIP: preferredIP) }
+                        },
+                        onManualIP: {
+                            Task {
+                                await viewModel.cleanupWithTimeout()
+                                onManualIP()
+                            }
+                        }
+                    )
+                }
             case .scanning:
                 CameraDiscoveryScanningView(
                     title: "Looking for cameras...",
