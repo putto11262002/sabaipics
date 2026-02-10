@@ -6,7 +6,11 @@ import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
 import '../globals.css';
 
-const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-sans', weight: ['400', '500', '600', '700'] });
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  weight: ['400', '500', '600', '700'],
+});
 
 const notoSansThai = Noto_Sans_Thai({
   subsets: ['thai'],
@@ -25,8 +29,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'SabaiPics - Event Photo Distribution',
-  description: 'AI-powered face recognition photo distribution platform for photographers and event organizers.',
+  title: 'FrameFast - Event Photo Distribution',
+  description:
+    'AI-powered face recognition photo distribution platform for photographers and event organizers.',
+  icons: {
+    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    shortcut: ['/favicon.ico'],
+  },
 };
 
 export function generateStaticParams() {
@@ -41,7 +50,7 @@ type Props = {
 export default async function LocaleLayout({ children, params }: Props) {
   const { locale } = await params;
 
-  if (!routing.locales.includes(locale as typeof routing.locales[number])) {
+  if (!routing.locales.includes(locale as (typeof routing.locales)[number])) {
     notFound();
   }
 
