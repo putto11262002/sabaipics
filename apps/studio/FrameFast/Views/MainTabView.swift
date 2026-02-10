@@ -18,6 +18,7 @@ struct MainTabView: View {
     @State private var selectedTab: Tab = .events
     @StateObject private var captureSessionStore = CaptureSessionStore()
     @State private var captureSheetDetent: PresentationDetent = .large
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var coordinator: AppCoordinator
     @EnvironmentObject private var uploadStatusStore: UploadStatusStore
 
@@ -197,4 +198,3 @@ private struct CaptureStatusBarLiveView: View {
         }
     }
 }
-    @Environment(\.scenePhase) private var scenePhase
