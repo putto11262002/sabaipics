@@ -78,6 +78,13 @@
       "when": 1770658638164,
       "tag": "0010_clammy_power_man",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1770690841774,
+      "tag": "0011_cool_betty_ross",
+      "breakpoints": true
     }
   ]
 }
