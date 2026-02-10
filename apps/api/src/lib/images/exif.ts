@@ -17,7 +17,7 @@ export function extractExif(
     }),
     (cause): ExifError => ({ stage: 'exif_parse', cause }),
   ).map((raw) => {
-    if (!raw) return null;
+    if (!raw || Object.keys(raw).length === 0) return null;
     return {
       make: raw.Make ?? undefined,
       model: raw.Model ?? undefined,
