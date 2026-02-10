@@ -1,17 +1,19 @@
-import { relations } from "drizzle-orm";
-import { photographers } from "./photographers";
-import { creditLedger } from "./credit-ledger";
-import { events } from "./events";
-import { photos } from "./photos";
-import { faces } from "./faces";
-import { consentRecords } from "./consent-records";
-import { participantSearches } from "./participant-searches";
+import { relations } from 'drizzle-orm';
+import { photographers } from './photographers';
+import { creditLedger } from './credit-ledger';
+import { events } from './events';
+import { photos } from './photos';
+import { faces } from './faces';
+import { consentRecords } from './consent-records';
+import { participantSearches } from './participant-searches';
+import { photoLuts } from './photo-luts';
 
 // Photographer relations
 export const photographersRelations = relations(photographers, ({ many }) => ({
   creditLedgerEntries: many(creditLedger),
   events: many(events),
   consentRecords: many(consentRecords),
+  photoLuts: many(photoLuts),
 }));
 
 // Credit ledger relations
@@ -30,6 +32,14 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   }),
   photos: many(photos),
   participantSearches: many(participantSearches),
+}));
+
+// Photo LUT relations
+export const photoLutsRelations = relations(photoLuts, ({ one }) => ({
+  photographer: one(photographers, {
+    fields: [photoLuts.photographerId],
+    references: [photographers.id],
+  }),
 }));
 
 // Photo relations

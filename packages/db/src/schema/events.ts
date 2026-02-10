@@ -26,6 +26,20 @@ export interface SlideshowConfig {
 }
 
 /**
+ * Event Settings
+ *
+ * Flexible settings blob for per-event configuration that can evolve over time.
+ */
+export interface EventSettings {
+  colorGrade?: {
+    enabled: boolean;
+    lutId: string | null;
+    intensity: number; // 0-100
+    includeLuminance: boolean;
+  };
+}
+
+/**
  * Default slideshow configuration
  * Used when events.slideshow_config is NULL
  */
@@ -54,6 +68,7 @@ export const events = pgTable(
     rekognitionCollectionId: text('rekognition_collection_id'), // Nullable, created on first upload
     slideshowConfig: jsonb('slideshow_config').$type<SlideshowConfig>(), // Nullable: Slideshow configuration (theme + blocks)
     logoR2Key: text('logo_r2_key'), // Nullable: R2 key for event logo (used in slideshow)
+    settings: jsonb('settings').$type<EventSettings>(), // Nullable: Flexible per-event settings (typed at app level)
     expiresAt: timestamptz('expires_at').notNull(),
     deletedAt: timestamptz('deleted_at'), // Nullable: Soft delete timestamp (null = active, set = deleted)
     createdAt: createdAtCol(),
@@ -75,7 +90,10 @@ export type NewEvent = typeof events.$inferInsert;
  * Query the base `events` table directly only for admin/debugging purposes.
  */
 export const activeEvents = pgView('active_events').as((qb) =>
-  qb.select().from(events).where(sql`${events.deletedAt} IS NULL`)
+  qb
+    .select()
+    .from(events)
+    .where(sql`${events.deletedAt} IS NULL`),
 );
 
 export type ActiveEvent = typeof activeEvents.$inferSelect;
