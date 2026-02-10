@@ -42,10 +42,6 @@ struct FrameFastApp: App {
                     }
                 }
         }
-        .backgroundTask(.processing(AppCoordinator.bgDrainTaskIdentifier)) {
-            await coordinator.uploadManager.drainOnce()
-            await coordinator.scheduleBackgroundDrainIfNeeded()
-        }
     }
 
     private func configureAndLoadClerk() async {
@@ -84,6 +80,70 @@ struct FrameFastApp: App {
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     @MainActor static weak var sharedBackgroundSession: BackgroundUploadSessionManager?
+    @MainActor static weak var sharedCoordinator: AppCoordinator?
+    private var bgDrainTask: Task<Void, Never>?
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: AppCoordinator.bgDrainTaskIdentifier, using: nil) { task in
+            guard let processingTask = task as? BGProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            self.handleUploadDrainTask(processingTask)
+        }
+        return true
+    }
+
+    private func handleUploadDrainTask(_ task: BGProcessingTask) {
+        task.expirationHandler = { [weak self] in
+            self?.bgDrainTask?.cancel()
+            self?.bgDrainTask = nil
+        }
+
+        bgDrainTask = Task {
+            let coordinator = await MainActor.run { AppDelegate.sharedCoordinator }
+            if let coordinator {
+                await coordinator.uploadManager.drainOnce()
+                await coordinator.scheduleBackgroundDrainIfNeeded()
+                task.setTaskCompleted(success: !Task.isCancelled)
+                return
+            }
+
+            // BGProcessing relaunch path (no coordinator yet): build minimal dependencies.
+            let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
+            let connectivity = ConnectivityService()
+            await connectivity.start()
+
+            let bgSession = BackgroundUploadSessionManager.create()
+            let uploadManager = UploadManager(baseURL: baseURL, connectivity: connectivity, backgroundSession: bgSession)
+
+            await uploadManager.drainOnce()
+            await scheduleBackgroundDrainIfNeeded(uploadManager: uploadManager)
+            task.setTaskCompleted(success: !Task.isCancelled)
+        }
+    }
+
+    private func scheduleBackgroundDrainIfNeeded(uploadManager: UploadManager) async {
+        let s = await uploadManager.summary()
+        guard s.inFlight > 0 else {
+            print("[AppDelegate] No pending uploads, skipping background drain schedule")
+            return
+        }
+
+        let request = BGProcessingTaskRequest(identifier: AppCoordinator.bgDrainTaskIdentifier)
+        request.requiresNetworkConnectivity = true
+        request.requiresExternalPower = false
+
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            print("[AppDelegate] Scheduled background drain (\(s.inFlight) pending)")
+        } catch {
+            print("[AppDelegate] Failed to schedule background drain: \(error)")
+        }
+    }
 
     func application(
         _ application: UIApplication,

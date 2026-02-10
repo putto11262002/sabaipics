@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct MainTabView: View {
     enum Tab {
@@ -17,6 +18,7 @@ struct MainTabView: View {
     @State private var selectedTab: Tab = .events
     @StateObject private var captureSessionStore = CaptureSessionStore()
     @State private var captureSheetDetent: PresentationDetent = .large
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var coordinator: AppCoordinator
     @EnvironmentObject private var uploadStatusStore: UploadStatusStore
 
@@ -45,6 +47,32 @@ struct MainTabView: View {
                 uploadManager: coordinator.uploadManager,
                 eventIdProvider: { await MainActor.run { coordinator.selectedEventId } }
             )
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .active:
+                break
+            case .inactive, .background:
+                // Foreground-only capture: do not keep camera session alive.
+                UIApplication.shared.isIdleTimerDisabled = false
+                captureSessionStore.disconnect()
+            @unknown default:
+                break
+            }
+        }
+        .onChange(of: captureSessionStore.state) { _, newState in
+            let shouldKeepAwake: Bool
+            switch newState {
+            case .active:
+                shouldKeepAwake = true
+            default:
+                shouldKeepAwake = false
+            }
+            UIApplication.shared.isIdleTimerDisabled = shouldKeepAwake
+        }
+        .onDisappear {
+            // Ensure we never keep the device awake when leaving the tab shell.
+            UIApplication.shared.isIdleTimerDisabled = false
         }
         .sheet(isPresented: $captureSessionStore.isDetailsPresented) {
             CaptureSessionSheetView(

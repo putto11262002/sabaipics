@@ -245,8 +245,7 @@ actor UploadManager {
 
             let now = Date().timeIntervalSince1970
             do {
-                guard let job = try await store.fetchNextRunnable(now: now) else { break }
-                try await store.markClaimed(jobId: job.id)
+                guard let job = try await store.claimNextRunnable(now: now) else { break }
                 print("[UploadManager] bgDrain job=\(job.id) state=\(job.state.rawValue)")
                 let startedUpload = await process(job, mode: .backgroundDrain)
                 if startedUpload {
@@ -280,16 +279,13 @@ actor UploadManager {
             let now = Date().timeIntervalSince1970
             do {
                 while inProgressJobIds.count < maxConcurrentJobs {
-                    guard let job = try await store.fetchNextRunnable(now: now) else {
+                    guard let job = try await store.claimNextRunnable(now: now) else {
                         break
                     }
 
                     if inProgressJobIds.contains(job.id) {
                         break
                     }
-
-                    // Prevent immediately picking the same job again while it is running.
-                    try await store.markClaimed(jobId: job.id)
 
                     let nextAt = Date(timeIntervalSince1970: job.nextAttemptAt)
                     print("[UploadManager] picked job=\(job.id) state=\(job.state.rawValue) attempts=\(job.attempts) next=\(nextAt) lastError=\(job.lastError ?? "-")")
@@ -414,7 +410,7 @@ actor UploadManager {
 
     private func handleOrphanUploadCompletion(jobId: String, result: Result<HTTPURLResponse, Error>) async {
         // Ignore if the job no longer exists or has already moved past upload.
-        guard let job = try? await store.fetch(jobId: jobId), let job else { return }
+        guard let job = (try? await store.fetch(jobId: jobId)) ?? nil else { return }
         guard job.state == .uploading else { return }
 
         switch result {
