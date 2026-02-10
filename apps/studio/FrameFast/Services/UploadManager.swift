@@ -34,6 +34,7 @@ actor UploadManager {
     private let fileManager: FileManager
     private let connectivity: ConnectivityService
     private let backgroundSession: BackgroundUploadSessionManager
+    private let reducer = UploadJobReducer()
     private var workerTask: Task<Void, Never>?
     private var started = false
 
@@ -327,61 +328,24 @@ actor UploadManager {
     @discardableResult
     private func process(_ job: UploadJobRecord, mode: ProcessingMode) async -> Bool {
         var jobForRetry = job
+        var startedBackgroundUpload = false
         do {
             // Always re-fetch before decisions so we act on the latest persisted state.
             if let latest = try await store.fetch(jobId: job.id) {
                 jobForRetry = latest
             }
 
-            switch jobForRetry.state {
-            case .queued, .failed:
-                print("[UploadManager] job=\(jobForRetry.id) presign")
-                try await ensurePresigned(jobForRetry)
+            let effects = reducer.effects(for: jobForRetry)
+            guard !effects.isEmpty else { return false }
 
-                guard let updated = try await store.fetch(jobId: jobForRetry.id) else {
-                    throw UploadManagerError.missingJob
+            for effect in effects {
+                if Task.isCancelled { return false }
+
+                let shouldContinue = try await run(effect: effect, jobId: jobForRetry.id, mode: mode)
+                if !shouldContinue {
+                    startedBackgroundUpload = (mode == .backgroundDrain && effect == .upload)
+                    break
                 }
-
-                if mode == .backgroundDrain {
-                    print("[UploadManager] job=\(updated.id) upload (background)")
-                    try await startUpload(updated)
-                    return true
-                }
-
-                print("[UploadManager] job=\(updated.id) upload")
-                try await upload(updated)
-
-                guard let postUpload = try await store.fetch(jobId: updated.id) else {
-                    throw UploadManagerError.missingJob
-                }
-                print("[UploadManager] job=\(postUpload.id) poll")
-                try await checkCompletion(postUpload)
-                return false
-
-            case .presigned:
-                if mode == .backgroundDrain {
-                    print("[UploadManager] job=\(jobForRetry.id) upload (presigned, background)")
-                    try await startUpload(jobForRetry)
-                    return true
-                }
-
-                print("[UploadManager] job=\(jobForRetry.id) upload (presigned)")
-                try await upload(jobForRetry)
-
-                guard let postUpload = try await store.fetch(jobId: jobForRetry.id) else {
-                    throw UploadManagerError.missingJob
-                }
-                print("[UploadManager] job=\(postUpload.id) poll")
-                try await checkCompletion(postUpload)
-                return false
-
-            case .uploaded, .awaitingCompletion:
-                print("[UploadManager] job=\(jobForRetry.id) poll")
-                try await checkCompletion(jobForRetry)
-                return false
-
-            case .uploading, .completed, .terminalFailed:
-                return false
             }
         } catch {
             let classification = classify(error)
@@ -409,6 +373,42 @@ actor UploadManager {
                 lastError: classification.message
             )
             return false
+        }
+
+        return startedBackgroundUpload
+    }
+
+    private func run(effect: UploadJobEffect, jobId: String, mode: ProcessingMode) async throws -> Bool {
+        // Re-fetch before each effect so subsequent effects always see fresh state.
+        guard let job = try await store.fetch(jobId: jobId) else {
+            throw UploadManagerError.missingJob
+        }
+
+        switch effect {
+        case .ensurePresigned:
+            print("[UploadManager] job=\(job.id) presign")
+            try await ensurePresigned(job)
+            return true
+
+        case .upload:
+            if mode == .backgroundDrain {
+                print("[UploadManager] job=\(job.id) upload (background)")
+                try await startUpload(job)
+                return false
+            }
+
+            if job.state == .presigned {
+                print("[UploadManager] job=\(job.id) upload (presigned)")
+            } else {
+                print("[UploadManager] job=\(job.id) upload")
+            }
+            try await upload(job)
+            return true
+
+        case .checkCompletion:
+            print("[UploadManager] job=\(job.id) poll")
+            try await checkCompletion(job)
+            return true
         }
     }
 
