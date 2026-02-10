@@ -1,6 +1,7 @@
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 
 import { RoundedButton } from '@/components/ui/rounded-button';
+import { LogoMark } from '@/components/icons/logo-mark';
 
 const navItems = [
   { href: '#features', label: 'Features' },
@@ -14,9 +15,12 @@ export function SiteNav() {
     <header className="sticky top-0 z-50 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-8">
-          <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
-            <span className="size-2 rounded-full bg-foreground" aria-hidden="true" />
-            SabaiPics
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight"
+          >
+            <LogoMark className="h-5 w-5 text-foreground" />
+            FrameFast
           </Link>
 
           <nav className="hidden items-center gap-6 md:flex" aria-label="Primary">

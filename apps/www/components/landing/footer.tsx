@@ -1,4 +1,5 @@
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
+import { LogoMark } from '@/components/icons/logo-mark';
 
 const footerLinks = {
   product: [
@@ -25,12 +26,16 @@ export function Footer() {
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
-              <span className="size-2 rounded-full bg-foreground" aria-hidden="true" />
-              SabaiPics
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight"
+            >
+              <LogoMark className="h-5 w-5 text-foreground" />
+              FrameFast
             </Link>
             <p className="mt-3 text-sm text-muted-foreground">
-              Event photo distribution with AI-powered face recognition. Made for photographers and event organizers.
+              Event photo distribution with AI-powered face recognition. Made for photographers and
+              event organizers.
             </p>
           </div>
 
@@ -89,7 +94,7 @@ export function Footer() {
         {/* Bottom */}
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} SabaiPics. All rights reserved.
+            &copy; {new Date().getFullYear()} FrameFast. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             <Link

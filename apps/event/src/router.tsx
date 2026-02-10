@@ -1,10 +1,20 @@
 import { createBrowserRouter } from 'react-router';
 import { SearchPage } from './routes/events/search';
+import { PrivacyPage } from './routes/privacy';
+import { TermsPage } from './routes/terms';
 
 export const router = createBrowserRouter([
   {
     path: '/:eventId/search',
     element: <SearchPage />,
+  },
+  {
+    path: '/privacy',
+    element: <PrivacyPage />,
+  },
+  {
+    path: '/terms',
+    element: <TermsPage />,
   },
   {
     path: '*',

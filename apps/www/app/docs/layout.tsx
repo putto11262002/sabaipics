@@ -27,7 +27,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <DocsLayout
             tree={source.pageTree}
             nav={{
-              title: 'SabaiPics เอกสาร',
+              title: 'FrameFast เอกสาร',
               url: '/docs',
             }}
             sidebar={{
