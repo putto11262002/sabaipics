@@ -63,7 +63,7 @@ struct CanonConnectFlowView: View {
 
                 CameraDiscoveryScreen(
                     preferredIP: preferredIP,
-                    showsManualIP: true,
+                    showsManualIP: false,
                     makeScanTargets: { preferredIP in
                         CanonAPDiscovery.candidateIPs(preferredIP: preferredIP)
                     },
