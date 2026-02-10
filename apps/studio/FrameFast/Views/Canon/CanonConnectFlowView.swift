@@ -63,7 +63,7 @@ struct CanonConnectFlowView: View {
 
                 CameraDiscoveryScreen(
                     preferredIP: preferredIP,
-                    showsManualIP: true,
+                    showsManualIP: false,
                     makeScanTargets: { preferredIP in
                         CanonAPDiscovery.candidateIPs(preferredIP: preferredIP)
                     },
@@ -77,7 +77,8 @@ struct CanonConnectFlowView: View {
                         }
                     },
                     onManualIP: {
-                        // TODO: Manual IP entry for Canon
+                        // Intentionally disabled: Canon manual IP connect is not implemented yet.
+                        // Keeping this hidden avoids reviewer-visible dead ends (App Completeness).
                     },
                     onSelect: { camera, allCameras in
                         Task {
