@@ -50,6 +50,10 @@ class AppCoordinator: ObservableObject {
             AppDelegate.pendingBackgroundCompletionHandler = nil
         }
 
+        // Make coordinator accessible to the BGTask handler registered in AppDelegate.
+        // This runs during @StateObject init, before the BGTask handler can fire.
+        AppDelegate.sharedCoordinator = self
+
         Task {
             await uploadManager.start()
         }
@@ -63,7 +67,10 @@ class AppCoordinator: ObservableObject {
 
     func scheduleBackgroundDrainIfNeeded() async {
         let s = await uploadManager.summary()
-        guard s.inFlight > 0 else { return }
+        guard s.inFlight > 0 else {
+            print("[AppCoordinator] No pending uploads, skipping background drain schedule")
+            return
+        }
 
         let request = BGProcessingTaskRequest(identifier: Self.bgDrainTaskIdentifier)
         request.requiresNetworkConnectivity = true
@@ -77,28 +84,31 @@ class AppCoordinator: ObservableObject {
         }
     }
 
-    nonisolated func handleUploadDrain(task: BGProcessingTask) async {
+    nonisolated func handleUploadDrain(task: BGProcessingTask) {
         print("[AppCoordinator] BGTask started")
 
-        // Give ourselves a 5-second margin before the system deadline.
-        let deadline = Date(timeIntervalSinceNow: 25)
-
-        task.expirationHandler = { [uploadManager] in
-            print("[AppCoordinator] BGTask expiring")
-            Task { await uploadManager.stop() }
+        let drainTask = Task {
+            await uploadManager.drainOnce()
         }
 
-        await uploadManager.drainOnce(deadline: deadline)
+        task.expirationHandler = {
+            print("[AppCoordinator] BGTask expiring, cancelling drain")
+            drainTask.cancel()
+        }
 
-        let remaining = await uploadManager.summary().inFlight
-        let success = remaining == 0
-        print("[AppCoordinator] BGTask done, remaining=\(remaining)")
+        Task { [uploadManager] in
+            _ = await drainTask.result
 
-        task.setTaskCompleted(success: success)
+            let remaining = await uploadManager.summary().inFlight
+            let success = !drainTask.isCancelled && remaining == 0
+            print("[AppCoordinator] BGTask done, cancelled=\(drainTask.isCancelled) remaining=\(remaining)")
 
-        // Re-schedule if there are still pending jobs.
-        if remaining > 0 {
-            await scheduleBackgroundDrainIfNeeded()
+            task.setTaskCompleted(success: success)
+
+            // Re-schedule if there are still pending jobs.
+            if remaining > 0 {
+                await self.scheduleBackgroundDrainIfNeeded()
+            }
         }
     }
 

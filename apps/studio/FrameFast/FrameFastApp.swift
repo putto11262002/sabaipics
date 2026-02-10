@@ -25,7 +25,6 @@ struct FrameFastApp: App {
                 .environment(\.clerk, clerk)
                 .tint(Color.Theme.primary)
                 .task {
-                    AppDelegate.sharedCoordinator = coordinator
                     await configureAndLoadClerk()
                 }
                 .onChange(of: scenePhase) { _, newPhase in
@@ -85,9 +84,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         // BGTask handler must be registered before app finishes launching.
-        // We create a temporary coordinator just for registration; the real one
-        // is created by FrameFastApp's @StateObject. The handler closure captures
-        // the shared coordinator via the static accessor below.
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: AppCoordinator.bgDrainTaskIdentifier,
             using: nil
@@ -96,18 +92,18 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 task.setTaskCompleted(success: false)
                 return
             }
-            // The coordinator is set once FrameFastApp initializes its @StateObject.
             guard let coordinator = AppDelegate.sharedCoordinator else {
+                print("[AppDelegate] BGTask fired but coordinator not yet available")
                 bgTask.setTaskCompleted(success: false)
                 return
             }
-            Task { await coordinator.handleUploadDrain(task: bgTask) }
+            coordinator.handleUploadDrain(task: bgTask)
         }
         return true
     }
 
-    /// Set by FrameFastApp so the BGTask handler can reach the coordinator.
-    static weak var sharedCoordinator: AppCoordinator?
+    /// Coordinator reference set during AppCoordinator.init().
+    @MainActor static weak var sharedCoordinator: AppCoordinator?
 
     func application(
         _ application: UIApplication,

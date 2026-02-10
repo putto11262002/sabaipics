@@ -202,18 +202,30 @@ actor UploadManager {
 
     // MARK: - Background drain
 
-    /// Process queued jobs sequentially until the deadline or queue is empty.
-    /// Designed for BGProcessingTask where we have limited execution time.
-    func drainOnce(deadline: Date) async {
+    /// Process queued jobs sequentially until cancelled or queue is empty.
+    /// Designed for BGProcessingTask — caller cancels the Task from the expirationHandler.
+    func drainOnce() async {
         await recoverStaleJobs()
 
-        while Date() < deadline {
+        while !Task.isCancelled {
+            if !(await connectivity.snapshot().isOnline) {
+                print("[UploadManager] bgDrain offline, stopping")
+                break
+            }
+
             let now = Date().timeIntervalSince1970
-            guard let job = try? await store.fetchNextRunnable(now: now) else { break }
-            try? await store.markClaimed(jobId: job.id)
-            print("[UploadManager] bgDrain job=\(job.id) state=\(job.state.rawValue)")
-            await process(job)
+            do {
+                guard let job = try await store.fetchNextRunnable(now: now) else { break }
+                try await store.markClaimed(jobId: job.id)
+                print("[UploadManager] bgDrain job=\(job.id) state=\(job.state.rawValue)")
+                await process(job)
+            } catch {
+                print("[UploadManager] bgDrain queue error: \(error)")
+                break
+            }
         }
+
+        print("[UploadManager] bgDrain finished, cancelled=\(Task.isCancelled)")
     }
 
     // MARK: - Internals
