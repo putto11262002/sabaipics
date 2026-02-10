@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, index, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, index, uuid, jsonb } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { timestamptz } from "./common";
 import { events } from "./events";
@@ -6,6 +6,20 @@ import { events } from "./events";
 // Enum for photo processing status (DBSCHEMA-001)
 export const photoStatuses = ["uploading", "indexing", "indexed", "failed"] as const;
 export type PhotoStatus = (typeof photoStatuses)[number];
+
+/** EXIF metadata extracted from original upload before normalization */
+export type PhotoExifData = {
+  make?: string;
+  model?: string;
+  lensModel?: string;
+  focalLength?: number;
+  iso?: number;
+  fNumber?: number;
+  exposureTime?: number;
+  dateTimeOriginal?: string;
+  gpsLatitude?: number;
+  gpsLongitude?: number;
+};
 
 export const photos = pgTable(
   "photos",
@@ -29,6 +43,8 @@ export const photos = pgTable(
     // Original upload metadata
     originalMimeType: text("original_mime_type"), // original upload mime type
     originalFileSize: integer("original_file_size"), // original size before normalization
+    // EXIF metadata from original upload
+    exif: jsonb("exif").$type<PhotoExifData>(),
     // Indexing timestamp
     indexedAt: timestamptz("indexed_at"), // when indexing completed
     // Soft delete
