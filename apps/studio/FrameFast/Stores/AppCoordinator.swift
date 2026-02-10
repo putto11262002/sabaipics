@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import BackgroundTasks
 
 @MainActor
 class AppCoordinator: ObservableObject {
@@ -54,6 +55,51 @@ class AppCoordinator: ObservableObject {
         }
 
         uploadStatusStore.start()
+    }
+
+    // MARK: - BGProcessingTask
+
+    static let bgDrainTaskIdentifier = "com.framefast.upload-queue-drain"
+
+    func scheduleBackgroundDrainIfNeeded() async {
+        let s = await uploadManager.summary()
+        guard s.inFlight > 0 else { return }
+
+        let request = BGProcessingTaskRequest(identifier: Self.bgDrainTaskIdentifier)
+        request.requiresNetworkConnectivity = true
+        request.requiresExternalPower = false
+
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            print("[AppCoordinator] Scheduled background drain (\(s.inFlight) pending)")
+        } catch {
+            print("[AppCoordinator] Failed to schedule background drain: \(error)")
+        }
+    }
+
+    nonisolated func handleUploadDrain(task: BGProcessingTask) async {
+        print("[AppCoordinator] BGTask started")
+
+        // Give ourselves a 5-second margin before the system deadline.
+        let deadline = Date(timeIntervalSinceNow: 25)
+
+        task.expirationHandler = { [uploadManager] in
+            print("[AppCoordinator] BGTask expiring")
+            Task { await uploadManager.stop() }
+        }
+
+        await uploadManager.drainOnce(deadline: deadline)
+
+        let remaining = await uploadManager.summary().inFlight
+        let success = remaining == 0
+        print("[AppCoordinator] BGTask done, remaining=\(remaining)")
+
+        task.setTaskCompleted(success: success)
+
+        // Re-schedule if there are still pending jobs.
+        if remaining > 0 {
+            await scheduleBackgroundDrainIfNeeded()
+        }
     }
 
     func selectEvent(id: String?, name: String?) {

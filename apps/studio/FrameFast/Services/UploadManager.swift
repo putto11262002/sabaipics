@@ -68,7 +68,9 @@ actor UploadManager {
     }
 
     private func recoverStaleJobs() async {
-        let staleThreshold = Date().timeIntervalSince1970
+        // Use a 5-minute window so we only reset jobs that are genuinely stuck,
+        // not ones still being uploaded by a background URLSession.
+        let staleThreshold = Date().timeIntervalSince1970 - 300
         do {
             let recovered = try await store.resetStaleUploadingJobs(staleBefore: staleThreshold)
             if recovered > 0 {
@@ -195,6 +197,22 @@ actor UploadManager {
             return result
         } catch {
             return [:]
+        }
+    }
+
+    // MARK: - Background drain
+
+    /// Process queued jobs sequentially until the deadline or queue is empty.
+    /// Designed for BGProcessingTask where we have limited execution time.
+    func drainOnce(deadline: Date) async {
+        await recoverStaleJobs()
+
+        while Date() < deadline {
+            let now = Date().timeIntervalSince1970
+            guard let job = try? await store.fetchNextRunnable(now: now) else { break }
+            try? await store.markClaimed(jobId: job.id)
+            print("[UploadManager] bgDrain job=\(job.id) state=\(job.state.rawValue)")
+            await process(job)
         }
     }
 
