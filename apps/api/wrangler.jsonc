@@ -60,6 +60,10 @@
         "queue": "logo-processing-dev",
         "binding": "LOGO_QUEUE",
       },
+      {
+        "queue": "lut-processing-dev",
+        "binding": "LUT_QUEUE",
+      },
     ],
     "consumers": [
       {
@@ -93,6 +97,14 @@
         "max_retries": 3,
         "max_concurrency": 1,
         "dead_letter_queue": "logo-processing-dlq-dev",
+      },
+      {
+        "queue": "lut-processing-dev",
+        "max_batch_size": 1,
+        "max_batch_timeout": 60,
+        "max_retries": 3,
+        "max_concurrency": 1,
+        "dead_letter_queue": "lut-processing-dlq-dev",
       },
     ],
   },
@@ -131,7 +143,7 @@
         "name": "SEARCH_RATE_LIMITER",
         "type": "ratelimit",
         "namespace_id": "1002",
-        "simple": { "limit": 200, "period": 10 },  // 200 req/10s = 20 TPS
+        "simple": { "limit": 200, "period": 10 }, // 200 req/10s = 20 TPS
       },
     ],
   },
@@ -139,10 +151,6 @@
   "env": {
     // Staging environment - auto-deploy from master
     "staging": {
- "observability": {
-    "enabled": true,
-    "head_sampling_rate": 1 // optional. default = 1.
-  },
       "images": {
         "binding": "IMAGES",
       },
@@ -194,6 +202,10 @@
             "queue": "logo-processing-staging",
             "binding": "LOGO_QUEUE",
           },
+          {
+            "queue": "lut-processing-staging",
+            "binding": "LUT_QUEUE",
+          },
         ],
         "consumers": [
           {
@@ -228,6 +240,14 @@
             "max_concurrency": 1,
             "dead_letter_queue": "logo-processing-dlq-staging",
           },
+          {
+            "queue": "lut-processing-staging",
+            "max_batch_size": 1,
+            "max_batch_timeout": 60,
+            "max_retries": 3,
+            "max_concurrency": 1,
+            "dead_letter_queue": "lut-processing-dlq-staging",
+          },
         ],
       },
       "durable_objects": {
@@ -253,7 +273,7 @@
             "name": "SEARCH_RATE_LIMITER",
             "type": "ratelimit",
             "namespace_id": "1002",
-            "simple": { "limit": 200, "period": 10 },  // 200 req/10s = 20 TPS
+            "simple": { "limit": 200, "period": 10 }, // 200 req/10s = 20 TPS
           },
         ],
       },
@@ -318,6 +338,10 @@
             "queue": "logo-processing",
             "binding": "LOGO_QUEUE",
           },
+          {
+            "queue": "lut-processing",
+            "binding": "LUT_QUEUE",
+          },
         ],
         "consumers": [
           {
@@ -352,6 +376,14 @@
             "max_concurrency": 1,
             "dead_letter_queue": "logo-processing-dlq",
           },
+          {
+            "queue": "lut-processing",
+            "max_batch_size": 1,
+            "max_batch_timeout": 60,
+            "max_retries": 3,
+            "max_concurrency": 1,
+            "dead_letter_queue": "lut-processing-dlq",
+          },
         ],
       },
       "durable_objects": {
@@ -377,7 +409,7 @@
             "name": "SEARCH_RATE_LIMITER",
             "type": "ratelimit",
             "namespace_id": "1002",
-            "simple": { "limit": 200, "period": 10 },  // 200 req/10s = 20 TPS
+            "simple": { "limit": 200, "period": 10 }, // 200 req/10s = 20 TPS
           },
         ],
       },
