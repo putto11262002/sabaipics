@@ -230,6 +230,15 @@ actor UploadManager {
         }
     }
 
+    func completedCountLast7Days(now: TimeInterval = Date().timeIntervalSince1970) async -> Int {
+        do {
+            return try await store.countCompletedJobs(updatedAfter: now - 7 * 24 * 60 * 60)
+        } catch {
+            print("[UploadManager] Failed to fetch 7d completed count: \(error)")
+            return 0
+        }
+    }
+
     // MARK: - Background drain
 
     /// Process queued jobs sequentially until cancelled or queue is empty.

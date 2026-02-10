@@ -71,24 +71,17 @@ struct EventsHomeView: View {
     @EnvironmentObject private var connectivityStore: ConnectivityStore
 
     @State private var uploadByEventId: [String: UploadManager.EventSummary] = [:]
+    @State private var uploadedLast7Days: Int = 0
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
-                UploadStatusHeaderView(
-                    isOnline: connectivityStore.isOnline,
-                    interface: connectivityStore.state.interface,
-                    pendingCount: uploadStatusStore.summary.inFlight
+                UploadStatsCardsRow(
+                    pendingJobs: uploadStatusStore.summary.inFlight,
+                    uploadedLast7Days: uploadedLast7Days
                 )
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
-
-                UploadStatsCardsRow(
-                    pendingJobs: uploadStatusStore.summary.inFlight,
-                    activeEvents: activeEventsCount,
-                    totalEvents: viewModel.events.count
-                )
-                .padding(.horizontal, 16)
 
                 Group {
                     if viewModel.events.isEmpty && !connectivityStore.isOnline {
@@ -104,8 +97,13 @@ struct EventsHomeView: View {
                     }
                 }
             }
-            .navigationTitle("Events")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Activity")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ConnectivityStatusToolbarView()
+                }
+            }
             .task {
                 if viewModel.events.isEmpty {
                     await viewModel.loadEvents()
@@ -121,19 +119,14 @@ struct EventsHomeView: View {
         while !Task.isCancelled {
             let eventIds = await MainActor.run { viewModel.events.map(\.id) }
             let summaries = await coordinator.uploadManager.eventSummaries(eventIds: eventIds)
+            let last7 = await coordinator.uploadManager.completedCountLast7Days()
             await MainActor.run {
                 self.uploadByEventId = summaries
+                self.uploadedLast7Days = last7
             }
             try? await Task.sleep(nanoseconds: 1_500_000_000)
         }
     }
-
-    private var activeEventsCount: Int {
-        uploadByEventId.values.reduce(into: 0) { acc, s in
-            if s.pending > 0 { acc += 1 }
-        }
-    }
-
 
     // MARK: - Skeleton View
 
@@ -235,57 +228,9 @@ struct EventsHomeView: View {
 
 }
 
-private struct UploadStatusHeaderView: View {
-    let isOnline: Bool
-    let interface: ConnectivityState.Interface?
-    let pendingCount: Int
-
-    var body: some View {
-        let leftText = isOnline ? "Online" : "Offline"
-
-        let interfaceIcon = interfaceIconName(isOnline: isOnline, interface: interface)
-        let interfaceTint: Color = isOnline ? Color.Theme.success : Color.Theme.warning
-
-        return HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: interfaceIcon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(interfaceTint)
-                Text(leftText)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.Theme.foreground)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 4)
-    }
-
-    private func interfaceIconName(isOnline: Bool, interface: ConnectivityState.Interface?) -> String {
-        if !isOnline {
-            return "wifi.slash"
-        }
-        switch interface {
-        case .wifi:
-            return "wifi"
-        case .cellular:
-            return "antenna.radiowaves.left.and.right"
-        case .wiredEthernet:
-            return "cable.connector"
-        case .loopback:
-            return "network"
-        case .other:
-            return "globe"
-        case .none:
-            return "network"
-        }
-    }
-}
-
 private struct UploadStatsCardsRow: View {
     let pendingJobs: Int
-    let activeEvents: Int
-    let totalEvents: Int
+    let uploadedLast7Days: Int
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -300,10 +245,10 @@ private struct UploadStatsCardsRow: View {
         return LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
             UploadSyncCard(pendingJobs: pendingJobs)
             UploadStatCard(
-                icon: "calendar.badge.clock",
-                iconTint: Color.Theme.warning,
-                title: "Active events",
-                value: String(activeEvents)
+                icon: "tray.and.arrow.up",
+                iconTint: Color.Theme.success,
+                title: "Uploaded (7d)",
+                value: String(uploadedLast7Days)
             )
         }
     }
@@ -313,16 +258,15 @@ private struct UploadSyncCard: View {
     let pendingJobs: Int
 
     var body: some View {
-        let isSynced = pendingJobs == 0
-        let icon = isSynced ? "tray.and.arrow.up.fill" : "arrow.triangle.2.circlepath"
-        let tint: Color = isSynced ? Color.Theme.success : Color.Theme.warning
-        let title = isSynced ? "Synced" : "Syncing"
+        let icon = "tray.and.arrow.up"
+        let tint: Color = Color.Theme.warning
+        let value = pendingJobs == 0 ? "—" : "\(pendingJobs)"
 
         return UploadStatCard(
             icon: icon,
             iconTint: tint,
-            title: title,
-            value: "\(pendingJobs)"
+            title: "Upload queue",
+            value: value
         )
     }
 }
@@ -461,15 +405,13 @@ private struct OfflineEventsPlaceholderView: View {
 
 #Preview("Events Upload - Online Syncing") {
     VStack(spacing: 12) {
-        UploadStatusHeaderView(
-            isOnline: true,
-            interface: .wifi,
-            pendingCount: 7
-        )
+        HStack {
+            ConnectivityStatusToolbarView()
+            Spacer()
+        }
         UploadStatsCardsRow(
             pendingJobs: 7,
-            activeEvents: 2,
-            totalEvents: 10
+            uploadedLast7Days: 42
         )
         List {
             Section {
@@ -502,15 +444,13 @@ private struct OfflineEventsPlaceholderView: View {
 
 #Preview("Events Upload - Offline Cold Start") {
     VStack(spacing: 12) {
-        UploadStatusHeaderView(
-            isOnline: false,
-            interface: nil,
-            pendingCount: 7
-        )
+        HStack {
+            ConnectivityStatusToolbarView()
+            Spacer()
+        }
         UploadStatsCardsRow(
             pendingJobs: 7,
-            activeEvents: 0,
-            totalEvents: 0
+            uploadedLast7Days: 0
         )
         OfflineEventsPlaceholderView()
     }
