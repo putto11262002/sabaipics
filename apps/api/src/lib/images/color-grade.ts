@@ -144,6 +144,13 @@ export function parseCubeLut(text: string): Result<ParsedCubeLut, CubeLutParseEr
     values.push(r, g, b);
   }
 
+  if ((domainMin && !domainMax) || (!domainMin && domainMax)) {
+    return err({
+      type: 'invalid_format',
+      message: 'DOMAIN_MIN and DOMAIN_MAX must both be provided when specifying a domain',
+    });
+  }
+
   if (!size) {
     return err({ type: 'invalid_format', message: 'Missing LUT_3D_SIZE' });
   }
@@ -556,7 +563,11 @@ export function generateCubeLutFromReferenceRgba(params: {
   includeLuminance: boolean;
   title?: string;
 }): string {
-  const size = params.size ?? 33;
+  const rawSize = params.size;
+  const size = rawSize == null ? 33 : Math.floor(rawSize);
+  if (!Number.isFinite(size) || size < 2 || size > 128) {
+    throw new Error('Invalid LUT size (expected integer 2..128)');
+  }
   const title = params.title ?? 'Generated LUT';
   const target = computeLabStatsFromRgba(params.referencePixels, params.width, params.height);
   const source = computeIdentityStats(size);

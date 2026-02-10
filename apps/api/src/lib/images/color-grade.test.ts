@@ -164,4 +164,22 @@ describe('color-grade: .cube parse + apply', () => {
     expect(out[1]).toBe(0);
     expect(out[2]).toBe(0);
   });
+
+  it('rejects partial domain definition', () => {
+    const cube = [
+      'DOMAIN_MIN 0 0 0',
+      'LUT_3D_SIZE 2',
+      '0 0 0',
+      '1 0 0',
+      '0 1 0',
+      '1 1 0',
+      '0 0 1',
+      '1 0 1',
+      '0 1 1',
+      '1 1 1',
+      '',
+    ].join('\n');
+    const parsed = parseCubeLut(cube);
+    expect(parsed.isErr()).toBe(true);
+  });
 });
