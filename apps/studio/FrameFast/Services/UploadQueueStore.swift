@@ -460,6 +460,31 @@ actor UploadQueueStore {
         return result
     }
 
+    func countCompletedJobs(updatedAfter: TimeInterval) throws -> Int {
+        try openAndMigrateIfNeeded()
+
+        let sql = """
+        SELECT COUNT(*)
+        FROM upload_jobs
+        WHERE state = 'completed'
+          AND updated_at >= ?;
+        """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_double(stmt, 1, updatedAfter)
+
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            throw UploadQueueStoreError.stepFailed(message: lastErrorMessage())
+        }
+
+        return Int(sqlite3_column_int(stmt, 0))
+    }
+
     func fetchRecentJobStates(limit: Int) throws -> [String: UploadJobState] {
         try openAndMigrateIfNeeded()
 

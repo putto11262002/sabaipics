@@ -61,6 +61,11 @@ struct ProfileView: View {
                 }
             }
             .navigationTitle("Profile")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ConnectivityStatusToolbarView()
+                }
+            }
             .sheet(isPresented: $showAccountPortal) {
                 UserProfileView()
             }

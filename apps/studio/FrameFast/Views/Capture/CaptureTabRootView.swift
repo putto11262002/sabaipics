@@ -115,6 +115,11 @@ struct CaptureTabRootView: View {
             .onAppear {
                 reloadRecent()
             }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ConnectivityStatusToolbarView()
+                }
+            }
         }
         // MARK: Sony reconnect alert
         .alert("Reconnect Sony", isPresented: $isShowingSonyReconnectAlert) {
