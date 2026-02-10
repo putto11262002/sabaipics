@@ -5,6 +5,16 @@
 // Re-export JPEG utilities
 export { extractJpegDimensions } from './jpeg';
 
+// Color grading (LUT)
+export {
+  parseCubeLut,
+  applyCubeLutToRgba,
+  generateCubeLutFromReferenceRgba,
+  rgbToLab,
+  labToRgb,
+  computeLabStatsFromRgba,
+} from './color-grade';
+
 // =============================================================================
 // Magic Byte Validation
 // =============================================================================
@@ -25,7 +35,10 @@ function matchesSignature(bytes: Uint8Array, signature: readonly number[], offse
  * Validates image magic bytes and returns the detected MIME type.
  * Supports JPEG, PNG, GIF, and WebP.
  */
-export function validateImageMagicBytes(bytes: Uint8Array): { valid: boolean; detectedType?: string } {
+export function validateImageMagicBytes(bytes: Uint8Array): {
+  valid: boolean;
+  detectedType?: string;
+} {
   // JPEG
   if (matchesSignature(bytes, IMAGE_SIGNATURES.jpeg)) {
     return { valid: true, detectedType: 'image/jpeg' };
