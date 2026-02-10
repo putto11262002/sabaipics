@@ -478,12 +478,12 @@ actor UploadManager {
     private func classify(_ error: Error) -> FailureClassification {
         if let e = error as? UploadsAPIError {
             switch e {
-            case .http(_, let code, let message, let retryAfter):
-                let msg = [code, message].compactMap { $0 }.joined(separator: ": ")
+            case .api(_, let code, let message, _):
+                let msg = [code.rawValue, message].compactMap { $0 }.joined(separator: ": ")
                 return FailureClassification(
                     disposition: e.isRetryable ? .retryable : .terminal,
                     message: msg.isEmpty ? e.localizedDescription : msg,
-                    retryAfterSeconds: retryAfter
+                    retryAfterSeconds: e.retryAfterSeconds
                 )
             default:
                 return FailureClassification(
