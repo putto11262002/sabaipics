@@ -7,11 +7,14 @@
 
 import SwiftUI
 import Clerk
+import BackgroundTasks
 
 @main
 struct FrameFastApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var coordinator = AppCoordinator()
     @State private var clerk = Clerk.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -24,6 +27,24 @@ struct FrameFastApp: App {
                 .task {
                     await configureAndLoadClerk()
                 }
+                .onChange(of: scenePhase) { _, newPhase in
+                    switch newPhase {
+                    case .active:
+                        Task { await coordinator.uploadManager.resume() }
+                        coordinator.uploadStatusStore.start()
+                    case .background:
+                        coordinator.uploadStatusStore.stop()
+                        Task { await coordinator.scheduleBackgroundDrainIfNeeded() }
+                    case .inactive:
+                        break
+                    @unknown default:
+                        break
+                    }
+                }
+        }
+        .backgroundTask(.processing(AppCoordinator.bgDrainTaskIdentifier)) {
+            await coordinator.uploadManager.drainOnce()
+            await coordinator.scheduleBackgroundDrainIfNeeded()
         }
     }
 
@@ -59,4 +80,29 @@ struct FrameFastApp: App {
             coordinator.appInitialized = true
         }
     }
+}
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+    @MainActor static weak var sharedBackgroundSession: BackgroundUploadSessionManager?
+
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        guard identifier == BackgroundUploadSessionManager.sessionIdentifier else {
+            completionHandler()
+            return
+        }
+
+        // If the session manager is already initialized (app was already running),
+        // wire the handler directly. Otherwise store it for init() to pick up.
+        if let session = AppDelegate.sharedBackgroundSession {
+            session.systemCompletionHandler = completionHandler
+        } else {
+            AppDelegate.pendingBackgroundCompletionHandler = completionHandler
+        }
+    }
+
+    static var pendingBackgroundCompletionHandler: (() -> Void)?
 }

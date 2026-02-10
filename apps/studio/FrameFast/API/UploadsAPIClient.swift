@@ -9,7 +9,7 @@ import Clerk
 
 struct APIErrorEnvelope: Decodable, Sendable {
     struct Payload: Decodable, Sendable {
-        let code: String
+        let code: ApiErrorCode
         let message: String
     }
 
@@ -20,9 +20,9 @@ enum UploadsAPIError: Error, LocalizedError {
     case notAuthenticated
     case invalidURL
     case noToken
-    case networkError(Error)
-    case decodingError(Error)
-    case http(statusCode: Int, code: String?, message: String?, retryAfterSeconds: Int?)
+    case transport(underlying: Error)
+    case decoding(underlying: Error, bodySnippet: String?)
+    case api(statusCode: Int, code: ApiErrorCode, message: String?, retryAfterSeconds: Int?)
 
     var errorDescription: String? {
         switch self {
@@ -32,38 +32,41 @@ enum UploadsAPIError: Error, LocalizedError {
             return "Invalid URL"
         case .noToken:
             return "No authentication token available"
-        case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
-        case .decodingError(let error):
-            return "Failed to decode response: \(error.localizedDescription)"
-        case .http(let statusCode, let code, let message, _):
-            let suffix = [code, message].compactMap { $0 }.joined(separator: ": ")
+        case .transport(let underlying):
+            return "Network error: \(underlying.localizedDescription)"
+        case .decoding(let underlying, _):
+            return "Failed to decode response: \(underlying.localizedDescription)"
+        case .api(let statusCode, let code, let message, _):
+            let suffix = [code.rawValue, message].compactMap { $0 }.joined(separator: ": ")
             return suffix.isEmpty ? "HTTP \(statusCode)" : "HTTP \(statusCode): \(suffix)"
         }
     }
 
+    var retryAfterSeconds: Int? {
+        if case .api(_, _, _, let retryAfterSeconds) = self {
+            return retryAfterSeconds
+        }
+        return nil
+    }
+
     var isRetryable: Bool {
         switch self {
-        case .http(let statusCode, let code, _, _):
-            // Prefer semantic API codes when present.
-            if let code {
-                switch code {
-                case "INTERNAL_ERROR", "BAD_GATEWAY", "SERVICE_UNAVAILABLE", "RATE_LIMITED":
-                    return true
-                default:
-                    break
-                }
+        case .api(let statusCode, let code, _, _):
+            switch code {
+            case .rateLimited, .internalError, .badGateway, .serviceUnavailable:
+                return true
+            case .unknown:
+                if statusCode == 429 { return true }
+                if (500...599).contains(statusCode) { return true }
+                return false
+            default:
+                return false
             }
 
-            // Fallback to status code mapping.
-            if statusCode == 429 { return true }
-            if (500...599).contains(statusCode) { return true }
-            return false
-
-        case .networkError:
+        case .transport:
             return true
 
-        case .decodingError:
+        case .decoding:
             // Usually indicates a backend contract issue; retrying may not help, but don't hard-stop.
             return true
 
@@ -176,23 +179,30 @@ actor UploadsAPIClient {
     }
 
     private func performRequest<T: Decodable>(request: URLRequest) async throws -> T {
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw UploadsAPIError.transport(underlying: error)
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw UploadsAPIError.networkError(URLError(.badServerResponse))
+            throw UploadsAPIError.transport(underlying: URLError(.badServerResponse))
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
             let envelope = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data)
             let retryAfter = httpResponse.value(forHTTPHeaderField: "Retry-After").flatMap { Int($0) }
-            if let responseBody = String(data: data, encoding: .utf8) {
+            let responseBody = String(data: data, encoding: .utf8)
+            if let responseBody {
                 print("[UploadsAPI Error] HTTP \(httpResponse.statusCode): \(responseBody)")
             }
 
-            throw UploadsAPIError.http(
+            throw UploadsAPIError.api(
                 statusCode: httpResponse.statusCode,
-                code: envelope?.error.code,
-                message: envelope?.error.message,
+                code: envelope?.error.code ?? .unknown("UNKNOWN"),
+                message: envelope?.error.message ?? responseBody,
                 retryAfterSeconds: retryAfter
             )
         }
@@ -201,7 +211,8 @@ actor UploadsAPIClient {
             let decoder = JSONDecoder()
             return try decoder.decode(T.self, from: data)
         } catch {
-            throw UploadsAPIError.decodingError(error)
+            let responseBody = String(data: data, encoding: .utf8)
+            throw UploadsAPIError.decoding(underlying: error, bodySnippet: responseBody)
         }
     }
 }

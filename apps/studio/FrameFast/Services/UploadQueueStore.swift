@@ -274,6 +274,60 @@ actor UploadQueueStore {
         )
     }
 
+    /// Reset all jobs stuck in `uploading` state from before `staleBefore` to `failed`.
+    /// Returns the number of recovered rows.
+    func resetStaleUploadingJobs(staleBefore: TimeInterval) throws -> Int {
+        try openAndMigrateIfNeeded()
+
+        let sql = """
+        UPDATE upload_jobs
+        SET state = ?,
+            updated_at = ?,
+            next_attempt_at = ?,
+            last_error = 'recovered: app terminated during upload'
+        WHERE state = 'uploading'
+          AND updated_at < ?;
+        """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        let now = Date().timeIntervalSince1970
+        sqlite3_bind_text(stmt, 1, UploadJobState.failed.rawValue, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_double(stmt, 2, now)
+        sqlite3_bind_double(stmt, 3, now)
+        sqlite3_bind_double(stmt, 4, staleBefore)
+
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw UploadQueueStoreError.stepFailed(message: lastErrorMessage())
+        }
+
+        return Int(sqlite3_changes(db))
+    }
+
+    func fetchUploadingJobIds(updatedBefore: TimeInterval) throws -> [String] {
+        try openAndMigrateIfNeeded()
+
+        let sql = "SELECT id FROM upload_jobs WHERE state = 'uploading' AND updated_at < ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_double(stmt, 1, updatedBefore)
+
+        var result: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let idC = sqlite3_column_text(stmt, 0) else { continue }
+            result.append(String(cString: idC))
+        }
+        return result
+    }
+
     func delete(jobId: String) throws {
         try openAndMigrateIfNeeded()
 

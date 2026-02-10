@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import BackgroundTasks
 
 @MainActor
 class AppCoordinator: ObservableObject {
@@ -23,6 +24,7 @@ class AppCoordinator: ObservableObject {
     let connectivityStore: ConnectivityStore
     let uploadManager: UploadManager
     let uploadStatusStore: UploadStatusStore
+    let backgroundSession: BackgroundUploadSessionManager
 
     private static let selectedEventDefaultsKey = "SelectedEventId"
     private static let selectedEventNameDefaultsKey = "SelectedEventName"
@@ -34,17 +36,52 @@ class AppCoordinator: ObservableObject {
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
 
         let connectivityService = ConnectivityService()
+        let bgSession = BackgroundUploadSessionManager.create()
         self.connectivityStore = ConnectivityStore(service: connectivityService)
-        self.uploadManager = UploadManager(baseURL: baseURL, connectivity: connectivityService)
+        self.backgroundSession = bgSession
+        self.uploadManager = UploadManager(baseURL: baseURL, connectivity: connectivityService, backgroundSession: bgSession)
         self.uploadStatusStore = UploadStatusStore(uploadManager: uploadManager)
 
         connectivityStore.start()
+
+        // Wire any pending background session completion handler from a system relaunch.
+        if let pending = AppDelegate.pendingBackgroundCompletionHandler {
+            bgSession.systemCompletionHandler = pending
+            AppDelegate.pendingBackgroundCompletionHandler = nil
+        }
+
+        // Make the background session manager accessible to AppDelegate so it can
+        // wire background URLSession completion handlers while the app is running.
+        AppDelegate.sharedBackgroundSession = bgSession
 
         Task {
             await uploadManager.start()
         }
 
         uploadStatusStore.start()
+    }
+
+    // MARK: - BGProcessingTask
+
+    static let bgDrainTaskIdentifier = "com.framefast.upload-queue-drain"
+
+    func scheduleBackgroundDrainIfNeeded() async {
+        let s = await uploadManager.summary()
+        guard s.inFlight > 0 else {
+            print("[AppCoordinator] No pending uploads, skipping background drain schedule")
+            return
+        }
+
+        let request = BGProcessingTaskRequest(identifier: Self.bgDrainTaskIdentifier)
+        request.requiresNetworkConnectivity = true
+        request.requiresExternalPower = false
+
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            print("[AppCoordinator] Scheduled background drain (\(s.inFlight) pending)")
+        } catch {
+            print("[AppCoordinator] Failed to schedule background drain: \(error)")
+        }
     }
 
     func selectEvent(id: String?, name: String?) {
