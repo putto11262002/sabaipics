@@ -35,6 +35,7 @@
     "aws4fetch": "^1.0.20",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.0",
+    "exifr": "^7.1.3",
     "hono": "^4.10.7",
     "jose": "^6.0.0",
     "littlezipper": "^0.1.5",

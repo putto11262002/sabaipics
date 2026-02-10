@@ -20,6 +20,7 @@ import { eq, and, gt, asc, sql } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
 import { validateImageMagicBytes } from '../lib/images';
 import { normalizeWithPhoton } from '../lib/images/normalize';
+import { extractExif } from '../lib/images/exif';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 
 // =============================================================================
@@ -209,6 +210,23 @@ async function processUpload(
       });
     }
 
+    // Step 6b: Extract EXIF metadata from original bytes (non-blocking)
+    const exifResult = await extractExif(imageBytes);
+    const exifData = exifResult.match(
+      (data) => data,
+      (error) => {
+        captureUploadWarning('exif_extraction', {
+          ...intentCtx,
+          extra: {
+            cause: error.cause instanceof Error
+              ? error.cause.message
+              : String(error.cause),
+          },
+        });
+        return null;
+      },
+    );
+
     // Step 7: Normalize image to JPEG using photon (in-Worker Wasm)
     console.log(`[upload-consumer] Normalizing with photon_wasm: ${key}`);
 
@@ -338,6 +356,7 @@ async function processUpload(
             width,
             height,
             fileSize,
+            exif: exifData,
           })
           .returning();
 
