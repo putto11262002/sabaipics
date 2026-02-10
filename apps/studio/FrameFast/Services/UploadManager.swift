@@ -414,7 +414,7 @@ actor UploadManager {
 
     private func handleOrphanUploadCompletion(jobId: String, result: Result<HTTPURLResponse, Error>) async {
         // Ignore if the job no longer exists or has already moved past upload.
-        guard let job = try? await store.fetch(jobId: jobId), let job else { return }
+        guard let job = (try? await store.fetch(jobId: jobId)) ?? nil else { return }
         guard job.state == .uploading else { return }
 
         switch result {
