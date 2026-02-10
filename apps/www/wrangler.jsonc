@@ -35,13 +35,13 @@
       },
       "routes": [
         {
-          "pattern": "sabaipics.com",
-          "zone_name": "sabaipics.com",
+          "pattern": "framefast.io",
+          "zone_name": "framefast.io",
           "custom_domain": true
         },
         {
-          "pattern": "www.sabaipics.com",
-          "zone_name": "sabaipics.com",
+          "pattern": "www.framefast.io",
+          "zone_name": "framefast.io",
           "custom_domain": true
         }
       ],
