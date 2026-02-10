@@ -80,6 +80,7 @@ struct FrameFastApp: App {
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     @MainActor static weak var sharedBackgroundSession: BackgroundUploadSessionManager?
+    @MainActor static weak var sharedCoordinator: AppCoordinator?
     private var bgDrainTask: Task<Void, Never>?
 
     func application(
@@ -103,6 +104,15 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
 
         bgDrainTask = Task {
+            let coordinator = await MainActor.run { AppDelegate.sharedCoordinator }
+            if let coordinator {
+                await coordinator.uploadManager.drainOnce()
+                await coordinator.scheduleBackgroundDrainIfNeeded()
+                task.setTaskCompleted(success: !Task.isCancelled)
+                return
+            }
+
+            // BGProcessing relaunch path (no coordinator yet): build minimal dependencies.
             let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
             let connectivity = ConnectivityService()
             await connectivity.start()

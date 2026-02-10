@@ -54,6 +54,9 @@ class AppCoordinator: ObservableObject {
         // wire background URLSession completion handlers while the app is running.
         AppDelegate.sharedBackgroundSession = bgSession
 
+        // Make coordinator accessible to BGProcessing task handler.
+        AppDelegate.sharedCoordinator = self
+
         Task {
             await uploadManager.start()
         }

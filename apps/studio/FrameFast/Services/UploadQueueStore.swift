@@ -176,6 +176,73 @@ actor UploadQueueStore {
         return try readJob(stmt: stmt)
     }
 
+    /// Atomically fetch and claim the next runnable job.
+    ///
+    /// This prevents multiple processors (or multiple async loops) from selecting the same row
+    /// between `fetchNextRunnable` and `markClaimed`.
+    func claimNextRunnable(now: TimeInterval, holdSeconds: TimeInterval = 10) throws -> UploadJobRecord? {
+        try openAndMigrateIfNeeded()
+
+        do {
+            try exec("BEGIN IMMEDIATE;")
+
+            let sql = """
+            SELECT
+              id, created_at, updated_at, next_attempt_at, attempts, state,
+              event_id, local_file_url, filename, content_type, content_length,
+              upload_id, put_url, object_key, expires_at, required_headers_json,
+              last_error
+            FROM upload_jobs
+            WHERE state IN ('queued','presigned','uploaded','awaitingCompletion','failed')
+              AND next_attempt_at <= ?
+            ORDER BY next_attempt_at ASC
+            LIMIT 1;
+            """
+
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+                throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+            }
+            defer { sqlite3_finalize(stmt) }
+
+            sqlite3_bind_double(stmt, 1, now)
+
+            guard sqlite3_step(stmt) == SQLITE_ROW else {
+                try exec("COMMIT;")
+                return nil
+            }
+
+            let job = try readJob(stmt: stmt)
+
+            let updateSQL = """
+            UPDATE upload_jobs
+            SET updated_at = ?,
+                next_attempt_at = ?
+            WHERE id = ?;
+            """
+
+            var updateStmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, updateSQL, -1, &updateStmt, nil) == SQLITE_OK else {
+                throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+            }
+            defer { sqlite3_finalize(updateStmt) }
+
+            sqlite3_bind_double(updateStmt, 1, now)
+            sqlite3_bind_double(updateStmt, 2, now + holdSeconds)
+            sqlite3_bind_text(updateStmt, 3, job.id, -1, SQLITE_TRANSIENT)
+
+            guard sqlite3_step(updateStmt) == SQLITE_DONE else {
+                throw UploadQueueStoreError.stepFailed(message: lastErrorMessage())
+            }
+
+            try exec("COMMIT;")
+            return job
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+    }
+
     func markClaimed(jobId: String, holdSeconds: TimeInterval = 10) throws {
         try openAndMigrateIfNeeded()
         let now = Date().timeIntervalSince1970
