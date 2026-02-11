@@ -24,8 +24,8 @@ struct CaptureTabRootView: View {
     }
 
     @State private var activeSheet: ActiveSheet? = nil
-    @State private var pendingActiveSheet: ActiveSheet? = nil
     @State private var isShowingEventPicker: Bool = false
+    @State private var pendingActiveCamera: ActiveCamera? = nil
     @State private var recentSony: [APCameraConnectionRecord] = []
     @State private var recentCanon: [APCameraConnectionRecord] = []
     @State private var recentNikon: [APCameraConnectionRecord] = []
@@ -92,20 +92,23 @@ struct CaptureTabRootView: View {
                 EventPickerSheetView(
                     preselectedEventId: coordinator.selectedEventId,
                     onCancel: {
-                        pendingActiveSheet = nil
                         isShowingEventPicker = false
+                        let camera = pendingActiveCamera
+                        pendingActiveCamera = nil
+                        if let camera {
+                            Task {
+                                await camera.disconnect()
+                            }
+                        }
                     },
                     onConfirm: { eventId, eventName in
                         coordinator.selectEvent(id: eventId, name: eventName)
-                        let next = pendingActiveSheet
-                        pendingActiveSheet = nil
                         isShowingEventPicker = false
 
-                        // Open connect flow after event selection.
-                        if let next {
-                            DispatchQueue.main.async {
-                                activeSheet = next
-                            }
+                        if let camera = pendingActiveCamera {
+                            pendingActiveCamera = nil
+                            sessionStore.start(activeCamera: camera)
+                            reloadRecent()
                         }
                     }
                 )
@@ -160,8 +163,7 @@ struct CaptureTabRootView: View {
     }
 
     private func requestStartCapture(sheet: ActiveSheet) {
-        pendingActiveSheet = sheet
-        isShowingEventPicker = true
+        activeSheet = sheet
     }
 
     // MARK: - Sheet content
@@ -174,9 +176,12 @@ struct CaptureTabRootView: View {
                 SonyConnectFlowView(
                     startMode: startMode,
                     onConnected: { activeCamera in
-                        sessionStore.start(activeCamera: activeCamera)
+                        pendingActiveCamera = activeCamera
                         activeSheet = nil
                         reloadRecent()
+                        DispatchQueue.main.async {
+                            isShowingEventPicker = true
+                        }
                     },
                     onCancel: {
                         activeSheet = nil
@@ -189,9 +194,12 @@ struct CaptureTabRootView: View {
                 CanonConnectFlowView(
                     startMode: startMode,
                     onConnected: { activeCamera in
-                        sessionStore.start(activeCamera: activeCamera)
+                        pendingActiveCamera = activeCamera
                         activeSheet = nil
                         reloadRecent()
+                        DispatchQueue.main.async {
+                            isShowingEventPicker = true
+                        }
                     },
                     onCancel: {
                         activeSheet = nil
@@ -205,9 +213,12 @@ struct CaptureTabRootView: View {
                 NikonConnectFlowView(
                     startMode: startMode,
                     onConnected: { activeCamera in
-                        sessionStore.start(activeCamera: activeCamera)
+                        pendingActiveCamera = activeCamera
                         activeSheet = nil
                         reloadRecent()
+                        DispatchQueue.main.async {
+                            isShowingEventPicker = true
+                        }
                     },
                     onCancel: {
                         activeSheet = nil

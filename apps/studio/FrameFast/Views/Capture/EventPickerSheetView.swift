@@ -8,6 +8,7 @@ import SwiftUI
 
 struct EventPickerSheetView: View {
     @StateObject private var viewModel = EventsViewModel()
+    @EnvironmentObject private var connectivityStore: ConnectivityStore
 
     let preselectedEventId: String?
     let onCancel: () -> Void
@@ -18,12 +19,16 @@ struct EventPickerSheetView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.isFirstLoad && viewModel.events.isEmpty {
-                    skeletonList
+                if viewModel.events.isEmpty && !connectivityStore.isOnline {
+                    offlineEmptyStateView
+                } else if viewModel.isFirstLoad && viewModel.events.isEmpty {
+                    skeletonListView
                 } else if let error = viewModel.error, viewModel.events.isEmpty {
-                    errorView(error)
+                    errorView(error: error)
+                } else if viewModel.events.isEmpty {
+                    emptyStateView
                 } else {
-                    list
+                    eventsList
                 }
             }
             .navigationTitle("Select Event")
@@ -59,7 +64,7 @@ struct EventPickerSheetView: View {
         return viewModel.events.first { $0.id == selectedEventId }
     }
 
-    private var list: some View {
+    private var eventsList: some View {
         List {
             Section {
                 ForEach(viewModel.events) { event in
@@ -67,7 +72,10 @@ struct EventPickerSheetView: View {
                         selectedEventId = event.id
                     } label: {
                         HStack(spacing: 12) {
-                            EventRow(event: event)
+                            Text(event.name)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.Theme.foreground)
+                                .lineLimit(1)
                             Spacer(minLength: 8)
                             if selectedEventId == event.id {
                                 Image(systemName: "checkmark.circle.fill")
@@ -77,33 +85,60 @@ struct EventPickerSheetView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.vertical, 2)
+                    .sabaiCardRow()
                 }
             } header: {
-                Text("Choose where uploads go")
+                Text("Events")
                     .foregroundStyle(Color.Theme.mutedForeground)
             }
         }
-        .listStyle(.insetGrouped)
+        .sabaiList()
+        .refreshable {
+            await viewModel.refreshEvents()
+        }
     }
 
-    private var skeletonList: some View {
+    private var skeletonListView: some View {
         List {
             Section {
                 ForEach(Event.placeholders) { event in
-                    EventRow(event: event)
+                    SkeletonEventRow(title: event.name)
                 }
             } header: {
-                Text("Choose where uploads go")
+                Text("Events")
                     .foregroundStyle(Color.Theme.mutedForeground)
             }
         }
-        .listStyle(.insetGrouped)
+        .sabaiList()
         .redacted(reason: .placeholder)
         .disabled(true)
     }
 
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "calendar")
+                .font(.system(size: 60))
+                .foregroundStyle(Color.Theme.mutedForeground)
+
+            Text("No events yet")
+                .font(.headline)
+                .foregroundStyle(Color.Theme.foreground)
+
+            Text("Your events will appear here once created")
+                .font(.subheadline)
+                .foregroundStyle(Color.Theme.mutedForeground)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var offlineEmptyStateView: some View {
+        OfflineEventsPlaceholderView()
+    }
+
     @ViewBuilder
-    private func errorView(_ error: Error) -> some View {
+    private func errorView(error: Error) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48))
@@ -127,6 +162,45 @@ struct EventPickerSheetView: View {
                 Text("Retry")
             }
             .buttonStyle(.primary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct SkeletonEventRow: View {
+    let title: String
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.Theme.foreground)
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 2)
+        .sabaiCardRow()
+    }
+}
+
+private struct OfflineEventsPlaceholderView: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 52))
+                .foregroundStyle(Color.Theme.mutedForeground)
+
+            Text("Offline")
+                .font(.headline)
+                .foregroundStyle(Color.Theme.mutedForeground)
+
+            Text("Events can’t be loaded right now. Uploads will resume when you’re back online.")
+                .font(.subheadline)
+                .foregroundStyle(Color.Theme.mutedForeground)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
