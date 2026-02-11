@@ -148,15 +148,15 @@
       },
       "vars": {
         "NODE_ENV": "staging",
-        "DASHBOARD_FRONTEND_URL": "https://app-staging.sabaipics.com",
-        "EVENT_FRONTEND_URL": "https://event-staging.sabaipics.com",
-        "CORS_ORIGIN": "https://app-staging.sabaipics.com,https://event-staging.sabaipics.com,http://localhost:5175",
-        "AUTHORIZED_PARTIES": "https://app-staging.sabaipics.com,https://event-staging.sabaipics.com",
+        "DASHBOARD_FRONTEND_URL": "https://app-staging.framefast.io",
+        "EVENT_FRONTEND_URL": "https://event-staging.framefast.io",
+        "CORS_ORIGIN": "https://app-staging.framefast.io,https://event-staging.framefast.io,http://localhost:5175",
+        "AUTHORIZED_PARTIES": "https://app-staging.framefast.io,https://event-staging.framefast.io",
         "AWS_REGION": "us-west-2",
-        "CF_ZONE": "sabaipics.com",
+        "CF_ZONE": "framefast.io",
         "CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
-        "PHOTO_BUCKET_NAME": "sabaipics-photos-staging",
-        "PHOTO_R2_BASE_URL": "https://photos-staging.sabaipics.com",
+        "PHOTO_BUCKET_NAME": "framefast-photos-staging",
+        "PHOTO_R2_BASE_URL": "https://photos-staging.framefast.io",
         "RETENTION_DAYS": "30",
         "CLEANUP_BATCH_SIZE": "10",
         "HARD_DELETE_GRACE_DAYS": "30",
@@ -165,15 +165,15 @@
       },
       "routes": [
         {
-          "pattern": "api-staging.sabaipics.com",
-          "zone_name": "sabaipics.com",
+          "pattern": "api-staging.framefast.io",
+          "zone_name": "framefast.io",
           "custom_domain": true,
         },
       ],
       "r2_buckets": [
         {
           "binding": "PHOTOS_BUCKET",
-          "bucket_name": "sabaipics-photos-staging",
+          "bucket_name": "framefast-photos-staging",
         },
       ],
       "queues": {
