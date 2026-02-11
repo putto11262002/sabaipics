@@ -17,13 +17,14 @@ class EventsViewModel: ObservableObject {
     @Published var isFirstLoad = true
     @Published var error: Error?
     @Published var isRefreshing = false
+    @Published var eventsSource: EventsRepository.Source? = nil
+    @Published var eventsFetchedAt: Date? = nil
 
-    private let apiClient: EventsAPIClient
+    private let repository: EventsRepository
 
     init() {
-        // Get API base URL from Info.plist or use default
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
-        self.apiClient = EventsAPIClient(baseURL: baseURL)
+        self.repository = EventsRepository(baseURL: baseURL)
     }
 
     func loadEvents() async {
@@ -31,13 +32,15 @@ class EventsViewModel: ObservableObject {
         error = nil
 
         // Concurrent operations: fetch + minimum display time
-        async let eventsData = apiClient.fetchEvents(page: 0, limit: 10)
+        async let eventsData = repository.fetchEvents(page: 0, limit: 10)
         async let minimumDelay: () = Task.sleep(nanoseconds: 300_000_000)  // 300ms
 
         do {
-            let response = try await eventsData
+            let result = try await eventsData
             try await minimumDelay  // Prevent skeleton flicker
-            events = response.data
+            events = result.value.data
+            eventsSource = result.source
+            eventsFetchedAt = result.fetchedAt
         } catch {
             try? await minimumDelay
             self.error = error
@@ -50,8 +53,10 @@ class EventsViewModel: ObservableObject {
         isRefreshing = true
 
         do {
-            let response = try await apiClient.fetchEvents(page: 0, limit: 10)
-            events = response.data
+            let result = try await repository.fetchEvents(page: 0, limit: 10)
+            events = result.value.data
+            eventsSource = result.source
+            eventsFetchedAt = result.fetchedAt
             error = nil
         } catch {
             self.error = error
