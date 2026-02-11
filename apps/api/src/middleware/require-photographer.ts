@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { eq } from "drizzle-orm";
-import { photographers, type Photographer, type Database } from "@sabaipics/db";
+import { activePhotographers, type Photographer, type Database } from "@sabaipics/db";
 import { createAuthError } from "@sabaipics/auth/errors";
 import type { AuthVariables } from "@sabaipics/auth/types";
 
@@ -48,11 +48,11 @@ export function requirePhotographer(): MiddlewareHandler<Env> {
     const db = c.var.db();
     const [row] = await db
       .select({
-        id: photographers.id,
-        pdpaConsentAt: photographers.pdpaConsentAt,
+        id: activePhotographers.id,
+        pdpaConsentAt: activePhotographers.pdpaConsentAt,
       })
-      .from(photographers)
-      .where(eq(photographers.clerkId, auth.userId))
+      .from(activePhotographers)
+      .where(eq(activePhotographers.clerkId, auth.userId))
       .limit(1);
 
     if (!row) {
