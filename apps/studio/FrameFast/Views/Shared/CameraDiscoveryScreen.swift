@@ -180,9 +180,22 @@ struct CameraDiscoveryScreen: View {
             }
         }
         .task {
-            if !connectivityStore.isOnline {
+            switch connectivityStore.state.status {
+            case .pending:
+                // Wait for connectivity to be determined before deciding
+                for await state in connectivityStore.$state.values {
+                    if state.status != .pending {
+                        if state.isOffline {
+                            showInternetGuide = true
+                        } else {
+                            await startIfNeeded()
+                        }
+                        break
+                    }
+                }
+            case .offline:
                 showInternetGuide = true
-            } else {
+            case .online:
                 await startIfNeeded()
             }
         }

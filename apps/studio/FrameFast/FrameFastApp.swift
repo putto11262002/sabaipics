@@ -113,8 +113,12 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             }
 
             // BGProcessing relaunch path (no coordinator yet): build minimal dependencies.
-            let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
-            let connectivity = ConnectivityService()
+            guard let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String,
+                  let baseURLParsed = URL(string: baseURL) else {
+                fatalError("APIBaseURL missing or malformed in Info.plist — check API_BASE_URL build setting")
+            }
+            let healthURL = baseURLParsed.appendingPathComponent("health")
+            let connectivity = ConnectivityService(healthURL: healthURL)
             await connectivity.start()
 
             let bgSession = BackgroundUploadSessionManager.create()
