@@ -11,8 +11,8 @@
     "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "check-types": "tsc --noEmit",
-    "deploy:staging": "pnpm build:staging && wrangler pages deploy dist --project-name=dashboard --branch=staging",
-    "deploy:prod": "pnpm build:prod && wrangler pages deploy dist --project-name=dashboard --branch=main",
+    "deploy:staging": "pnpm build:staging && wrangler deploy --env staging",
+    "deploy:prod": "pnpm build:prod && wrangler deploy --env production",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
