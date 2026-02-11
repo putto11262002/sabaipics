@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		17D895C82F17E10300FE1698 /* gphoto2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 17D895C32F17E09B00FE1698 /* gphoto2.framework */; };
-		17D895C92F17E10300FE1698 /* gphoto2.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 17D895C32F17E09B00FE1698 /* gphoto2.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		18C1A0D62F1A000100000001 /* Clerk in Frameworks */ = {isa = PBXBuildFile; productRef = 18C1A0D52F1A000100000001 /* Clerk */; };
 /* End PBXBuildFile section */
 
@@ -27,28 +25,7 @@
 			remoteGlobalIDString = 179FE9AB2F178F650090EBC9;
 			remoteInfo = FrameFast;
 		};
-		17D895C22F17E09B00FE1698 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 17D895BB2F17E09B00FE1698 /* GPhoto2Framework.xcodeproj */;
-			proxyType = 2;
-			remoteGlobalIDString = 89D2FD0D217CE88100B2C9D4;
-			remoteInfo = gphoto2;
-		};
 /* End PBXContainerItemProxy section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		17D895CA2F17E10300FE1698 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				17D895C92F17E10300FE1698 /* gphoto2.framework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		179FE9AC2F178F650090EBC9 /* FrameFast.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FrameFast.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -86,7 +63,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				18C1A0D62F1A000100000001 /* Clerk in Frameworks */,
-				17D895C82F17E10300FE1698 /* gphoto2.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -137,7 +113,6 @@
 		17D895BC2F17E09B00FE1698 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				17D895C32F17E09B00FE1698 /* gphoto2.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -159,7 +134,6 @@
 				179FE9A82F178F650090EBC9 /* Sources */,
 				179FE9A92F178F650090EBC9 /* Frameworks */,
 				179FE9AA2F178F650090EBC9 /* Resources */,
-				17D895CA2F17E10300FE1698 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -274,16 +248,6 @@
 			);
 		};
 /* End PBXProject section */
-
-/* Begin PBXReferenceProxy section */
-		17D895C32F17E09B00FE1698 /* gphoto2.framework */ = {
-			isa = PBXReferenceProxy;
-			fileType = wrapper.framework;
-			path = gphoto2.framework;
-			remoteRef = 17D895C22F17E09B00FE1698 /* PBXContainerItemProxy */;
-			sourceTree = BUILT_PRODUCTS_DIR;
-		};
-/* End PBXReferenceProxy section */
 
 /* Begin PBXResourcesBuildPhase section */
 		179FE9AA2F178F650090EBC9 /* Resources */ = {
@@ -494,7 +458,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/FrameFast/FrameFast-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -526,7 +490,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/FrameFast/FrameFast-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
