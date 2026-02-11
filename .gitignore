@@ -61,6 +61,7 @@ apps/studio/Config/Studio.Local.xcconfig
 
 ## Local Studio config overrides
 # (If you add additional local-only config files, ignore them here.)
+apps/studio/Studio.Local.xcconfig
 
 ## Build generated
 apps/studio/build/
@@ -96,6 +97,13 @@ packages/face-eval/runs/*.csv
 packages/face-eval/data/
 
 opencode.json
+
+# Local design/screenshot scratch
+logo-workspace/
+logo_ref/
+screenshots/
+screenshots_sick/
+tmp/
 
 # MCP config (local)
 .mcp.json
