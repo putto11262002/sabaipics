@@ -43,6 +43,7 @@ final class CaptureSessionStore: ObservableObject {
 
     private var uploadManager: UploadManager?
     private var eventIdProvider: (() async -> String?)?
+    private var pendingCamera: ActiveCamera?
 
     func configure(uploadManager: UploadManager, eventIdProvider: @escaping () async -> String?) {
         self.uploadManager = uploadManager
@@ -52,6 +53,7 @@ final class CaptureSessionStore: ObservableObject {
     func start(activeCamera: ActiveCamera) {
         disconnectTask?.cancel()
         cancellables.removeAll()
+        pendingCamera = nil
         self.activeCamera = activeCamera
         self.recentDownloads = []
 
@@ -138,6 +140,26 @@ final class CaptureSessionStore: ObservableObject {
                     self.captureSession = nil
                     self.activeCamera = nil
                     self.controller = nil
+                    self.pendingCamera = nil
+                    self.state = .idle
+                    self.isDetailsPresented = false
+                    self.stats = Stats()
+                    self.recentDownloads = []
+                }
+            }
+            return
+        }
+
+        if let camera = pendingCamera {
+            pendingCamera = nil
+            disconnectTask = Task { [weak self] in
+                await camera.disconnect()
+                await MainActor.run {
+                    guard let self else { return }
+                    self.captureSession = nil
+                    self.activeCamera = nil
+                    self.controller = nil
+                    self.pendingCamera = nil
                     self.state = .idle
                     self.isDetailsPresented = false
                     self.stats = Stats()
@@ -154,6 +176,7 @@ final class CaptureSessionStore: ObservableObject {
             recentDownloads = []
             captureSession = nil
             controller = nil
+            pendingCamera = nil
             return
         }
 
@@ -164,11 +187,22 @@ final class CaptureSessionStore: ObservableObject {
             self.activeCamera = nil
             self.captureSession = nil
             self.controller = nil
+            self.pendingCamera = nil
             self.state = .idle
             self.isDetailsPresented = false
             self.stats = Stats()
             self.recentDownloads = []
         }
+    }
+
+    func setPendingCamera(_ camera: ActiveCamera) {
+        pendingCamera = camera
+    }
+
+    func startPendingCamera() {
+        guard let camera = pendingCamera else { return }
+        pendingCamera = nil
+        start(activeCamera: camera)
     }
 
     func handle(event: Event) {

@@ -25,7 +25,6 @@ struct CaptureTabRootView: View {
 
     @State private var activeSheet: ActiveSheet? = nil
     @State private var isShowingEventPicker: Bool = false
-    @State private var pendingActiveCamera: ActiveCamera? = nil
     @State private var recentSony: [APCameraConnectionRecord] = []
     @State private var recentCanon: [APCameraConnectionRecord] = []
     @State private var recentNikon: [APCameraConnectionRecord] = []
@@ -93,23 +92,14 @@ struct CaptureTabRootView: View {
                     preselectedEventId: coordinator.selectedEventId,
                     onCancel: {
                         isShowingEventPicker = false
-                        let camera = pendingActiveCamera
-                        pendingActiveCamera = nil
-                        if let camera {
-                            Task {
-                                await camera.disconnect()
-                            }
-                        }
+                        sessionStore.disconnect()
                     },
                     onConfirm: { eventId, eventName in
                         coordinator.selectEvent(id: eventId, name: eventName)
                         isShowingEventPicker = false
 
-                        if let camera = pendingActiveCamera {
-                            pendingActiveCamera = nil
-                            sessionStore.start(activeCamera: camera)
-                            reloadRecent()
-                        }
+                        sessionStore.startPendingCamera()
+                        reloadRecent()
                     }
                 )
                 .interactiveDismissDisabled(true)
@@ -176,7 +166,7 @@ struct CaptureTabRootView: View {
                 SonyConnectFlowView(
                     startMode: startMode,
                     onConnected: { activeCamera in
-                        pendingActiveCamera = activeCamera
+                        sessionStore.setPendingCamera(activeCamera)
                         activeSheet = nil
                         reloadRecent()
                         DispatchQueue.main.async {
@@ -194,7 +184,7 @@ struct CaptureTabRootView: View {
                 CanonConnectFlowView(
                     startMode: startMode,
                     onConnected: { activeCamera in
-                        pendingActiveCamera = activeCamera
+                        sessionStore.setPendingCamera(activeCamera)
                         activeSheet = nil
                         reloadRecent()
                         DispatchQueue.main.async {
@@ -213,7 +203,7 @@ struct CaptureTabRootView: View {
                 NikonConnectFlowView(
                     startMode: startMode,
                     onConnected: { activeCamera in
-                        pendingActiveCamera = activeCamera
+                        sessionStore.setPendingCamera(activeCamera)
                         activeSheet = nil
                         reloadRecent()
                         DispatchQueue.main.async {
