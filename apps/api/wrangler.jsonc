@@ -16,10 +16,10 @@
     "CORS_ORIGIN": "http://localhost:5173,http://localhost:5174",
     "AUTHORIZED_PARTIES": "http://localhost:5173",
     "AWS_REGION": "us-west-2",
-    "CF_ZONE": "sabaipics.com",
+    "CF_ZONE": "framefast.io",
     "CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
-    "PHOTO_BUCKET_NAME": "sabaipics-photos-dev",
-    "PHOTO_R2_BASE_URL": "https://devphotos.sabaipics.com",
+    "PHOTO_BUCKET_NAME": "framefast-photos-dev",
+    "PHOTO_R2_BASE_URL": "https://photos-dev.framefast.io",
     "RETENTION_DAYS": "30",
     "CLEANUP_BATCH_SIZE": "10",
     "HARD_DELETE_GRACE_DAYS": "30",
@@ -31,7 +31,7 @@
   "r2_buckets": [
     {
       "binding": "PHOTOS_BUCKET",
-      "bucket_name": "sabaipics-photos-dev",
+      "bucket_name": "framefast-photos-dev",
       "remote": true,
     },
   ],
