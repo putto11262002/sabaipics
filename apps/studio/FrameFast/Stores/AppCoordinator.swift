@@ -34,8 +34,9 @@ class AppCoordinator: ObservableObject {
         self.selectedEventName = UserDefaults.standard.string(forKey: Self.selectedEventNameDefaultsKey)
 
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
+        let healthURL = URL(string: baseURL)!.appendingPathComponent("health")
 
-        let connectivityService = ConnectivityService()
+        let connectivityService = ConnectivityService(healthURL: healthURL)
         let bgSession = BackgroundUploadSessionManager.create()
         self.connectivityStore = ConnectivityStore(service: connectivityService)
         self.backgroundSession = bgSession

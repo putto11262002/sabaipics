@@ -8,7 +8,9 @@ import Foundation
 @MainActor
 final class ConnectivityStore: ObservableObject {
     @Published private(set) var state: ConnectivityState = ConnectivityState(
-        isOnline: true,
+        status: .pending,
+        pathSatisfied: false,
+        apiReachable: false,
         isExpensive: false,
         isConstrained: false,
         interface: nil

@@ -8,6 +8,12 @@
 import Foundation
 import Network
 
+enum ConnectivityStatus: Sendable, Equatable {
+    case pending    // Initial state — no signal yet
+    case online     // NWPath satisfied AND health check passed
+    case offline    // NWPath unsatisfied OR health check failed
+}
+
 struct ConnectivityState: Sendable, Equatable {
     enum Interface: String, Sendable {
         case wifi
@@ -17,28 +23,39 @@ struct ConnectivityState: Sendable, Equatable {
         case other
     }
 
-    let isOnline: Bool
+    let status: ConnectivityStatus
+    let pathSatisfied: Bool
+    let apiReachable: Bool
     let isExpensive: Bool
     let isConstrained: Bool
     let interface: Interface?
+
+    /// Convenience — most consumers can keep using this
+    var isOnline: Bool { status == .online }
+    var isOffline: Bool { status == .offline }
 }
 
 actor ConnectivityService {
     private let monitor: NWPathMonitor
     private let queue = DispatchQueue(label: "com.framefast.connectivity.monitor")
+    private let healthURL: URL
 
     private var started = false
     private var state: ConnectivityState = ConnectivityState(
-        isOnline: true,
+        status: .pending,
+        pathSatisfied: false,
+        apiReachable: false,
         isExpensive: false,
         isConstrained: false,
         interface: nil
     )
 
     private var continuations: [UUID: AsyncStream<ConnectivityState>.Continuation] = [:]
+    private var reprobeTask: Task<Void, Never>?
 
-    init() {
+    init(healthURL: URL) {
         self.monitor = NWPathMonitor()
+        self.healthURL = healthURL
     }
 
     deinit {
@@ -51,7 +68,7 @@ actor ConnectivityService {
 
         monitor.pathUpdateHandler = { [weak self] path in
             guard let self else { return }
-            Task { await self.update(path: path) }
+            Task { await self.handlePathUpdate(path: path) }
         }
 
         monitor.start(queue: queue)
@@ -82,19 +99,96 @@ actor ConnectivityService {
         continuations[id] = nil
     }
 
-    private func update(path: NWPath) {
-        let newState = ConnectivityState(
-            isOnline: path.status == .satisfied,
-            isExpensive: path.isExpensive,
-            isConstrained: path.isConstrained,
-            interface: interface(for: path)
-        )
+    private func handlePathUpdate(path: NWPath) {
+        let pathSatisfied = path.status == .satisfied
+        let iface = interface(for: path)
+        let isExpensive = path.isExpensive
+        let isConstrained = path.isConstrained
 
+        if pathSatisfied {
+            // Path is satisfied — probe the API to confirm real connectivity
+            let url = healthURL
+            Task {
+                let reachable = await Self.probeHealth(url: url)
+                let newState = ConnectivityState(
+                    status: reachable ? .online : .offline,
+                    pathSatisfied: true,
+                    apiReachable: reachable,
+                    isExpensive: isExpensive,
+                    isConstrained: isConstrained,
+                    interface: iface
+                )
+                self.applyState(newState)
+
+                // Start periodic probing — fast (3s) when offline, slow (30s) when online
+                self.startProbeLoop(reachable: reachable, isExpensive: isExpensive, isConstrained: isConstrained, interface: iface)
+            }
+        } else {
+            // Path not satisfied — immediately offline, no probe needed
+            stopProbeLoop()
+            let newState = ConnectivityState(
+                status: .offline,
+                pathSatisfied: false,
+                apiReachable: false,
+                isExpensive: isExpensive,
+                isConstrained: isConstrained,
+                interface: iface
+            )
+            applyState(newState)
+        }
+    }
+
+    private func applyState(_ newState: ConnectivityState) {
         guard newState != state else { return }
         state = newState
-
         for (_, c) in continuations {
             c.yield(newState)
+        }
+    }
+
+    private static let offlineProbeInterval: UInt64 = 3_000_000_000   // 3s — fast recovery
+    private static let onlineProbeInterval: UInt64  = 15_000_000_000  // 15s — background heartbeat
+
+    private func startProbeLoop(reachable: Bool, isExpensive: Bool, isConstrained: Bool, interface: ConnectivityState.Interface?) {
+        stopProbeLoop()
+        let url = healthURL
+        reprobeTask = Task { [weak self] in
+            var currentlyReachable = reachable
+            while !Task.isCancelled {
+                let interval = currentlyReachable ? Self.onlineProbeInterval : Self.offlineProbeInterval
+                try? await Task.sleep(nanoseconds: interval)
+                guard !Task.isCancelled else { break }
+                let probeResult = await Self.probeHealth(url: url)
+                guard let self, !Task.isCancelled else { break }
+                let newState = ConnectivityState(
+                    status: probeResult ? .online : .offline,
+                    pathSatisfied: true,
+                    apiReachable: probeResult,
+                    isExpensive: isExpensive,
+                    isConstrained: isConstrained,
+                    interface: interface
+                )
+                await self.applyState(newState)
+                currentlyReachable = probeResult
+            }
+        }
+    }
+
+    private func stopProbeLoop() {
+        reprobeTask?.cancel()
+        reprobeTask = nil
+    }
+
+    private static func probeHealth(url: URL) async -> Bool {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 5
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return false }
+            return (200...299).contains(http.statusCode)
+        } catch {
+            return false
         }
     }
 

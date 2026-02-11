@@ -114,7 +114,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
             // BGProcessing relaunch path (no coordinator yet): build minimal dependencies.
             let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
-            let connectivity = ConnectivityService()
+            let healthURL = URL(string: baseURL)!.appendingPathComponent("health")
+            let connectivity = ConnectivityService(healthURL: healthURL)
             await connectivity.start()
 
             let bgSession = BackgroundUploadSessionManager.create()

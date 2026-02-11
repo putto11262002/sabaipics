@@ -19,7 +19,9 @@ struct EventPickerSheetView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.events.isEmpty && !connectivityStore.isOnline {
+                if viewModel.events.isEmpty && connectivityStore.state.status == .pending {
+                    skeletonListView
+                } else if viewModel.events.isEmpty && connectivityStore.state.isOffline {
                     offlineEmptyStateView
                 } else if viewModel.isFirstLoad && viewModel.events.isEmpty {
                     skeletonListView

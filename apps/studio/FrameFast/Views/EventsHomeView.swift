@@ -89,7 +89,9 @@ struct EventsHomeView: View {
                 .padding(.top, 8)
 
                 Group {
-                    if viewModel.events.isEmpty && !connectivityStore.isOnline {
+                    if viewModel.events.isEmpty && connectivityStore.state.status == .pending {
+                        skeletonListView
+                    } else if viewModel.events.isEmpty && connectivityStore.state.isOffline {
                         offlineEmptyStateView
                     } else if viewModel.isFirstLoad && viewModel.events.isEmpty {
                         skeletonListView
