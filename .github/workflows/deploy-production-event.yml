@@ -26,7 +26,7 @@ jobs:
 
       - name: Create Event Env
         run: |
-          echo "VITE_API_URL=https://api.sabaipics.com" > apps/event/.env.production
+          echo "VITE_API_URL=https://api.framefast.io" > apps/event/.env.production
           echo "VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }}" >> apps/event/.env.production
 
       # Build API first so tsc generates .d.ts files for hono client types
