@@ -24,7 +24,6 @@ struct CaptureTabRootView: View {
     }
 
     @State private var activeSheet: ActiveSheet? = nil
-    @State private var pendingActiveSheet: ActiveSheet? = nil
     @State private var isShowingEventPicker: Bool = false
     @State private var recentSony: [APCameraConnectionRecord] = []
     @State private var recentCanon: [APCameraConnectionRecord] = []
@@ -92,21 +91,15 @@ struct CaptureTabRootView: View {
                 EventPickerSheetView(
                     preselectedEventId: coordinator.selectedEventId,
                     onCancel: {
-                        pendingActiveSheet = nil
                         isShowingEventPicker = false
+                        sessionStore.disconnect()
                     },
                     onConfirm: { eventId, eventName in
                         coordinator.selectEvent(id: eventId, name: eventName)
-                        let next = pendingActiveSheet
-                        pendingActiveSheet = nil
                         isShowingEventPicker = false
 
-                        // Open connect flow after event selection.
-                        if let next {
-                            DispatchQueue.main.async {
-                                activeSheet = next
-                            }
-                        }
+                        sessionStore.startPendingCamera()
+                        reloadRecent()
                     }
                 )
                 .interactiveDismissDisabled(true)
@@ -160,8 +153,7 @@ struct CaptureTabRootView: View {
     }
 
     private func requestStartCapture(sheet: ActiveSheet) {
-        pendingActiveSheet = sheet
-        isShowingEventPicker = true
+        activeSheet = sheet
     }
 
     // MARK: - Sheet content
@@ -174,9 +166,12 @@ struct CaptureTabRootView: View {
                 SonyConnectFlowView(
                     startMode: startMode,
                     onConnected: { activeCamera in
-                        sessionStore.start(activeCamera: activeCamera)
+                        sessionStore.setPendingCamera(activeCamera)
                         activeSheet = nil
                         reloadRecent()
+                        DispatchQueue.main.async {
+                            isShowingEventPicker = true
+                        }
                     },
                     onCancel: {
                         activeSheet = nil
@@ -189,9 +184,12 @@ struct CaptureTabRootView: View {
                 CanonConnectFlowView(
                     startMode: startMode,
                     onConnected: { activeCamera in
-                        sessionStore.start(activeCamera: activeCamera)
+                        sessionStore.setPendingCamera(activeCamera)
                         activeSheet = nil
                         reloadRecent()
+                        DispatchQueue.main.async {
+                            isShowingEventPicker = true
+                        }
                     },
                     onCancel: {
                         activeSheet = nil
@@ -205,9 +203,12 @@ struct CaptureTabRootView: View {
                 NikonConnectFlowView(
                     startMode: startMode,
                     onConnected: { activeCamera in
-                        sessionStore.start(activeCamera: activeCamera)
+                        sessionStore.setPendingCamera(activeCamera)
                         activeSheet = nil
                         reloadRecent()
+                        DispatchQueue.main.async {
+                            isShowingEventPicker = true
+                        }
                     },
                     onCancel: {
                         activeSheet = nil

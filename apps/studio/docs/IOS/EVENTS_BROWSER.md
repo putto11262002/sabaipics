@@ -212,10 +212,9 @@ Events Tab → EventsHomeView (List)
 ## Known Limitations
 
 1. **No pagination UI**: Only shows first 10 events (API supports pagination)
-2. **No caching**: Always fetches fresh data
-3. **No offline support**: Requires network connection
-4. **No search/filter**: Shows events in chronological order only
-5. **No Thai localization**: Dates use standard iOS format
+2. **No cache UI**: The app may show cached events when offline, but does not currently surface "last updated" state in the UI
+3. **No search/filter**: Shows events in chronological order only
+4. **No Thai localization**: Dates use standard iOS format
 
 ## Future Enhancements (Out of Scope)
 

@@ -18,13 +18,13 @@ struct EventDetailView: View {
     @State private var error: Error?
     @State private var showCopyConfirmation = false
 
-    private let apiClient: EventsAPIClient
+    private let repository: EventsRepository
 
     init(eventId: String) {
         self.eventId = eventId
 
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
-        self.apiClient = EventsAPIClient(baseURL: baseURL)
+        self.repository = EventsRepository(baseURL: baseURL)
     }
 
     var body: some View {
@@ -165,13 +165,13 @@ struct EventDetailView: View {
         error = nil
 
         // Concurrent operations: fetch + minimum display time
-        async let eventData = apiClient.fetchEvent(id: eventId)
+        async let eventData = repository.fetchEvent(id: eventId)
         async let minimumDelay: () = Task.sleep(nanoseconds: 300_000_000)  // 300ms
 
         do {
-            let response = try await eventData
+            let result = try await eventData
             try await minimumDelay  // Prevent skeleton flicker on fast loads
-            event = response.data
+            event = result.value.data
         } catch {
             try? await minimumDelay
             print("[EventDetail Error] Failed to load event \(eventId): \(error.localizedDescription)")
