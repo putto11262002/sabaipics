@@ -1,9 +1,25 @@
-<svg width="96" height="110" viewBox="-4 -4 104 118" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- SabaiPics Camera Shutter Mark - Optimized -->
-  <line x1="48" y1="5" x2="70.71" y2="41.5" stroke="black" stroke-width="10" stroke-linecap="round"/>
-  <line x1="91.3" y1="30" x2="70.71" y2="68.5" stroke="black" stroke-width="10" stroke-linecap="round"/>
-  <line x1="91.3" y1="80" x2="48" y2="80" stroke="black" stroke-width="10" stroke-linecap="round"/>
-  <line x1="48" y1="105" x2="25.29" y2="68.5" stroke="black" stroke-width="10" stroke-linecap="round"/>
-  <line x1="4.7" y1="80" x2="25.29" y2="41.5" stroke="black" stroke-width="10" stroke-linecap="round"/>
-  <line x1="4.7" y1="30" x2="48" y2="30" stroke="black" stroke-width="10" stroke-linecap="round"/>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 128 128"
+  width="128"
+  height="128"
+  fill="none"
+>
+  <!-- White circle background for visibility on browser tabs -->
+  <circle cx="64" cy="64" r="60" fill="#FFFFFF" />
+
+  <!-- FrameFast shutter mark (from dashboard LogoMark) -->
+  <g
+    transform="translate(64 64) scale(1.05) translate(-48 -55)"
+    stroke="#111827"
+    stroke-width="10"
+    stroke-linecap="round"
+  >
+    <line x1="48" y1="5" x2="70.71" y2="41.5" />
+    <line x1="91.3" y1="30" x2="70.71" y2="68.5" />
+    <line x1="91.3" y1="80" x2="48" y2="80" />
+    <line x1="48" y1="105" x2="25.29" y2="68.5" />
+    <line x1="4.7" y1="80" x2="25.29" y2="41.5" />
+    <line x1="4.7" y1="30" x2="48" y2="30" />
+  </g>
 </svg>
