@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "api",
+  "name": "framefast-api",
   "main": "src/index.ts",
   "compatibility_date": "2025-12-06",
   "compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
