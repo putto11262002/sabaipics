@@ -272,15 +272,15 @@
       },
       "vars": {
         "NODE_ENV": "production",
-        "DASHBOARD_FRONTEND_URL": "https://app.sabaipics.com",
-        "EVENT_FRONTEND_URL": "https://event.sabaipics.com",
-        "CORS_ORIGIN": "https://app.sabaipics.com,https://event.sabaipics.com",
-        "AUTHORIZED_PARTIES": "https://app.sabaipics.com,https://event.sabaipics.com",
+        "DASHBOARD_FRONTEND_URL": "https://app.framefast.io",
+        "EVENT_FRONTEND_URL": "https://event.framefast.io",
+        "CORS_ORIGIN": "https://app.framefast.io,https://event.framefast.io",
+        "AUTHORIZED_PARTIES": "https://app.framefast.io,https://event.framefast.io",
         "AWS_REGION": "us-west-2",
-        "CF_ZONE": "sabaipics.com",
+        "CF_ZONE": "framefast.io",
         "CF_ACCOUNT_ID": "ac76d647241fb6b589f88fe88d0e4a08",
-        "PHOTO_BUCKET_NAME": "sabaipics-photos",
-        "PHOTO_R2_BASE_URL": "https://photo.sabaipics.com",
+        "PHOTO_BUCKET_NAME": "framefast-photos",
+        "PHOTO_R2_BASE_URL": "https://photos.framefast.io",
         "RETENTION_DAYS": "30",
         "CLEANUP_BATCH_SIZE": "10",
         "HARD_DELETE_GRACE_DAYS": "30",
@@ -289,15 +289,15 @@
       },
       "routes": [
         {
-          "pattern": "api.sabaipics.com",
-          "zone_name": "sabaipics.com",
+          "pattern": "api.framefast.io",
+          "zone_name": "framefast.io",
           "custom_domain": true,
         },
       ],
       "r2_buckets": [
         {
           "binding": "PHOTOS_BUCKET",
-          "bucket_name": "sabaipics-photos",
+          "bucket_name": "framefast-photos",
         },
       ],
       "queues": {
