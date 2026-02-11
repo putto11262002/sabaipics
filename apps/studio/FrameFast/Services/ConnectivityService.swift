@@ -52,6 +52,7 @@ actor ConnectivityService {
 
     private var continuations: [UUID: AsyncStream<ConnectivityState>.Continuation] = [:]
     private var reprobeTask: Task<Void, Never>?
+    private var pathGeneration: UInt64 = 0
 
     init(healthURL: URL) {
         self.monitor = NWPathMonitor()
@@ -100,6 +101,9 @@ actor ConnectivityService {
     }
 
     private func handlePathUpdate(path: NWPath) {
+        pathGeneration += 1
+        let gen = pathGeneration
+
         let pathSatisfied = path.status == .satisfied
         let iface = interface(for: path)
         let isExpensive = path.isExpensive
@@ -110,6 +114,9 @@ actor ConnectivityService {
             let url = healthURL
             Task {
                 let reachable = await Self.probeHealth(url: url)
+                // Guard against stale probe: a newer path update may have arrived
+                // while probeHealth was in-flight (up to 5s).
+                guard gen == self.pathGeneration else { return }
                 let newState = ConnectivityState(
                     status: reachable ? .online : .offline,
                     pathSatisfied: true,

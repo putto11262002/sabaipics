@@ -33,8 +33,11 @@ class AppCoordinator: ObservableObject {
         self.selectedEventId = UserDefaults.standard.string(forKey: Self.selectedEventDefaultsKey)
         self.selectedEventName = UserDefaults.standard.string(forKey: Self.selectedEventNameDefaultsKey)
 
-        let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String ?? "https://api.sabaipics.com"
-        let healthURL = URL(string: baseURL)!.appendingPathComponent("health")
+        guard let baseURL = Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String,
+              let baseURLParsed = URL(string: baseURL) else {
+            fatalError("APIBaseURL missing or malformed in Info.plist — check API_BASE_URL build setting")
+        }
+        let healthURL = baseURLParsed.appendingPathComponent("health")
 
         let connectivityService = ConnectivityService(healthURL: healthURL)
         let bgSession = BackgroundUploadSessionManager.create()
