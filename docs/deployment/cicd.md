@@ -143,16 +143,18 @@ Only bootstrap secrets remain in GitHub:
 
 ### Running Terraform locally
 
+Terraform secrets (CLOUDFLARE_API_TOKEN, R2 backend creds, Infisical universal auth) are stored in Infisical under the `/terraform` folder path. State is stored remotely in the `framefast-tf-state` R2 bucket.
+
 ```bash
 # Staging
 cd infra/terraform/environments/staging
-infisical run --env=staging -- terraform plan
-infisical run --env=staging -- terraform apply
+infisical run --env=staging --path="/terraform" -- terraform plan
+infisical run --env=staging --path="/terraform" -- terraform apply
 
 # Production
 cd infra/terraform/environments/production
-infisical run --env=prod -- terraform plan
-infisical run --env=prod -- terraform apply
+infisical run --env=prod --path="/terraform" -- terraform plan
+infisical run --env=prod --path="/terraform" -- terraform apply
 ```
 
 ## Triggering Deploys
