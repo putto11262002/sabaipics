@@ -11,6 +11,7 @@ import { slideshowConfigSchema } from './slideshow-schema';
 import { logoPresignSchema, logoStatusQuerySchema } from './logo-schema';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../../lib/error';
+import { safeHandler } from '../../lib/safe-handler';
 import { generatePresignedPutUrl } from '../../lib/r2/presign';
 import { createFtpCredentialsWithRetry } from '../../lib/ftp/credentials';
 import { hardDeleteEvents } from '../../lib/services/events/hard-delete';
@@ -61,7 +62,7 @@ export const eventsRouter = new Hono<Env>()
       const db = c.var.db();
       const body = c.req.valid('json');
 
-      return safeTry(async function* () {
+      return safeHandler(async function* () {
         // Validate date range
         if (body.startDate && body.endDate && body.startDate > body.endDate) {
           return err<never, HandlerError>({
@@ -129,12 +130,7 @@ export const eventsRouter = new Hono<Env>()
           expiresAt: created.expiresAt,
           createdAt: created.createdAt,
         });
-      })
-        .orTee((e) => e.cause && console.error('[Events] POST /', e.code, e.cause))
-        .match(
-          (data) => c.json({ data }, 201),
-          (e) => apiError(c, e),
-        );
+      }, c, { status: 201 });
     },
   )
 
