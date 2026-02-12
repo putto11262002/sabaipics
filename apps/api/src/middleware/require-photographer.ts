@@ -1,5 +1,4 @@
 import type { MiddlewareHandler } from "hono";
-import * as Sentry from "@sentry/cloudflare";
 import { eq } from "drizzle-orm";
 import { activePhotographers, type Photographer, type Database } from "@sabaipics/db";
 import { createAuthError } from "@sabaipics/auth/errors";
@@ -40,26 +39,6 @@ export function requirePhotographer(): MiddlewareHandler<Env> {
   return async (c, next) => {
     const auth = c.get("auth");
     if (!auth) {
-      const rejectionReason = c.get("authRejectionReason") as string | null;
-      const path = new URL(c.req.url).pathname;
-
-      Sentry.captureMessage("[auth] requirePhotographer: unauthenticated request", {
-        level: "warning",
-        tags: {
-          auth_rejection: "true",
-          middleware: "requirePhotographer",
-          path,
-        },
-        extra: {
-          rejectionDetail: rejectionReason ?? "no rejection context",
-          url: c.req.url,
-          method: c.req.method,
-          hasAuthHeader: !!c.req.header("Authorization"),
-          userAgent: c.req.header("User-Agent") ?? "unknown",
-          origin: c.req.header("Origin") ?? "none",
-        },
-      });
-
       return c.json(
         createAuthError("UNAUTHENTICATED", "Authentication required"),
         401

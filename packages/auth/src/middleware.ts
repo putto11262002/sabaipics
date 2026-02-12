@@ -53,30 +53,13 @@ export function createClerkAuth(): MiddlewareHandler<AuthEnv> {
         sessionId: clerkAuth.sessionId!,
       };
       c.set("auth", auth);
-      c.set("authRejectionReason", null);
     } else {
+      // Log rejection reason for debugging (not exposed to client)
       const reason = requestState.reason;
-      const message = requestState.message;
-      const hasAuthHeader = !!c.req.header("Authorization");
-
-      // Build detailed rejection info for observability
-      const rejectionDetail = [
-        `reason=${reason ?? "unknown"}`,
-        `message=${message ?? "none"}`,
-        `hasAuthHeader=${hasAuthHeader}`,
-        `authorizedParties=${authorizedParties.join(",")}`,
-        `path=${new URL(c.req.url).pathname}`,
-      ].join(" | ");
-
       if (reason && reason !== "session-token-missing") {
-        console.error(`[auth] Token rejected: ${rejectionDetail}`);
-      } else if (hasAuthHeader) {
-        // Token was sent but treated as missing — likely a format issue
-        console.error(`[auth] Auth header present but session-token-missing: ${rejectionDetail}`);
+        console.warn(`[auth] Token rejected: ${reason}`);
       }
-
       c.set("auth", null);
-      c.set("authRejectionReason", rejectionDetail);
     }
 
     return next();
@@ -88,8 +71,7 @@ export function requireAuth(): MiddlewareHandler<{ Variables: AuthVariables }> {
   return async (c, next) => {
     const auth = c.get("auth");
     if (!auth) {
-      const reason = c.get("authRejectionReason");
-      console.error(`[auth] requireAuth denied: ${reason ?? "no auth context"} | path=${new URL(c.req.url).pathname}`);
+      // Generic error - specific reason already logged in createClerkAuth
       return c.json(
         createAuthError("UNAUTHENTICATED", "Authentication required"),
         401,
