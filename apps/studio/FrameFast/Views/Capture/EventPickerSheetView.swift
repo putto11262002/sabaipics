@@ -19,14 +19,14 @@ struct EventPickerSheetView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.events.isEmpty && connectivityStore.state.status == .pending {
-                    skeletonListView
-                } else if viewModel.events.isEmpty && connectivityStore.state.isOffline {
-                    offlineEmptyStateView
-                } else if viewModel.isFirstLoad && viewModel.events.isEmpty {
+                if viewModel.isFirstLoad && viewModel.events.isEmpty {
                     skeletonListView
                 } else if let error = viewModel.error, viewModel.events.isEmpty {
-                    errorView(error: error)
+                    if connectivityStore.state.isOffline {
+                        offlineEmptyStateView
+                    } else {
+                        errorView(error: error)
+                    }
                 } else if viewModel.events.isEmpty {
                     emptyStateView
                 } else {
@@ -170,41 +170,3 @@ struct EventPickerSheetView: View {
     }
 }
 
-private struct SkeletonEventRow: View {
-    let title: String
-
-    var body: some View {
-        HStack {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.Theme.foreground)
-                .lineLimit(1)
-
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 2)
-        .sabaiCardRow()
-    }
-}
-
-private struct OfflineEventsPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "wifi.slash")
-                .font(.system(size: 52))
-                .foregroundStyle(Color.Theme.mutedForeground)
-
-            Text("Offline")
-                .font(.headline)
-                .foregroundStyle(Color.Theme.mutedForeground)
-
-            Text("Events can’t be loaded right now. Uploads will resume when you’re back online.")
-                .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}

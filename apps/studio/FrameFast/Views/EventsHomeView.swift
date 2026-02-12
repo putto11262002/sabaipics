@@ -89,14 +89,14 @@ struct EventsHomeView: View {
                 .padding(.top, 8)
 
                 Group {
-                    if viewModel.events.isEmpty && connectivityStore.state.status == .pending {
-                        skeletonListView
-                    } else if viewModel.events.isEmpty && connectivityStore.state.isOffline {
-                        offlineEmptyStateView
-                    } else if viewModel.isFirstLoad && viewModel.events.isEmpty {
+                    if viewModel.isFirstLoad && viewModel.events.isEmpty {
                         skeletonListView
                     } else if let error = viewModel.error, viewModel.events.isEmpty {
-                        errorView(error: error)
+                        if connectivityStore.state.isOffline {
+                            offlineEmptyStateView
+                        } else {
+                            errorView(error: error)
+                        }
                     } else if viewModel.events.isEmpty {
                         emptyStateView
                     } else {
@@ -369,7 +369,7 @@ private struct UploadEventSyncIndicator: View {
     }
 }
 
-private struct SkeletonEventRow: View {
+struct SkeletonEventRow: View {
     let title: String
 
     var body: some View {
@@ -386,7 +386,7 @@ private struct SkeletonEventRow: View {
     }
 }
 
-private struct OfflineEventsPlaceholderView: View {
+struct OfflineEventsPlaceholderView: View {
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "wifi.slash")
@@ -397,7 +397,7 @@ private struct OfflineEventsPlaceholderView: View {
                 .font(.headline)
                 .foregroundStyle(Color.Theme.mutedForeground)
 
-            Text("Events can’t be loaded right now. Uploads will resume when you’re back online.")
+            Text("Events can't be loaded right now. Uploads will resume when you're back online.")
                 .font(.subheadline)
                 .foregroundStyle(Color.Theme.mutedForeground)
                 .multilineTextAlignment(.center)
