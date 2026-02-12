@@ -66,10 +66,11 @@ Triggers: Push to `master` with changes in `apps/api/**`, `packages/db/**`, `pac
 
 Steps:
 
-1. Validate required secrets (fail-fast)
+1. Inject secrets from Infisical (`staging` env)
 2. Run database migrations
-3. Set Worker secrets via `wrangler secret put`
-4. Deploy Worker via `wrangler deploy --env staging`
+3. Deploy Worker via `wrangler deploy --env staging`
+
+Worker secrets are managed by Terraform (`infra/terraform/modules/cloudflare-worker-secrets`), not CI.
 
 ### Staging Dashboard/Event (`deploy-staging-*.yml`)
 
@@ -77,10 +78,11 @@ Triggers: Push to `master` with changes in respective app/package paths
 
 Steps:
 
-1. Create `.env.staging` with `VITE_API_URL` and `VITE_CLERK_PUBLISHABLE_KEY`
-2. Build API (for TypeScript types)
-3. Build app with `--mode staging`
-4. Deploy to Pages with `--branch=staging`
+1. Inject secrets from Infisical (`staging` env)
+2. Create `.env.staging` with `VITE_API_URL` and `VITE_CLERK_PUBLISHABLE_KEY`
+3. Build API (for TypeScript types)
+4. Build app with `--mode staging`
+5. Deploy to Pages with `--branch=staging`
 
 ### Production Workflows
 
@@ -88,43 +90,70 @@ Same as staging but:
 
 - **Trigger**: Manual `workflow_dispatch` only
 - **Environment**: `production` (can require approvals)
+- **Infisical env**: `prod`
 - **Branch**: `--branch=main` for Pages
 
-## Secrets
+## Secrets Management
 
-All secrets are stored in GitHub repository settings under Environments (`staging`, `production`).
+Secrets are managed via **Infisical** (project: `frame-fast-pu-xi`) and **Terraform**.
 
-### Required Secrets
+### How it works
 
-| Secret                         | Used By               | Description                          |
-| ------------------------------ | --------------------- | ------------------------------------ |
-| `CLOUDFLARE_API_TOKEN`         | All                   | CF API access                        |
-| `CLOUDFLARE_ACCOUNT_ID`        | All                   | CF account                           |
-| `DATABASE_URL`                 | API                   | Neon connection string               |
-| `CLERK_SECRET_KEY`             | API                   | Clerk backend key                    |
-| `CLERK_PUBLISHABLE_KEY`        | API, Dashboard, Event | Clerk frontend key                   |
-| `CLERK_JWT_KEY`                | API                   | JWT verification                     |
-| `CLERK_WEBHOOK_SIGNING_SECRET` | API                   | Webhook validation                   |
-| `AWS_ACCESS_KEY_ID`            | API                   | Rekognition access                   |
-| `AWS_SECRET_ACCESS_KEY`        | API                   | Rekognition secret                   |
-| `STRIPE_SECRET_KEY`            | API                   | Stripe backend key                   |
-| `STRIPE_WEBHOOK_SECRET`        | API                   | Webhook validation                   |
-| `R2_ACCESS_KEY_ID`             | API                   | R2 S3-compatible access              |
-| `R2_SECRET_ACCESS_KEY`         | API                   | R2 S3-compatible secret              |
-| `ADMIN_API_KEY`                | API                   | Internal admin endpoints             |
-| `FTP_JWT_SECRET`               | API                   | FTP token signing key                |
-| `FTP_PASSWORD_ENCRYPTION_KEY`  | API                   | FTP password encryption              |
-| `DESKTOP_ACCESS_JWT_SECRET`    | API                   | Desktop access JWT secret            |
-| `DESKTOP_REFRESH_TOKEN_PEPPER` | API                   | Desktop refresh/token hashing pepper |
+1. **External secrets** (DATABASE_URL, Clerk, Stripe, AWS, etc.) are stored in Infisical
+2. **Terraform** reads from Infisical, generates internal secrets (R2 tokens, random passwords), and pushes all Worker secrets via the Cloudflare API
+3. **CI workflows** use `Infisical/secrets-action` to inject env vars at deploy time (for migrations, wrangler auth, build-time env vars)
 
-### Optional Secrets
+### Terraform-managed secrets (pushed to Worker)
+
+| Secret                         | Source     | Description                          |
+| ------------------------------ | ---------- | ------------------------------------ |
+| `DATABASE_URL`                 | Infisical  | Neon connection string               |
+| `CLERK_SECRET_KEY`             | Infisical  | Clerk backend key                    |
+| `CLERK_PUBLISHABLE_KEY`        | Infisical  | Clerk frontend key                   |
+| `CLERK_JWT_KEY`                | Infisical  | JWT verification                     |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | Infisical  | Webhook validation                   |
+| `AWS_ACCESS_KEY_ID`            | Infisical  | Rekognition access                   |
+| `AWS_SECRET_ACCESS_KEY`        | Infisical  | Rekognition secret                   |
+| `STRIPE_SECRET_KEY`            | Infisical  | Stripe backend key                   |
+| `STRIPE_WEBHOOK_SECRET`        | Infisical  | Webhook validation                   |
+| `R2_ACCESS_KEY_ID`             | Terraform  | R2 S3-compatible access (generated)  |
+| `R2_SECRET_ACCESS_KEY`         | Terraform  | R2 S3-compatible secret (generated)  |
+| `ADMIN_API_KEY`                | Terraform  | Internal admin endpoints (generated) |
+| `FTP_JWT_SECRET`               | Terraform  | FTP token signing key (generated)    |
+| `FTP_PASSWORD_ENCRYPTION_KEY`  | Terraform  | FTP password encryption (generated)  |
+| `DESKTOP_ACCESS_JWT_SECRET`    | Terraform  | Desktop access JWT (generated)       |
+| `DESKTOP_REFRESH_TOKEN_PEPPER` | Terraform  | Desktop refresh hashing (generated)  |
+
+### GitHub secrets (minimal)
+
+Only bootstrap secrets remain in GitHub:
+
+| Secret                    | Environment       | Description                    |
+| ------------------------- | ----------------- | ------------------------------ |
+| `INFISICAL_CLIENT_ID`     | staging/production | Infisical Machine Identity ID  |
+| `INFISICAL_CLIENT_SECRET` | staging/production | Infisical Machine Identity key |
+| `NEON_API_KEY`             | (repo-level)      | Neon preview branches in CI    |
+
+### Optional secrets (Infisical)
 
 | Secret                      | Description                         |
 | --------------------------- | ----------------------------------- |
-| `LINE_CHANNEL_SECRET`       | LINE integration (warns if missing) |
-| `LINE_CHANNEL_ACCESS_TOKEN` | LINE integration (warns if missing) |
-| `NEON_PROJECT_ID`           | Enables PR preview databases        |
-| `NEON_API_KEY`              | Enables PR preview databases        |
+| `LINE_CHANNEL_SECRET`       | LINE integration (skipped if empty) |
+| `LINE_CHANNEL_ACCESS_TOKEN` | LINE integration (skipped if empty) |
+
+### Running Terraform locally
+
+```bash
+# Staging
+cd infra/terraform/environments/staging
+infisical run --env=staging -- terraform plan
+infisical run --env=staging -- terraform apply
+
+# Production
+cd infra/terraform/environments/production
+infisical run --env=prod -- terraform plan
+infisical run --env=prod -- terraform apply
+```
 
 ## Triggering Deploys
 
