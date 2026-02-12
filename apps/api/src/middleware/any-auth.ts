@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
+import * as Sentry from '@sentry/cloudflare';
 import { createClerkAuth } from '@sabaipics/auth/middleware';
 import type { AuthObject } from '@sabaipics/auth/types';
 import { verifyDesktopAccessToken } from '../lib/desktop-auth/jwt';
@@ -49,6 +50,28 @@ export function createAnyAuth(): MiddlewareHandler<Env> {
       }
     }
 
-    return clerkAuth(c, next);
+    await clerkAuth(c, next);
+
+    // After Clerk auth runs, capture rejection details to Sentry
+    // This fires when a Bearer token was present but Clerk rejected it
+    const auth = c.get('auth');
+    const rejectionReason = c.get('authRejectionReason');
+    if (!auth && rejectionReason && c.req.header('Authorization')) {
+      Sentry.captureMessage('[auth] Clerk token rejected', {
+        level: 'warning',
+        tags: {
+          auth_rejection: 'true',
+          path: new URL(c.req.url).pathname,
+        },
+        extra: {
+          rejectionDetail: rejectionReason,
+          url: c.req.url,
+          method: c.req.method,
+          userAgent: c.req.header('User-Agent') ?? 'unknown',
+          origin: c.req.header('Origin') ?? 'none',
+          referer: c.req.header('Referer') ?? 'none',
+        },
+      });
+    }
   };
 }
