@@ -38,7 +38,7 @@ jobs:
         with:
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-          project-slug: frame-fast-pu-xiu
+          project-slug: frame-fast-pu-xi
           env-slug: staging
 
       - run: pnpm install
