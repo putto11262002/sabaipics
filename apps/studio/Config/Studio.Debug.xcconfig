@@ -3,6 +3,9 @@
 // Clerk
 CLERK_PUBLISHABLE_KEY = pk_test_cmljaC1wdWctNjQuY2xlcmsuYWNjb3VudHMuZGV2JA
 
+// Entitlements
+CODE_SIGN_ENTITLEMENTS = FrameFast/FrameFast.Debug.entitlements
+
 // API Configuration
 API_BASE_URL = https:/$()/dev-api.sabaipics.com
 EVENT_FRONTEND_URL = https:/$()/dev.sabaipics.com
