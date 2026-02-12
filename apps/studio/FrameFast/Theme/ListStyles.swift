@@ -8,17 +8,14 @@ import SwiftUI
 /// App-default list styling.
 ///
 /// Design rules:
-/// - Keep separators visible
-/// - Do not override the system list background
-/// - Use card background per-row when desired
+/// - Keep native list behavior and spacing
+/// - Only override row background when needed
 extension View {
     func sabaiList() -> some View {
-        self.listStyle(.insetGrouped)
+        self
     }
 
     func sabaiCardRow() -> some View {
-        self
-            .listRowBackground(Color.Theme.card)
-            .listRowSeparator(.visible)
+        self.listRowBackground(Color.Theme.card)
     }
 }

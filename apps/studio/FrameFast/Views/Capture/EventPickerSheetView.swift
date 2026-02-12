@@ -75,9 +75,8 @@ struct EventPickerSheetView: View {
                     } label: {
                         HStack(spacing: 12) {
                             Text(event.name)
-                                .font(.subheadline.weight(.semibold))
+                                .font(.body)
                                 .foregroundStyle(Color.Theme.foreground)
-                                .lineLimit(1)
                             Spacer(minLength: 8)
                             if selectedEventId == event.id {
                                 Image(systemName: "checkmark.circle.fill")
@@ -86,15 +85,12 @@ struct EventPickerSheetView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .padding(.vertical, 2)
-                    .sabaiCardRow()
                 }
             } header: {
                 Text("Events")
                     .foregroundStyle(Color.Theme.mutedForeground)
             }
         }
-        .sabaiList()
         .refreshable {
             await viewModel.refreshEvents()
         }
@@ -111,7 +107,6 @@ struct EventPickerSheetView: View {
                     .foregroundStyle(Color.Theme.mutedForeground)
             }
         }
-        .sabaiList()
         .redacted(reason: .placeholder)
         .disabled(true)
     }
@@ -170,3 +165,38 @@ struct EventPickerSheetView: View {
     }
 }
 
+private struct SkeletonEventRow: View {
+    let title: String
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.body)
+                .foregroundStyle(Color.Theme.foreground)
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct OfflineEventsPlaceholderView: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 52))
+                .foregroundStyle(Color.Theme.mutedForeground)
+
+            Text("Offline")
+                .font(.headline)
+                .foregroundStyle(Color.Theme.mutedForeground)
+
+            Text("Events can’t be loaded right now. Uploads will resume when you’re back online.")
+                .font(.subheadline)
+                .foregroundStyle(Color.Theme.mutedForeground)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
