@@ -10,6 +10,14 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
+    infisical = {
+      source  = "Infisical/infisical"
+      version = ">= 0.7.0"
+    }
   }
 }
 
@@ -22,6 +30,12 @@ provider "cloudflare" {
   # API token is read from CLOUDFLARE_API_TOKEN env var
 }
 
+provider "infisical" {
+  host = "https://app.infisical.com"
+  # Auth via INFISICAL_UNIVERSAL_AUTH_CLIENT_ID +
+  #          INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET env vars
+}
+
 # ------------------------------------------------------------------------------
 # Cloudflare Infrastructure Module
 # ------------------------------------------------------------------------------
@@ -29,9 +43,9 @@ provider "cloudflare" {
 module "cloudflare_infra" {
   source = "../../modules/cloudflare-infra"
 
-  account_id   = var.account_id
-  environment  = var.environment
-  zone_id      = var.zone_id
+  account_id  = var.account_id
+  environment = var.environment
+  zone_id     = var.zone_id
 
   # R2 Bucket
   photos_bucket_name     = var.photos_bucket_name
@@ -52,4 +66,22 @@ module "cloudflare_infra" {
 
   # Event Notifications
   bucket_notifications = var.bucket_notifications
+}
+
+# ------------------------------------------------------------------------------
+# Worker Secrets Module
+# Reads external secrets from Infisical, generates R2 token + random passwords,
+# and pushes everything to the staging Worker.
+# ------------------------------------------------------------------------------
+
+module "worker_secrets" {
+  source = "../../modules/cloudflare-worker-secrets"
+
+  account_id            = var.account_id
+  environment           = var.environment
+  worker_script_name    = var.worker_script_name
+  r2_bucket_names       = [module.cloudflare_infra.photos_bucket_name]
+  infisical_project_id  = var.infisical_project_id
+  infisical_env_slug    = "staging"
+  infisical_folder_path = "/"
 }

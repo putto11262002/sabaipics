@@ -33,111 +33,20 @@ jobs:
         with:
           version: 9.0.0
 
+      - name: Inject Secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.15
+        with:
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          project-slug: frame-fast-pu-xiu
+          env-slug: staging
+
       - run: pnpm install
-
-      - name: Validate Required Secrets
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          CLERK_JWT_KEY: ${{ secrets.CLERK_JWT_KEY }}
-          CLERK_WEBHOOK_SIGNING_SECRET: ${{ secrets.CLERK_WEBHOOK_SIGNING_SECRET }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
-          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
-          FTP_JWT_SECRET: ${{ secrets.FTP_JWT_SECRET }}
-          FTP_PASSWORD_ENCRYPTION_KEY: ${{ secrets.FTP_PASSWORD_ENCRYPTION_KEY }}
-          DESKTOP_ACCESS_JWT_SECRET: ${{ secrets.DESKTOP_ACCESS_JWT_SECRET }}
-          DESKTOP_REFRESH_TOKEN_PEPPER: ${{ secrets.DESKTOP_REFRESH_TOKEN_PEPPER }}
-        run: |
-          set -euo pipefail
-          required=(
-            DATABASE_URL
-            CLERK_SECRET_KEY
-            CLERK_PUBLISHABLE_KEY
-            CLERK_JWT_KEY
-            CLERK_WEBHOOK_SIGNING_SECRET
-            AWS_ACCESS_KEY_ID
-            AWS_SECRET_ACCESS_KEY
-            STRIPE_SECRET_KEY
-            STRIPE_WEBHOOK_SECRET
-            R2_ACCESS_KEY_ID
-            R2_SECRET_ACCESS_KEY
-            ADMIN_API_KEY
-            FTP_JWT_SECRET
-            FTP_PASSWORD_ENCRYPTION_KEY
-            DESKTOP_ACCESS_JWT_SECRET
-            DESKTOP_REFRESH_TOKEN_PEPPER
-          )
-          # LINE secrets are optional until LINE integration is enabled
-          optional=(
-            LINE_CHANNEL_SECRET
-            LINE_CHANNEL_ACCESS_TOKEN
-          )
-
-          for k in "${required[@]}"; do
-            v="${!k:-}"
-            if [[ -z "$v" ]]; then
-              echo "Missing required secret: $k" >&2
-              exit 1
-            fi
-          done
-
-          for k in "${optional[@]}"; do
-            v="${!k:-}"
-            if [[ -z "$v" ]]; then
-              echo "::warning::Optional secret not set: $k (LINE integration disabled)"
-            fi
-          done
 
       # Tests already run in PR checks - skip here to avoid running against staging DB
       - name: Run Database Migrations
         run: pnpm --filter=@sabaipics/db db:migrate
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Set API Secrets
-        working-directory: apps/api
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
-          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
-          FTP_JWT_SECRET: ${{ secrets.FTP_JWT_SECRET }}
-          FTP_PASSWORD_ENCRYPTION_KEY: ${{ secrets.FTP_PASSWORD_ENCRYPTION_KEY }}
-        run: |
-          echo "${{ secrets.DATABASE_URL }}" | pnpm wrangler secret put DATABASE_URL --env staging
-          echo "${{ secrets.CLERK_SECRET_KEY }}" | pnpm wrangler secret put CLERK_SECRET_KEY --env staging
-          echo "${{ secrets.CLERK_PUBLISHABLE_KEY }}" | pnpm wrangler secret put CLERK_PUBLISHABLE_KEY --env staging
-          echo "${{ secrets.CLERK_JWT_KEY }}" | pnpm wrangler secret put CLERK_JWT_KEY --env staging
-          echo "${{ secrets.CLERK_WEBHOOK_SIGNING_SECRET }}" | pnpm wrangler secret put CLERK_WEBHOOK_SIGNING_SECRET --env staging
-          echo "${{ secrets.AWS_ACCESS_KEY_ID }}" | pnpm wrangler secret put AWS_ACCESS_KEY_ID --env staging
-          echo "${{ secrets.AWS_SECRET_ACCESS_KEY }}" | pnpm wrangler secret put AWS_SECRET_ACCESS_KEY --env staging
-          echo "${{ secrets.STRIPE_SECRET_KEY }}" | pnpm wrangler secret put STRIPE_SECRET_KEY --env staging
-          echo "${{ secrets.STRIPE_WEBHOOK_SECRET }}" | pnpm wrangler secret put STRIPE_WEBHOOK_SECRET --env staging
-          echo "${{ secrets.R2_ACCESS_KEY_ID }}" | pnpm wrangler secret put R2_ACCESS_KEY_ID --env staging
-          echo "${{ secrets.R2_SECRET_ACCESS_KEY }}" | pnpm wrangler secret put R2_SECRET_ACCESS_KEY --env staging
-          echo "${{ secrets.ADMIN_API_KEY }}" | pnpm wrangler secret put ADMIN_API_KEY --env staging
-          echo "${{ secrets.FTP_JWT_SECRET }}" | pnpm wrangler secret put FTP_JWT_SECRET --env staging
-          echo "${{ secrets.FTP_PASSWORD_ENCRYPTION_KEY }}" | pnpm wrangler secret put FTP_PASSWORD_ENCRYPTION_KEY --env staging
-          echo "${{ secrets.DESKTOP_ACCESS_JWT_SECRET }}" | pnpm wrangler secret put DESKTOP_ACCESS_JWT_SECRET --env staging
-          echo "${{ secrets.DESKTOP_REFRESH_TOKEN_PEPPER }}" | pnpm wrangler secret put DESKTOP_REFRESH_TOKEN_PEPPER --env staging
-          # Optional LINE secrets
-          if [[ -n "$LINE_CHANNEL_SECRET" ]]; then
-            echo "$LINE_CHANNEL_SECRET" | pnpm wrangler secret put LINE_CHANNEL_SECRET --env staging
-          fi
-          if [[ -n "$LINE_CHANNEL_ACCESS_TOKEN" ]]; then
-            echo "$LINE_CHANNEL_ACCESS_TOKEN" | pnpm wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env staging
-          fi
-
+      # Worker secrets are managed by Terraform (infra/terraform/modules/cloudflare-worker-secrets)
       - name: Deploy API
         run: pnpm --filter=@sabaipics/api deploy:staging
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

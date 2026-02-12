@@ -26,3 +26,17 @@ output "queue_names" {
   value       = module.cloudflare_infra.queue_names
   description = "Map of queue logical names to their actual names"
 }
+
+# ------------------------------------------------------------------------------
+# Worker Secrets
+# ------------------------------------------------------------------------------
+
+output "r2_access_key_id" {
+  value       = module.worker_secrets.r2_access_key_id
+  description = "R2 API token ID (used as access key)"
+}
+
+output "secrets_pushed" {
+  value       = module.worker_secrets.secrets_pushed
+  description = "List of secret names pushed to the Worker"
+}

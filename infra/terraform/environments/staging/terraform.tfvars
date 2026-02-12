@@ -9,6 +9,9 @@ account_id  = "ac76d647241fb6b589f88fe88d0e4a08"
 # Zone ID for framefast.io
 zone_id = "cad9739a62904eeef1eaf4a2c0ab13ce"
 
+# Worker script name for secrets injection
+worker_script_name = "framefast-api-staging"
+
 # ------------------------------------------------------------------------------
 # R2 Bucket Configuration
 # ------------------------------------------------------------------------------
