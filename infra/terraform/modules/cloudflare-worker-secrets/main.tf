@@ -1,8 +1,8 @@
 # ------------------------------------------------------------------------------
 # Cloudflare Worker Secrets Module
 #
-# Reads external secrets from Infisical, generates internal ones
-# (R2 token + random passwords), and pushes everything to a
+# Reads external secrets from Infisical, generates R2 credentials,
+# and pushes everything to a
 # Cloudflare Worker via the Workers Secrets REST API.
 #
 # NOTE: Cloudflare Terraform provider v5 removed the standalone
@@ -37,36 +37,7 @@ module "r2_token" {
 }
 
 # ------------------------------------------------------------------------------
-# 3. Generate random passwords for internal secrets
-# ------------------------------------------------------------------------------
-
-resource "random_password" "ftp_jwt_secret" {
-  length  = 64
-  special = false
-}
-
-resource "random_password" "ftp_password_encryption_key" {
-  length  = 64
-  special = false
-}
-
-resource "random_password" "desktop_access_jwt_secret" {
-  length  = 64
-  special = false
-}
-
-resource "random_password" "desktop_refresh_token_pepper" {
-  length  = 64
-  special = false
-}
-
-resource "random_password" "admin_api_key" {
-  length  = 32
-  special = false
-}
-
-# ------------------------------------------------------------------------------
-# 4. Assemble all secrets and push to Worker
+# 3. Assemble all secrets and push to Worker
 # ------------------------------------------------------------------------------
 
 locals {
@@ -83,6 +54,11 @@ locals {
     AWS_SECRET_ACCESS_KEY        = local.infisical["AWS_SECRET_ACCESS_KEY"].value
     STRIPE_SECRET_KEY            = local.infisical["STRIPE_SECRET_KEY"].value
     STRIPE_WEBHOOK_SECRET        = local.infisical["STRIPE_WEBHOOK_SECRET"].value
+    FTP_PASSWORD_ENCRYPTION_KEY  = local.infisical["FTP_PASSWORD_ENCRYPTION_KEY"].value
+    FTP_JWT_SECRET               = local.infisical["FTP_JWT_SECRET"].value
+    ADMIN_API_KEY                = local.infisical["ADMIN_API_KEY"].value
+    DESKTOP_ACCESS_JWT_SECRET    = local.infisical["DESKTOP_ACCESS_JWT_SECRET"].value
+    DESKTOP_REFRESH_TOKEN_PEPPER = local.infisical["DESKTOP_REFRESH_TOKEN_PEPPER"].value
   }
 
   # Optional secrets (only include if present in Infisical)
@@ -92,15 +68,10 @@ locals {
     if contains(keys(local.infisical), k)
   }
 
-  # Terraform-generated secrets
+  # Terraform-generated secrets (only R2 credentials — safe to regenerate)
   generated_secrets = {
-    R2_ACCESS_KEY_ID             = module.r2_token.id
-    R2_SECRET_ACCESS_KEY         = module.r2_token.secret
-    FTP_JWT_SECRET               = random_password.ftp_jwt_secret.result
-    FTP_PASSWORD_ENCRYPTION_KEY  = random_password.ftp_password_encryption_key.result
-    DESKTOP_ACCESS_JWT_SECRET    = random_password.desktop_access_jwt_secret.result
-    DESKTOP_REFRESH_TOKEN_PEPPER = random_password.desktop_refresh_token_pepper.result
-    ADMIN_API_KEY                = random_password.admin_api_key.result
+    R2_ACCESS_KEY_ID     = module.r2_token.id
+    R2_SECRET_ACCESS_KEY = module.r2_token.secret
   }
 
   all_secrets = merge(local.external_secrets, local.optional_secrets, local.generated_secrets)
