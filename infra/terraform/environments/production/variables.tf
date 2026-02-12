@@ -93,3 +93,19 @@ variable "bucket_notifications" {
   description = "R2 bucket event notification configuration"
   default     = []
 }
+
+# ------------------------------------------------------------------------------
+# Worker Secrets Configuration
+# ------------------------------------------------------------------------------
+
+variable "worker_script_name" {
+  type        = string
+  description = "Name of the Cloudflare Worker script to push secrets to"
+  default     = "framefast-api-production"
+}
+
+variable "infisical_project_id" {
+  type        = string
+  description = "Infisical project (workspace) ID"
+  default     = "315a1831-a394-47fb-856b-e791dd7e9f9e"
+}

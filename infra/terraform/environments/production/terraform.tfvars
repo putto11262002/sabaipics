@@ -60,3 +60,9 @@ bucket_notifications = [
     description = "Trigger logo processing on new logos"
   }
 ]
+
+# ------------------------------------------------------------------------------
+# Worker Secrets Configuration
+# ------------------------------------------------------------------------------
+
+worker_script_name = "framefast-api-production"
