@@ -12,4 +12,5 @@ export type AuthBindings = {
 
 export type AuthVariables = {
 	auth: AuthObject | null;
+	authRejectionReason: string | null;
 };
