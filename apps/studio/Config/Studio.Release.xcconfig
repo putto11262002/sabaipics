@@ -1,7 +1,7 @@
 // FrameFast Release configuration
 
 // Clerk
-CLERK_PUBLISHABLE_KEY =
+CLERK_PUBLISHABLE_KEY = pk_live_Y2xlcmsuZnJhbWVmYXN0LmlvJA
 
 // API Configuration
 API_BASE_URL = https:/$()/api.sabaipics.com

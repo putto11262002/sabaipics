@@ -1,7 +1,7 @@
 // FrameFast Debug configuration
 
 // Clerk
-CLERK_PUBLISHABLE_KEY =
+CLERK_PUBLISHABLE_KEY = pk_test_cmljaC1wdWctNjQuY2xlcmsuYWNjb3VudHMuZGV2JA
 
 // API Configuration
 API_BASE_URL = https:/$()/dev-api.sabaipics.com

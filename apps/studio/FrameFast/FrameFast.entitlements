@@ -4,8 +4,8 @@
 <dict>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>webcredentials:rich-pug-64.clerk.accounts.dev</string>
-		<string>applinks:rich-pug-64.clerk.accounts.dev</string>
+		<string>webcredentials:clerk.framefast.io</string>
+		<string>applinks:clerk.framefast.io</string>
 	</array>
 	<key>com.apple.developer.networking.HotspotConfiguration</key>
 	<true/>
