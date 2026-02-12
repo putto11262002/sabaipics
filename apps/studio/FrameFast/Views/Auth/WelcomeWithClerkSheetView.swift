@@ -14,6 +14,7 @@ import Clerk
 struct WelcomeWithClerkSheetView: View {
     @State private var showAuthSheet = false
     @State private var authMode: AuthView.Mode = .signIn
+    @State private var legalURL: URL?
     
     /// Custom theme for Clerk AuthView matching our shadcn/ui design system
     private var clerkTheme: ClerkTheme {
@@ -85,17 +86,26 @@ struct WelcomeWithClerkSheetView: View {
             .padding(.bottom, 32)
             
             // MARK: - Footer
-            Text("By continuing, you agree to our Terms of Service and Privacy Policy")
+            Text("By continuing, you agree to our [Terms of Service](https://framefast.io/terms) and [Privacy Policy](https://framefast.io/privacy)")
                 .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(Color.Theme.mutedForeground)
+                .tint(Color.Theme.primary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
                 .padding(.bottom, 16)
+                .environment(\.openURL, OpenURLAction { url in
+                    legalURL = url
+                    return .handled
+                })
         }
         .background(Color.Theme.background)
         .sheet(isPresented: $showAuthSheet) {
             AuthView(mode: authMode)
                 .environment(\.clerkTheme, clerkTheme)
+        }
+        .sheet(item: $legalURL) { url in
+            SafariView(url: url)
+                .ignoresSafeArea()
         }
     }
 }

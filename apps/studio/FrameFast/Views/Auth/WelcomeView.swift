@@ -17,6 +17,7 @@ import SwiftUI
 /// - Continue with LINE (starts OAuth)
 struct WelcomeView: View {
     @ObservedObject var coordinator: AuthFlowCoordinator
+    @State private var legalURL: URL?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -101,12 +102,21 @@ struct WelcomeView: View {
             .opacity(coordinator.isLoading ? 0.6 : 1.0)
             
             // MARK: - Footer
-            Text("By continuing, you agree to our Terms of Service and Privacy Policy")
+            Text("By continuing, you agree to our [Terms of Service](https://framefast.io/terms) and [Privacy Policy](https://framefast.io/privacy)")
                 .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(.secondary)
+                .tint(.accentColor)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
                 .padding(.bottom, 16)
+                .environment(\.openURL, OpenURLAction { url in
+                    legalURL = url
+                    return .handled
+                })
+        }
+        .sheet(item: $legalURL) { url in
+            SafariView(url: url)
+                .ignoresSafeArea()
         }
     }
 }

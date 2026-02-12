@@ -11,6 +11,7 @@ import Clerk
 struct ProfileView: View {
     @Environment(\.clerk) private var clerk
     @State private var showAccountPortal = false
+    @State private var legalURL: URL?
 
     var body: some View {
         NavigationStack {
@@ -59,6 +60,19 @@ struct ProfileView: View {
                             .foregroundStyle(.red)
                     }
                 }
+
+                Section("Legal") {
+                    Button {
+                        legalURL = URL(string: "https://framefast.io/terms")
+                    } label: {
+                        Label("Terms of Service", systemImage: "doc.text")
+                    }
+                    Button {
+                        legalURL = URL(string: "https://framefast.io/privacy")
+                    } label: {
+                        Label("Privacy Policy", systemImage: "hand.raised")
+                    }
+                }
             }
             .navigationTitle("Profile")
             .toolbar {
@@ -68,6 +82,10 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showAccountPortal) {
                 UserProfileView()
+            }
+            .sheet(item: $legalURL) { url in
+                SafariView(url: url)
+                    .ignoresSafeArea()
             }
         }
     }
