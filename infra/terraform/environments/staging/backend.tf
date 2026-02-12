@@ -1,26 +1,24 @@
 # ------------------------------------------------------------------------------
-# Terraform Backend Configuration - Local State
+# Terraform Backend Configuration - Cloudflare R2
 #
-# For now, using local state. State file will be at:
-#   infra/terraform/environments/staging/terraform.tfstate
+# State is stored in the sabaipics-terraform-state R2 bucket using
+# the S3-compatible API. Credentials (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
+# are injected via Infisical from the /terraform folder:
 #
-# TODO: Migrate to R2 backend for team collaboration:
+#   infisical run --env=staging --path="/terraform" -- terraform plan
 #
-# terraform {
-#   backend "s3" {
-#     bucket                      = "sabaipics-terraform-state"
-#     key                         = "cloudflare/staging.tfstate"
-#     region                      = "auto"
-#     skip_credentials_validation = true
-#     skip_metadata_api_check     = true
-#     skip_region_validation      = true
-#     skip_requesting_account_id  = true
-#     skip_s3_checksum            = true
-#     endpoints = {
-#       s3 = "https://ac76d647241fb6b589f88fe88d0e4a08.r2.cloudflarestorage.com"
-#     }
-#   }
-# }
+# NOTE: R2 does not support state locking. Avoid concurrent applies.
 # ------------------------------------------------------------------------------
 
-# Using local backend (default) - no configuration needed
+terraform {
+  backend "s3" {
+    bucket                      = "framefast-tf-state"
+    key                         = "cloudflare/staging.tfstate"
+    region                      = "auto"
+    endpoint                    = "https://ac76d647241fb6b589f88fe88d0e4a08.r2.cloudflarestorage.com"
+    skip_credentials_validation = true
+    skip_metadata_api_check     = true
+    skip_region_validation      = true
+    force_path_style            = true
+  }
+}
