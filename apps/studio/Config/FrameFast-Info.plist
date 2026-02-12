@@ -39,6 +39,8 @@
 	<string>$(API_BASE_URL)</string>
 	<key>EventFrontendURL</key>
 	<string>$(EVENT_FRONTEND_URL)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
