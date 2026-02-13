@@ -142,17 +142,17 @@ struct AccountNotFoundView: View {
                 }
                 
                 // Sign up button
-                Button {
-                    openURL(signUpURL)
-                } label: {
-                    Label("Sign up at FrameFast", systemImage: "arrow.up.right.square")
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                        .background(Color.accentColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
+                 Button {
+                     openURL(signUpURL)
+                 } label: {
+                     Label("Sign up at FrameFast", systemImage: "arrow.up.right.square")
+                         .frame(maxWidth: .infinity)
+                         .frame(height: 44)
+                         .font(.system(size: 17, weight: .semibold))
+                         .foregroundColor(.white)
+                         .background(Color.accentColor)
+                         .clipShape(RoundedRectangle(cornerRadius: 12))
+                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 8)
                 

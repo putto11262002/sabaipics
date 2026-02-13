@@ -10,14 +10,14 @@ import SwiftUI
 // MARK: - Themed TextField Style
 
 /// Standard themed text field with background and focus border
-/// Matches button sizing: height 50, corner radius 12
+/// Matches button sizing: height 44, corner radius 12
 struct ThemedTextFieldStyle: TextFieldStyle {
     @FocusState.Binding var isFocused: Bool
 
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .font(.system(size: 17))
-            .frame(height: 50)
+            .frame(height: 44)
             .padding(.horizontal, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
@@ -53,7 +53,7 @@ extension TextFieldStyle where Self == ThemedTextFieldStyle {
         Button("Connect Camera") { }
             .buttonStyle(.primary)
 
-        Text("Text field matches button sizing:\n• Height: 50pt\n• Corner radius: 12pt\n• Font: 17pt")
+        Text("Text field matches button sizing:\n• Height: 44pt\n• Corner radius: 12pt\n• Font: 17pt")
             .font(.caption)
             .foregroundStyle(Color.Theme.mutedForeground)
             .multilineTextAlignment(.center)

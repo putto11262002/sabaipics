@@ -85,6 +85,7 @@ struct EventPickerSheetView: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .sabaiCardRow()
                 }
             } header: {
                 Text("Events")
@@ -176,6 +177,7 @@ private struct SkeletonEventRow: View {
 
             Spacer(minLength: 0)
         }
+        .sabaiCardRow()
     }
 }
 

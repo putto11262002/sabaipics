@@ -92,7 +92,7 @@ struct EmailEntryView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 50)
+                .frame(height: 44)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.white)
                 .background(isValidEmail ? Color.accentColor : Color.gray)
