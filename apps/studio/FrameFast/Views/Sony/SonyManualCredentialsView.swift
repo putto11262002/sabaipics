@@ -63,7 +63,6 @@ struct SonyManualCredentialsView: View {
             .padding(20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.Theme.background.ignoresSafeArea())
         .navigationTitle("Enter SSID")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)

@@ -66,6 +66,7 @@ struct CaptureTabRootView: View {
                 sheetContent(sheet)
                     .interactiveDismissDisabled(true)
                     .presentationDragIndicator(.hidden)
+                    .presentationBackground(Color.Theme.background)
             }
             .sheet(isPresented: $isShowingEventPicker) {
                 EventPickerSheetView(
