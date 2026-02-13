@@ -24,6 +24,7 @@ class AppCoordinator: ObservableObject {
     @Published private(set) var selectedEventName: String?
 
     let connectivityStore: ConnectivityStore
+    let creditsStore: CreditsStore
     let uploadManager: UploadManager
     let uploadStatusStore: UploadStatusStore
     let backgroundSession: BackgroundUploadSessionManager
@@ -43,13 +44,16 @@ class AppCoordinator: ObservableObject {
         let healthURL = baseURLParsed.appendingPathComponent("health")
 
         let connectivityService = ConnectivityService(healthURL: healthURL)
+        let dashboardClient = DashboardAPIClient(baseURL: baseURL)
         let bgSession = BackgroundUploadSessionManager.create()
         self.connectivityStore = ConnectivityStore(service: connectivityService)
+        self.creditsStore = CreditsStore(apiClient: dashboardClient, connectivityStore: connectivityStore)
         self.backgroundSession = bgSession
         self.uploadManager = UploadManager(baseURL: baseURL, connectivity: connectivityService, backgroundSession: bgSession)
         self.uploadStatusStore = UploadStatusStore(uploadManager: uploadManager)
 
         connectivityStore.start()
+        creditsStore.start()
         observeConnectivityForAuthRefresh()
 
         // Wire any pending background session completion handler from a system relaunch.

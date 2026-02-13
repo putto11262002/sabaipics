@@ -93,6 +93,9 @@ struct CaptureTabRootView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     ConnectivityStatusToolbarView()
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    CreditsToolbarView()
+                }
             }
             .confirmationDialog(
                 "Add camera",

@@ -22,6 +22,7 @@ struct FrameFastApp: App {
                 .environmentObject(coordinator)
                 .environmentObject(coordinator.uploadStatusStore)
                 .environmentObject(coordinator.connectivityStore)
+                .environmentObject(coordinator.creditsStore)
                 .environment(\.clerk, clerk)
                 .tint(Color.Theme.primary)
                 .task {
@@ -33,8 +34,10 @@ struct FrameFastApp: App {
                         Task { try? await clerk.load() }
                         Task { await coordinator.uploadManager.resume() }
                         coordinator.uploadStatusStore.start()
+                        coordinator.creditsStore.start()
                     case .background:
                         coordinator.uploadStatusStore.stop()
+                        coordinator.creditsStore.stop()
                         Task { await coordinator.scheduleBackgroundDrainIfNeeded() }
                     case .inactive:
                         break

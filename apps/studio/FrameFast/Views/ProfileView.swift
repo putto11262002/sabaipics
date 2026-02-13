@@ -132,6 +132,9 @@ struct ProfileView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     ConnectivityStatusToolbarView()
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    CreditsToolbarView()
+                }
             }
             .sheet(isPresented: $showAccountPortal) {
                 UserProfileView()

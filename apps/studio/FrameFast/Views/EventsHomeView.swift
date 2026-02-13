@@ -117,6 +117,9 @@ struct EventsHomeView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     ConnectivityStatusToolbarView()
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    CreditsToolbarView()
+                }
             }
             .task {
                 if viewModel.events.isEmpty {
