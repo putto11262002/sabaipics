@@ -163,17 +163,9 @@ struct CameraDiscoveryScreen: View {
                             onDone()
                         }
                     } label: {
-                        Text("Done")
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .background(Color.Theme.muted)
-                            .clipShape(Capsule())
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.Theme.border, lineWidth: 1)
-                            )
-                            .foregroundStyle(Color.Theme.foreground)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.Theme.mutedForeground)
                     }
                     .buttonStyle(.plain)
                 }

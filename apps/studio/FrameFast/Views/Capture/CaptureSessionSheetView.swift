@@ -63,10 +63,14 @@ struct CaptureSessionSheetView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
+                    Button {
                         dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.Theme.mutedForeground)
                     }
-                    .buttonStyle(.ghost)
+                    .buttonStyle(.plain)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
