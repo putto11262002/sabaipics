@@ -9,6 +9,10 @@
 
 import SwiftUI
 
+#if os(iOS)
+import UIKit
+#endif
+
 // MARK: - ViewModel
 
 @MainActor
@@ -104,6 +108,9 @@ struct EventsHomeView: View {
                     }
                 }
             }
+            #if os(iOS)
+            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            #endif
             .navigationTitle("Activity")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -148,7 +155,6 @@ struct EventsHomeView: View {
                     .foregroundStyle(Color.Theme.mutedForeground)
             }
         }
-        .sabaiList()
         .redacted(reason: .placeholder)
         .disabled(true)
     }
@@ -170,7 +176,6 @@ struct EventsHomeView: View {
                     .foregroundStyle(Color.Theme.mutedForeground)
             }
         }
-        .sabaiList()
         .refreshable {
             await viewModel.refreshEvents()
         }
@@ -321,15 +326,13 @@ private struct UploadEventStatusRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(.body)
                 .foregroundStyle(Color.Theme.foreground)
-                .lineLimit(1)
 
             Spacer(minLength: 10)
 
             UploadEventSyncIndicator(isOnline: isOnline, summary: summary)
         }
-        .padding(.vertical, 2)
         .sabaiCardRow()
     }
 }
@@ -375,13 +378,11 @@ struct SkeletonEventRow: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(.body)
                 .foregroundStyle(Color.Theme.foreground)
-                .lineLimit(1)
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 2)
         .sabaiCardRow()
     }
 }
