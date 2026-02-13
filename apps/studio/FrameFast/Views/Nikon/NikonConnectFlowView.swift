@@ -46,7 +46,7 @@ struct NikonConnectFlowView: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.Theme.mutedForeground)
+                                .foregroundStyle(Color.Theme.primary)
                         }
                         .buttonStyle(.plain)
                     }
