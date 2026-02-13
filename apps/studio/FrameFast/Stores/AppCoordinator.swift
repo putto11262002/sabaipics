@@ -8,6 +8,8 @@
 
 import SwiftUI
 import BackgroundTasks
+import Clerk
+import Combine
 
 @MainActor
 class AppCoordinator: ObservableObject {
@@ -28,6 +30,7 @@ class AppCoordinator: ObservableObject {
 
     private static let selectedEventDefaultsKey = "SelectedEventId"
     private static let selectedEventNameDefaultsKey = "SelectedEventName"
+    private var connectivityCancellable: AnyCancellable?
 
     init() {
         self.selectedEventId = UserDefaults.standard.string(forKey: Self.selectedEventDefaultsKey)
@@ -47,6 +50,7 @@ class AppCoordinator: ObservableObject {
         self.uploadStatusStore = UploadStatusStore(uploadManager: uploadManager)
 
         connectivityStore.start()
+        observeConnectivityForAuthRefresh()
 
         // Wire any pending background session completion handler from a system relaunch.
         if let pending = AppDelegate.pendingBackgroundCompletionHandler {
@@ -90,6 +94,36 @@ class AppCoordinator: ObservableObject {
             print("[AppCoordinator] Failed to schedule background drain: \(error)")
         }
     }
+
+    // MARK: - Auth Helpers
+
+    func forceSignOut() {
+        Task {
+            do {
+                try await Clerk.shared.signOut()
+            } catch {
+                // Session already revoked server-side — signOut() fails because
+                // it also hits a 401. Re-sync local state so clerk.user clears.
+                print("[AppCoordinator] Sign-out failed: \(error), refreshing Clerk state")
+                try? await Clerk.shared.load()
+            }
+        }
+    }
+
+    private func observeConnectivityForAuthRefresh() {
+        var previousStatus = connectivityStore.state.status
+        connectivityCancellable = connectivityStore.$state
+            .sink { [weak self] newState in
+                guard self != nil else { return }
+                let newStatus = newState.status
+                defer { previousStatus = newStatus }
+                guard previousStatus == .offline, newStatus == .online else { return }
+                print("[AppCoordinator] Connectivity restored, refreshing Clerk session")
+                Task { try? await Clerk.shared.load() }
+            }
+    }
+
+    // MARK: - Event Selection
 
     func selectEvent(id: String?, name: String?) {
         selectedEventId = id

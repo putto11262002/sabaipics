@@ -30,6 +30,7 @@ struct FrameFastApp: App {
                 .onChange(of: scenePhase) { _, newPhase in
                     switch newPhase {
                     case .active:
+                        Task { try? await clerk.load() }
                         Task { await coordinator.uploadManager.resume() }
                         coordinator.uploadStatusStore.start()
                     case .background:
