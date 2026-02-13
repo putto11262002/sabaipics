@@ -28,6 +28,7 @@ import {
 } from "../../lib/stripe";
 import { eventBus } from "../../events";
 import type { StripeEvents } from "../../lib/stripe/events";
+import * as Sentry from "@sentry/cloudflare";
 import { apiError } from "../../lib/error";
 
 /**
@@ -62,8 +63,9 @@ export async function fulfillCheckout(
   session: Stripe.Checkout.Session,
   metadata: Record<string, string>
 ): Promise<{ success: boolean; reason: string }> {
-  // Check payment status - only fulfill if paid
-  if (session.payment_status !== "paid") {
+  // Check payment status - fulfill if paid or no payment required (gift codes)
+  const validStatuses = ["paid", "no_payment_required"];
+  if (!validStatuses.includes(session.payment_status)) {
     console.log(
       `[Stripe Fulfillment] Skipping unpaid session: ${session.id} (status: ${session.payment_status})`
     );
@@ -226,6 +228,19 @@ export const stripeWebhookRouter = new Hono<{
         console.log(
           `[Stripe Webhook] Fulfillment result: ${result.reason} (session: ${session.id})`
         );
+
+        // If fulfillment failed, capture to Sentry and return 500 so Stripe retries
+        if (!result.success) {
+          Sentry.withScope((scope) => {
+            scope.setTag('stripe_event', 'checkout.session.completed');
+            scope.setTag('fulfillment_reason', result.reason);
+            scope.setExtra('session_id', session.id);
+            scope.setExtra('metadata', metadata);
+            scope.setLevel('error');
+            Sentry.captureMessage(`Stripe fulfillment failed: ${result.reason}`);
+          });
+          return c.json({ error: `Fulfillment failed: ${result.reason}` }, 500);
+        }
 
         // Emit event for logging/analytics (not for fulfillment)
         stripeProducer.emit("stripe:checkout.completed", {
