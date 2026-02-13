@@ -27,6 +27,8 @@ struct CaptureTabRootView: View {
     @State private var isShowingEventPicker: Bool = false
     @State private var recentCameras: [APCameraConnectionRecord] = []
 
+    @State private var isShowingAddCameraDialog: Bool = false
+
     @State private var pendingSonyReconnectID: String? = nil
     @State private var pendingSonyReconnectSSID: String? = nil
     @State private var isShowingSonyReconnectAlert: Bool = false
@@ -38,8 +40,9 @@ struct CaptureTabRootView: View {
     var body: some View {
         NavigationStack {
             CaptureHomeView(
-                onConnectNew: { manufacturer in
-                    handleConnectNew(manufacturer)
+                onAddCameraTap: {
+                    guard sessionStore.state == .idle else { return }
+                    isShowingAddCameraDialog = true
                 },
                 recentCameras: recentCameras,
                 onReconnect: { manufacturer, id in
@@ -88,6 +91,23 @@ struct CaptureTabRootView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     ConnectivityStatusToolbarView()
+                }
+            }
+            .confirmationDialog(
+                "Add camera",
+                isPresented: $isShowingAddCameraDialog,
+                titleVisibility: .visible
+            ) {
+                ForEach(CameraManufacturer.allCases, id: \.self) { manufacturer in
+                    Button(manufacturer.rawValue) {
+                        handleConnectNew(manufacturer)
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            }
+            .onChange(of: sessionStore.state) { _, newState in
+                if newState != .idle {
+                    isShowingAddCameraDialog = false
                 }
             }
         }

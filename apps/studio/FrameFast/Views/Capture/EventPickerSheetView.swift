@@ -101,7 +101,7 @@ struct EventPickerSheetView: View {
         List {
             Section {
                 ForEach(Event.placeholders) { event in
-                    SkeletonEventRow(title: event.name)
+                    EventPickerSkeletonEventRow(title: event.name)
                 }
             } header: {
                 Text("Events")
@@ -132,7 +132,7 @@ struct EventPickerSheetView: View {
     }
 
     private var offlineEmptyStateView: some View {
-        OfflineEventsPlaceholderView()
+        EventPickerOfflineEventsPlaceholderView()
     }
 
     @ViewBuilder
@@ -166,7 +166,7 @@ struct EventPickerSheetView: View {
     }
 }
 
-private struct SkeletonEventRow: View {
+private struct EventPickerSkeletonEventRow: View {
     let title: String
 
     var body: some View {
@@ -181,7 +181,7 @@ private struct SkeletonEventRow: View {
     }
 }
 
-private struct OfflineEventsPlaceholderView: View {
+private struct EventPickerOfflineEventsPlaceholderView: View {
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "wifi.slash")

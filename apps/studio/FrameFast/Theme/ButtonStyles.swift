@@ -7,6 +7,8 @@
 
 import SwiftUI
 
+private let themedButtonCornerRadius: CGFloat = 14
+
 // MARK: - Primary Button Style
 
 /// Filled button with primary brand color
@@ -14,13 +16,14 @@ struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: themedButtonCornerRadius, style: .continuous)
         configuration.label
             .frame(maxWidth: .infinity)
             .frame(height: 44)
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(Color.Theme.primaryForeground)
             .background(Color.Theme.primary)
-            .clipShape(Capsule())
+            .clipShape(shape)
             .opacity(configuration.isPressed ? 0.9 : 1.0)
             .opacity(isEnabled ? 1.0 : 0.5)
     }
@@ -33,16 +36,16 @@ struct SecondaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: themedButtonCornerRadius, style: .continuous)
         configuration.label
             .frame(maxWidth: .infinity)
             .frame(height: 44)
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(Color.Theme.foreground)
             .background(Color.Theme.background)
-            .clipShape(Capsule())
+            .clipShape(shape)
             .overlay(
-                Capsule()
-                    .strokeBorder(Color.Theme.border, lineWidth: 1)
+                shape.strokeBorder(Color.Theme.border, lineWidth: 1)
             )
             .opacity(configuration.isPressed ? 0.9 : 1.0)
             .opacity(isEnabled ? 1.0 : 0.5)
@@ -71,13 +74,14 @@ struct DestructiveButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: themedButtonCornerRadius, style: .continuous)
         configuration.label
             .frame(maxWidth: .infinity)
             .frame(height: 44)
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(.white)
             .background(Color.Theme.destructive)
-            .clipShape(Capsule())
+            .clipShape(shape)
             .opacity(configuration.isPressed ? 0.9 : 1.0)
             .opacity(isEnabled ? 1.0 : 0.5)
     }
@@ -90,16 +94,16 @@ struct CompactButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: themedButtonCornerRadius, style: .continuous)
         configuration.label
             .font(.subheadline.weight(.semibold))
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .foregroundStyle(Color.Theme.foreground)
             .background(Color.Theme.muted)
-            .clipShape(Capsule())
+            .clipShape(shape)
             .overlay(
-                Capsule()
-                    .stroke(Color.Theme.border, lineWidth: 1)
+                shape.stroke(Color.Theme.border, lineWidth: 1)
             )
             .opacity(configuration.isPressed ? 0.9 : 1.0)
             .opacity(isEnabled ? 1.0 : 0.5)
