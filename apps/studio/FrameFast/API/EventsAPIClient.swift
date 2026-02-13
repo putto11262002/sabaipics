@@ -16,6 +16,17 @@ enum APIError: Error, LocalizedError {
     case decodingError(Error)
     case httpError(statusCode: Int, message: String?)
 
+    var isAuthError: Bool {
+        switch self {
+        case .notAuthenticated, .noToken:
+            return true
+        case .httpError(statusCode: 401, _):
+            return true
+        default:
+            return false
+        }
+    }
+
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:
@@ -70,7 +81,14 @@ actor EventsAPIClient {
             throw APIError.notAuthenticated
         }
 
-        guard let token = try await session.getToken() else {
+        let token: TokenResource?
+        do {
+            token = try await session.getToken()
+        } catch {
+            throw APIError.notAuthenticated
+        }
+
+        guard let token else {
             throw APIError.noToken
         }
 
@@ -97,6 +115,10 @@ actor EventsAPIClient {
             // Log error responses for debugging
             if let responseBody = String(data: data, encoding: .utf8) {
                 print("[EventsAPI Error] HTTP \(httpResponse.statusCode): \(responseBody)")
+            }
+
+            if httpResponse.statusCode == 401 {
+                throw APIError.notAuthenticated
             }
 
             throw APIError.httpError(

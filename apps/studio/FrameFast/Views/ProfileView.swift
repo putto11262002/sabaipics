@@ -14,8 +14,11 @@ import UIKit
 
 struct ProfileView: View {
     @Environment(\.clerk) private var clerk
+    @EnvironmentObject private var connectivityStore: ConnectivityStore
     @State private var showAccountPortal = false
     @State private var legalURL: URL?
+    @State private var signOutError: Error?
+    @State private var showSignOutError = false
 
     var body: some View {
         NavigationStack {
@@ -55,17 +58,24 @@ struct ProfileView: View {
                     } label: {
                         profileRowLabel(
                             title: "Manage Account",
-                            systemImage: "person.crop.circle",
+                            systemImage: connectivityStore.isOnline ? "person.crop.circle" : "wifi.slash",
                             foreground: Color.Theme.foreground,
                             showsChevron: true
                         )
                     }
                     .buttonStyle(.plain)
                     .sabaiCardRow()
+                    .disabled(!connectivityStore.isOnline)
+                    .opacity(connectivityStore.isOnline ? 1 : 0.5)
 
                     Button {
                         Task {
-                            try? await clerk.signOut()
+                            do {
+                                try await clerk.signOut()
+                            } catch {
+                                signOutError = error
+                                showSignOutError = true
+                            }
                         }
                     } label: {
                         profileRowLabel(
@@ -77,6 +87,8 @@ struct ProfileView: View {
                     }
                     .buttonStyle(.plain)
                     .sabaiCardRow()
+                    .disabled(!connectivityStore.isOnline)
+                    .opacity(connectivityStore.isOnline ? 1 : 0.5)
                 }
 
                 Section("Legal") {
@@ -92,6 +104,8 @@ struct ProfileView: View {
                     }
                     .buttonStyle(.plain)
                     .sabaiCardRow()
+                    .disabled(!connectivityStore.isOnline)
+                    .opacity(connectivityStore.isOnline ? 1 : 0.5)
 
                     Button {
                         legalURL = URL(string: "https://framefast.io/privacy")
@@ -105,6 +119,8 @@ struct ProfileView: View {
                     }
                     .buttonStyle(.plain)
                     .sabaiCardRow()
+                    .disabled(!connectivityStore.isOnline)
+                    .opacity(connectivityStore.isOnline ? 1 : 0.5)
                 }
             }
             #if os(iOS)
@@ -123,6 +139,11 @@ struct ProfileView: View {
             .sheet(item: $legalURL) { url in
                 SafariView(url: url)
                     .ignoresSafeArea()
+            }
+            .alert("Sign Out Failed", isPresented: $showSignOutError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(signOutError?.localizedDescription ?? "An unexpected error occurred. Please try again.")
             }
         }
     }
