@@ -29,9 +29,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'FrameFast - Event Photo Distribution',
-  description:
-    'AI-powered face recognition photo distribution platform for photographers and event organizers.',
+  title: 'FrameFast',
+  description: 'AI face recognition photo distribution for events.',
   icons: {
     icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
     shortcut: ['/favicon.ico'],
