@@ -52,10 +52,9 @@ export function CreditSuccessPage() {
       return response.json() as Promise<PurchaseStatusResponse>;
     },
     // Poll every 2 seconds until fulfilled or timeout
-    refetchInterval: (data: unknown) => {
+    refetchInterval: (query) => {
       // Stop polling when purchase is fulfilled
-      const status = data as PurchaseStatusResponse | undefined;
-      if (status?.fulfilled) {
+      if (query.state.data?.fulfilled) {
         return false;
       }
       return 2000;
