@@ -16,7 +16,7 @@ struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
+            .frame(height: 44)
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(Color.Theme.primaryForeground)
             .background(Color.Theme.primary)
@@ -35,7 +35,7 @@ struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
+            .frame(height: 44)
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(Color.Theme.foreground)
             .background(Color.Theme.background)
@@ -73,7 +73,7 @@ struct DestructiveButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
+            .frame(height: 44)
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(.white)
             .background(Color.Theme.destructive)

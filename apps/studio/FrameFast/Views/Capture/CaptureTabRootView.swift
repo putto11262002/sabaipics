@@ -25,9 +25,7 @@ struct CaptureTabRootView: View {
 
     @State private var activeSheet: ActiveSheet? = nil
     @State private var isShowingEventPicker: Bool = false
-    @State private var recentSony: [APCameraConnectionRecord] = []
-    @State private var recentCanon: [APCameraConnectionRecord] = []
-    @State private var recentNikon: [APCameraConnectionRecord] = []
+    @State private var recentCameras: [APCameraConnectionRecord] = []
 
     @State private var pendingSonyReconnectID: String? = nil
     @State private var pendingSonyReconnectSSID: String? = nil
@@ -41,43 +39,22 @@ struct CaptureTabRootView: View {
         NavigationStack {
             CaptureHomeView(
                 onConnectNew: { manufacturer in
+                    handleConnectNew(manufacturer)
+                },
+                recentCameras: recentCameras,
+                onReconnect: { manufacturer, id in
                     guard sessionStore.state == .idle else { return }
                     switch manufacturer {
                     case .sony:
-                        requestStartCapture(sheet: .sony(.new))
-                    case .canon:
-                        requestStartCapture(sheet: .canon(.new))
-                    case .nikon:
-                        requestStartCapture(sheet: .nikon(.new))
-                    }
-                },
-                recentSony: recentSony,
-                recentCanon: recentCanon,
-                recentNikon: recentNikon,
-                onReconnect: { manufacturer, id in
-                    guard sessionStore.state == .idle else { return }
-                    switch manufacturer.lowercased() {
-                    case "sony":
                         handleSonyReconnect(id: id)
-                    case "canon":
+                    case .canon:
                         handleCanonReconnect(id: id)
-                    case "nikon":
+                    case .nikon:
                         handleNikonReconnect(id: id)
-                    default:
-                        break
                     }
                 },
                 onRemoveRecent: { manufacturer, id in
-                    switch manufacturer.lowercased() {
-                    case "sony":
-                        APCameraConnectionStore.shared.deleteRecord(id: id)
-                    case "canon":
-                        APCameraConnectionStore.shared.deleteRecord(id: id)
-                    case "nikon":
-                        APCameraConnectionStore.shared.deleteRecord(id: id)
-                    default:
-                        break
-                    }
+                    APCameraConnectionStore.shared.deleteRecord(id: id)
                     reloadRecent()
                 },
                 isConnectionMuted: sessionStore.state != .idle
@@ -156,6 +133,18 @@ struct CaptureTabRootView: View {
         activeSheet = sheet
     }
 
+    private func handleConnectNew(_ manufacturer: CameraManufacturer) {
+        guard sessionStore.state == .idle else { return }
+        switch manufacturer {
+        case .sony:
+            requestStartCapture(sheet: .sony(.new))
+        case .canon:
+            requestStartCapture(sheet: .canon(.new))
+        case .nikon:
+            requestStartCapture(sheet: .nikon(.new))
+        }
+    }
+
     // MARK: - Sheet content
 
     @ViewBuilder
@@ -221,56 +210,53 @@ struct CaptureTabRootView: View {
 
     // MARK: - Reconnect handlers
 
-    private func handleSonyReconnect(id: String) {
-        let recordID = UUID(uuidString: id)
+    private func handleSonyReconnect(id: UUID) {
         let record = APCameraConnectionStore.shared.listRecords(manufacturer: .sony)
-            .first(where: { $0.id == recordID })
+            .first(where: { $0.id == id })
 
         let mode = record?.connectionMode ?? .unknown
         switch mode {
         case .cameraHotspot, .unknown, .sameWifi:
             if let ssid = record?.ssid, !ssid.isEmpty {
                 if let currentKey = WiFiNetworkInfo.currentNetworkKey(), currentKey == record?.networkKey {
-                    requestStartCapture(sheet: .sony(.reconnect(recordID: id)))
+                    requestStartCapture(sheet: .sony(.reconnect(recordID: id.uuidString)))
                 } else {
-                    pendingSonyReconnectID = id
+                    pendingSonyReconnectID = id.uuidString
                     pendingSonyReconnectSSID = ssid
                     isShowingSonyReconnectAlert = true
                 }
             } else {
-                requestStartCapture(sheet: .sony(.reconnect(recordID: id)))
+                requestStartCapture(sheet: .sony(.reconnect(recordID: id.uuidString)))
             }
 
         case .personalHotspot:
             // Shouldn't happen for Sony, but treat as generic scan.
-            requestStartCapture(sheet: .sony(.reconnect(recordID: id)))
+            requestStartCapture(sheet: .sony(.reconnect(recordID: id.uuidString)))
         }
     }
 
-    private func handleCanonReconnect(id: String) {
-        let recordID = UUID(uuidString: id)
+    private func handleCanonReconnect(id: UUID) {
         let record = APCameraConnectionStore.shared.listRecords(manufacturer: .canon)
-            .first(where: { $0.id == recordID })
+            .first(where: { $0.id == id })
         let mode = record?.connectionMode ?? .unknown
         if mode == .personalHotspot {
             // Show Canon setup sheet first; user can continue to discovery.
             requestStartCapture(sheet: .canon(.new))
         } else {
-            requestStartCapture(sheet: .canon(.reconnect(recordID: id)))
+            requestStartCapture(sheet: .canon(.reconnect(recordID: id.uuidString)))
         }
     }
 
-    private func handleNikonReconnect(id: String) {
-        let recordID = UUID(uuidString: id)
+    private func handleNikonReconnect(id: UUID) {
         let record = APCameraConnectionStore.shared.listRecords(manufacturer: .nikon)
-            .first(where: { $0.id == recordID })
+            .first(where: { $0.id == id })
 
         if let currentKey = WiFiNetworkInfo.currentNetworkKey(), currentKey == record?.networkKey {
-            requestStartCapture(sheet: .nikon(.reconnect(recordID: id)))
+            requestStartCapture(sheet: .nikon(.reconnect(recordID: id.uuidString)))
             return
         }
 
-        pendingNikonReconnectID = id
+        pendingNikonReconnectID = id.uuidString
         pendingNikonReconnectSSID = record?.ssid
         isShowingNikonReconnectAlert = true
     }
@@ -278,9 +264,7 @@ struct CaptureTabRootView: View {
     // MARK: - Data
 
     private func reloadRecent() {
-        recentSony = APCameraConnectionStore.shared.listRecords(manufacturer: .sony)
-        recentCanon = APCameraConnectionStore.shared.listRecords(manufacturer: .canon)
-        recentNikon = APCameraConnectionStore.shared.listRecords(manufacturer: .nikon)
+        recentCameras = APCameraConnectionStore.shared.listRecords()
     }
 }
 
