@@ -114,8 +114,6 @@ struct CaptureHomeView: View {
         // Match the grouped List background so the header/button area
         // doesn't look like a different screen.
         .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
-        .toolbarBackground(Color(uiColor: .systemGroupedBackground), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
         #endif
         .navigationTitle("Cameras")
         .navigationBarTitleDisplayMode(.large)
