@@ -21,7 +21,7 @@ struct WelcomeWithClerkSheetView: View {
         ClerkTheme(
             colors: .init(
                 primary: Color.Theme.primary,
-                background: Color.Theme.background,
+                background: Color(.systemBackground),
                 input: Color.Theme.input,
                 danger: Color.Theme.destructive,
                 success: Color(hex: "#22c55e"),  // green-500
@@ -98,7 +98,7 @@ struct WelcomeWithClerkSheetView: View {
                     return .handled
                 })
         }
-        .background(Color.Theme.background)
+        .background(Color(.systemBackground))
         .sheet(isPresented: $showAuthSheet) {
             AuthView(mode: authMode)
                 .environment(\.clerkTheme, clerkTheme)
