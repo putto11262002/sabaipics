@@ -15,11 +15,21 @@ import type { R2EventMessage } from '../types/r2-event';
 import type { Bindings } from '../types';
 import type { PhotoJob } from '../types/photo-job';
 import { createDb, createDbTx } from '@sabaipics/db';
-import { uploadIntents, photos, creditLedger, photographers } from '@sabaipics/db';
+import {
+  activeEvents,
+  events,
+  photoLuts,
+  uploadIntents,
+  photos,
+  creditLedger,
+  photographers,
+  type EventSettings,
+} from '@sabaipics/db';
 import { eq, and, gt, asc, sql } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
-import { validateImageMagicBytes } from '../lib/images';
-import { normalizeWithPhoton } from '../lib/images/normalize';
+import { applyCubeLutToRgba, parseCubeLut, validateImageMagicBytes } from '../lib/images';
+import type { ParsedCubeLut } from '../lib/images/color-grade';
+import { normalizeWithPhoton, type PhotonPostProcessHook } from '../lib/images/normalize';
 import { extractExif } from '../lib/images/exif';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 
@@ -35,6 +45,55 @@ type UploadProcessingError =
   | { type: 'normalization'; key: string; intentId: string; cause: unknown }
   | { type: 'r2'; operation: string; cause: unknown }
   | { type: 'insufficient_credits'; key: string; intentId: string };
+
+type ParsedLutCacheEntry =
+  | { kind: 'ok'; lut: ParsedCubeLut }
+  | { kind: 'skip'; reason: string; extra?: Record<string, unknown> };
+
+type UploadBatchCaches = {
+  eventSettingsByEventId: Map<string, EventSettings | null>;
+  eventSettingsLoadFailedByEventId: Set<string>;
+  parsedLutByPhotographerAndLutId: Map<string, ParsedLutCacheEntry>;
+  lutLookupFailedByCacheKey: Set<string>;
+  lutTextByR2Key: Map<string, string | null>;
+};
+
+const DEFAULT_COLOR_GRADE_SETTINGS = {
+  enabled: false,
+  lutId: null as string | null,
+  intensity: 75,
+  includeLuminance: false,
+};
+
+function resolveColorGradeSettings(settings: EventSettings | null): {
+  enabled: boolean;
+  lutId: string | null;
+  intensity: number;
+  includeLuminance: boolean;
+} {
+  const cg = settings?.colorGrade;
+  const intensityRaw = cg?.intensity;
+  const intensity =
+    typeof intensityRaw === 'number' && Number.isFinite(intensityRaw)
+      ? intensityRaw
+      : DEFAULT_COLOR_GRADE_SETTINGS.intensity;
+
+  return {
+    enabled: cg?.enabled ?? DEFAULT_COLOR_GRADE_SETTINGS.enabled,
+    lutId: cg?.lutId ?? DEFAULT_COLOR_GRADE_SETTINGS.lutId,
+    intensity: Math.max(0, Math.min(100, Math.round(intensity))),
+    includeLuminance: cg?.includeLuminance ?? DEFAULT_COLOR_GRADE_SETTINGS.includeLuminance,
+  };
+}
+
+function unknownToString(cause: unknown): string {
+  if (cause instanceof Error) return cause.message;
+  try {
+    return String(cause);
+  } catch {
+    return 'unknown';
+  }
+}
 
 // =============================================================================
 // Sentry Helpers
@@ -107,6 +166,7 @@ function captureUploadWarning(
 async function processUpload(
   env: Bindings,
   event: R2EventMessage,
+  caches: UploadBatchCaches,
 ): Promise<Result<void, UploadProcessingError>> {
   return safeTry(async function* () {
     const { key, size } = event.object;
@@ -116,9 +176,8 @@ async function processUpload(
 
     // Step 1: Find matching upload intent
     const intent = yield* ResultAsync.fromPromise(
-      Sentry.startSpan(
-        { name: 'upload.find_intent', op: 'db.query' },
-        () => db.query.uploadIntents.findFirst({ where: eq(uploadIntents.r2Key, key) }),
+      Sentry.startSpan({ name: 'upload.find_intent', op: 'db.query' }, () =>
+        db.query.uploadIntents.findFirst({ where: eq(uploadIntents.r2Key, key) }),
       ),
       (cause): UploadProcessingError => ({ type: 'database', operation: 'find_intent', cause }),
     );
@@ -146,9 +205,8 @@ async function processUpload(
 
     // Step 3: HEAD request first to check size without downloading
     const headResult = yield* ResultAsync.fromPromise(
-      Sentry.startSpan(
-        { name: 'upload.r2_fetch', op: 'r2.get' },
-        () => env.PHOTOS_BUCKET.head(key),
+      Sentry.startSpan({ name: 'upload.r2_fetch', op: 'r2.get' }, () =>
+        env.PHOTOS_BUCKET.head(key),
       ),
       (cause): UploadProcessingError => ({ type: 'r2', operation: 'head', cause }),
     );
@@ -192,7 +250,10 @@ async function processUpload(
           }),
     );
 
-    const imageBytes = await r2Object.arrayBuffer();
+    const imageBytes = yield* ResultAsync.fromPromise(
+      r2Object.arrayBuffer(),
+      (cause): UploadProcessingError => ({ type: 'r2', operation: 'read_body', cause }),
+    );
 
     // Step 6: Validate magic bytes
     const magicValidation = validateImageMagicBytes(new Uint8Array(imageBytes.slice(0, 16)));
@@ -218,14 +279,207 @@ async function processUpload(
         captureUploadWarning('exif_extraction', {
           ...intentCtx,
           extra: {
-            cause: error.cause instanceof Error
-              ? error.cause.message
-              : String(error.cause),
+            cause: error.cause instanceof Error ? error.cause.message : String(error.cause),
           },
         });
         return null;
       },
     );
+
+    // Step 6c: Load event color grade settings + LUT (best-effort; never fail upload)
+    let postProcess: PhotonPostProcessHook | undefined;
+    let colorGradeApplied = false;
+    let colorGradeSkip: { reason: string; extra?: Record<string, unknown> } | null = null;
+
+    const hasEventSettings = caches.eventSettingsByEventId.has(intent.eventId);
+    const eventSettings = hasEventSettings
+      ? (caches.eventSettingsByEventId.get(intent.eventId) ?? null)
+      : await ResultAsync.fromPromise(
+          Sentry.startSpan({ name: 'upload.load_event_settings', op: 'db.query' }, async () => {
+            const [row] = await db
+              .select({ settings: activeEvents.settings })
+              .from(activeEvents)
+              .where(eq(activeEvents.id, intent.eventId))
+              .limit(1);
+
+            if (row) return row.settings ?? null;
+
+            const [fallback] = await db
+              .select({ settings: events.settings })
+              .from(events)
+              .where(eq(events.id, intent.eventId))
+              .limit(1);
+            return fallback?.settings ?? null;
+          }),
+          (cause) => cause,
+        ).match(
+          (settings) => {
+            caches.eventSettingsByEventId.set(intent.eventId, settings);
+            return settings;
+          },
+          (cause) => {
+            colorGradeSkip = { reason: 'event_settings_unavailable' };
+            // Do not cache failures: transient DB errors shouldn't disable grading
+            // for the rest of the batch.
+            if (!caches.eventSettingsLoadFailedByEventId.has(intent.eventId)) {
+              caches.eventSettingsLoadFailedByEventId.add(intent.eventId);
+              captureUploadWarning('color_grade_skipped', {
+                ...intentCtx,
+                extra: { reason: 'event_settings_unavailable', cause: unknownToString(cause) },
+              });
+            }
+            return null;
+          },
+        );
+
+    const colorGrade = resolveColorGradeSettings(eventSettings);
+    if (colorGrade.enabled && colorGrade.lutId) {
+      const lutId = colorGrade.lutId;
+      const cacheKey = `${intent.photographerId}:${lutId}`;
+
+      const warnSkip = (reason: string, extra?: Record<string, unknown>) => {
+        colorGradeSkip = { reason, extra };
+        captureUploadWarning('color_grade_skipped', {
+          ...intentCtx,
+          extra: { reason, lutId, ...(extra ?? {}) },
+        });
+      };
+
+      const cached = caches.parsedLutByPhotographerAndLutId.get(cacheKey);
+      if (cached) {
+        if (cached.kind === 'ok') {
+          postProcess = (pixels: Uint8Array) =>
+            applyCubeLutToRgba(pixels, cached.lut, {
+              intensity: colorGrade.intensity,
+              includeLuminance: colorGrade.includeLuminance,
+            });
+          colorGradeApplied = true;
+        } else {
+          colorGradeSkip = { reason: cached.reason, extra: cached.extra };
+        }
+      } else {
+        let lutLookupFailed = false;
+        const lutRow = await ResultAsync.fromPromise(
+          Sentry.startSpan({ name: 'upload.color_grade.find_lut', op: 'db.query' }, () =>
+            db.query.photoLuts.findFirst({
+              where: and(
+                eq(photoLuts.id, lutId),
+                eq(photoLuts.photographerId, intent.photographerId),
+              ),
+              columns: { status: true, lutR2Key: true },
+            }),
+          ),
+          (cause) => cause,
+        ).match(
+          (row) => row,
+          (cause) => {
+            lutLookupFailed = true;
+            // Do not cache failures: transient DB errors shouldn't disable grading
+            // for the rest of the batch.
+            if (!caches.lutLookupFailedByCacheKey.has(cacheKey)) {
+              caches.lutLookupFailedByCacheKey.add(cacheKey);
+              warnSkip('lut_lookup_failed', { cause: unknownToString(cause) });
+            } else {
+              colorGradeSkip = {
+                reason: 'lut_lookup_failed',
+                extra: { cause: unknownToString(cause) },
+              };
+            }
+            return null;
+          },
+        );
+
+        if (!lutRow) {
+          if (lutLookupFailed) {
+            // Already warned/cached.
+          } else {
+            caches.parsedLutByPhotographerAndLutId.set(cacheKey, {
+              kind: 'skip',
+              reason: 'lut_not_found',
+            });
+            warnSkip('lut_not_found');
+          }
+        } else if (lutRow.status !== 'completed' || !lutRow.lutR2Key) {
+          caches.parsedLutByPhotographerAndLutId.set(cacheKey, {
+            kind: 'skip',
+            reason: 'lut_not_ready',
+            extra: { status: lutRow.status, hasLutR2Key: Boolean(lutRow.lutR2Key) },
+          });
+          warnSkip('lut_not_ready', {
+            status: lutRow.status,
+            hasLutR2Key: Boolean(lutRow.lutR2Key),
+          });
+        } else {
+          const lutR2Key = lutRow.lutR2Key;
+          let lutText = caches.lutTextByR2Key.get(lutR2Key);
+
+          if (lutText === undefined) {
+            const r2Object = await ResultAsync.fromPromise(
+              Sentry.startSpan({ name: 'upload.color_grade.r2_get_lut', op: 'r2.get' }, () =>
+                env.PHOTOS_BUCKET.get(lutR2Key),
+              ),
+              (cause) => cause,
+            ).match(
+              (obj) => obj,
+              (cause) => {
+                caches.lutTextByR2Key.set(lutR2Key, null);
+                warnSkip('lut_r2_get_failed', { cause: unknownToString(cause), lutR2Key });
+                return null;
+              },
+            );
+
+            if (!r2Object) {
+              caches.lutTextByR2Key.set(lutR2Key, null);
+              if (!colorGradeSkip) warnSkip('lut_r2_missing', { lutR2Key });
+              lutText = null;
+            } else {
+              lutText = await ResultAsync.fromPromise(r2Object.text(), (cause) => cause).match(
+                (text) => text,
+                (cause) => {
+                  warnSkip('lut_r2_read_failed', { cause: unknownToString(cause), lutR2Key });
+                  return null;
+                },
+              );
+              caches.lutTextByR2Key.set(lutR2Key, lutText);
+            }
+          }
+
+          if (!lutText) {
+            caches.parsedLutByPhotographerAndLutId.set(cacheKey, {
+              kind: 'skip',
+              reason: 'lut_text_unavailable',
+              extra: { lutR2Key },
+            });
+            if (!colorGradeSkip) warnSkip('lut_text_unavailable', { lutR2Key });
+          } else {
+            const parsed = parseCubeLut(lutText);
+            if (parsed.isErr()) {
+              const extra = {
+                message: parsed.error.message,
+                line: parsed.error.line ?? null,
+              };
+              caches.parsedLutByPhotographerAndLutId.set(cacheKey, {
+                kind: 'skip',
+                reason: 'lut_parse_error',
+                extra,
+              });
+              warnSkip('lut_parse_error', extra);
+            } else {
+              caches.parsedLutByPhotographerAndLutId.set(cacheKey, {
+                kind: 'ok',
+                lut: parsed.value,
+              });
+              postProcess = (pixels: Uint8Array) =>
+                applyCubeLutToRgba(pixels, parsed.value, {
+                  intensity: colorGrade.intensity,
+                  includeLuminance: colorGrade.includeLuminance,
+                });
+              colorGradeApplied = true;
+            }
+          }
+        }
+      }
+    }
 
     // Step 7: Normalize image to JPEG using photon (in-Worker Wasm)
     console.log(`[upload-consumer] Normalizing with photon_wasm: ${key}`);
@@ -234,7 +488,14 @@ async function processUpload(
       { name: 'upload.normalize', op: 'image.process' },
       (span) => {
         span.setAttribute('upload.original_size', imageBytes.byteLength);
-        const result = normalizeWithPhoton(imageBytes);
+        span.setAttribute('upload.color_grade.enabled', colorGrade.enabled);
+        span.setAttribute('upload.color_grade.applied', colorGradeApplied);
+        if (colorGrade.lutId) span.setAttribute('upload.color_grade.lut_id', colorGrade.lutId);
+        if (colorGradeSkip) {
+          span.setAttribute('upload.color_grade.skip_reason', colorGradeSkip.reason);
+        }
+
+        const result = normalizeWithPhoton(imageBytes, postProcess);
         if (result.isOk()) {
           span.setAttribute('upload.width', result.value.width);
           span.setAttribute('upload.height', result.value.height);
@@ -252,9 +513,10 @@ async function processUpload(
         extra: {
           normalization_method: 'photon_wasm',
           stage: normalizeResult.error.stage,
-          cause: normalizeResult.error.cause instanceof Error
-            ? normalizeResult.error.cause.message
-            : String(normalizeResult.error.cause),
+          cause:
+            normalizeResult.error.cause instanceof Error
+              ? normalizeResult.error.cause.message
+              : String(normalizeResult.error.cause),
           detectedType: magicValidation.detectedType,
           originalSize: imageBytes.byteLength,
         },
@@ -276,9 +538,8 @@ async function processUpload(
 
     // Step 9: Upload normalized image to final location
     yield* ResultAsync.fromPromise(
-      Sentry.startSpan(
-        { name: 'upload.r2_put', op: 'r2.put' },
-        () => env.PHOTOS_BUCKET.put(finalR2Key, normalizedBytes, {
+      Sentry.startSpan({ name: 'upload.r2_put', op: 'r2.put' }, () =>
+        env.PHOTOS_BUCKET.put(finalR2Key, normalizedBytes, {
           httpMetadata: { contentType: 'image/jpeg' },
         }),
       ),
@@ -289,89 +550,88 @@ async function processUpload(
     const dbTx = createDbTx(env.DATABASE_URL);
 
     const photo = yield* ResultAsync.fromPromise(
-      Sentry.startSpan(
-        { name: 'upload.transaction', op: 'db.transaction' },
-        () => dbTx.transaction(async (tx) => {
-        // Lock photographer row
-        await tx
-          .select({ id: photographers.id })
-          .from(photographers)
-          .where(eq(photographers.id, intent.photographerId))
-          .for('update');
+      Sentry.startSpan({ name: 'upload.transaction', op: 'db.transaction' }, () =>
+        dbTx.transaction(async (tx) => {
+          // Lock photographer row
+          await tx
+            .select({ id: photographers.id })
+            .from(photographers)
+            .where(eq(photographers.id, intent.photographerId))
+            .for('update');
 
-        // Check balance under lock
-        const [balanceResult] = await tx
-          .select({ balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int` })
-          .from(creditLedger)
-          .where(
-            and(
-              eq(creditLedger.photographerId, intent.photographerId),
-              gt(creditLedger.expiresAt, sql`NOW()`),
-            ),
-          );
+          // Check balance under lock
+          const [balanceResult] = await tx
+            .select({ balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int` })
+            .from(creditLedger)
+            .where(
+              and(
+                eq(creditLedger.photographerId, intent.photographerId),
+                gt(creditLedger.expiresAt, sql`NOW()`),
+              ),
+            );
 
-        if ((balanceResult?.balance ?? 0) < 1) {
-          throw new Error('INSUFFICIENT_CREDITS');
-        }
+          if ((balanceResult?.balance ?? 0) < 1) {
+            throw new Error('INSUFFICIENT_CREDITS');
+          }
 
-        // Find oldest unexpired credit (FIFO)
-        const [oldestCredit] = await tx
-          .select({ expiresAt: creditLedger.expiresAt })
-          .from(creditLedger)
-          .where(
-            and(
-              eq(creditLedger.photographerId, intent.photographerId),
-              gt(creditLedger.amount, 0),
-              gt(creditLedger.expiresAt, sql`NOW()`),
-            ),
-          )
-          .orderBy(asc(creditLedger.expiresAt))
-          .limit(1);
+          // Find oldest unexpired credit (FIFO)
+          const [oldestCredit] = await tx
+            .select({ expiresAt: creditLedger.expiresAt })
+            .from(creditLedger)
+            .where(
+              and(
+                eq(creditLedger.photographerId, intent.photographerId),
+                gt(creditLedger.amount, 0),
+                gt(creditLedger.expiresAt, sql`NOW()`),
+              ),
+            )
+            .orderBy(asc(creditLedger.expiresAt))
+            .limit(1);
 
-        if (!oldestCredit) {
-          throw new Error('INSUFFICIENT_CREDITS');
-        }
+          if (!oldestCredit) {
+            throw new Error('INSUFFICIENT_CREDITS');
+          }
 
-        // Deduct 1 credit
-        await tx.insert(creditLedger).values({
-          photographerId: intent.photographerId,
-          amount: -1,
-          type: 'debit',
-          source: 'upload',
-          expiresAt: oldestCredit.expiresAt,
-          stripeSessionId: null,
-        });
+          // Deduct 1 credit
+          await tx.insert(creditLedger).values({
+            photographerId: intent.photographerId,
+            amount: -1,
+            type: 'debit',
+            source: 'upload',
+            expiresAt: oldestCredit.expiresAt,
+            stripeSessionId: null,
+          });
 
-        // Create photo record
-        const [newPhoto] = await tx
-          .insert(photos)
-          .values({
-            id: photoId,
-            eventId: intent.eventId,
-            r2Key: finalR2Key,
-            status: 'uploading',
-            faceCount: 0,
-            originalMimeType: intent.contentType,
-            originalFileSize: intent.contentLength,
-            width,
-            height,
-            fileSize,
-            exif: exifData,
-          })
-          .returning();
+          // Create photo record
+          const [newPhoto] = await tx
+            .insert(photos)
+            .values({
+              id: photoId,
+              eventId: intent.eventId,
+              r2Key: finalR2Key,
+              status: 'uploading',
+              faceCount: 0,
+              originalMimeType: intent.contentType,
+              originalFileSize: intent.contentLength,
+              width,
+              height,
+              fileSize,
+              exif: exifData,
+            })
+            .returning();
 
-        // Update intent to completed with photoId mapping
-        await tx
-          .update(uploadIntents)
-          .set({
-            status: 'completed',
-            completedAt: new Date().toISOString(),
-            photoId: newPhoto.id,
-          })
-          .where(eq(uploadIntents.id, intent.id));
+          // Update intent to completed with photoId mapping
+          await tx
+            .update(uploadIntents)
+            .set({
+              status: 'completed',
+              completedAt: new Date().toISOString(),
+              photoId: newPhoto.id,
+            })
+            .where(eq(uploadIntents.id, intent.id));
 
-        return newPhoto;
-      }),
+          return newPhoto;
+        }),
       ),
       (cause): UploadProcessingError => {
         const msg = cause instanceof Error ? cause.message : '';
@@ -387,14 +647,22 @@ async function processUpload(
       },
     );
 
-    // Step 11: Delete original upload (keep only normalized)
-    await env.PHOTOS_BUCKET.delete(key);
+    // Step 11: Delete original upload (keep only normalized) - best-effort
+    await ResultAsync.fromPromise(env.PHOTOS_BUCKET.delete(key), (cause) => cause).match(
+      () => undefined,
+      (cause) => {
+        captureUploadWarning('r2_delete_original_failed', {
+          ...intentCtx,
+          extra: { cause: unknownToString(cause) },
+        });
+        return undefined;
+      },
+    );
 
     // Step 12: Enqueue for face detection
     yield* ResultAsync.fromPromise(
-      Sentry.startSpan(
-        { name: 'upload.enqueue', op: 'queue.send' },
-        () => env.PHOTO_QUEUE.send({
+      Sentry.startSpan({ name: 'upload.enqueue', op: 'queue.send' }, () =>
+        env.PHOTO_QUEUE.send({
           photo_id: photo.id,
           event_id: intent.eventId,
           r2_key: photo.r2Key,
@@ -419,6 +687,14 @@ export async function queue(
 ): Promise<void> {
   if (batch.messages.length === 0) return;
 
+  const caches: UploadBatchCaches = {
+    eventSettingsByEventId: new Map(),
+    eventSettingsLoadFailedByEventId: new Set(),
+    parsedLutByPhotographerAndLutId: new Map(),
+    lutLookupFailedByCacheKey: new Set(),
+    lutTextByR2Key: new Map(),
+  };
+
   for (const message of batch.messages) {
     const event = message.body;
 
@@ -437,7 +713,7 @@ export async function queue(
     const result = await Sentry.startSpan(
       { name: 'upload.process', op: 'queue.process' },
       async (rootSpan) => {
-        const r = await processUpload(env, event);
+        const r = await processUpload(env, event, caches);
         rootSpan.setAttribute('upload.r2_key', event.object.key);
         r.match(
           () => rootSpan.setAttribute('upload.status', 'ok'),
