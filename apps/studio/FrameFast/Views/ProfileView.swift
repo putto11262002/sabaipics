@@ -124,7 +124,7 @@ struct ProfileView: View {
                 }
             }
             #if os(iOS)
-            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            .background(Color(.systemBackground).ignoresSafeArea())
             #endif
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.large)
