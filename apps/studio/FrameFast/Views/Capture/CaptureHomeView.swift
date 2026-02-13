@@ -3,6 +3,10 @@
 
 import SwiftUI
 
+#if os(iOS)
+import UIKit
+#endif
+
 struct CaptureHomeView: View {
     let onConnectNew: (CameraManufacturer) -> Void
     let recentCameras: [APCameraConnectionRecord]
@@ -106,6 +110,13 @@ struct CaptureHomeView: View {
             }
         }
         .animation(.snappy(duration: 0.18, extraBounce: 0.06), value: isAddCameraMenuPresented)
+        #if os(iOS)
+        // Match the grouped List background so the header/button area
+        // doesn't look like a different screen.
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+        .toolbarBackground(Color(uiColor: .systemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        #endif
         .navigationTitle("Cameras")
         .navigationBarTitleDisplayMode(.large)
         .onChange(of: isConnectionMuted) { _, muted in
