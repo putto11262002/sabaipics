@@ -8,6 +8,10 @@
 import SwiftUI
 import Clerk
 
+#if os(iOS)
+import UIKit
+#endif
+
 struct ProfileView: View {
     @Environment(\.clerk) private var clerk
     @State private var showAccountPortal = false
@@ -15,66 +19,99 @@ struct ProfileView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            List {
                 Section("Account") {
                     if let user = clerk.user {
                         HStack(spacing: 12) {
-                            // User avatar
                             UserButton()
                                 .frame(width: 44, height: 44)
-                            
+
                             VStack(alignment: .leading, spacing: 2) {
-                                // Display name (prefer username, fallback to full name)
                                 Text(displayName(for: user))
-                                    .font(.body)
-                                    .fontWeight(.medium)
-                                
-                                // Email as secondary info
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(Color.Theme.foreground)
+
                                 if let email = user.primaryEmailAddress?.emailAddress {
                                     Text(email)
                                         .font(.footnote)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Color.Theme.mutedForeground)
                                 }
                             }
+
+                            Spacer(minLength: 0)
                         }
                         .padding(.vertical, 4)
+                        .sabaiCardRow()
                     } else {
                         Text("Not signed in")
                             .foregroundStyle(.secondary)
+                            .sabaiCardRow()
                     }
                 }
-                
+
                 Section {
                     Button {
                         showAccountPortal = true
                     } label: {
-                        Label("Manage Account", systemImage: "person.crop.circle")
+                        profileRowLabel(
+                            title: "Manage Account",
+                            systemImage: "person.crop.circle",
+                            foreground: Color.Theme.foreground,
+                            showsChevron: true
+                        )
                     }
-                    
+                    .buttonStyle(.plain)
+                    .sabaiCardRow()
+
                     Button {
                         Task {
                             try? await clerk.signOut()
                         }
                     } label: {
-                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-                            .foregroundStyle(.red)
+                        profileRowLabel(
+                            title: "Sign Out",
+                            systemImage: "rectangle.portrait.and.arrow.right",
+                            foreground: Color.Theme.destructive,
+                            showsChevron: false
+                        )
                     }
+                    .buttonStyle(.plain)
+                    .sabaiCardRow()
                 }
 
                 Section("Legal") {
                     Button {
                         legalURL = URL(string: "https://framefast.io/terms")
                     } label: {
-                        Label("Terms of Service", systemImage: "doc.text")
+                        profileRowLabel(
+                            title: "Terms of Service",
+                            systemImage: "doc.text",
+                            foreground: Color.Theme.foreground,
+                            showsChevron: true
+                        )
                     }
+                    .buttonStyle(.plain)
+                    .sabaiCardRow()
+
                     Button {
                         legalURL = URL(string: "https://framefast.io/privacy")
                     } label: {
-                        Label("Privacy Policy", systemImage: "hand.raised")
+                        profileRowLabel(
+                            title: "Privacy Policy",
+                            systemImage: "hand.raised",
+                            foreground: Color.Theme.foreground,
+                            showsChevron: true
+                        )
                     }
+                    .buttonStyle(.plain)
+                    .sabaiCardRow()
                 }
             }
+            #if os(iOS)
+            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            #endif
             .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     ConnectivityStatusToolbarView()
@@ -88,6 +125,32 @@ struct ProfileView: View {
                     .ignoresSafeArea()
             }
         }
+    }
+
+    private func profileRowLabel(
+        title: String,
+        systemImage: String,
+        foreground: Color,
+        showsChevron: Bool
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(foreground)
+
+            Text(title)
+                .font(.body)
+                .foregroundStyle(foreground)
+
+            Spacer(minLength: 0)
+
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .contentShape(Rectangle())
     }
     
     /// Returns the best display name for the user
