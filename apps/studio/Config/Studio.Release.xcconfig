@@ -1,7 +1,8 @@
 // FrameFast Release configuration
 
 // Clerk
-CLERK_PUBLISHABLE_KEY = pk_live_Y2xlcmsuZnJhbWVmYXN0LmlvJA
+// CLERK_PUBLISHABLE_KEY = pk_live_Y2xlcmsuZnJhbWVmYXN0LmlvJA
+CLERK_PUBLISHABLE_KEY = pk_test_cmljaC1wdWctNjQuY2xlcmsuYWNjb3VudHMuZGV2JA
 
 // Entitlements
 CODE_SIGN_ENTITLEMENTS = FrameFast/FrameFast.Release.entitlements
