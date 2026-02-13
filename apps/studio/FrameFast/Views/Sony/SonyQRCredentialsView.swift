@@ -53,10 +53,8 @@ struct SonyQRCredentialsView: View {
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 10)
-            .background(Color.Theme.background)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.Theme.background.ignoresSafeArea())
         .navigationTitle("Scan QR")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)

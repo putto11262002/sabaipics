@@ -63,7 +63,6 @@ struct WiFiJoinView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.Theme.background.ignoresSafeArea())
         .navigationBarBackButtonHidden(true)
         .appBackButton {
             viewModel.cancel()

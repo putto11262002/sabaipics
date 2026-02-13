@@ -53,7 +53,6 @@ struct SonyWiFiOnboardingView: View {
             } else {
                 ssidInput
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.Theme.background.ignoresSafeArea())
                     .navigationTitle(navigationTitle)
                     .navigationBarTitleDisplayMode(.inline)
                     .navigationBarBackButtonHidden(true)
@@ -133,7 +132,6 @@ struct SonyWiFiOnboardingView: View {
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 10)
-            .background(Color.Theme.background)
         }
     }
 
