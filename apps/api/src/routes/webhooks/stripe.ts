@@ -20,6 +20,7 @@ import type Stripe from "stripe";
 import { addMonths } from "date-fns";
 import { creditLedger, promoCodeUsage, type Database, type DatabaseTx } from "@sabaipics/db";
 import { eq } from "drizzle-orm";
+import { ResultAsync, ok, err } from "neverthrow";
 import {
   createStripeClient,
   verifyWebhookSignature,
@@ -28,8 +29,8 @@ import {
 } from "../../lib/stripe";
 import { eventBus } from "../../events";
 import type { StripeEvents } from "../../lib/stripe/events";
-import * as Sentry from "@sentry/cloudflare";
-import { apiError } from "../../lib/error";
+import { safeHandler } from "../../lib/safe-handler";
+import type { HandlerError } from "../../lib/error";
 
 /**
  * Environment bindings for Stripe webhook
@@ -172,50 +173,62 @@ export const stripeWebhookRouter = new Hono<{
   Bindings: StripeWebhookBindings;
   Variables: StripeWebhookVariables;
 }>().post("/", async (c) => {
-  // Validate environment
-  if (!c.env.STRIPE_SECRET_KEY) {
-    console.error("[Stripe Webhook] STRIPE_SECRET_KEY not configured");
-    return apiError(c, 'INTERNAL_ERROR', 'Stripe not configured');
-  }
+  return safeHandler(async function* () {
+    // Validate environment
+    if (!c.env.STRIPE_SECRET_KEY) {
+      return err<never, HandlerError>({
+        code: 'INTERNAL_ERROR',
+        message: 'Stripe not configured',
+      });
+    }
 
-  if (!c.env.STRIPE_WEBHOOK_SECRET) {
-    console.error("[Stripe Webhook] STRIPE_WEBHOOK_SECRET not configured");
-    return apiError(c, 'INTERNAL_ERROR', 'Webhook secret not configured');
-  }
+    if (!c.env.STRIPE_WEBHOOK_SECRET) {
+      return err<never, HandlerError>({
+        code: 'INTERNAL_ERROR',
+        message: 'Webhook secret not configured',
+      });
+    }
 
-  // Get signature header
-  const signature = c.req.header("stripe-signature");
-  if (!signature) {
-    console.error("[Stripe Webhook] Missing stripe-signature header");
-    return apiError(c, 'BAD_REQUEST', 'Missing webhook signature');
-  }
+    // Get signature header
+    const signature = c.req.header("stripe-signature");
+    if (!signature) {
+      return err<never, HandlerError>({
+        code: 'BAD_REQUEST',
+        message: 'Missing webhook signature',
+      });
+    }
 
-  // Create Stripe client
-  const stripe = createStripeClient(c.env);
+    // Create Stripe client
+    const stripe = createStripeClient(c.env);
 
-  try {
     // CRITICAL: Get raw body - do NOT use c.req.json()
     const rawBody = await c.req.text();
 
+    // Verify signature and construct event
     // Test mode bypass - skip signature verification during testing
-    // Vitest sets NODE_ENV to "test" automatically during test runs
-    let event: Stripe.Event;
-    const nodeEnv = process.env.NODE_ENV as string | undefined;
-    if (nodeEnv === "test" || signature === "test_signature") {
-      event = JSON.parse(rawBody) as Stripe.Event;
-    } else {
-      // Verify signature and construct event (production)
-      event = await verifyWebhookSignature(
-        stripe,
-        rawBody,
-        signature,
-        c.env.STRIPE_WEBHOOK_SECRET
-      );
-    }
+    const event = yield* ResultAsync.fromPromise(
+      (async (): Promise<Stripe.Event> => {
+        const nodeEnv = process.env.NODE_ENV as string | undefined;
+        if (nodeEnv === "test" || signature === "test_signature") {
+          return JSON.parse(rawBody) as Stripe.Event;
+        }
+        return verifyWebhookSignature(
+          stripe,
+          rawBody,
+          signature,
+          c.env.STRIPE_WEBHOOK_SECRET
+        );
+      })(),
+      (cause): HandlerError => ({
+        code: 'UNAUTHORIZED',
+        message: 'Invalid webhook signature',
+        cause,
+      }),
+    );
 
     console.log(`[Stripe Webhook] Processing: ${event.type} (${event.id})`);
 
-    // Route event to appropriate handler via event bus
+    // Route event to appropriate handler
     switch (event.type) {
       // Checkout events
       case "checkout.session.completed": {
@@ -229,17 +242,16 @@ export const stripeWebhookRouter = new Hono<{
           `[Stripe Webhook] Fulfillment result: ${result.reason} (session: ${session.id})`
         );
 
-        // If fulfillment failed, capture to Sentry and return 500 so Stripe retries
+        // If fulfillment failed, return error so Stripe retries
+        // safeHandler captures to Sentry automatically for 5xx errors
         if (!result.success) {
-          Sentry.withScope((scope) => {
-            scope.setTag('stripe_event', 'checkout.session.completed');
-            scope.setTag('fulfillment_reason', result.reason);
-            scope.setExtra('session_id', session.id);
-            scope.setExtra('metadata', metadata);
-            scope.setLevel('error');
-            Sentry.captureMessage(`Stripe fulfillment failed: ${result.reason}`);
+          return err<never, HandlerError>({
+            code: 'INTERNAL_ERROR',
+            message: `Fulfillment failed: ${result.reason}`,
+            cause: new Error(
+              `Stripe fulfillment failed for session ${session.id}: ${result.reason}`
+            ),
           });
-          return c.json({ error: `Fulfillment failed: ${result.reason}` }, 500);
         }
 
         // Emit event for logging/analytics (not for fulfillment)
@@ -309,15 +321,8 @@ export const stripeWebhookRouter = new Hono<{
     }
 
     console.log(`[Stripe Webhook] Processed: ${event.type} (${event.id})`);
-    return c.json({ received: true });
-  } catch (err) {
-    // Signature verification or parsing errors
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    console.error(`[Stripe Webhook] Verification failed: ${errorMessage}`);
-
-    // Return 400 for signature errors - Stripe will retry
-    return apiError(c, 'UNAUTHORIZED', 'Invalid webhook signature');
-  }
+    return ok({ received: true as const });
+  }, c);
 });
 
 export type StripeWebhookRouterType = typeof stripeWebhookRouter;
