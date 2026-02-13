@@ -25,6 +25,12 @@ export type NormalizeError = {
   cause: unknown;
 };
 
+export type PhotonPostProcessHook = (
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+) => Uint8Array;
+
 // =============================================================================
 // Constants
 // =============================================================================
@@ -65,11 +71,17 @@ const safeFree = Result.fromThrowable(
 
 export function normalizeWithPhoton(
   imageBytes: ArrayBuffer,
+  postProcess?: PhotonPostProcessHook,
 ): Result<NormalizeResult, NormalizeError> {
   let inputImage: PhotonImage | null = null;
   let resizedImage: PhotonImage | null = null;
+  let processedImage: PhotonImage | null = null;
 
   const cleanup = () => {
+    if (processedImage) {
+      safeFree(processedImage);
+      processedImage = null;
+    }
     if (resizedImage) {
       safeFree(resizedImage);
       resizedImage = null;
@@ -96,6 +108,33 @@ export function normalizeWithPhoton(
 
       // No resize needed — use input directly for re-encode
       return ok(img);
+    })
+    .andThen((img) => {
+      if (!postProcess) return ok(img);
+
+      const width = img.get_width();
+      const height = img.get_height();
+
+      const safePostProcess = Result.fromThrowable(
+        () => {
+          // Copy pixels out of Wasm memory before any frees.
+          const pixels = img.get_raw_pixels().slice();
+          const outPixels = postProcess(pixels, width, height);
+          const expected = width * height * 4;
+          if (outPixels.length !== expected) {
+            throw new Error(
+              `postProcess returned invalid buffer length (got ${outPixels.length}, expected ${expected})`,
+            );
+          }
+          return new PhotonImage(outPixels, width, height);
+        },
+        (cause): NormalizeError => ({ stage: 'post_process', cause }),
+      );
+
+      return safePostProcess().map((out) => {
+        processedImage = out;
+        return out;
+      });
     })
     .andThen((img) => safeEncodeJpeg(img))
     .map((result) => {
