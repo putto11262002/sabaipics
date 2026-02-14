@@ -165,8 +165,10 @@ case "$ENVIRONMENT" in
       "r2-notification-proxy"
     )
     UPLOAD_QUEUE="upload-processing-dev"
+    LUT_QUEUE="lut-processing-dev"
     NOTIFICATION_QUEUE="r2-notification-proxy"
     LOGO_NOTIFICATION_QUEUE="r2-notification-proxy"
+    LUT_NOTIFICATION_QUEUE="r2-notification-proxy"
     ;;
   staging)
     PHOTOS_BUCKET="sabaipics-photos-staging"
@@ -180,11 +182,15 @@ case "$ENVIRONMENT" in
       "upload-processing-dlq-staging"
       "logo-processing-staging"
       "logo-processing-dlq-staging"
+      "lut-processing-staging"
+      "lut-processing-dlq-staging"
     )
     UPLOAD_QUEUE="upload-processing-staging"
     LOGO_QUEUE="logo-processing-staging"
+    LUT_QUEUE="lut-processing-staging"
     NOTIFICATION_QUEUE="$UPLOAD_QUEUE"
     LOGO_NOTIFICATION_QUEUE="$LOGO_QUEUE"
+    LUT_NOTIFICATION_QUEUE="$LUT_QUEUE"
     ;;
   production)
     PHOTOS_BUCKET="sabaipics-photos"
@@ -198,11 +204,15 @@ case "$ENVIRONMENT" in
       "upload-processing-dlq"
       "logo-processing"
       "logo-processing-dlq"
+      "lut-processing"
+      "lut-processing-dlq"
     )
     UPLOAD_QUEUE="upload-processing"
     LOGO_QUEUE="logo-processing"
+    LUT_QUEUE="lut-processing"
     NOTIFICATION_QUEUE="$UPLOAD_QUEUE"
     LOGO_NOTIFICATION_QUEUE="$LOGO_QUEUE"
+    LUT_NOTIFICATION_QUEUE="$LUT_QUEUE"
     ;;
 esac
 
@@ -224,6 +234,7 @@ set_bucket_cors "$PHOTOS_BUCKET"
 echo "\n== R2 Notifications =="
 create_bucket_notification "$PHOTOS_BUCKET" "$NOTIFICATION_QUEUE" "uploads/ object-create -> $NOTIFICATION_QUEUE" "uploads/"
 create_bucket_notification "$PHOTOS_BUCKET" "$LOGO_NOTIFICATION_QUEUE" "logos/ object-create -> $LOGO_NOTIFICATION_QUEUE" "logos/"
+create_bucket_notification "$PHOTOS_BUCKET" "$LUT_NOTIFICATION_QUEUE" "lut-uploads/ object-create -> $LUT_NOTIFICATION_QUEUE" "lut-uploads/"
 
 echo "\n== R2 Custom Domain =="
 add_r2_custom_domain "$PHOTOS_BUCKET" "$PHOTO_DOMAIN"

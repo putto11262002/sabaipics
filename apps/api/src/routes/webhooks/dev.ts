@@ -37,9 +37,12 @@ export const devWebhookRouter = new Hono<Env>().post(
     const notification = c.req.valid('json');
 
     // Dispatch to the correct queue based on R2 key prefix
-    const queue = notification.object.key.startsWith('logos/')
-      ? c.env.LOGO_QUEUE
-      : c.env.UPLOAD_QUEUE;
+    const key = notification.object.key;
+    const queue = key.startsWith('lut-uploads/')
+      ? c.env.LUT_QUEUE
+      : key.startsWith('logos/')
+        ? c.env.LOGO_QUEUE
+        : c.env.UPLOAD_QUEUE;
 
     await queue.send({
       account: notification.account,

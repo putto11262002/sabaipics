@@ -22,6 +22,7 @@ import { queue as photoQueue } from './queue/photo-consumer';
 import { queue as cleanupQueue } from './queue/cleanup-consumer';
 import { queue as uploadQueue } from './queue/upload-consumer';
 import logoUploadConsumer from './queue/logo-upload-consumer';
+import lutProcessingConsumer from './queue/lut-processing-consumer';
 
 // Cron handlers
 import { scheduled } from './crons';
@@ -115,6 +116,9 @@ export default Sentry.withSentry(
       }
       if (batch.queue.startsWith('logo-processing')) {
         return logoUploadConsumer.queue(batch as MessageBatch<any>, env);
+      }
+      if (batch.queue.startsWith('lut-processing')) {
+        return lutProcessingConsumer.queue(batch as MessageBatch<any>, env);
       }
       console.error('[Queue] Unknown queue:', batch.queue);
     },

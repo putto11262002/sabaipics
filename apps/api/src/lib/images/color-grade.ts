@@ -150,7 +150,6 @@ export function parseCubeLut(text: string): Result<ParsedCubeLut, CubeLutParseEr
       message: 'DOMAIN_MIN and DOMAIN_MAX must both be provided when specifying a domain',
     });
   }
-
   if (!size) {
     return err({ type: 'invalid_format', message: 'Missing LUT_3D_SIZE' });
   }
