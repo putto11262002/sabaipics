@@ -9,7 +9,7 @@ import {
   CardDescription,
 } from '@sabaipics/uiv3/components/card';
 import { Skeleton } from '@sabaipics/uiv3/components/skeleton';
-import { Wallet, TrendingUp, TrendingDown } from 'lucide-react';
+import { Wallet, Clock, TrendingDown } from 'lucide-react';
 import { cn } from '@sabaipics/uiv3/lib/utils';
 import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { CreditTopUpDialog } from '../../components/credits/CreditTopUpDialog';
@@ -61,19 +61,19 @@ export default function CreditsLayout() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
-              <TrendingUp className="size-4" />
-              Total Purchased
+              <Clock className="size-4" />
+              Expiring Soon
             </CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums">
               {isLoading ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
-                (summary?.totalPurchased ?? 0).toLocaleString()
+                (summary?.expiringSoon ?? 0).toLocaleString()
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">All-time credits purchased</p>
+            <p className="text-xs text-muted-foreground">Credits expiring in 30 days</p>
           </CardContent>
         </Card>
 
@@ -81,18 +81,18 @@ export default function CreditsLayout() {
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <TrendingDown className="size-4" />
-              Total Used
+              Used This Month
             </CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums">
               {isLoading ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
-                (summary?.totalUsed ?? 0).toLocaleString()
+                (summary?.usedThisMonth ?? 0).toLocaleString()
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">All-time credits used</p>
+            <p className="text-xs text-muted-foreground">Credits used this month</p>
           </CardContent>
         </Card>
       </div>
@@ -120,7 +120,7 @@ export default function CreditsLayout() {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-auto px-4">
+      <div className="min-w-0 flex-1 overflow-auto px-4">
         <Outlet />
       </div>
 
