@@ -581,8 +581,8 @@ export const creditsRouter = new Hono<Env>()
       const [summary] = yield* ResultAsync.fromPromise(
         db
           .select({
-            balance: sql<number>`coalesce(sum(${creditLedger.amount}), 0)::int`,
-            expiringSoon: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'credit' and ${creditLedger.expiresAt} > now() and ${creditLedger.expiresAt} <= now() + interval '30 days' then ${creditLedger.amount} else 0 end), 0)::int`,
+            balance: sql<number>`coalesce(sum(case when ${creditLedger.expiresAt} > now() then ${creditLedger.amount} else 0 end), 0)::int`,
+            expiringSoon: sql<number>`coalesce(sum(case when ${creditLedger.expiresAt} > now() and ${creditLedger.expiresAt} <= now() + interval '30 days' then ${creditLedger.amount} else 0 end), 0)::int`,
             usedThisMonth: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'debit' and ${creditLedger.createdAt} >= date_trunc('month', now()) then abs(${creditLedger.amount}) else 0 end), 0)::int`,
           })
           .from(creditLedger)
