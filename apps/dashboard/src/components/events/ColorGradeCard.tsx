@@ -67,6 +67,12 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
   };
 
   const disabledReason = enabled && !lutId ? 'Select a LUT to enable color grade' : null;
+  const lutControlsDisabled =
+    !enabled ||
+    update.isPending ||
+    eventCg.isLoading ||
+    studioLuts.isLoading ||
+    studioLuts.isFetching;
 
   return (
     <>
@@ -111,9 +117,12 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
             <Select
               value={lutId ?? ''}
               onValueChange={(v) => setLutId(v ? v : null)}
-              disabled={completedLuts.length === 0}
+              disabled={lutControlsDisabled || completedLuts.length === 0}
             >
-              <SelectTrigger>
+              <SelectTrigger
+                className="w-full"
+                disabled={lutControlsDisabled || completedLuts.length === 0}
+              >
                 <SelectValue
                   placeholder={completedLuts.length === 0 ? 'No completed LUTs' : 'Select a LUT'}
                 />
@@ -146,6 +155,7 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
               max={100}
               step={1}
               onValueChange={(v) => setIntensity(v[0] ?? 75)}
+              disabled={lutControlsDisabled}
             />
           </div>
 
@@ -154,7 +164,11 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
               <Label className="text-sm">Include luminance</Label>
               <p className="text-xs text-muted-foreground">Allow brightness changes</p>
             </div>
-            <Switch checked={includeLuminance} onCheckedChange={setIncludeLuminance} />
+            <Switch
+              checked={includeLuminance}
+              onCheckedChange={setIncludeLuminance}
+              disabled={lutControlsDisabled}
+            />
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -162,7 +176,7 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
               variant="outline"
               size="sm"
               onClick={() => setPreviewOpen(true)}
-              disabled={!lutId}
+              disabled={lutControlsDisabled || !lutId}
             >
               <Eye className="mr-2 size-4" />
               Preview
