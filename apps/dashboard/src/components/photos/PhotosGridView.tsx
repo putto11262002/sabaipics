@@ -9,15 +9,7 @@ import { Check, Image as ImageIcon } from 'lucide-react';
 import type { Photo } from '../../hooks/photos/usePhotos';
 import { useState, useMemo } from 'react';
 
-import Lightbox from 'yet-another-react-lightbox';
-import 'yet-another-react-lightbox/styles.css';
-
-// import optional lightbox plugins
-import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
-import Slideshow from 'yet-another-react-lightbox/plugins/slideshow';
-// import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
-import Zoom from 'yet-another-react-lightbox/plugins/zoom';
-import 'yet-another-react-lightbox/plugins/thumbnails.css';
+import { PhotoViewerSheet } from './PhotoViewerSheet';
 
 import { RowsPhotoAlbum } from 'react-photo-album';
 import 'react-photo-album/rows.css';
@@ -37,21 +29,33 @@ export function PhotosGridView({
 }: PhotosGridViewProps) {
   const [index, setIndex] = useState(-1);
 
-  const photos = useMemo(
+  const albumPhotos = useMemo(
     () =>
-      _photos
-        ? _photos.map((photo) => ({
-            src: photo.thumbnailUrl,
-            height: photo.height ?? 1,
-            width: photo.width ?? 1,
-            key: photo.id,
-          }))
-        : [],
+      _photos.map((photo) => ({
+        src: photo.thumbnailUrl,
+        height: photo.height ?? 1,
+        width: photo.width ?? 1,
+        key: photo.id,
+      })),
+    [_photos],
+  );
+
+  const viewerPhotos = useMemo(
+    () =>
+      _photos.map((photo) => ({
+        id: photo.id,
+        previewUrl: photo.previewUrl,
+        width: photo.width ?? 1,
+        height: photo.height ?? 1,
+        uploadedAt: photo.uploadedAt,
+        fileSize: photo.fileSize,
+        faceCount: photo.faceCount,
+      })),
     [_photos],
   );
 
   // Empty state
-  if (photos.length === 0) {
+  if (albumPhotos.length === 0) {
     return (
       <Empty>
         <EmptyHeader>
@@ -68,16 +72,14 @@ export function PhotosGridView({
   }
   return (
     <>
-      <Lightbox
-        slides={photos}
-        open={index >= 0}
+      <PhotoViewerSheet
+        photos={viewerPhotos}
         index={index}
-        close={() => setIndex(-1)}
-        // enable optional lightbox plugins
-        plugins={[Fullscreen, Slideshow, Zoom]}
+        onIndexChange={setIndex}
+        onClose={() => setIndex(-1)}
       />
       <RowsPhotoAlbum
-        photos={photos}
+        photos={albumPhotos}
         onClick={(event) => {
           if (!isSelelectable) {
             setIndex(event.index);
