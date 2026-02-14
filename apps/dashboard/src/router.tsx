@@ -14,6 +14,7 @@ import EventStatisticsTab from './routes/events/[id]/statistics';
 import EventPhotosTab from './routes/events/[id]/photos';
 import EventSlideshowTab from './routes/events/[id]/slideshow';
 import SlideshowPreviewPage from './routes/events/[id]/slideshow/preview';
+import StudioLutsPage from './routes/studio/luts';
 import { SidebarLayout } from './components/shell/sidebar-layout';
 
 export const router = createBrowserRouter([
@@ -81,6 +82,10 @@ export const router = createBrowserRouter([
       {
         path: '/events',
         element: <EventsPage />,
+      },
+      {
+        path: '/studio/luts',
+        element: <StudioLutsPage />,
       },
       {
         path: '/events/:id',
