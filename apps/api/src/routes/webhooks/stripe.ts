@@ -62,7 +62,8 @@ const stripeProducer = eventBus.producer<StripeEvents>();
 export async function fulfillCheckout(
   dbTx: DatabaseTx,
   session: Stripe.Checkout.Session,
-  metadata: Record<string, string>
+  metadata: Record<string, string>,
+  stripe?: Stripe
 ): Promise<{ success: boolean; reason: string }> {
   // Check payment status - fulfill if paid or no payment required (gift codes)
   const validStatuses = ["paid", "no_payment_required"];
@@ -156,6 +157,30 @@ export async function fulfillCheckout(
       .limit(1);
 
     if (existing.length > 0) {
+      // Best-effort: fetch and store Stripe receipt URL
+      if (stripe && session.payment_intent) {
+        try {
+          const paymentIntentId = typeof session.payment_intent === 'string'
+            ? session.payment_intent
+            : session.payment_intent.id;
+          const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
+            expand: ['latest_charge'],
+          });
+          const charge = pi.latest_charge;
+          const receiptUrl = charge && typeof charge === 'object' ? charge.receipt_url : null;
+          if (receiptUrl) {
+            await dbTx
+              .update(creditLedger)
+              .set({ stripeReceiptUrl: receiptUrl })
+              .where(eq(creditLedger.id, existing[0].id));
+          }
+        } catch (receiptErr) {
+          console.warn(
+            `[Stripe Fulfillment] Failed to fetch receipt URL for session ${session.id}:`,
+            receiptErr instanceof Error ? receiptErr.message : receiptErr
+          );
+        }
+      }
       return { success: true, reason: "fulfilled" };
     } else {
       return { success: false, reason: "duplicate" };
@@ -237,7 +262,7 @@ export const stripeWebhookRouter = new Hono<{
 
         // Fulfill the checkout (add credits to ledger) - use transaction
         const dbTx = c.var.dbTx();
-        const result = await fulfillCheckout(dbTx, session, metadata);
+        const result = await fulfillCheckout(dbTx, session, metadata, stripe);
         console.log(
           `[Stripe Webhook] Fulfillment result: ${result.reason} (session: ${session.id})`
         );
