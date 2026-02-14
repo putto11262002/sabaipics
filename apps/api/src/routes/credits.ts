@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, asc, and } from 'drizzle-orm';
+import { eq, asc, and, desc, sql } from 'drizzle-orm';
 import { creditPackages, photographers, creditLedger, promoCodeUsage } from '@sabaipics/db';
 import { requirePhotographer } from '../middleware';
 import type { Env } from '../types';
@@ -521,6 +521,247 @@ export const creditsRouter = new Hono<Env>()
       .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
       .match(
         (data) => c.json(data),
+        (e) => apiError(c, e),
+      );
+  })
+  /**
+   * GET /credit-packages/purchases
+   *
+   * Returns credit increments (purchases, gifts, discounts, refunds) for the authenticated photographer.
+   * Requires authentication.
+   *
+   * Query params:
+   * - page: number (default: 0)
+   * - limit: number (default: 20, max: 100)
+   *
+   * Response:
+   * - entries: Array of credit ledger entries with type='credit'
+   * - pagination: { page, limit, totalCount, hasMore }
+   */
+  .get('/purchases', requirePhotographer(), async (c) => {
+    return safeTry(async function* () {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+
+      const pageParam = c.req.query('page');
+      const limitParam = c.req.query('limit');
+      const page = Math.max(0, parseInt(pageParam || '0', 10) || 0);
+      const limit = Math.min(100, Math.max(1, parseInt(limitParam || '20', 10) || 20));
+
+      // Get total count for pagination
+      const [countResult] = yield* ResultAsync.fromPromise(
+        db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(creditLedger)
+          .where(
+            and(
+              eq(creditLedger.photographerId, photographer.id),
+              eq(creditLedger.type, 'credit')
+            )
+          ),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      const totalCount = countResult?.count ?? 0;
+
+      // Get paginated entries
+      const entries = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            id: creditLedger.id,
+            amount: creditLedger.amount,
+            source: creditLedger.source,
+            createdAt: creditLedger.createdAt,
+            expiresAt: creditLedger.expiresAt,
+            promoCode: creditLedger.promoCode,
+            stripeReceiptUrl: creditLedger.stripeReceiptUrl,
+          })
+          .from(creditLedger)
+          .where(
+            and(
+              eq(creditLedger.photographerId, photographer.id),
+              eq(creditLedger.type, 'credit')
+            )
+          )
+          .orderBy(desc(creditLedger.createdAt))
+          .limit(limit)
+          .offset(page * limit),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      return ok({
+        entries: entries.map((entry) => ({
+          id: entry.id,
+          amount: entry.amount,
+          source: entry.source,
+          createdAt: entry.createdAt,
+          expiresAt: entry.expiresAt,
+          promoCode: entry.promoCode,
+          stripeReceiptUrl: entry.stripeReceiptUrl,
+        })),
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          hasMore: (page + 1) * limit < totalCount,
+        },
+      });
+    })
+      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
+  })
+  /**
+   * GET /credit-packages/usage
+   *
+   * Returns credit debits (usage) for the authenticated photographer with chart data.
+   * Requires authentication.
+   *
+   * Query params:
+   * - page: number (default: 0)
+   * - limit: number (default: 20, max: 100)
+   *
+   * Response:
+   * - entries: Array of credit ledger entries with type='debit'
+   * - chartData: Aggregated usage by date
+   * - summary: { totalUsed, thisMonth, thisWeek, today }
+   * - pagination: { page, limit, totalCount, hasMore }
+   */
+  .get('/usage', requirePhotographer(), async (c) => {
+    return safeTry(async function* () {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+
+      const pageParam = c.req.query('page');
+      const limitParam = c.req.query('limit');
+      const page = Math.max(0, parseInt(pageParam || '0', 10) || 0);
+      const limit = Math.min(100, Math.max(1, parseInt(limitParam || '20', 10) || 20));
+
+      // Get total count for pagination
+      const [countResult] = yield* ResultAsync.fromPromise(
+        db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(creditLedger)
+          .where(
+            and(
+              eq(creditLedger.photographerId, photographer.id),
+              eq(creditLedger.type, 'debit')
+            )
+          ),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      const totalCount = countResult?.count ?? 0;
+
+      // Get paginated entries
+      const entries = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            id: creditLedger.id,
+            amount: creditLedger.amount,
+            source: creditLedger.source,
+            createdAt: creditLedger.createdAt,
+          })
+          .from(creditLedger)
+          .where(
+            and(
+              eq(creditLedger.photographerId, photographer.id),
+              eq(creditLedger.type, 'debit')
+            )
+          )
+          .orderBy(desc(creditLedger.createdAt))
+          .limit(limit)
+          .offset(page * limit),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      // Get chart data - aggregate by date (last 90 days max)
+      const chartData = yield* ResultAsync.fromPromise(
+        db.execute(sql`
+          SELECT
+            TO_CHAR(DATE(created_at), 'YYYY-MM-DD') as date,
+            SUM(ABS(amount)) as credits
+          FROM credit_ledger
+          WHERE photographer_id = ${photographer.id}
+            AND type = 'debit'
+            AND created_at >= NOW() - INTERVAL '90 days'
+          GROUP BY DATE(created_at)
+          ORDER BY DATE(created_at) ASC
+        `),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      // Get summary stats
+      const summaryResult = yield* ResultAsync.fromPromise(
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(ABS(amount)), 0)::int as "totalUsed",
+            COALESCE((
+              SELECT SUM(ABS(amount))::int
+              FROM credit_ledger
+              WHERE photographer_id = ${photographer.id}
+                AND type = 'debit'
+                AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())
+            ), 0) as "thisMonth",
+            COALESCE((
+              SELECT SUM(ABS(amount))::int
+              FROM credit_ledger
+              WHERE photographer_id = ${photographer.id}
+                AND type = 'debit'
+                AND created_at >= NOW() - INTERVAL '7 days'
+            ), 0) as "thisWeek",
+            COALESCE((
+              SELECT SUM(ABS(amount))::int
+              FROM credit_ledger
+              WHERE photographer_id = ${photographer.id}
+                AND type = 'debit'
+                AND DATE(created_at) = CURRENT_DATE
+            ), 0) as "today"
+          FROM credit_ledger
+          WHERE photographer_id = ${photographer.id}
+            AND type = 'debit'
+          LIMIT 1
+        `),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      const summary = summaryResult?.rows?.[0] ?? {
+        totalUsed: 0,
+        thisMonth: 0,
+        thisWeek: 0,
+        today: 0,
+      };
+
+      return ok({
+        entries: entries.map((entry) => ({
+          id: entry.id,
+          amount: entry.amount,
+          source: entry.source,
+          createdAt: entry.createdAt,
+        })),
+        chartData: chartData.rows.map((row: any) => ({
+          date: row.date,
+          credits: Number(row.credits),
+        })),
+        summary: {
+          totalUsed: Number(summary.totalUsed) || 0,
+          thisMonth: Number(summary.thisMonth) || 0,
+          thisWeek: Number(summary.thisWeek) || 0,
+          today: Number(summary.today) || 0,
+        },
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          hasMore: (page + 1) * limit < totalCount,
+        },
+      });
+    })
+      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+      .match(
+        (data) => c.json({ data }),
         (e) => apiError(c, e),
       );
   });

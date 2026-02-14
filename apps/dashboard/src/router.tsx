@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { SignedIn, SignedOut } from '@sabaipics/auth/react';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { SignInPage } from './routes/sign-in';
@@ -6,6 +6,9 @@ import { SignUpPage } from './routes/sign-up';
 import { DesktopAuthPage } from './routes/auth/desktop';
 import { DashboardPage } from './routes/dashboard';
 import { CreditSuccessPage } from './routes/credits/success';
+import { CreditsIndexPage } from './routes/credits';
+import { PurchasesPage } from './routes/credits/purchases';
+import { UsagePage } from './routes/credits/usage';
 import EventsPage from './routes/events';
 import EventDetailLayout from './routes/events/[id]/layout';
 import EventDetailsTab from './routes/events/[id]/details';
@@ -50,20 +53,14 @@ export const router = createBrowserRouter([
     ),
   },
 
-  // Credits routes (auth required, no sidebar)
+  // Credits routes (auth required, no sidebar for success)
   {
-    path: '/credits',
+    path: '/credits/success',
     element: (
       <ProtectedRoute>
-        <Outlet />
+        <CreditSuccessPage />
       </ProtectedRoute>
     ),
-    children: [
-      {
-        path: 'success',
-        element: <CreditSuccessPage />,
-      },
-    ],
   },
 
   // Protected routes (auth required)
@@ -81,6 +78,18 @@ export const router = createBrowserRouter([
       {
         path: '/events',
         element: <EventsPage />,
+      },
+      {
+        path: '/credits',
+        element: <CreditsIndexPage />,
+      },
+      {
+        path: '/credits/purchases',
+        element: <PurchasesPage />,
+      },
+      {
+        path: '/credits/usage',
+        element: <UsagePage />,
       },
       {
         path: '/events/:id',
