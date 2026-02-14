@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import { api, useApiClient } from '../../lib/api';
 
 type CreateKind = 'cube' | 'reference';
 
@@ -17,13 +17,20 @@ export function useCreateStudioLut() {
       name: string;
       file: File;
     }): Promise<{ lutId: string }> => {
+      const token = await getToken();
       const contentLength = file.size;
 
       const presignRes =
         kind === 'cube'
           ? await api.studio.luts.cube.presign.$post(
               { json: { name, contentLength } },
-              await withAuth(getToken, { headers: { 'Content-Type': 'application/json' } }),
+              token
+                ? {
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                    },
+                  }
+                : undefined,
             )
           : await api.studio.luts.reference.presign.$post(
               {
@@ -33,7 +40,13 @@ export function useCreateStudioLut() {
                   contentLength,
                 },
               },
-              await withAuth(getToken, { headers: { 'Content-Type': 'application/json' } }),
+              token
+                ? {
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                    },
+                  }
+                : undefined,
             );
 
       if (!presignRes.ok) {

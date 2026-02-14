@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import { api, useApiClient } from '../../lib/api';
 
 const putColorGrade = api.events[':id']['color-grade'].$put;
 
@@ -21,12 +21,17 @@ export function useUpdateEventColorGrade() {
       intensity: number;
       includeLuminance: boolean;
     }) => {
+      const token = await getToken();
       const res = await putColorGrade(
         {
           param: { id: eventId },
           json: { enabled, lutId, intensity, includeLuminance },
         },
-        await withAuth(getToken, { headers: { 'Content-Type': 'application/json' } }),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
 
       if (!res.ok) {
