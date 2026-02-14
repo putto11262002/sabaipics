@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import { api, useApiClient } from '../../lib/api';
 
 export function useRenameStudioLut() {
   const queryClient = useQueryClient();
@@ -7,9 +7,16 @@ export function useRenameStudioLut() {
 
   return useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const token = await getToken();
       const res = await api.studio.luts[':id'].$patch(
         { param: { id }, json: { name } },
-        await withAuth(getToken, { headers: { 'Content-Type': 'application/json' } }),
+        token
+          ? {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          : undefined,
       );
 
       if (!res.ok) {
