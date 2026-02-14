@@ -119,6 +119,10 @@ export async function fulfillCheckout(
       // Extract promo code from metadata
       const promoCodeApplied = metadata.promo_code_applied;
 
+      // Extract receipt URL from session (available after payment completion)
+      // Note: receipt_url may not be typed in older Stripe versions
+      const receiptUrl = (session as any).receipt_url ?? null;
+
       // Insert credit ledger entry
       await tx.insert(creditLedger).values({
         photographerId,
@@ -127,6 +131,7 @@ export async function fulfillCheckout(
         source: "purchase",
         promoCode: promoCodeApplied && typeof promoCodeApplied === 'string' ? promoCodeApplied : null,
         stripeSessionId: session.id,
+        stripeReceiptUrl: receiptUrl,
         expiresAt: addMonths(new Date(), 6).toISOString(),
       });
 
