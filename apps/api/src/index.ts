@@ -15,6 +15,7 @@ import { r2Router } from './routes/r2';
 import { participantRouter } from './routes/participant';
 import { ftpRouter } from './routes/ftp';
 import { desktopAuthRouter } from './routes/desktop-auth';
+import { studioRouter } from './routes/studio';
 import type { Env, Bindings } from './types';
 
 // Queue consumers
@@ -81,6 +82,7 @@ const app = new Hono<Env>()
   .route('/desktop/auth', desktopAuthRouter)
   .route('/auth', authRouter)
   .route('/dashboard', dashboardRouter)
+  .route('/studio', studioRouter)
   .route('/events', eventsRouter)
   .route('/uploads', uploadsRouter)
   .route('/', photosRouter);

@@ -18,6 +18,12 @@ export interface PresignOptions {
   expiresIn: number; // seconds
 }
 
+export interface PresignGetOptions {
+  bucket: string;
+  key: string;
+  expiresIn: number; // seconds
+}
+
 export interface PresignResult {
   url: string;
   expiresAt: Date;
@@ -68,6 +74,41 @@ export async function generatePresignedPutUrl(
     new Request(urlWithExpiry, {
       method: 'PUT',
       headers,
+    }),
+    { aws: { signQuery: true } },
+  );
+
+  const expiresAt = new Date(Date.now() + options.expiresIn * 1000);
+
+  return {
+    url: signedRequest.url,
+    expiresAt,
+  };
+}
+
+/**
+ * Generate a presigned GET URL for R2.
+ */
+export async function generatePresignedGetUrl(
+  accountId: string,
+  accessKeyId: string,
+  secretAccessKey: string,
+  options: PresignGetOptions,
+): Promise<PresignResult> {
+  const client = new AwsClient({
+    accessKeyId,
+    secretAccessKey,
+    service: 's3',
+    region: 'auto',
+  });
+
+  const r2Url = `https://${accountId}.r2.cloudflarestorage.com`;
+  const objectUrl = `${r2Url}/${options.bucket}/${options.key}`;
+  const urlWithExpiry = `${objectUrl}?X-Amz-Expires=${options.expiresIn}`;
+
+  const signedRequest = await client.sign(
+    new Request(urlWithExpiry, {
+      method: 'GET',
     }),
     { aws: { signQuery: true } },
   );
