@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { LayoutDashboard, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Sparkles } from 'lucide-react';
 
 import { LogoMark } from '../icons/logo-mark';
 import { NavMain } from './nav-main';
@@ -23,6 +23,11 @@ const data = {
       title: 'Events',
       url: '/events',
       icon: CalendarDays,
+    },
+    {
+      title: 'Studio',
+      url: '/studio/luts',
+      icon: Sparkles,
     },
     // {
     // 	title: "Galleries",

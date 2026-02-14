@@ -3,11 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@sabaipics/uiv3/components/button';
 import { Input } from '@sabaipics/uiv3/components/input';
 import { Field, FieldLabel, FieldError } from '@sabaipics/uiv3/components/field';
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from '@sabaipics/uiv3/components/alert';
+import { Alert, AlertDescription, AlertTitle } from '@sabaipics/uiv3/components/alert';
 import {
   Card,
   CardAction,
@@ -28,7 +24,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@sabaipics/uiv3/components/dropdown-menu';
-import { Check, Copy, ExternalLink, Download, Save, Upload, X, Image as ImageIcon, Info, Loader2, Eye, EyeOff } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Download,
+  Save,
+  Upload,
+  X,
+  Image as ImageIcon,
+  Info,
+  Loader2,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router';
@@ -41,9 +50,13 @@ import { useUpdateEvent } from '../../../../hooks/events/useUpdateEvent';
 import { useLogoPresign } from '../../../../hooks/events/useLogoPresign';
 import { useLogoStatus } from '../../../../hooks/events/useLogoStatus';
 import { useDeleteLogo } from '../../../../hooks/events/useDeleteLogo';
-import { useFtpCredentials, useRevealFtpCredentials } from '../../../../hooks/events/useFtpCredentials';
+import {
+  useFtpCredentials,
+  useRevealFtpCredentials,
+} from '../../../../hooks/events/useFtpCredentials';
 import { updateEventFormSchema, type UpdateEventFormData } from '../../../../lib/event-form-schema';
 import { toast } from 'sonner';
+import { ColorGradeCard } from '../../../../components/events/ColorGradeCard';
 
 const ALLOWED_LOGO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_LOGO_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -131,8 +144,11 @@ export default function EventDetailsTab() {
       setLogoPreviewUrl(URL.createObjectURL(file));
 
       try {
-        const { putUrl, uploadId: newUploadId, requiredHeaders } =
-          await presign.mutateAsync({ eventId: id!, file });
+        const {
+          putUrl,
+          uploadId: newUploadId,
+          requiredHeaders,
+        } = await presign.mutateAsync({ eventId: id!, file });
 
         await fetch(putUrl, {
           method: 'PUT',
@@ -256,7 +272,12 @@ export default function EventDetailsTab() {
           <CardHeader>
             <CardTitle>Event details</CardTitle>
             <CardAction>
-              <Button variant="outline" size="sm" onClick={form.handleSubmit(handleSave)} disabled={updateEvent.isPending}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={form.handleSubmit(handleSave)}
+                disabled={updateEvent.isPending}
+              >
                 <Save className="mr-1 size-4" />
                 <span className="hidden sm:inline">Save</span>
               </Button>
@@ -291,7 +312,7 @@ export default function EventDetailsTab() {
                     placeholder="Add a tagline or slogan..."
                     aria-invalid={fieldState.invalid}
                   />
-                   <FieldError errors={fieldState.error ? [fieldState.error] : undefined} />
+                  <FieldError errors={fieldState.error ? [fieldState.error] : undefined} />
                 </Field>
               )}
             />
@@ -388,14 +409,18 @@ export default function EventDetailsTab() {
               <AlertTitle>Upload guidelines</AlertTitle>
               <AlertDescription>
                 <p className="text-xs">
-                  Formats: JPEG, PNG, WebP<br />
-                  Maximum size: 5MB<br />
+                  Formats: JPEG, PNG, WebP
+                  <br />
+                  Maximum size: 5MB
+                  <br />
                   Recommended size: 512x512px
                 </p>
               </AlertDescription>
             </Alert>
           </CardContent>
         </Card>
+
+        <ColorGradeCard eventId={event.id} />
 
         {/* Event links */}
         <Card>
