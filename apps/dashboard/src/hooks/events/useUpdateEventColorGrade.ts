@@ -26,7 +26,7 @@ export function useUpdateEventColorGrade() {
           param: { id: eventId },
           json: { enabled, lutId, intensity, includeLuminance },
         },
-        await withAuth(getToken),
+        await withAuth(getToken, { headers: { 'Content-Type': 'application/json' } }),
       );
 
       if (!res.ok) {
