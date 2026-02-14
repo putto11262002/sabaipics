@@ -9,7 +9,7 @@ export function useRenameStudioLut() {
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
       const res = await api.studio.luts[':id'].$patch(
         { param: { id }, json: { name } },
-        await withAuth(getToken),
+        await withAuth(getToken, { headers: { 'Content-Type': 'application/json' } }),
       );
 
       if (!res.ok) {

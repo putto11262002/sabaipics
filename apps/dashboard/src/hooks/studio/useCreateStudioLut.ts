@@ -23,7 +23,7 @@ export function useCreateStudioLut() {
         kind === 'cube'
           ? await api.studio.luts.cube.presign.$post(
               { json: { name, contentLength } },
-              await withAuth(getToken),
+              await withAuth(getToken, { headers: { 'Content-Type': 'application/json' } }),
             )
           : await api.studio.luts.reference.presign.$post(
               {
@@ -33,7 +33,7 @@ export function useCreateStudioLut() {
                   contentLength,
                 },
               },
-              await withAuth(getToken),
+              await withAuth(getToken, { headers: { 'Content-Type': 'application/json' } }),
             );
 
       if (!presignRes.ok) {
