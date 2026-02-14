@@ -1,10 +1,9 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { api, useApiClient } from '../../lib/api';
 
 type CreateKind = 'cube' | 'reference';
 
 export function useCreateStudioLut() {
-  const queryClient = useQueryClient();
   const { getToken } = useApiClient();
 
   return useMutation({
@@ -66,9 +65,6 @@ export function useCreateStudioLut() {
       }
 
       return { lutId: presign.lutId };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['studio', 'luts'] });
     },
     retry: false,
   });

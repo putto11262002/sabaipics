@@ -6,10 +6,6 @@ const listLuts = api.studio.luts.$get;
 
 export type StudioLut = InferResponseType<typeof listLuts, 200>['data'][0];
 
-function shouldPoll(luts: StudioLut[]): boolean {
-  return luts.some((l) => l.status === 'pending' || l.status === 'processing');
-}
-
 export function useStudioLuts(options?: { limit?: number }) {
   const { getToken } = useApiClient();
   const limit = options?.limit ?? 200;
@@ -26,11 +22,9 @@ export function useStudioLuts(options?: { limit?: number }) {
       const json = await res.json();
       return json.data;
     },
-    refetchInterval: (query) => {
-      const data = query.state.data as StudioLut[] | undefined;
-      if (!data) return false;
-      return shouldPoll(data) ? 2000 : false;
-    },
+    // LUT creation flow now owns pending/processing state and revalidates on completion.
+    // Keep the Studio LUT list stable (no background polling).
+    refetchInterval: false,
     staleTime: 0,
   });
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
 import { Button } from '@sabaipics/uiv3/components/button';
 import { Badge } from '@sabaipics/uiv3/components/badge';
@@ -38,11 +39,11 @@ import { useDeleteStudioLut } from '../../../hooks/studio/useDeleteStudioLut';
 import { useDownloadStudioLut } from '../../../hooks/studio/useDownloadStudioLut';
 import { useRenameStudioLut } from '../../../hooks/studio/useRenameStudioLut';
 import { CreateLutDialog } from '../../../components/studio/CreateLutDialog';
-import { LutPreviewDialog } from '../../../components/studio/LutPreviewDialog';
 
 type CreateKind = 'cube' | 'reference';
 
 export default function StudioLutsPage() {
+  const navigate = useNavigate();
   const luts = useStudioLuts();
   const del = useDeleteStudioLut();
   const download = useDownloadStudioLut();
@@ -50,10 +51,6 @@ export default function StudioLutsPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createKind, setCreateKind] = useState<CreateKind>('cube');
-  const [preview, setPreview] = useState<{ open: boolean; lutId: string | null; name?: string }>({
-    open: false,
-    lutId: null,
-  });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [renameState, setRenameState] = useState<{ id: string; name: string } | null>(null);
 
@@ -159,9 +156,10 @@ export default function StudioLutsPage() {
                           <DropdownMenuContent align="end" className="min-w-[160px]">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem
-                              onClick={() =>
-                                setPreview({ open: true, lutId: lut.id, name: lut.name })
-                              }
+                              onClick={() => {
+                                const query = new URLSearchParams({ name: lut.name });
+                                navigate(`/studio/luts/${lut.id}/preview?${query.toString()}`);
+                              }}
                             >
                               Preview
                             </DropdownMenuItem>
@@ -203,13 +201,6 @@ export default function StudioLutsPage() {
       </div>
 
       <CreateLutDialog open={createOpen} onOpenChange={setCreateOpen} kind={createKind} />
-
-      <LutPreviewDialog
-        open={preview.open}
-        onOpenChange={(open) => setPreview((s) => ({ ...s, open }))}
-        lutId={preview.lutId}
-        title={preview.name ? `Preview: ${preview.name}` : 'Preview LUT'}
-      />
 
       <AlertDialog
         open={confirmDeleteId != null}

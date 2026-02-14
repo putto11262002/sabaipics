@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   Card,
   CardAction,
@@ -25,9 +26,9 @@ import { toast } from 'sonner';
 import { useStudioLuts } from '../../hooks/studio/useStudioLuts';
 import { useEventColorGrade } from '../../hooks/events/useEventColorGrade';
 import { useUpdateEventColorGrade } from '../../hooks/events/useUpdateEventColorGrade';
-import { LutPreviewDialog } from '../studio/LutPreviewDialog';
 
 export function ColorGradeCard({ eventId }: { eventId: string }) {
+  const navigate = useNavigate();
   const studioLuts = useStudioLuts();
   const eventCg = useEventColorGrade(eventId);
   const update = useUpdateEventColorGrade();
@@ -41,7 +42,6 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
   const [lutId, setLutId] = useState<string | null>(null);
   const [intensity, setIntensity] = useState(75);
   const [includeLuminance, setIncludeLuminance] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (!eventCg.data) return;
@@ -175,7 +175,14 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPreviewOpen(true)}
+              onClick={() => {
+                if (!lutId) return;
+                const query = new URLSearchParams({
+                  intensity: String(intensity),
+                  includeLuminance: includeLuminance ? 'true' : 'false',
+                });
+                navigate(`/studio/luts/${lutId}/preview?${query.toString()}`);
+              }}
               disabled={lutControlsDisabled || !lutId}
             >
               <Eye className="mr-2 size-4" />
@@ -184,14 +191,6 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
           </div>
         </CardContent>
       </Card>
-
-      <LutPreviewDialog
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-        lutId={lutId}
-        title="Preview on sample image"
-        initial={{ intensity, includeLuminance }}
-      />
     </>
   );
 }
