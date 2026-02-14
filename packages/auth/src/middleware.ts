@@ -1,7 +1,17 @@
-import type { MiddlewareHandler } from "hono";
-import { createClerkClient } from "@clerk/backend";
-import type { AuthBindings, AuthVariables, AuthObject } from "./types";
-import { createAuthError } from "./errors";
+import type { MiddlewareHandler } from 'hono';
+import { createClerkClient } from '@clerk/backend';
+import type { AuthBindings, AuthVariables, AuthObject } from './types';
+import { createAuthError } from './errors';
+
+// In Workers/browsers, `process` is not defined. We still want a test-mode bypass
+// in Node-based test runners (e.g. Vitest), so we declare a minimal shape.
+declare const process:
+  | {
+      env?: {
+        NODE_ENV?: string;
+      };
+    }
+  | undefined;
 
 /**
  * Clerk authenticateRequest status values:
@@ -22,13 +32,13 @@ export function createClerkAuth(): MiddlewareHandler<AuthEnv> {
   return async (c, next) => {
     // Test mode bypass - inject mock auth for integration testing
     // Uses NODE_ENV which Vitest automatically sets to 'test' during test runs
-    const nodeEnv = process.env.NODE_ENV as string | undefined;
-    if (nodeEnv === "test") {
+    const nodeEnv = process?.env?.NODE_ENV;
+    if (nodeEnv === 'test') {
       const auth: AuthObject = {
-        userId: "test_clerk_user_integration",
-        sessionId: "test_session_integration",
+        userId: 'test_clerk_user_integration',
+        sessionId: 'test_session_integration',
       };
-      c.set("auth", auth);
+      c.set('auth', auth);
       return next();
     }
 
@@ -37,7 +47,7 @@ export function createClerkAuth(): MiddlewareHandler<AuthEnv> {
       publishableKey: c.env.CLERK_PUBLISHABLE_KEY,
     });
 
-    const authorizedParties = c.env.AUTHORIZED_PARTIES.split(",");
+    const authorizedParties = c.env.AUTHORIZED_PARTIES.split(',');
 
     // Networkless verification with jwtKey
     const requestState = await clerkClient.authenticateRequest(c.req.raw, {
@@ -45,21 +55,21 @@ export function createClerkAuth(): MiddlewareHandler<AuthEnv> {
       authorizedParties,
     });
 
-    if (requestState.status === "signed-in") {
+    if (requestState.status === 'signed-in') {
       const clerkAuth = requestState.toAuth();
       // When status is "signed-in", userId and sessionId are guaranteed
       const auth: AuthObject = {
         userId: clerkAuth.userId!,
         sessionId: clerkAuth.sessionId!,
       };
-      c.set("auth", auth);
+      c.set('auth', auth);
     } else {
       // Log rejection reason for debugging (not exposed to client)
       const reason = requestState.reason;
-      if (reason && reason !== "session-token-missing") {
+      if (reason && reason !== 'session-token-missing') {
         console.warn(`[auth] Token rejected: ${reason}`);
       }
-      c.set("auth", null);
+      c.set('auth', null);
     }
 
     return next();
@@ -69,13 +79,10 @@ export function createClerkAuth(): MiddlewareHandler<AuthEnv> {
 // Require authenticated user
 export function requireAuth(): MiddlewareHandler<{ Variables: AuthVariables }> {
   return async (c, next) => {
-    const auth = c.get("auth");
+    const auth = c.get('auth');
     if (!auth) {
       // Generic error - specific reason already logged in createClerkAuth
-      return c.json(
-        createAuthError("UNAUTHENTICATED", "Authentication required"),
-        401,
-      );
+      return c.json(createAuthError('UNAUTHENTICATED', 'Authentication required'), 401);
     }
     return next();
   };

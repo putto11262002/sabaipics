@@ -118,7 +118,9 @@ async function processLutUpload(
     }
 
     // Expiry check at processing time (event delivery may be delayed).
-    if (new Date(lut.expiresAt).getTime() < Date.now()) {
+    // Only apply to pre-processing state: once we've started processing, do not
+    // transition to expired on subsequent retries.
+    if (lut.status === 'pending' && new Date(lut.expiresAt).getTime() < Date.now()) {
       return err<never, LutProcessingError>({ type: 'expired', key, lutId: lut.id });
     }
 
@@ -448,6 +450,48 @@ async function handleLutProcessingError(env: Bindings, error: LutProcessingError
   }
 }
 
+async function markRetryExhaustedFailure(params: {
+  env: Bindings;
+  uploadKey: string;
+  error: Extract<LutProcessingError, { type: 'database' | 'r2' }>;
+}): Promise<void> {
+  const db = createDb(params.env.DATABASE_URL);
+
+  const lut = await ResultAsync.fromPromise(
+    db.query.photoLuts.findFirst({ where: eq(photoLuts.uploadR2Key, params.uploadKey) }),
+    (cause) => cause,
+  ).match(
+    (row) => row,
+    (e) => {
+      console.error(
+        '[lut-processing-consumer] Failed to fetch LUT for retry-exhausted failure:',
+        e,
+      );
+      Sentry.captureException(e);
+      return null;
+    },
+  );
+
+  if (!lut) return;
+
+  try {
+    await db
+      .update(photoLuts)
+      .set({
+        status: 'failed',
+        errorCode: 'RETRY_EXHAUSTED',
+        errorMessage: `${params.error.type} error (${params.error.operation}) exceeded retry limit`,
+      })
+      .where(eq(photoLuts.id, lut.id));
+  } catch (e) {
+    console.error('[lut-processing-consumer] Failed to mark retry-exhausted failure:', e);
+    Sentry.captureException(e);
+    return;
+  }
+
+  await bestEffortDeleteTemp(params.env, params.uploadKey);
+}
+
 // =============================================================================
 // Queue Handler Export
 // =============================================================================
@@ -462,6 +506,27 @@ export default {
       const result = await processLutUpload(env, message.body);
 
       if (result.isErr()) {
+        const uploadKey = message.body.object.key;
+
+        // If we keep retrying after a finite retry policy, we can permanently
+        // strand LUT rows in `processing`. On the final attempt, record a
+        // terminal failure for retryable errors.
+        const MAX_RETRIES = 3;
+        const MAX_ATTEMPTS = 1 + MAX_RETRIES;
+
+        if (
+          (result.error.type === 'database' || result.error.type === 'r2') &&
+          message.attempts >= MAX_ATTEMPTS
+        ) {
+          await markRetryExhaustedFailure({
+            env,
+            uploadKey,
+            error: result.error,
+          });
+          message.ack();
+          continue;
+        }
+
         try {
           await handleLutProcessingError(env, result.error);
           message.ack();
