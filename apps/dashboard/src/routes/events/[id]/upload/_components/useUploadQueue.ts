@@ -190,6 +190,7 @@ export function useUploadQueue(eventId: string | undefined) {
   const activeUploadsRef = useRef<Map<string, UploadQueueItem>>(new Map());
   const failedUploadsRef = useRef<Map<string, UploadQueueItem>>(new Map());
   const tokensRef = useRef(MAX_TOKENS);
+  const batchTotalRef = useRef(0);
 
   // Minimal reactive state for UI
   const [displayItems, setDisplayItems] = useState<UploadQueueItem[]>([]);
@@ -201,6 +202,10 @@ export function useUploadQueue(eventId: string | undefined) {
       ...Array.from(activeUploadsRef.current.values()),
       ...Array.from(failedUploadsRef.current.values()),
     ];
+    // Reset batch total when queue is empty
+    if (items.length === 0) {
+      batchTotalRef.current = 0;
+    }
     setDisplayItems(items);
   }, []);
 
@@ -318,6 +323,7 @@ export function useUploadQueue(eventId: string | undefined) {
       syncUploadLog();
 
       pendingQueueRef.current.push(...newItems);
+      batchTotalRef.current += newItems.length;
       processQueue();
     },
     [processQueue, syncUploadLog],
@@ -401,5 +407,8 @@ export function useUploadQueue(eventId: string | undefined) {
 
     // State for UI (upload log)
     uploadLogEntries,
+
+    // Batch tracking (for progress bar)
+    batchTotal: batchTotalRef.current,
   };
 }

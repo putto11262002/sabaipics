@@ -13,7 +13,8 @@ import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
 import { useParams } from 'react-router';
 import { PhotoUploadZone } from './_components/PhotoUploadZone';
-import { UploadLog } from './_components/UploadLog';
+import { UploadQueueStatus } from './_components/UploadQueueStatus';
+import { RecentUploadsTable } from './_components/RecentUploadsTable';
 import { useUploadQueue } from './_components/useUploadQueue';
 import { useEvent } from '../../../../hooks/events/useEvent';
 import { Spinner } from '@sabaipics/uiv3/components/spinner';
@@ -41,7 +42,7 @@ function EventUploadTabContent({ event }: { event: { id: string; expiresAt: stri
   const daysUntilExpiry = differenceInDays(parseISO(event.expiresAt), new Date());
   const isExpired = daysUntilExpiry <= 0;
 
-  const { addFiles, uploadingItems, uploadLogEntries } = useUploadQueue(event.id);
+  const { addFiles, uploadingItems, batchTotal } = useUploadQueue(event.id);
 
   // Block navigation if uploads are in progress
   const hasActiveUploads = uploadingItems.length > 0;
@@ -90,8 +91,11 @@ function EventUploadTabContent({ event }: { event: { id: string; expiresAt: stri
       {/* Upload dropzone */}
       <PhotoUploadZone onFilesSelected={addFiles} disabled={isExpired} />
 
-      {/* Upload log - shows photos currently uploading, indexing, or failed */}
-      <UploadLog entries={uploadLogEntries} />
+      {/* Progress bar for client-side upload queue */}
+      <UploadQueueStatus items={uploadingItems} totalBatchSize={batchTotal} />
+
+      {/* Paginated table of upload intents from DB */}
+      <RecentUploadsTable eventId={event.id} />
     </div>
   );
 }
