@@ -145,9 +145,9 @@ export function PhotoViewerSheet({
           </div>
           <Separator />
 
-          <div className="relative flex flex-1 items-center justify-center bg-black">
+          <div className="relative flex flex-1 items-center justify-center bg-background">
             <Carousel
-              className="w-full h-full"
+              className="w-full h-full [&_[data-slot=carousel-content]]:h-full [&_[data-slot=carousel-content]>div]:h-full"
               opts={{ startIndex: Math.max(index, 0), loop: false }}
               setApi={setApi}
             >
@@ -158,7 +158,7 @@ export function PhotoViewerSheet({
                       <img
                         src={p.previewUrl}
                         alt="Photo"
-                        className="h-full w-full object-contain"
+                        className="max-h-full max-w-full object-contain"
                         draggable={false}
                       />
                     </div>
@@ -167,12 +167,12 @@ export function PhotoViewerSheet({
               </CarouselContent>
 
               <div className="hidden md:block">
-                <CarouselPrevious className="left-4 top-1/2 -translate-y-1/2" />
-                <CarouselNext className="right-4 top-1/2 -translate-y-1/2" />
+                <CarouselPrevious variant="secondary" className="left-4 top-1/2 -translate-y-1/2" />
+                <CarouselNext variant="secondary" className="right-4 top-1/2 -translate-y-1/2" />
               </div>
             </Carousel>
 
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/50 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/20 to-transparent" />
           </div>
 
           <div className="flex items-center justify-between px-4 py-3">
