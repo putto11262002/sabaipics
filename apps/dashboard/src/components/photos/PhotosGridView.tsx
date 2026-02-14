@@ -50,6 +50,7 @@ export function PhotosGridView({
         uploadedAt: photo.uploadedAt,
         fileSize: photo.fileSize,
         faceCount: photo.faceCount,
+        exif: photo.exif ?? null,
       })),
     [_photos],
   );

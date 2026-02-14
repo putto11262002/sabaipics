@@ -28,7 +28,18 @@ type ViewerPhoto = {
   uploadedAt: string;
   fileSize?: number | null;
   faceCount?: number | null;
-  // exif?: { ... }  // not currently included in API response
+  exif?: {
+    make?: string;
+    model?: string;
+    lensModel?: string;
+    focalLength?: number;
+    iso?: number;
+    fNumber?: number;
+    exposureTime?: number;
+    dateTimeOriginal?: string;
+    gpsLatitude?: number;
+    gpsLongitude?: number;
+  } | null;
 };
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -50,6 +61,13 @@ function MetaRow({ label, value }: { label: string; value: string }) {
       <div className="text-xs break-words">{value}</div>
     </div>
   );
+}
+
+function formatExposureTime(v: number | undefined): string {
+  if (v == null) return '-';
+  if (v >= 1) return `${v}s`;
+  const denom = Math.round(1 / v);
+  return denom > 0 ? `1/${denom}s` : `${v}s`;
 }
 
 export function PhotoViewerSheet({
@@ -202,10 +220,58 @@ export function PhotoViewerSheet({
                     <Separator />
                     <MetaRow label="Faces" value={String(current.faceCount ?? 0)} />
                     <Separator />
-                    <div className="py-3 text-xs text-muted-foreground">
-                      EXIF metadata UI is not wired yet (backend extracts and stores it, but the
-                      photos list API does not currently return it).
-                    </div>
+                    {current.exif ? (
+                      <>
+                        <MetaRow label="Make" value={current.exif.make ?? '-'} />
+                        <Separator />
+                        <MetaRow label="Model" value={current.exif.model ?? '-'} />
+                        <Separator />
+                        <MetaRow label="Lens" value={current.exif.lensModel ?? '-'} />
+                        <Separator />
+                        <MetaRow
+                          label="Focal length"
+                          value={
+                            current.exif.focalLength != null ? `${current.exif.focalLength}mm` : '-'
+                          }
+                        />
+                        <Separator />
+                        <MetaRow
+                          label="ISO"
+                          value={current.exif.iso != null ? String(current.exif.iso) : '-'}
+                        />
+                        <Separator />
+                        <MetaRow
+                          label="Aperture"
+                          value={current.exif.fNumber != null ? `f/${current.exif.fNumber}` : '-'}
+                        />
+                        <Separator />
+                        <MetaRow
+                          label="Shutter"
+                          value={formatExposureTime(current.exif.exposureTime)}
+                        />
+                        <Separator />
+                        <MetaRow
+                          label="Taken"
+                          value={
+                            current.exif.dateTimeOriginal
+                              ? new Date(current.exif.dateTimeOriginal).toLocaleString()
+                              : '-'
+                          }
+                        />
+                        <Separator />
+                        <MetaRow
+                          label="GPS"
+                          value={
+                            current.exif.gpsLatitude != null && current.exif.gpsLongitude != null
+                              ? `${current.exif.gpsLatitude}, ${current.exif.gpsLongitude}`
+                              : '-'
+                          }
+                        />
+                        <Separator />
+                      </>
+                    ) : (
+                      <div className="py-3 text-xs text-muted-foreground">No EXIF metadata.</div>
+                    )}
                   </>
                 )}
               </div>
