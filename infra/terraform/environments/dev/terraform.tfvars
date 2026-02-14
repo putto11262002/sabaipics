@@ -56,6 +56,7 @@ bucket_notifications = []
 notification_queue_name     = "r2-notification-proxy"
 enable_uploads_notification = true
 enable_logos_notification   = true
+enable_lut_uploads_notification = true
 
 # Webhook URL for notification proxy worker (update with your ngrok URL)
 webhook_url = "https://unscientifically-pseudogenteel-kinley.ngrok-free.dev/webhooks/dev/r2-notification"
