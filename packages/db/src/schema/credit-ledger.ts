@@ -41,6 +41,7 @@ export const creditLedger = pgTable(
     promoCode: text("promo_code"), // Nullable, promo code used (if any)
     stripeSessionId: text("stripe_session_id"), // Nullable, only for Stripe purchases
     appleTransactionId: text("apple_transaction_id"), // Nullable, only for Apple IAP purchases
+    stripeReceiptUrl: text("stripe_receipt_url"), // Nullable, Stripe receipt URL for purchases
     expiresAt: timestamptz("expires_at").notNull(),
     createdAt: createdAtCol(),
   },
