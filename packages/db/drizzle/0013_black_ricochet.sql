@@ -1,0 +1,1 @@
+ALTER TABLE "credit_ledger" ADD COLUMN "stripe_receipt_url" text;
