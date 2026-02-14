@@ -582,7 +582,7 @@ export const creditsRouter = new Hono<Env>()
         db
           .select({
             balance: sql<number>`coalesce(sum(case when ${creditLedger.expiresAt} > now() then ${creditLedger.amount} else 0 end), 0)::int`,
-            expiringSoon: sql<number>`coalesce(sum(case when ${creditLedger.expiresAt} > now() and ${creditLedger.expiresAt} <= now() + interval '30 days' then ${creditLedger.amount} else 0 end), 0)::int`,
+            expiringSoon: sql<number>`greatest(0, coalesce(sum(case when ${creditLedger.expiresAt} > now() then ${creditLedger.amount} else 0 end), 0) - coalesce(sum(case when ${creditLedger.expiresAt} > now() + interval '30 days' then ${creditLedger.amount} else 0 end), 0))::int`,
             usedThisMonth: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'debit' and ${creditLedger.createdAt} >= date_trunc('month', now()) then abs(${creditLedger.amount}) else 0 end), 0)::int`,
           })
           .from(creditLedger)
