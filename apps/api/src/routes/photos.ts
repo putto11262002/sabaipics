@@ -45,7 +45,8 @@ const uploadPhotoSchema = z.object({
       `File size must be less than ${PHOTO_MAX_FILE_SIZE / 1024 / 1024} MB`,
     )
     .refine(
-      (file) => PHOTO_ALLOWED_MIME_TYPES.includes(file.type as (typeof PHOTO_ALLOWED_MIME_TYPES)[number]),
+      (file) =>
+        PHOTO_ALLOWED_MIME_TYPES.includes(file.type as (typeof PHOTO_ALLOWED_MIME_TYPES)[number]),
       `File type must be one of: ${PHOTO_ALLOWED_MIME_TYPES.join(', ')}`,
     ),
   eventId: z.string().uuid('Invalid event ID format'),
@@ -120,7 +121,9 @@ export const photosRouter = new Hono<Env>()
           db
             .select({ id: activeEvents.id })
             .from(activeEvents)
-            .where(and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)))
+            .where(
+              and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)),
+            )
             .limit(1)
             .then((rows) => rows),
           (error): HandlerError => ({
@@ -149,6 +152,7 @@ export const photosRouter = new Hono<Env>()
               uploadedAt: photos.uploadedAt,
               width: photos.width,
               height: photos.height,
+              exif: photos.exif,
             })
             .from(photos)
             .where(
@@ -188,6 +192,7 @@ export const photosRouter = new Hono<Env>()
           uploadedAt: new Date(photo.uploadedAt).toISOString(),
           width: photo.width ?? 1,
           height: photo.height ?? 1,
+          exif: photo.exif ?? null,
         }));
 
         return ok({
