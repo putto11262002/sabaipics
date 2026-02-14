@@ -37,7 +37,7 @@ resource "cloudflare_r2_bucket_event_notification" "uploads" {
 
   rules = [{
     prefix      = "uploads/"
-    actions     = ["PutObject", "CopyObject"]
+    actions     = ["PutObject", "CopyObject", "CompleteMultipartUpload"]
     description = "Forward uploads/ events to local dev server via notification proxy"
   }]
 }
@@ -51,8 +51,22 @@ resource "cloudflare_r2_bucket_event_notification" "logos" {
 
   rules = [{
     prefix      = "logos/"
-    actions     = ["PutObject", "CopyObject"]
+    actions     = ["PutObject", "CopyObject", "CompleteMultipartUpload"]
     description = "Forward logos/ events to local dev server via notification proxy"
+  }]
+}
+
+resource "cloudflare_r2_bucket_event_notification" "lut_uploads" {
+  count = var.enable_lut_uploads_notification ? 1 : 0
+
+  account_id  = var.account_id
+  bucket_name = var.photos_bucket_name
+  queue_id    = cloudflare_queue.notification_proxy.queue_id
+
+  rules = [{
+    prefix      = "lut-uploads/"
+    actions     = ["PutObject", "CopyObject", "CompleteMultipartUpload"]
+    description = "Forward lut-uploads/ events to local dev server via notification proxy"
   }]
 }
 
