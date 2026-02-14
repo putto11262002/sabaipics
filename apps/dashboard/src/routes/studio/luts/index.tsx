@@ -1,14 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
 import { Button } from '@sabaipics/uiv3/components/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@sabaipics/uiv3/components/card';
 import { Badge } from '@sabaipics/uiv3/components/badge';
+import { Separator } from '@sabaipics/uiv3/components/separator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@sabaipics/uiv3/components/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +22,15 @@ import {
   AlertDialogTitle,
 } from '@sabaipics/uiv3/components/alert-dialog';
 import { Input } from '@sabaipics/uiv3/components/input';
-import { Plus, Download, Trash2, Pencil, Eye } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@sabaipics/uiv3/components/table';
+import { ChevronDown, MoreHorizontal, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useStudioLuts } from '../../../hooks/studio/useStudioLuts';
@@ -30,11 +40,7 @@ import { useRenameStudioLut } from '../../../hooks/studio/useRenameStudioLut';
 import { CreateLutDialog } from '../../../components/studio/CreateLutDialog';
 import { LutPreviewDialog } from '../../../components/studio/LutPreviewDialog';
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' {
-  if (status === 'completed') return 'default';
-  if (status === 'failed' || status === 'expired') return 'destructive';
-  return 'secondary';
-}
+type CreateKind = 'cube' | 'reference';
 
 export default function StudioLutsPage() {
   const luts = useStudioLuts();
@@ -43,6 +49,7 @@ export default function StudioLutsPage() {
   const rename = useRenameStudioLut();
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [createKind, setCreateKind] = useState<CreateKind>('cube');
   const [preview, setPreview] = useState<{ open: boolean; lutId: string | null; name?: string }>({
     open: false,
     lutId: null,
@@ -50,8 +57,8 @@ export default function StudioLutsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [renameState, setRenameState] = useState<{ id: string; name: string } | null>(null);
 
-  const lutRows = luts.data ?? [];
-  const completedLuts = useMemo(() => lutRows.filter((l) => l.status === 'completed'), [lutRows]);
+  // We only show completed LUTs in the Studio table.
+  const lutRows = (luts.data ?? []).filter((l) => l.status === 'completed');
 
   return (
     <>
@@ -62,117 +69,140 @@ export default function StudioLutsPage() {
           { label: 'LUTs' },
         ]}
       >
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 size-4" />
-          New LUT
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm">
+              <Plus className="mr-2 size-4" />
+              New LUT
+              <ChevronDown className="ml-2 size-4 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[220px]">
+            <DropdownMenuLabel>Create LUT</DropdownMenuLabel>
+            <DropdownMenuItem
+              onClick={() => {
+                setCreateKind('cube');
+                setCreateOpen(true);
+              }}
+            >
+              Upload .cube
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setCreateKind('reference');
+                setCreateOpen(true);
+              }}
+            >
+              Reference image
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarPageHeader>
 
       <div className="flex flex-1 flex-col gap-4 p-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Your LUTs</CardTitle>
-            <CardDescription>Upload .cube LUTs or generate from a reference image.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {luts.isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
-            {luts.isError && (
-              <div className="text-sm text-destructive">
-                {luts.error instanceof Error ? luts.error.message : 'Failed to load LUTs'}
-              </div>
-            )}
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="text-sm font-medium">Your LUTs</div>
+          </div>
+          <Separator />
+        </div>
 
-            {!luts.isLoading && !luts.isError && lutRows.length === 0 && (
-              <div className="text-sm text-muted-foreground">
-                No LUTs yet. Create one to get started.
-              </div>
-            )}
-
-            <div className="grid gap-3">
-              {lutRows.map((lut) => (
-                <div
-                  key={lut.id}
-                  className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className="truncate font-medium">{lut.name}</div>
-                      <Badge variant={statusVariant(lut.status)} className="capitalize">
-                        {lut.status}
-                      </Badge>
-                      <Badge variant="outline" className="capitalize">
-                        {lut.sourceType === 'reference_image' ? 'reference' : 'cube'}
-                      </Badge>
-                    </div>
-                    {lut.errorMessage && (
-                      <div className="mt-1 text-xs text-destructive">{lut.errorMessage}</div>
-                    )}
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {new Date(lut.createdAt).toLocaleString()}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPreview({ open: true, lutId: lut.id, name: lut.name })}
-                      disabled={lut.status !== 'completed'}
-                    >
-                      <Eye className="mr-2 size-4" />
-                      Preview
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setRenameState({ id: lut.id, name: lut.name })}
-                    >
-                      <Pencil className="mr-2 size-4" />
-                      Rename
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          const { url } = await download.mutateAsync(lut.id);
-                          window.open(url, '_blank', 'noopener,noreferrer');
-                        } catch (e) {
-                          toast.error(e instanceof Error ? e.message : 'Download failed');
-                        }
-                      }}
-                      disabled={lut.status !== 'completed'}
-                    >
-                      <Download className="mr-2 size-4" />
-                      Download
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setConfirmDeleteId(lut.id)}
-                      disabled={del.isPending}
-                    >
-                      <Trash2 className="mr-2 size-4" />
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              ))}
+        <div className="space-y-3">
+          {luts.isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
+          {luts.isError && (
+            <div className="text-sm text-destructive">
+              {luts.error instanceof Error ? luts.error.message : 'Failed to load LUTs'}
             </div>
-          </CardContent>
-        </Card>
+          )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Ready to use</CardTitle>
-            <CardDescription>
-              Completed LUTs available for events: {completedLuts.length}
-            </CardDescription>
-          </CardHeader>
-        </Card>
+          {!luts.isLoading && !luts.isError && lutRows.length === 0 && (
+            <div className="text-sm text-muted-foreground">
+              No LUTs yet. Create one to get started.
+            </div>
+          )}
+
+          {!luts.isLoading && !luts.isError && lutRows.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[40%]">Name</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lutRows.map((lut) => {
+                  return (
+                    <TableRow key={lut.id}>
+                      <TableCell className="min-w-0">
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{lut.name}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize">
+                          {lut.sourceType === 'reference_image' ? 'reference' : 'cube'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(lut.createdAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0 text-muted-foreground">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-[160px]">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setPreview({ open: true, lutId: lut.id, name: lut.name })
+                              }
+                            >
+                              Preview
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setRenameState({ id: lut.id, name: lut.name })}
+                            >
+                              Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={async () => {
+                                try {
+                                  const { url } = await download.mutateAsync(lut.id);
+                                  window.open(url, '_blank', 'noopener,noreferrer');
+                                } catch (e) {
+                                  toast.error(e instanceof Error ? e.message : 'Download failed');
+                                }
+                              }}
+                            >
+                              Download
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={del.isPending}
+                              onClick={() => setConfirmDeleteId(lut.id)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </div>
       </div>
 
-      <CreateLutDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateLutDialog open={createOpen} onOpenChange={setCreateOpen} kind={createKind} />
 
       <LutPreviewDialog
         open={preview.open}
