@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -29,14 +29,19 @@ export function CreateLutDialog({
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
-  useEffect(() => {
-    if (!open) {
-      setKind('cube');
-      setName('');
-      setFile(null);
-      create.reset();
+  const resetForm = () => {
+    setKind('cube');
+    setName('');
+    setFile(null);
+    create.reset();
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+    if (!nextOpen) {
+      resetForm();
     }
-  }, [open, create]);
+  };
 
   const accept = useMemo(() => {
     return kind === 'cube' ? '.cube,text/plain' : 'image/jpeg,image/png,image/webp';
@@ -47,11 +52,11 @@ export function CreateLutDialog({
   const submit = async () => {
     if (!file) return;
     await create.mutateAsync({ kind, name: name.trim(), file });
-    onOpenChange(false);
+    handleOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>New LUT</DialogTitle>
@@ -112,7 +117,11 @@ export function CreateLutDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={create.isPending}>
+          <Button
+            variant="outline"
+            onClick={() => handleOpenChange(false)}
+            disabled={create.isPending}
+          >
             Cancel
           </Button>
           <Button onClick={submit} disabled={!canSubmit || create.isPending}>
