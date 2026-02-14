@@ -24,9 +24,8 @@ export function DataTable<TData>({
   onRowClick,
 }: DataTableProps<TData>) {
   return (
-    <div className="overflow-x-auto">
-      <div className="overflow-hidden rounded-lg">
-        <Table>
+    <div className="min-w-0 overflow-x-auto rounded-lg border">
+      <Table>
           <TableHeader className="bg-muted/50">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -65,7 +64,6 @@ export function DataTable<TData>({
             )}
           </TableBody>
         </Table>
-      </div>
     </div>
   );
 }

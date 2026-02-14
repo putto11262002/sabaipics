@@ -14,8 +14,8 @@ export interface CreditEntry {
 
 export interface CreditSummary {
   balance: number;
-  totalPurchased: number;
-  totalUsed: number;
+  expiringSoon: number;
+  usedThisMonth: number;
 }
 
 export interface CreditHistoryResponse {

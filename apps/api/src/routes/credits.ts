@@ -582,8 +582,8 @@ export const creditsRouter = new Hono<Env>()
         db
           .select({
             balance: sql<number>`coalesce(sum(${creditLedger.amount}), 0)::int`,
-            totalPurchased: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'credit' then ${creditLedger.amount} else 0 end), 0)::int`,
-            totalUsed: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'debit' then abs(${creditLedger.amount}) else 0 end), 0)::int`,
+            expiringSoon: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'credit' and ${creditLedger.expiresAt} > now() and ${creditLedger.expiresAt} <= now() + interval '30 days' then ${creditLedger.amount} else 0 end), 0)::int`,
+            usedThisMonth: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'debit' and ${creditLedger.createdAt} >= date_trunc('month', now()) then abs(${creditLedger.amount}) else 0 end), 0)::int`,
           })
           .from(creditLedger)
           .where(eq(creditLedger.photographerId, photographer.id)),
@@ -594,7 +594,7 @@ export const creditsRouter = new Hono<Env>()
 
       return ok({
         entries,
-        summary: summary ?? { balance: 0, totalPurchased: 0, totalUsed: 0 },
+        summary: summary ?? { balance: 0, expiringSoon: 0, usedThisMonth: 0 },
         pagination: {
           page,
           limit,

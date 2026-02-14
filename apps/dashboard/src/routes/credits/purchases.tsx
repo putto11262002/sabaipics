@@ -37,7 +37,7 @@ const columns = [
   columnHelper.accessor('amount', {
     header: 'Amount',
     cell: (info) => (
-      <span className="font-medium tabular-nums">
+      <span className="font-medium tabular-nums text-success">
         +{info.getValue().toLocaleString()}
       </span>
     ),
