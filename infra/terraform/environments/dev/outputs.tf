@@ -26,3 +26,22 @@ output "queue_names" {
   value       = module.cloudflare_infra.queue_names
   description = "Map of queue logical names to their actual names"
 }
+
+# ------------------------------------------------------------------------------
+# Dev Notification Proxy Outputs
+# ------------------------------------------------------------------------------
+
+output "notification_proxy_queue_id" {
+  value       = module.dev_notification_proxy.queue_id
+  description = "ID of the notification proxy queue"
+}
+
+output "notification_proxy_queue_name" {
+  value       = module.dev_notification_proxy.queue_name
+  description = "Name of the notification proxy queue"
+}
+
+output "notification_proxy_worker_name" {
+  value       = module.dev_notification_proxy.worker_name
+  description = "Name of the deployed notification proxy worker"
+}

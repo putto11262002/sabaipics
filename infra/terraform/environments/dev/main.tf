@@ -53,3 +53,20 @@ module "cloudflare_infra" {
   # Event Notifications (none for dev - local testing)
   bucket_notifications = var.bucket_notifications
 }
+
+# ------------------------------------------------------------------------------
+# Dev Notification Proxy (dev-only infrastructure)
+# ------------------------------------------------------------------------------
+
+module "dev_notification_proxy" {
+  source = "../../modules/dev-notification-proxy"
+
+  account_id         = var.account_id
+  environment        = var.environment
+  photos_bucket_name = module.cloudflare_infra.photos_bucket_name
+
+  notification_queue_name     = var.notification_queue_name
+  enable_uploads_notification = var.enable_uploads_notification
+  enable_logos_notification   = var.enable_logos_notification
+  webhook_url                 = var.webhook_url
+}

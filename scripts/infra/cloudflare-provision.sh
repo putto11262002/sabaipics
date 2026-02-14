@@ -156,6 +156,9 @@ add_r2_custom_domain() {
 
 case "$ENVIRONMENT" in
   dev)
+    # DEPRECATED: Dev environment is now managed by OpenTofu (infra/terraform/environments/dev)
+    # This section is kept for backwards compatibility only.
+    # Use: cd infra/terraform/environments/dev && infisical run --env=dev --path="/terraform" -- tofu apply
     PHOTOS_BUCKET="sabaipics-photos-dev"
     PHOTO_DOMAIN="devphotos.sabaipics.com"
     QUEUES=(

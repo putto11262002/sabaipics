@@ -93,3 +93,30 @@ variable "bucket_notifications" {
   description = "R2 bucket event notification configuration"
   default     = []
 }
+
+# ------------------------------------------------------------------------------
+# Dev Notification Proxy Configuration
+# ------------------------------------------------------------------------------
+
+variable "notification_queue_name" {
+  type        = string
+  description = "Name of the R2 notification proxy queue"
+  default     = "r2-notification-proxy"
+}
+
+variable "enable_uploads_notification" {
+  type        = bool
+  description = "Enable R2 event notification for uploads/"
+  default     = true
+}
+
+variable "enable_logos_notification" {
+  type        = bool
+  description = "Enable R2 event notification for logos/"
+  default     = true
+}
+
+variable "webhook_url" {
+  type        = string
+  description = "Webhook URL for R2 notification proxy (ngrok URL for local dev)"
+}
