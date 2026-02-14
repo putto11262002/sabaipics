@@ -9,10 +9,10 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { eq, and, gt, sql, inArray } from 'drizzle-orm';
-import { activeEvents, creditLedger, uploadIntents } from '@sabaipics/db';
+import { eq, and, gt, lt, sql, inArray, desc } from 'drizzle-orm';
+import { activeEvents, creditLedger, uploadIntents, photos } from '@sabaipics/db';
 import { requirePhotographer, type PhotographerVariables } from '../middleware';
-import type { Env } from '../types';
+import type { Env, Bindings } from '../types';
 import { apiError, type HandlerError } from '../lib/error';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { generatePresignedPutUrl } from '../lib/r2/presign';
@@ -54,6 +54,31 @@ const statusQuerySchema = z.object({
 const repressignParamsSchema = z.object({
   uploadId: z.string().uuid('Invalid upload ID format'),
 });
+
+const listIntentsParamsSchema = z.object({
+  eventId: z.string().uuid('Invalid event ID format'),
+});
+
+const listIntentsQuerySchema = z.object({
+  cursor: z.string().datetime({ offset: true }).optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1, 'Limit must be at least 1')
+    .max(50, 'Limit cannot exceed 50')
+    .default(10),
+});
+
+// =============================================================================
+// URL Generators
+// =============================================================================
+
+function generateThumbnailUrl(env: Bindings, r2Key: string): string {
+  if (env.NODE_ENV === 'development') {
+    return `${env.PHOTO_R2_BASE_URL}/${r2Key}`;
+  }
+  return `https://${env.CF_ZONE}/cdn-cgi/image/width=400,fit=cover,format=auto,quality=75/${env.PHOTO_R2_BASE_URL}/${r2Key}`;
+}
 
 // =============================================================================
 // Route
@@ -344,6 +369,110 @@ export const uploadsRouter = new Hono<Env>()
         )
         .match(
           (data) => c.json({ data }),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // =========================================================================
+  // GET /uploads/events/:eventId - List upload intents for event (FF-94)
+  // =========================================================================
+  .get(
+    '/events/:eventId',
+    requirePhotographer(),
+    zValidator('param', listIntentsParamsSchema),
+    zValidator('query', listIntentsQuerySchema),
+    async (c) => {
+      return safeTry(async function* () {
+        const photographer = c.var.photographer;
+        const db = c.var.db();
+        const { eventId } = c.req.valid('param');
+        const { cursor, limit } = c.req.valid('query');
+
+        // Verify event ownership
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: activeEvents.id })
+            .from(activeEvents)
+            .where(
+              and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)),
+            )
+            .limit(1),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        // Fetch limit + 1 for cursor pagination
+        const fetchLimit = limit + 1;
+
+        const rows = yield* ResultAsync.fromPromise(
+          db
+            .select({
+              id: uploadIntents.id,
+              status: uploadIntents.status,
+              contentType: uploadIntents.contentType,
+              contentLength: uploadIntents.contentLength,
+              source: uploadIntents.source,
+              errorCode: uploadIntents.errorCode,
+              errorMessage: uploadIntents.errorMessage,
+              createdAt: uploadIntents.createdAt,
+              completedAt: uploadIntents.completedAt,
+              photoId: photos.id,
+              photoR2Key: photos.r2Key,
+              photoStatus: photos.status,
+              photoFaceCount: photos.faceCount,
+              photoFileSize: photos.fileSize,
+            })
+            .from(uploadIntents)
+            .leftJoin(photos, eq(uploadIntents.photoId, photos.id))
+            .where(
+              and(
+                eq(uploadIntents.eventId, eventId),
+                eq(uploadIntents.photographerId, photographer.id),
+                cursor ? lt(uploadIntents.createdAt, cursor) : undefined,
+              ),
+            )
+            .orderBy(desc(uploadIntents.createdAt))
+            .limit(fetchLimit),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        const hasMore = rows.length > limit;
+        const items = hasMore ? rows.slice(0, limit) : rows;
+        const nextCursor = hasMore ? new Date(items[limit - 1].createdAt).toISOString() : null;
+
+        const data = items.map((row) => ({
+          id: row.id,
+          status: row.status,
+          contentType: row.contentType,
+          contentLength: row.contentLength,
+          source: row.source,
+          errorCode: row.errorCode,
+          errorMessage: row.errorMessage,
+          createdAt: new Date(row.createdAt).toISOString(),
+          completedAt: row.completedAt ? new Date(row.completedAt).toISOString() : null,
+          photo: row.photoId
+            ? {
+                id: row.photoId,
+                thumbnailUrl: generateThumbnailUrl(c.env, row.photoR2Key!),
+                status: row.photoStatus!,
+                faceCount: row.photoFaceCount ?? 0,
+                fileSize: row.photoFileSize ?? null,
+              }
+            : null,
+        }));
+
+        return ok({
+          data,
+          pagination: { nextCursor, hasMore },
+        });
+      })
+        .orTee((e) => e.cause && console.error('[uploads/events] error:', e.cause))
+        .match(
+          (result) => c.json(result),
           (e) => apiError(c, e),
         );
     },
