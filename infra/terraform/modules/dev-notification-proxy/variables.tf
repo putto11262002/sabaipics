@@ -40,6 +40,12 @@ variable "enable_logos_notification" {
   description = "Enable R2 event notification for logos/ prefix"
 }
 
+variable "enable_lut_uploads_notification" {
+  type        = bool
+  default     = true
+  description = "Enable R2 event notification for lut-uploads/ prefix"
+}
+
 variable "webhook_url" {
   type        = string
   description = "Webhook URL for forwarding R2 notifications (typically ngrok URL for local dev)"
