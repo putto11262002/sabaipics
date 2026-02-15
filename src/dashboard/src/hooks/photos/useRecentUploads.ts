@@ -1,40 +1,31 @@
 import { useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import { api } from '../../lib/api';
 import { type InferResponseType } from 'hono/client';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
 const listUploadIntents = api.uploads.events[':eventId'].$get;
 
-export type UploadIntent = InferResponseType<typeof listUploadIntents, 200>['data'][0];
+type RecentUploadsResponse = InferResponseType<typeof listUploadIntents, 200>;
+
+export type UploadIntent = RecentUploadsResponse['data'][0];
 
 export function useRecentUploads(eventId: string | undefined, limit = 10) {
-  const { getToken } = useApiClient();
-
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
 
-  const query = useQuery({
+  const query = useApiQuery<RecentUploadsResponse>({
     queryKey: ['event', eventId, 'upload-intents', cursor, limit],
-    queryFn: async () => {
-      if (!eventId) throw new Error('eventId is required');
-
-      const res = await listUploadIntents(
+    apiFn: (opts) =>
+      listUploadIntents(
         {
-          param: { eventId },
+          param: { eventId: eventId! },
           query: {
             ...(cursor ? { cursor } : {}),
             limit,
           },
         },
-        await withAuth(getToken),
-      );
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch upload intents: ${res.status}`);
-      }
-
-      return (await res.json()) as InferResponseType<typeof listUploadIntents, 200>;
-    },
+        opts,
+      ),
     enabled: !!eventId,
     refetchInterval: 5000,
     refetchOnWindowFocus: false,

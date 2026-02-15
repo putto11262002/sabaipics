@@ -15,7 +15,7 @@ import { useParams } from 'react-router';
 import { PhotoUploadZone } from './_components/PhotoUploadZone';
 import { UploadQueueStatus } from './_components/UploadQueueStatus';
 import { RecentUploadsTable } from './_components/RecentUploadsTable';
-import { useUploadQueue } from './_components/useUploadQueue';
+import { useUploadQueue } from '../../../../hooks/photos/useUploadQueue';
 import { useEvent } from '../../../../hooks/events/useEvent';
 import { Spinner } from '@/shared/components/ui/spinner';
 
