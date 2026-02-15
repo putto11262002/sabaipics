@@ -1,14 +1,23 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { eq, desc, sql, and, inArray, isNull } from 'drizzle-orm';
+import { eq, desc, sql, and, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { events, activeEvents, DEFAULT_SLIDESHOW_CONFIG, logoUploadIntents, ftpCredentials } from '@sabaipics/db';
+import {
+  events,
+  activeEvents,
+  photoLuts,
+  DEFAULT_SLIDESHOW_CONFIG,
+  logoUploadIntents,
+  ftpCredentials,
+  type EventSettings,
+} from '@sabaipics/db';
 import { requirePhotographer } from '../../middleware';
 import type { Env } from '../../types';
 import { generatePngQrCode } from '@juit/qrcode';
 import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './schema';
 import { slideshowConfigSchema } from './slideshow-schema';
 import { logoPresignSchema, logoStatusQuerySchema } from './logo-schema';
+import { eventColorGradeSchema } from './color-grade-schema';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../../lib/error';
 import { safeHandler } from '../../lib/safe-handler';
@@ -19,6 +28,33 @@ import { createFaceProvider } from '../../lib/rekognition';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+
+const DEFAULT_COLOR_GRADE_SETTINGS = {
+  enabled: false,
+  lutId: null as string | null,
+  intensity: 75,
+  includeLuminance: false,
+};
+
+function normalizeColorGradeSettings(colorGrade: EventSettings['colorGrade'] | undefined): {
+  enabled: boolean;
+  lutId: string | null;
+  intensity: number;
+  includeLuminance: boolean;
+} {
+  const intensityRaw = colorGrade?.intensity;
+  const intensity =
+    typeof intensityRaw === 'number' && Number.isFinite(intensityRaw)
+      ? intensityRaw
+      : DEFAULT_COLOR_GRADE_SETTINGS.intensity;
+
+  return {
+    enabled: colorGrade?.enabled ?? DEFAULT_COLOR_GRADE_SETTINGS.enabled,
+    lutId: colorGrade?.lutId ?? DEFAULT_COLOR_GRADE_SETTINGS.lutId,
+    intensity: Math.max(0, Math.min(100, Math.round(intensity))),
+    includeLuminance: colorGrade?.includeLuminance ?? DEFAULT_COLOR_GRADE_SETTINGS.includeLuminance,
+  };
+}
 
 // QR Code Generation
 
@@ -51,6 +87,150 @@ async function generateEventQR(
 // Routes
 
 export const eventsRouter = new Hono<Env>()
+
+  // GET /events/:id/color-grade - Get event color grade settings
+  .get(
+    '/:id/color-grade',
+    requirePhotographer(),
+    zValidator('param', eventParamsSchema),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id } = c.req.valid('param');
+
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: activeEvents.id, settings: activeEvents.settings })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const settings = (event.settings ?? null) as EventSettings | null;
+        const cg = normalizeColorGradeSettings(settings?.colorGrade);
+
+        return ok({
+          data: {
+            enabled: cg.enabled,
+            lutId: cg.lutId,
+            intensity: cg.intensity,
+            includeLuminance: cg.includeLuminance,
+          },
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] GET /:id/color-grade', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // PUT /events/:id/color-grade - Update event color grade settings
+  .put(
+    '/:id/color-grade',
+    requirePhotographer(),
+    zValidator('param', eventParamsSchema),
+    zValidator('json', eventColorGradeSchema),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id } = c.req.valid('param');
+      const body = c.req.valid('json');
+
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: activeEvents.id, settings: activeEvents.settings })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        // Validate LUT ownership if provided
+        if (body.lutId) {
+          const [lut] = yield* ResultAsync.fromPromise(
+            db
+              .select({ id: photoLuts.id, status: photoLuts.status })
+              .from(photoLuts)
+              .where(
+                and(eq(photoLuts.id, body.lutId), eq(photoLuts.photographerId, photographer.id)),
+              )
+              .limit(1),
+            (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+          );
+
+          if (!lut) {
+            return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'LUT not found' });
+          }
+
+          if (lut.status !== 'completed') {
+            return err<never, HandlerError>({
+              code: 'CONFLICT',
+              message: 'LUT is not ready',
+            });
+          }
+        }
+
+        const prev = (event.settings ?? null) as EventSettings | null;
+        const next: EventSettings = {
+          ...(prev ?? {}),
+          colorGrade: {
+            enabled: body.enabled,
+            lutId: body.lutId,
+            intensity: body.intensity,
+            includeLuminance: body.includeLuminance,
+          },
+        };
+
+        const [updated] = yield* ResultAsync.fromPromise(
+          db
+            .update(events)
+            .set({ settings: next })
+            .where(
+              and(
+                eq(events.id, id),
+                eq(events.photographerId, photographer.id),
+                isNull(events.deletedAt),
+              ),
+            )
+            .returning({ settings: events.settings }),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!updated) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const normalized = normalizeColorGradeSettings(updated.settings?.colorGrade);
+
+        return ok({
+          data: {
+            enabled: normalized.enabled,
+            lutId: normalized.lutId,
+            intensity: normalized.intensity,
+            includeLuminance: normalized.includeLuminance,
+          },
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] PUT /:id/color-grade', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
 
   .post(
     '/',
@@ -492,7 +672,9 @@ export const eventsRouter = new Hono<Env>()
           db
             .select({ id: activeEvents.id, expiresAt: activeEvents.expiresAt })
             .from(activeEvents)
-            .where(and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)))
+            .where(
+              and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)),
+            )
             .limit(1),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
@@ -589,7 +771,9 @@ export const eventsRouter = new Hono<Env>()
           db
             .select({ id: activeEvents.id, logoR2Key: activeEvents.logoR2Key })
             .from(activeEvents)
-            .where(and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)))
+            .where(
+              and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)),
+            )
             .limit(1),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
@@ -664,7 +848,9 @@ export const eventsRouter = new Hono<Env>()
         db
           .select({ id: activeEvents.id })
           .from(activeEvents)
-          .where(and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)))
+          .where(
+            and(eq(activeEvents.id, eventId), eq(activeEvents.photographerId, photographer.id)),
+          )
           .limit(1),
         (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
       );
@@ -675,7 +861,10 @@ export const eventsRouter = new Hono<Env>()
 
       // Remove logo reference (actual R2 cleanup via lifecycle policy)
       yield* ResultAsync.fromPromise(
-        db.update(events).set({ logoR2Key: null }).where(and(eq(events.id, eventId), isNull(events.deletedAt))),
+        db
+          .update(events)
+          .set({ logoR2Key: null })
+          .where(and(eq(events.id, eventId), isNull(events.deletedAt))),
         (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
       );
 
@@ -732,11 +921,13 @@ export const eventsRouter = new Hono<Env>()
         eventIds: [id],
         r2Bucket: c.env.PHOTOS_BUCKET,
         deleteRekognition,
-      }).mapErr((serviceError): HandlerError => ({
-        code: 'INTERNAL_ERROR',
-        message: `Hard delete failed: ${serviceError.type}`,
-        cause: serviceError
-      }));
+      }).mapErr(
+        (serviceError): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: `Hard delete failed: ${serviceError.type}`,
+          cause: serviceError,
+        }),
+      );
 
       // Check if deletion succeeded
       const result = results[0];
@@ -744,7 +935,7 @@ export const eventsRouter = new Hono<Env>()
         const errorMsg = result?.error ? `${result.error.type}` : 'Hard delete failed';
         return err<never, HandlerError>({
           code: 'INTERNAL_ERROR',
-          message: errorMsg
+          message: errorMsg,
         });
       }
 
