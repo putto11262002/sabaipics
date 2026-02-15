@@ -5,8 +5,13 @@ on:
     branches: [master]
     paths:
       - 'src/event/**'
-      - 'src/ui-legacy/**'
+      - 'src/shared/**'
       - 'src/auth/**'
+      - 'src/db/**'
+      - 'vite.event.config.ts'
+      - 'vite.base.ts'
+      - 'tsconfig.browser.json'
+      - 'tsconfig.json'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/deploy-staging-event.yml'
