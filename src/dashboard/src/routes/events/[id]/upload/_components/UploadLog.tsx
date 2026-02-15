@@ -8,7 +8,7 @@ import {
   TableRow,
 } from '@/shared/components/ui/table';
 import { Skeleton } from '@/shared/components/ui/skeleton';
-import type { UploadLogEntry } from './useUploadQueue';
+import type { UploadLogEntry } from '../../../../../hooks/photos/useUploadQueue';
 
 // Format file size utility
 function formatFileSize(bytes: number): string {
@@ -69,17 +69,17 @@ function UploadLogRow({ entry }: UploadLogRowProps) {
     switch (entry.status) {
       case 'uploading':
         return {
-          icon: <Upload className="size-4 animate-pulse text-blue-500" />,
+          icon: <Upload className="size-4 animate-pulse text-info" />,
           text: 'Uploading...',
         };
       case 'indexing':
         return {
-          icon: <Loader2 className="size-4 animate-spin text-amber-500" />,
+          icon: <Loader2 className="size-4 animate-spin text-warning" />,
           text: 'Indexing faces...',
         };
       case 'indexed':
         return {
-          icon: <CheckCircle className="size-4 text-green-500" />,
+          icon: <CheckCircle className="size-4 text-success" />,
           text: 'Indexed',
         };
       case 'failed':

@@ -1,11 +1,11 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { usePresignedUpload } from '../../../../../hooks/photos/usePresignedUpload';
+import { usePresignedUpload } from './usePresignedUpload';
 import {
   useUploadIntentStatus,
   type MappedUploadIntent,
-} from '../../../../../hooks/photos/useUploadIntentStatus';
-import { usePhotos, type Photo } from '../../../../../hooks/photos/usePhotos';
-import { usePhotosStatus, type PhotoStatus } from '../../../../../hooks/photos/usePhotoStatus';
+} from './useUploadIntentStatus';
+import { usePhotos, type Photo } from './usePhotos';
+import { usePhotosStatus, type PhotoStatus } from './usePhotoStatus';
 
 export interface UploadQueueItem {
   id: string;
@@ -158,6 +158,9 @@ export function useUploadQueue(eventId: string | undefined) {
   }, [photoStatuses]);
 
   // Remove indexed entries from upload log after 3 second delay
+  // Note: No effect cleanup for timeouts — they are short (3s), idempotent,
+  // and self-cleaning via indexedForRemovalRef. Cleaning up on every
+  // photoStatuses change (every 2s poll) would cancel timers before they fire.
   useEffect(() => {
     if (!photoStatuses) return;
 
@@ -173,11 +176,10 @@ export function useUploadQueue(eventId: string | undefined) {
 
         setTimeout(() => {
           uploadLogRef.current.delete(p.id);
-          indexedForRemovalRef.current.delete(p.id); // Clean up tracking
+          indexedForRemovalRef.current.delete(p.id);
           setUploadLogVersion((v) => v + 1);
-        }, 3000); // 3 second delay to show "Indexed" status
+        }, 3000);
       });
-    // Note: No cleanup function - let timeouts fire naturally
   }, [photoStatuses]);
 
   // Helper to sync upload log state
@@ -245,19 +247,10 @@ export function useUploadQueue(eventId: string | undefined) {
 
         syncUploadLog();
       } catch (error) {
-        const err = error as Error & { status?: number };
-        let errorMessage = err.message || 'Upload failed';
-
-        // Fallback mapping if message wasn't set from API
-        if (errorMessage === 'Upload failed') {
-          if (err.status === 402) {
-            errorMessage = 'Insufficient credits';
-          } else if (err.status === 410) {
-            errorMessage = 'Event expired';
-          } else if (err.status === 409) {
-            errorMessage = 'Upload already processing';
-          }
-        }
+        const errorMessage =
+          error && typeof error === 'object' && 'message' in error
+            ? (error as { message: string }).message
+            : 'Upload failed';
 
         // Update upload log with error
         uploadLogRef.current.set(item.id, {
@@ -271,7 +264,7 @@ export function useUploadQueue(eventId: string | undefined) {
         activeUploadsRef.current.delete(item.id);
         item.status = 'failed';
         item.error = errorMessage;
-        item.errorStatus = err.status;
+        item.errorStatus = undefined;
         failedUploadsRef.current.set(item.id, item);
       } finally {
         // Return token and process next

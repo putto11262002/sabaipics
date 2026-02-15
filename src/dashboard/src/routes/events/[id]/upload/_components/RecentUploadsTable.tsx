@@ -38,14 +38,14 @@ function StatusBadge({ intent }: { intent: UploadIntent }) {
   // Failed/expired intents
   if (intent.status === 'failed') {
     return (
-      <Badge variant="outline" className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+      <Badge variant="destructive">
         <XCircle />
       </Badge>
     );
   }
   if (intent.status === 'expired') {
     return (
-      <Badge variant="outline" className="bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400">
+      <Badge variant="outline">
         <Clock />
       </Badge>
     );
@@ -54,7 +54,7 @@ function StatusBadge({ intent }: { intent: UploadIntent }) {
   // Photo failed
   if (intent.photo?.status === 'failed') {
     return (
-      <Badge variant="outline" className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+      <Badge variant="destructive">
         <XCircle />
       </Badge>
     );
@@ -63,7 +63,7 @@ function StatusBadge({ intent }: { intent: UploadIntent }) {
   // Fully indexed = done
   if (intent.photo?.status === 'indexed') {
     return (
-      <Badge variant="outline" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+      <Badge variant="success">
         <CheckCircle />
       </Badge>
     );
@@ -71,7 +71,7 @@ function StatusBadge({ intent }: { intent: UploadIntent }) {
 
   // Everything else (pending, uploading, indexing) = loading
   return (
-    <Badge variant="outline" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+    <Badge variant="info">
       <Loader2 className="animate-spin" />
     </Badge>
   );
@@ -189,7 +189,7 @@ export function RecentUploadsTable({ eventId }: RecentUploadsTableProps) {
             onClick={goToPreviousPage}
             disabled={!hasPreviousPage}
           >
-            <ChevronLeft className="size-4" />
+            <ChevronLeft className="mr-1 size-3" />
             Previous
           </Button>
           <Button
@@ -199,7 +199,7 @@ export function RecentUploadsTable({ eventId }: RecentUploadsTableProps) {
             disabled={!hasNextPage}
           >
             Next
-            <ChevronRight className="size-4" />
+            <ChevronRight className="ml-1 size-3" />
           </Button>
         </div>
       </div>

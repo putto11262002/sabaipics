@@ -126,7 +126,7 @@ export function PhotoUploadZone({
         className={cn(
           "relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 transition-colors",
           isDragging && !disabled
-            ? "border-primary bg-primary/5"
+            ? "border-info bg-info/5"
             : "border-muted-foreground/25 hover:border-muted-foreground/50",
           disabled && "cursor-not-allowed opacity-50"
         )}
