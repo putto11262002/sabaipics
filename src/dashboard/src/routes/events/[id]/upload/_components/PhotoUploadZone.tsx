@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { Upload, XCircle } from "lucide-react";
-import { Button } from "@/ui/components/ui/button";
-import { Alert, AlertDescription } from "@/ui/components/ui/alert";
-import { cn } from "@/ui/lib/utils";
+import { Button } from "@/shared/components/ui/button";
+import { Alert, AlertDescription } from "@/shared/components/ui/alert";
+import { cn } from "@/shared/utils/ui";
 
 const ACCEPTED_FORMATS = ["image/jpeg", "image/png", "image/webp"];
 const ACCEPTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];

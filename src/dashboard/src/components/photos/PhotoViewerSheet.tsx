@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Info, ArrowLeft, ArrowRight } from 'lucide-react';
 
-import { Sheet, SheetContent } from '@/ui/components/ui/sheet';
+import { Sheet, SheetContent } from '@/shared/components/ui/sheet';
 import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
-} from '@/ui/components/ui/drawer';
-import { Separator } from '@/ui/components/ui/separator';
-import { Button } from '@/ui/components/ui/button';
-import { ScrollArea } from '@/ui/components/ui/scroll-area';
+} from '@/shared/components/ui/drawer';
+import { Separator } from '@/shared/components/ui/separator';
+import { Button } from '@/shared/components/ui/button';
+import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import {
   Carousel,
   CarouselContent,
@@ -18,7 +18,7 @@ import {
   CarouselNext,
   CarouselPrevious,
   type CarouselApi,
-} from '@/ui/components/ui/carousel';
+} from '@/shared/components/ui/carousel';
 
 type ViewerPhoto = {
   id: string;

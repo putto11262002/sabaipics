@@ -6,8 +6,8 @@ import {
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
-} from "@/ui/components/ui/empty";
-import { Spinner } from "@/ui/components/ui/spinner";
+} from "@/shared/components/ui/empty";
+import { Spinner } from "@/shared/components/ui/spinner";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 	const { isLoaded, isSignedIn } = useAuth();

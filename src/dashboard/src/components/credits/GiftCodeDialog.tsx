@@ -5,9 +5,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/ui/components/ui/dialog';
-import { Button } from '@/ui/components/ui/button';
-import { Alert, AlertDescription } from '@/ui/components/ui/alert';
+} from '@/shared/components/ui/dialog';
+import { Button } from '@/shared/components/ui/button';
+import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Gift, Loader2, AlertCircle, Plus, Check } from 'lucide-react';
 import { useTopUpCheckout } from '../../hooks/credits/useTopUpCheckout';
 import { useValidatePromoCode } from '../../hooks/credits/useValidatePromoCode';

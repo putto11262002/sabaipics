@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { Button } from '@/ui/components/ui/button';
+import { Button } from '@/shared/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,8 +7,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/ui/components/ui/dropdown-menu';
-import { ToggleGroup, ToggleGroupItem } from '@/ui/components/toggle-group';
+} from '@/shared/components/ui/dropdown-menu';
+import { ToggleGroup, ToggleGroupItem } from '@/shared/components/ui/toggle-group';
 import { Save, Plus, Loader2, Eye, Tv, Monitor, Tablet, Smartphone, RotateCcw } from 'lucide-react';
 import { blockRegistry, getTopLevelTypes } from '../blocks/registry';
 import { blockPresets } from '../lib/presets';

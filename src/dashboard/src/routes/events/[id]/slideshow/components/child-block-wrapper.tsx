@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { cn } from '@/ui/lib/utils';
+import { cn } from '@/shared/utils/ui';
 import type { SlideshowBlock, SlideshowContext } from '../types';
 import { getBlockDef } from '../blocks/registry';
 

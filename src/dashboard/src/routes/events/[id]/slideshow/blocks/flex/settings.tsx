@@ -1,19 +1,19 @@
-import { Label } from '@/ui/components/ui/label';
-import { Switch } from '@/ui/components/ui/switch';
-import { Button } from '@/ui/components/ui/button';
+import { Label } from '@/shared/components/ui/label';
+import { Switch } from '@/shared/components/ui/switch';
+import { Button } from '@/shared/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/components/ui/select';
+} from '@/shared/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/ui/components/ui/dropdown-menu';
+} from '@/shared/components/ui/dropdown-menu';
 import { Plus, GripVertical, X } from 'lucide-react';
 import {
   DndContext,

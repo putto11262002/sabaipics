@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { Button } from '@/ui-legacy/components/ui/button';
-import { Checkbox } from '@/ui-legacy/components/ui/checkbox';
-import { Skeleton } from '@/ui-legacy/components/ui/skeleton';
+import { Button } from '@/shared/components/ui/button';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import { th } from '../lib/i18n';
 
 interface ConsentStepProps {

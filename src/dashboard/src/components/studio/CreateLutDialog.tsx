@@ -5,11 +5,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/components/ui/dialog';
-import { Button } from '@/ui/components/ui/button';
-import { Input } from '@/ui/components/ui/input';
-import { Label } from '@/ui/components/ui/label';
-import { Alert } from '@/ui/components/ui/alert';
+} from '@/shared/components/ui/dialog';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Alert } from '@/shared/components/ui/alert';
 import { Loader2, Upload } from 'lucide-react';
 import { useCreateStudioLut } from '../../hooks/studio/useCreateStudioLut';
 import {
@@ -21,7 +21,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/ui/components/ui/alert-dialog';
+} from '@/shared/components/ui/alert-dialog';
 import { useBlocker } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, useApiClient, withAuth } from '../../lib/api';

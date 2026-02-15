@@ -3,12 +3,12 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-} from '@/ui/components/ui/sidebar';
-import { ScrollArea } from '@/ui/components/ui/scroll-area';
-import { Button } from '@/ui/components/ui/button';
-import { Switch } from '@/ui/components/ui/switch';
-import { Label } from '@/ui/components/ui/label';
-import { Separator } from '@/ui/components/ui/separator';
+} from '@/shared/components/ui/sidebar';
+import { ScrollArea } from '@/shared/components/ui/scroll-area';
+import { Button } from '@/shared/components/ui/button';
+import { Switch } from '@/shared/components/ui/switch';
+import { Label } from '@/shared/components/ui/label';
+import { Separator } from '@/shared/components/ui/separator';
 import { Trash2, ChevronLeft } from 'lucide-react';
 import type { SlideshowBlock, SlideshowTheme, SlideshowLayout } from '../types';
 import { getBlockDef } from '../blocks/registry';

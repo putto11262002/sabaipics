@@ -10,7 +10,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-} from '@/ui/components/ui/sidebar';
+} from '@/shared/components/ui/sidebar';
 
 const data = {
   navMain: [

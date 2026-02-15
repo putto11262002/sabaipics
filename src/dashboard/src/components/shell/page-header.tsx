@@ -2,8 +2,8 @@ import { Fragment, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 
-import { cn } from '@/ui/lib/utils';
-import { Button } from '@/ui/components/ui/button';
+import { cn } from '@/shared/utils/ui';
+import { Button } from '@/shared/components/ui/button';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,7 +11,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@/ui/components/ui/breadcrumb';
+} from '@/shared/components/ui/breadcrumb';
 
 interface BreadcrumbItemType {
   label: string;

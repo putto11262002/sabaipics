@@ -1,12 +1,12 @@
-import { Label } from '@/ui/components/ui/label';
-import { Input } from '@/ui/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Input } from '@/shared/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/components/ui/select';
+} from '@/shared/components/ui/select';
 import type { SlideshowBlock, QrProps } from '../../types';
 
 export function QrSettings({

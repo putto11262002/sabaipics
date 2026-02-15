@@ -18,10 +18,10 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Spinner } from '@/ui/components/ui/spinner';
-import { Alert, AlertDescription } from '@/ui/components/ui/alert';
+import { Spinner } from '@/shared/components/ui/spinner';
+import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { cn } from '@/ui/lib/utils';
+import { cn } from '@/shared/utils/ui';
 import type { SlideshowConfig, SlideshowContext, SlideshowBlock, FlexProps, SlideshowLayout } from './types';
 import { DEFAULT_CONFIG } from './lib/templates';
 import { buildThemeCssVars } from './lib/color-utils';

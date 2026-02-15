@@ -5,7 +5,7 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "@/ui/components/ui/card";
+} from "@/shared/components/ui/card";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import type { Event } from "../../hooks/events/useEvents";
 

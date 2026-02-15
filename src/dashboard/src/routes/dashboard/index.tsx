@@ -17,8 +17,8 @@ import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useDownloadQR } from '../../hooks/events/useDownloadQR';
 import { DataTable, useEventsTable, createColumns } from '../../components/events-table';
 import type { EventTableActions } from '../../components/events-table';
-import { Alert, AlertDescription, AlertTitle } from '@/ui/components/ui/alert';
-import { Button } from '@/ui/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
+import { Button } from '@/shared/components/ui/button';
 import {
   Card,
   CardAction,
@@ -26,16 +26,16 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/ui/components/ui/card';
+} from '@/shared/components/ui/card';
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from '@/ui/components/ui/empty';
-import { Skeleton } from '@/ui/components/ui/skeleton';
-import { Spinner } from '@/ui/components/ui/spinner';
+} from '@/shared/components/ui/empty';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Spinner } from '@/shared/components/ui/spinner';
 import { CreditTopUpDialog } from '../../components/credits/CreditTopUpDialog';
 import { GiftCodeDialog } from '../../components/credits/GiftCodeDialog';
 import { useValidatePromoCode } from '../../hooks/credits/useValidatePromoCode';
@@ -47,7 +47,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/ui/components/ui/alert-dialog';
+} from '@/shared/components/ui/alert-dialog';
 
 export function DashboardPage() {
   const [creditDialogOpen, setCreditDialogOpen] = useState(false);

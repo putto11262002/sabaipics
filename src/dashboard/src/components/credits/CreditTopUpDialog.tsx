@@ -4,17 +4,17 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/ui/components/ui/dialog';
-import { Button } from '@/ui/components/ui/button';
-import { Input } from '@/ui/components/ui/input';
-import { Label } from '@/ui/components/ui/label';
+} from '@/shared/components/ui/dialog';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
 import {
   Table,
   TableBody,
   TableCell,
   TableRow,
-} from '@/ui/components/ui/table';
-import { Alert, AlertDescription } from '@/ui/components/ui/alert';
+} from '@/shared/components/ui/table';
+import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Loader2, CheckCircle2, XCircle, AlertCircle, X } from 'lucide-react';
 import { calculateTieredDiscount } from '../../lib/credits/discount';
 import { useTopUpCheckout } from '../../hooks/credits/useTopUpCheckout';

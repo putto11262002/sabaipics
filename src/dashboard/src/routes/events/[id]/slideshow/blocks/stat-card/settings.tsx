@@ -1,11 +1,11 @@
-import { Label } from '@/ui/components/ui/label';
+import { Label } from '@/shared/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/components/ui/select';
+} from '@/shared/components/ui/select';
 import type { SlideshowBlock, StatCardProps } from '../../types';
 
 export function StatCardSettings({

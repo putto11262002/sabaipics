@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
-import { Label } from '@/ui/components/ui/label';
-import { Slider } from '@/ui/components/slider';
-import { Switch } from '@/ui/components/ui/switch';
-import { Alert } from '@/ui/components/ui/alert';
-import { Spinner } from '@/ui/components/ui/spinner';
+import { Label } from '@/shared/components/ui/label';
+import { Slider } from '@/shared/components/ui/slider';
+import { Switch } from '@/shared/components/ui/switch';
+import { Alert } from '@/shared/components/ui/alert';
+import { Spinner } from '@/shared/components/ui/spinner';
 import { Upload } from 'lucide-react';
 
 import { useDebounce } from '../../../hooks/useDebounce';

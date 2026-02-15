@@ -1,9 +1,9 @@
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button } from '@/ui/components/ui/button';
-import { Input } from '@/ui/components/ui/input';
-import { Field, FieldLabel, FieldError } from '@/ui/components/ui/field';
-import { Alert, AlertDescription, AlertTitle } from '@/ui/components/ui/alert';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Field, FieldLabel, FieldError } from '@/shared/components/ui/field';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
 import {
   Card,
   CardAction,
@@ -11,19 +11,19 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/ui/components/ui/card';
+} from '@/shared/components/ui/card';
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-} from '@/ui/components/ui/input-group';
+} from '@/shared/components/ui/input-group';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/ui/components/ui/dropdown-menu';
+} from '@/shared/components/ui/dropdown-menu';
 import {
   Check,
   Copy,

@@ -1,4 +1,4 @@
-import { Spinner } from '@/ui-legacy/components/ui/spinner';
+import { Spinner } from '@/shared/components/ui/spinner';
 import { th } from '../lib/i18n';
 
 export function SearchingStep() {

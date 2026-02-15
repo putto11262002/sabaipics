@@ -2,8 +2,8 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { MoreHorizontal } from 'lucide-react';
 
-import { Button } from '@/ui/components/ui/button';
-import { Checkbox } from '@/ui/components/ui/checkbox';
+import { Button } from '@/shared/components/ui/button';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +11,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/ui/components/ui/dropdown-menu';
+} from '@/shared/components/ui/dropdown-menu';
 
 import type { Event } from '../../hooks/events/useEvents';
 

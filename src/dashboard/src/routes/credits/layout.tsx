@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router';
-import { Button } from '@/ui/components/ui/button';
+import { Button } from '@/shared/components/ui/button';
 import {
   Card,
   CardHeader,
   CardTitle,
   CardContent,
   CardDescription,
-} from '@/ui/components/ui/card';
-import { Skeleton } from '@/ui/components/ui/skeleton';
+} from '@/shared/components/ui/card';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Wallet, Clock, TrendingDown } from 'lucide-react';
-import { cn } from '@/ui/lib/utils';
+import { cn } from '@/shared/utils/ui';
 import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { CreditTopUpDialog } from '../../components/credits/CreditTopUpDialog';
 import { useCreditHistory } from '../../hooks/credits/useCreditHistory';

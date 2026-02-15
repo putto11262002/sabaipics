@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Badge } from '@/ui/components/ui/badge';
+import { Badge } from '@/shared/components/ui/badge';
 import {
   Card,
   CardHeader,
   CardTitle,
   CardContent,
   CardDescription,
-} from '@/ui/components/ui/card';
+} from '@/shared/components/ui/card';
 import { Calendar, Image as ImageIcon, Clock, BarChart3 } from 'lucide-react';
 import { parseISO, differenceInDays, differenceInDays as daysBetween, format } from 'date-fns';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
@@ -15,15 +15,15 @@ import {
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from '@/ui/components/ui/chart';
+} from '@/shared/components/ui/chart';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/components/ui/select';
-import { ToggleGroup, ToggleGroupItem } from '@/ui/components/toggle-group';
+} from '@/shared/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/shared/components/ui/toggle-group';
 import { useParams } from 'react-router';
 import { useEvent } from '../../../../hooks/events/useEvent';
 

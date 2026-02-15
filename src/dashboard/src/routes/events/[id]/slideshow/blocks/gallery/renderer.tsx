@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
-import { Skeleton } from '@/ui/components/ui/skeleton';
-import { AspectRatio } from '@/ui/components/ui/aspect-ratio';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { AspectRatio } from '@/shared/components/ui/aspect-ratio';
 import type { SlideshowBlock, SlideshowContext, GalleryProps, GalleryDensity } from '../../types';
 import { useContainerSize } from '../../hooks/useContainerSize';
 import { useSlideshowPhotos } from '../../hooks/useSlideshowPhotos';

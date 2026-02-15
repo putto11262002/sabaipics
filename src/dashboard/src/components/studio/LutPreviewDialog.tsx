@@ -5,12 +5,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/components/ui/dialog';
-import { Button } from '@/ui/components/ui/button';
-import { Slider } from '@/ui/components/slider';
-import { Switch } from '@/ui/components/ui/switch';
-import { Label } from '@/ui/components/ui/label';
-import { Alert } from '@/ui/components/ui/alert';
+} from '@/shared/components/ui/dialog';
+import { Button } from '@/shared/components/ui/button';
+import { Slider } from '@/shared/components/ui/slider';
+import { Switch } from '@/shared/components/ui/switch';
+import { Label } from '@/shared/components/ui/label';
+import { Alert } from '@/shared/components/ui/alert';
 import { Loader2, Upload } from 'lucide-react';
 import { usePreviewStudioLut } from '../../hooks/studio/usePreviewStudioLut';
 

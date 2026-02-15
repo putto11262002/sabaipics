@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useParams, useNavigate, Outlet, NavLink, Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Button } from '@/ui/components/ui/button';
-import { Alert } from '@/ui/components/ui/alert';
-import { Skeleton } from '@/ui/components/ui/skeleton';
+import { Button } from '@/shared/components/ui/button';
+import { Alert } from '@/shared/components/ui/alert';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +12,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/ui/components/ui/dropdown-menu';
+} from '@/shared/components/ui/dropdown-menu';
 import { MoreVertical, ExternalLink } from 'lucide-react';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
 import { useEvent } from '../../../hooks/events/useEvent';
@@ -21,7 +21,7 @@ import { useDownloadQR } from '../../../hooks/events/useDownloadQR';
 import { useDeleteEvent } from '../../../hooks/events/useDeleteEvent';
 import { useHardDeleteEvent } from '../../../hooks/events/useHardDeleteEvent';
 import { DeleteConfirmDialog } from '../../../components/events/DeleteConfirmDialog';
-import { cn } from '@/ui/lib/utils';
+import { cn } from '@/shared/utils/ui';
 
 const tabs = [
   { name: 'Details', path: 'details' },

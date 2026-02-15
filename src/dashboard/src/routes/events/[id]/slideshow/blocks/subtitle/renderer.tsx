@@ -1,4 +1,4 @@
-import { cn } from '@/ui/lib/utils';
+import { cn } from '@/shared/utils/ui';
 import type { SlideshowBlock, SlideshowContext, SubtitleProps } from '../../types';
 
 const FONT_SIZE_CLASS: Record<string, string> = {

@@ -1,5 +1,5 @@
 import QRCodeSVG from 'react-qr-code';
-import { cn } from '@/ui/lib/utils';
+import { cn } from '@/shared/utils/ui';
 import type { SlideshowBlock, SlideshowContext, QrProps } from '../../types';
 
 const SIZE_CLASS: Record<string, string> = {
