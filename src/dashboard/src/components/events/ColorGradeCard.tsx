@@ -1,17 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Switch } from '@/shared/components/ui/switch';
-import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
+import { Field, FieldContent, FieldGroup, FieldLabel, FieldDescription } from '@/shared/components/ui/field';
 import {
   Select,
   SelectContent,
@@ -20,7 +12,8 @@ import {
   SelectValue,
 } from '@/shared/components/ui/select';
 import { Alert } from '@/shared/components/ui/alert';
-import { Eye, Loader2, Save } from 'lucide-react';
+import { Eye } from 'lucide-react';
+import { Spinner } from '@/shared/components/ui/spinner';
 import { toast } from 'sonner';
 
 import { useStudioLuts } from '../../hooks/studio/useStudioLuts';
@@ -45,25 +38,20 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
 
   useEffect(() => {
     if (!eventCg.data) return;
-    setEnabled(eventCg.data.enabled);
-    setLutId(eventCg.data.lutId);
-    setIntensity(eventCg.data.intensity);
-    setIncludeLuminance(eventCg.data.includeLuminance);
+    setEnabled(eventCg.data.data.enabled);
+    setLutId(eventCg.data.data.lutId);
+    setIntensity(eventCg.data.data.intensity);
+    setIncludeLuminance(eventCg.data.data.includeLuminance);
   }, [eventCg.data]);
 
-  const save = async () => {
-    try {
-      await update.mutateAsync({
-        eventId,
-        enabled,
-        lutId,
-        intensity,
-        includeLuminance,
-      });
-      toast.success('Color grade settings saved');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to save settings');
-    }
+  const save = () => {
+    update.mutate(
+      { eventId, enabled, lutId, intensity, includeLuminance },
+      {
+        onSuccess: () => toast.success('Color grade settings saved'),
+        onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to save settings'),
+      },
+    );
   };
 
   const disabledReason = enabled && !lutId ? 'Select a LUT to enable color grade' : null;
@@ -75,122 +63,118 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
     studioLuts.isFetching;
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Color grade</CardTitle>
-          <CardDescription>
-            Apply a Studio LUT automatically to new uploads for this event.
-          </CardDescription>
-          <CardAction>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={save}
-              disabled={update.isPending || Boolean(disabledReason)}
-              title={disabledReason ?? undefined}
-            >
-              {update.isPending ? (
-                <Loader2 className="mr-2 size-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 size-4" />
-              )}
-              Save
-            </Button>
-          </CardAction>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {(eventCg.isError || studioLuts.isError) && (
-            <Alert variant="destructive">Failed to load color grade settings.</Alert>
-          )}
+    <div className="space-y-6">
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-medium">Color grade</h2>
+          <Button
+            variant="link"
+            size="sm"
+            onClick={() => {
+              if (!lutId) return;
+              const query = new URLSearchParams({
+                intensity: String(intensity),
+                includeLuminance: includeLuminance ? 'true' : 'false',
+              });
+              navigate(`/studio/luts/${lutId}/preview?${query.toString()}`);
+            }}
+            disabled={lutControlsDisabled || !lutId}
+          >
+            <Eye className="mr-1 size-3" />
+            Preview
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Apply a Studio LUT automatically to new uploads for this event.
+        </p>
 
-          <div className="flex items-center justify-between rounded-md border px-3 py-2">
-            <div className="space-y-0.5">
-              <Label className="text-sm">Enable</Label>
-              <p className="text-xs text-muted-foreground">Applies to new uploads only</p>
-            </div>
+        {(eventCg.isError || studioLuts.isError) && (
+          <Alert variant="destructive">Failed to load color grade settings.</Alert>
+        )}
+
+        <FieldGroup>
+          <Field orientation="responsive">
+            <FieldContent>
+              <FieldLabel>Enable</FieldLabel>
+              <FieldDescription>Applies to new uploads only</FieldDescription>
+            </FieldContent>
             <Switch checked={enabled} onCheckedChange={setEnabled} />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label className="text-xs">LUT</Label>
-            <Select
-              value={lutId ?? ''}
-              onValueChange={(v) => setLutId(v ? v : null)}
-              disabled={lutControlsDisabled || completedLuts.length === 0}
-            >
-              <SelectTrigger
-                className="w-full"
+          <Field orientation="responsive">
+            <FieldLabel>LUT</FieldLabel>
+            <FieldContent>
+              <Select
+                value={lutId ?? ''}
+                onValueChange={(v) => setLutId(v ? v : null)}
                 disabled={lutControlsDisabled || completedLuts.length === 0}
               >
-                <SelectValue
-                  placeholder={completedLuts.length === 0 ? 'No completed LUTs' : 'Select a LUT'}
+                <SelectTrigger
+                  className="w-full"
+                  disabled={lutControlsDisabled || completedLuts.length === 0}
+                >
+                  <SelectValue
+                    placeholder={completedLuts.length === 0 ? 'No completed LUTs' : 'Select a LUT'}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {completedLuts.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                <a className="underline" href="/studio/luts">Create a new LUT in Studio</a>
+              </FieldDescription>
+            </FieldContent>
+          </Field>
+
+          <Field orientation="responsive">
+            <FieldLabel>Intensity</FieldLabel>
+            <FieldContent>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[intensity]}
+                  min={0}
+                  max={100}
+                  step={1}
+                  onValueChange={(v) => setIntensity(v[0] ?? 75)}
+                  disabled={lutControlsDisabled}
+                  className="flex-1"
                 />
-              </SelectTrigger>
-              <SelectContent>
-                {completedLuts.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>
-                    {l.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Manage LUTs in{' '}
-              <a className="underline" href="/studio/luts">
-                Studio
-              </a>
-              .
-            </p>
-          </div>
+                <span className="w-10 text-right text-sm text-muted-foreground">{intensity}%</span>
+              </div>
+            </FieldContent>
+          </Field>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Intensity</Label>
-              <span className="text-xs text-muted-foreground">{intensity}%</span>
-            </div>
-            <Slider
-              value={[intensity]}
-              min={0}
-              max={100}
-              step={1}
-              onValueChange={(v) => setIntensity(v[0] ?? 75)}
-              disabled={lutControlsDisabled}
-            />
-          </div>
-
-          <div className="flex items-center justify-between rounded-md border px-3 py-2">
-            <div className="space-y-0.5">
-              <Label className="text-sm">Include luminance</Label>
-              <p className="text-xs text-muted-foreground">Allow brightness changes</p>
-            </div>
+          <Field orientation="responsive">
+            <FieldContent>
+              <FieldLabel>Include luminance</FieldLabel>
+              <FieldDescription>Allow brightness changes</FieldDescription>
+            </FieldContent>
             <Switch
               checked={includeLuminance}
               onCheckedChange={setIncludeLuminance}
               disabled={lutControlsDisabled}
             />
-          </div>
+          </Field>
+        </FieldGroup>
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (!lutId) return;
-                const query = new URLSearchParams({
-                  intensity: String(intensity),
-                  includeLuminance: includeLuminance ? 'true' : 'false',
-                });
-                navigate(`/studio/luts/${lutId}/preview?${query.toString()}`);
-              }}
-              disabled={lutControlsDisabled || !lutId}
-            >
-              <Eye className="mr-2 size-4" />
-              Preview
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={save}
+            disabled={update.isPending || Boolean(disabledReason)}
+            title={disabledReason ?? undefined}
+          >
+            {update.isPending && <Spinner className="mr-1 size-3" />}
+            Save
+          </Button>
+        </div>
+      </section>
+    </div>
   );
 }
