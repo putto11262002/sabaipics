@@ -663,6 +663,18 @@ export const studioLutsRouter = new Hono<Env>()
     async (c) => {
       return safeTry(async function* () {
         const photographer = c.var.photographer;
+
+        const { success } = await c.env.LUT_PREVIEW_RATE_LIMITER.limit({
+          key: photographer.id,
+        });
+        if (!success) {
+          return err<never, HandlerError>({
+            code: 'RATE_LIMITED',
+            message: 'Too many preview requests. Please wait a moment and try again.',
+            headers: { 'Retry-After': '60' },
+          });
+        }
+
         const db = c.var.db();
         const { id } = c.req.valid('param');
         const { file, intensity, includeLuminance } = c.req.valid('form');
