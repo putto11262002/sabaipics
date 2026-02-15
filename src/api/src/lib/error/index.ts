@@ -67,6 +67,7 @@ export const API_ERROR_STATUS = {
 } as const;
 
 export type ApiErrorCode = keyof typeof API_ERROR_STATUS;
+export type ApiErrorStatus = (typeof API_ERROR_STATUS)[ApiErrorCode];
 
 /**
  * Handler error type for safeTry pattern.

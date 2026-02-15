@@ -8,13 +8,15 @@ import { Toaster } from "@/shared/components/ui/sonner";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import "@/shared/styles/globals.css";
 import "sonner/dist/styles.css";
+import { shouldRetry } from "@/shared/lib/api-error";
 import { router } from "./router.tsx";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60, // 1 minute
-      retry: 1,
+      retry: shouldRetry,
+      refetchOnWindowFocus: false,
     },
   },
 });

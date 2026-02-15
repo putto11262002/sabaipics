@@ -48,9 +48,11 @@ export function CreateEventModal({ open, onOpenChange }: CreateEventModalProps) 
         },
         onError: (error) => {
           console.error('Create event error:', error);
-          setApiError(
-            error instanceof Error ? error.message : 'Failed to create event. Please try again.',
-          );
+          if (error.type === 'API_ERROR') {
+            setApiError(error.error.message);
+          } else {
+            setApiError('Something went wrong. Please try again.');
+          }
         },
       },
     );
