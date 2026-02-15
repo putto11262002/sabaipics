@@ -14,8 +14,10 @@ import EventsPage from './routes/events';
 import EventDetailLayout from './routes/events/[id]/layout';
 import EventDetailsTab from './routes/events/[id]/details';
 import EventUploadTab from './routes/events/[id]/upload';
-import EventStatisticsTab from './routes/events/[id]/statistics';
+// import EventStatisticsTab from './routes/events/[id]/statistics';
 import EventPhotosTab from './routes/events/[id]/photos';
+import EventColorTab from './routes/events/[id]/color';
+import EventFtpTab from './routes/events/[id]/ftp';
 import EventSlideshowTab from './routes/events/[id]/slideshow';
 import SlideshowPreviewPage from './routes/events/[id]/slideshow/preview';
 import StudioLutsPage from './routes/studio/luts';
@@ -120,13 +122,21 @@ export const router = createBrowserRouter([
             path: 'upload',
             element: <EventUploadTab />,
           },
-          {
-            path: 'statistics',
-            element: <EventStatisticsTab />,
-          },
+          // {
+          //   path: 'statistics',
+          //   element: <EventStatisticsTab />,
+          // },
           {
             path: 'photos',
             element: <EventPhotosTab />,
+          },
+          {
+            path: 'color',
+            element: <EventColorTab />,
+          },
+          {
+            path: 'ftp',
+            element: <EventFtpTab />,
           },
         ],
       },

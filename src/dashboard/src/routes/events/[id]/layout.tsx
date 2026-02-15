@@ -21,13 +21,16 @@ import { useDownloadQR } from '../../../hooks/events/useDownloadQR';
 import { useDeleteEvent } from '../../../hooks/events/useDeleteEvent';
 import { useHardDeleteEvent } from '../../../hooks/events/useHardDeleteEvent';
 import { DeleteConfirmDialog } from '../../../components/events/DeleteConfirmDialog';
+
 import { cn } from '@/shared/utils/ui';
 
 const tabs = [
   { name: 'Details', path: 'details' },
   { name: 'Upload', path: 'upload' },
   { name: 'Photos', path: 'photos' },
-  { name: 'Statistics', path: 'statistics' },
+  { name: 'Color', path: 'color' },
+  { name: 'FTP', path: 'ftp' },
+  // { name: 'Statistics', path: 'statistics' },
 ];
 
 export default function EventDetailLayout() {
@@ -147,7 +150,7 @@ export default function EventDetailLayout() {
   const event = data.data;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col">
       {/* Header */}
       <SidebarPageHeader
         breadcrumbs={[
@@ -189,8 +192,8 @@ export default function EventDetailLayout() {
         </DropdownMenu>
       </SidebarPageHeader>
 
-      {/* Tab Navigation */}
-      <div className="flex-shrink-0 border-b px-4">
+      {/* Tab Navigation (sticky) */}
+      <div className="sticky top-16 z-10 border-b bg-background px-4">
         <div className="flex gap-6 -mb-px">
           {tabs.map((tab) => (
             <NavLink
@@ -219,7 +222,7 @@ export default function EventDetailLayout() {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-auto px-4">
+      <div className="px-4">
         <Outlet />
       </div>
 
