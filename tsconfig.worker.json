@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "types": ["./src/api/worker-configuration.d.ts"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
+  },
+  "include": [
+    "src/api/worker-configuration.d.ts",
+    "src/api/src/**/*",
+    "src/db/**/*",
+    "src/auth/**/*"
+  ],
+  "exclude": ["**/node_modules", "**/dist", "**/*.test.ts"]
+}

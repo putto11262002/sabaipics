@@ -1,9 +1,0 @@
-{
-  "extends": "../tsconfig.json",
-  "compilerOptions": {
-    "rootDir": "..",
-    "types": ["@cloudflare/vitest-pool-workers"]
-  },
-  "include": ["./**/*.ts", "../src/**/*", "../src/worker-configuration.d.ts"],
-  "references": [{ "path": "../" }]
-}

@@ -4,12 +4,11 @@ on:
   push:
     branches: [master]
     paths:
-      - 'apps/api/**'
-      - 'packages/db/**'
-      - 'packages/auth/**'
+      - 'src/api/**'
+      - 'src/db/**'
+      - 'src/auth/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
-      - 'turbo.json'
       - '.github/workflows/deploy-staging-api.yml'
 
   workflow_dispatch:
@@ -45,8 +44,8 @@ jobs:
 
       # Tests already run in PR checks - skip here to avoid running against staging DB
       - name: Run Database Migrations
-        run: pnpm --filter=@sabaipics/db db:migrate
+        run: pnpm db:migrate
 
       # Worker secrets are managed by Terraform (infra/terraform/modules/cloudflare-worker-secrets)
       - name: Deploy API
-        run: pnpm --filter=@sabaipics/api deploy:staging
+        run: pnpm deploy:api:staging

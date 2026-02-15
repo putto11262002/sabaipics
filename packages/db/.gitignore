@@ -1,7 +1,0 @@
-# Build
-dist/
-*.tsbuildinfo
-
-# Env
-.env
-.env.local

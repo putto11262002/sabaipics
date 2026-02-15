@@ -3,7 +3,7 @@ This is a rule/conventional file for FrameFast - an Event photo distribution pla
 ## Tech
 
 - `pnpm` for package management
-- `turbo` for monorepo management
+- Flat repo with `tsconfig` paths + Vite aliases (`@/` → `src/`)
 
 ## Quick Context
 
@@ -13,7 +13,7 @@ This is a rule/conventional file for FrameFast - an Event photo distribution pla
 
 - Always run build and type check after code changes
 - Use official docs only - spawn subagents to research
-- Use shadcn CLI for components: `pnpm --filter=@sabaipics/ui ui:add <component>`
+- Use shadcn CLI for components: `pnpm dlx shadcn@latest add <component> --path src/ui/components/ui`
 - `.claude/rules/vc-workflow.md` — Read before any branch, commit, push, or PR operation. Use Graphite (`gt`) stacked PRs, not raw git/gh.
 
 ## Product Documentation

@@ -1,0 +1,74 @@
+# =============================================================================
+# SabaiFace Fly.io Configuration
+# =============================================================================
+# Deploy (from monorepo root):
+#   fly deploy . -c src/sabaiface/fly.toml
+# Logs:   fly logs -a sabai-recognition
+# Status: fly status -a sabai-recognition
+
+app = "sabai-recognition"
+primary_region = "sin"  # Singapore - closest to Thailand
+
+[build]
+  # Dockerfile path relative to deploy context (repo root)
+  dockerfile = "src/sabaiface/Dockerfile"
+
+# -----------------------------------------------------------------------------
+# HTTP Service
+# -----------------------------------------------------------------------------
+[http_service]
+  internal_port = 8086
+  force_https = true
+
+  # Autostop: suspend for faster resume (keeps memory snapshot)
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 10
+    hard_limit = 20
+
+  # Health check
+  [http_service.http_options]
+    response = { status = 200 }
+
+  [[http_service.checks]]
+    grace_period = "60s"
+    interval = "30s"
+    method = "GET"
+    timeout = "10s"
+    path = "/health"
+
+# -----------------------------------------------------------------------------
+# VM Size
+# -----------------------------------------------------------------------------
+# shared-cpu-2x is the sweet spot: good performance, reasonable cost
+# 1x CPU degrades under load, 4x is overkill
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "1gb"
+  count = 1  # Single machine, suspends when idle, wakes on request
+
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
+# Secrets are set via: fly secrets set DATABASE_URL=...
+# Non-sensitive config can go here:
+[env]
+  NODE_ENV = "production"
+  PORT = "8086"
+  MODELS_PATH = "./models"
+  # ML tuning (low false positive defaults)
+  SEARCH_MIN_SIMILARITY = "0.97"
+  INDEX_QUALITY_FILTER = "none"
+  INDEX_MIN_CONFIDENCE = "0.5"
+
+# -----------------------------------------------------------------------------
+# Deploy Strategy
+# -----------------------------------------------------------------------------
+[deploy]
+  strategy = "rolling"
+
+# Note: No [processes] section - uses CMD from Dockerfile

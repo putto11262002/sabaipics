@@ -34,8 +34,8 @@ jobs:
 
       # Tests already run in PR checks - skip here to avoid running against prod DB
       - name: Run Database Migrations
-        run: pnpm --filter=@sabaipics/db db:migrate
+        run: pnpm db:migrate
 
       # Worker secrets are managed by Terraform (infra/terraform/modules/cloudflare-worker-secrets)
       - name: Deploy API
-        run: pnpm --filter=@sabaipics/api deploy:prod
+        run: pnpm deploy:api:prod

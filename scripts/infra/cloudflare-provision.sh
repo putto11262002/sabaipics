@@ -28,7 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 PNPM="pnpm -C $REPO_ROOT"
-WRANGLER="$PNPM --filter=@sabaipics/api exec wrangler"
+WRANGLER="$PNPM exec wrangler -c $REPO_ROOT/wrangler.api.jsonc"
 
 CORS_FILE="$SCRIPT_DIR/r2-cors.json"
 
