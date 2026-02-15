@@ -79,7 +79,7 @@ resource "cloudflare_r2_bucket_event_notification" "notifications" {
 
   rules = [{
     prefix      = var.bucket_notifications[count.index].prefix
-    actions     = ["PutObject", "CopyObject"]
+    actions     = ["PutObject", "CopyObject", "CompleteMultipartUpload"]
     description = var.bucket_notifications[count.index].description
   }]
 }
