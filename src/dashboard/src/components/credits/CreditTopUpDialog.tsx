@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/shared/components/ui/dialog';
@@ -15,7 +16,8 @@ import {
   TableRow,
 } from '@/shared/components/ui/table';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
-import { Loader2, CheckCircle2, XCircle, AlertCircle, X } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertCircle, X } from 'lucide-react';
+import { Spinner } from '@/shared/components/ui/spinner';
 import { calculateTieredDiscount } from '../../lib/credits/discount';
 import { useTopUpCheckout } from '../../hooks/credits/useTopUpCheckout';
 import { useValidatePromoCode } from '../../hooks/credits/useValidatePromoCode';
@@ -110,17 +112,20 @@ export function CreditTopUpDialog({
     }
   }, [open, initialPromoCode]);
 
-  const handleCheckout = async () => {
-    try {
-      const result = await checkoutMutation.mutateAsync({
-        amount,
-        promoCode: promoCode || undefined,
-      });
-      window.location.href = result.checkoutUrl;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create checkout';
-      setErrorMessage(message);
-    }
+  const handleCheckout = () => {
+    setErrorMessage('');
+    checkoutMutation.mutate(
+      { amount, promoCode: promoCode || undefined },
+      {
+        onSuccess: (result) => {
+          window.location.href = result.checkoutUrl;
+        },
+        onError: (error) => {
+          const message = error instanceof Error ? error.message : 'Failed to create checkout';
+          setErrorMessage(message);
+        },
+      },
+    );
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -159,7 +164,7 @@ export function CreditTopUpDialog({
                 inputMode="numeric"
                 value={amount === 0 ? '' : amount}
                 onChange={handleAmountChange}
-                className="h-16 pl-12 pr-4 !text-3xl font-bold bg-muted border-0"
+                className="h-16 pl-12 pr-4 !text-3xl font-bold bg-muted border-0 focus-visible:ring-1"
                 style={{ fontSize: '1.875rem' }}
               />
             </div>
@@ -170,17 +175,26 @@ export function CreditTopUpDialog({
 
           {/* Quick Select Buttons */}
           <div className="flex justify-center gap-3">
-            {QUICK_AMOUNTS.map((quickAmount) => (
-              <Button
-                key={quickAmount}
-                variant={amount === quickAmount ? 'secondary' : 'outline'}
-                size="lg"
-                onClick={() => setAmount(quickAmount)}
-                className="flex-1"
-              >
-                {quickAmount.toLocaleString()} ฿
-              </Button>
-            ))}
+            {QUICK_AMOUNTS.map((quickAmount) => {
+              const { discountPercent } = calculateTieredDiscount(quickAmount);
+              return (
+                <button
+                  key={quickAmount}
+                  type="button"
+                  onClick={() => setAmount(quickAmount)}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-center transition-colors ${
+                    amount === quickAmount
+                      ? 'border-primary bg-primary/5 text-foreground'
+                      : 'border-border bg-background text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <span className="text-sm font-semibold">{quickAmount.toLocaleString()} ฿</span>
+                  {discountPercent > 0 && (
+                    <span className="block text-xs text-success">+{discountPercent}% bonus</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Promo Code Input */}
@@ -213,10 +227,10 @@ export function CreditTopUpDialog({
 
                     {/* Status icon */}
                     {validateQuery.isLoading && (
-                      <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                      <Spinner className="size-4 text-muted-foreground" />
                     )}
                     {validateQuery.isSuccess && isValidPromo && meetsMinimum && (
-                      <CheckCircle2 className="size-4 text-green-600" />
+                      <CheckCircle2 className="size-4 text-success" />
                     )}
                     {validateQuery.isError && (
                       <XCircle className="size-4 text-destructive" />
@@ -231,7 +245,7 @@ export function CreditTopUpDialog({
               <>
                 {/* Valid and applied */}
                 {validateQuery.isSuccess && isValidPromo && meetsMinimum && promoData && (
-                  <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                  <p className="text-xs text-success font-medium flex items-center gap-1">
                     <CheckCircle2 className="size-3" />
                     {promoData.discountType === 'percent'
                       ? `${promoData.discountPercent}% off applied!`
@@ -249,7 +263,7 @@ export function CreditTopUpDialog({
 
                 {/* Wrong type (gift code) */}
                 {validateQuery.isSuccess && !isDiscountCode && (
-                  <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                  <p className="text-xs text-warning font-medium flex items-center gap-1">
                     <AlertCircle className="size-3" />
                     This is a gift code, not a discount code
                   </p>
@@ -258,7 +272,7 @@ export function CreditTopUpDialog({
             )}
 
             {initialPromoCode && (
-              <p className="text-xs text-green-600 font-medium">
+              <p className="text-xs text-success font-medium">
                 Discount code applied!
               </p>
             )}
@@ -266,7 +280,7 @@ export function CreditTopUpDialog({
 
           {/* Base Minimum Alert (50 THB) */}
           {!isValidAmount && amount > 0 && (
-            <Alert variant="destructive">
+            <Alert variant="warning">
               <AlertCircle className="size-4" />
               <AlertDescription>
                 Minimum purchase is {MIN_AMOUNT} THB
@@ -306,7 +320,7 @@ export function CreditTopUpDialog({
                   <TableCell className="text-muted-foreground">Bonus credits:</TableCell>
                   <TableCell
                     className={`text-right font-medium ${
-                      preview.bonusCredits > 0 ? 'text-info' : 'text-muted-foreground'
+                      preview.bonusCredits > 0 ? 'text-success/80' : 'text-muted-foreground'
                     }`}
                   >
                     {preview.bonusCredits > 0 ? `+${preview.bonusCredits}` : '0'} ({preview.discountPercent}%)
@@ -330,7 +344,9 @@ export function CreditTopUpDialog({
             </Table>
           </div>
 
-          {/* Checkout Button */}
+        </div>
+
+        <DialogFooter>
           <Button
             onClick={handleCheckout}
             disabled={checkoutMutation.isPending || !canCheckout}
@@ -339,14 +355,14 @@ export function CreditTopUpDialog({
           >
             {checkoutMutation.isPending ? (
               <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                <Spinner className="mr-1 size-4" />
                 Redirecting to Payment...
               </>
             ) : (
               <>Proceed to Payment →</>
             )}
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

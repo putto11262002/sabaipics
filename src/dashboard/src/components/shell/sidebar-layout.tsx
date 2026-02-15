@@ -7,7 +7,7 @@ export function SidebarLayout() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="max-h-svh overflow-auto">
         <Outlet />
       </SidebarInset>
     </SidebarProvider>

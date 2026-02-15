@@ -104,7 +104,11 @@ export default function EventsPage() {
   const tableActions: EventTableActions = {
     onViewEvent: (eventId: string) => navigate(`/events/${eventId}`),
     onCopySearchLink: (eventId: string) => handleCopyLink(eventId),
-    onDownloadQR: (eventId: string, eventName: string) => downloadQR.mutate({ eventId, eventName }),
+    onDownloadQR: (eventId: string, eventName: string) =>
+      downloadQR.mutate(
+        { eventId, eventName },
+        { onError: (e) => toast.error('Failed to download QR', { description: e.message }) },
+      ),
     onDeleteEvent: (eventId: string) => {
       setDeleteEventId(eventId); // Open soft delete dialog
     },
@@ -127,7 +131,7 @@ export default function EventsPage() {
         breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Events' }]}
       >
         <Button onClick={() => setIsCreateModalOpen(true)} size="sm">
-          <Plus className="mr-2 size-4" />
+          <Plus className="mr-1 size-3" />
           Create Event
         </Button>
       </SidebarPageHeader>
@@ -169,7 +173,7 @@ export default function EventsPage() {
         {error && (
           <Alert variant="destructive">
             <p className="mb-3">{error.message}</p>
-            <Button onClick={() => refetch()} variant="outline" size="sm">
+            <Button onClick={() => refetch()} variant="destructive" size="sm">
               Try Again
             </Button>
           </Alert>
@@ -183,15 +187,15 @@ export default function EventsPage() {
               <Empty>
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
-                    <Calendar className="size-12 text-muted-foreground" />
+                    <Calendar className="size-8 text-muted-foreground" />
                   </EmptyMedia>
                   <EmptyTitle>No events yet</EmptyTitle>
                   <EmptyDescription>
                     Create your first event to start organizing and sharing photos
                   </EmptyDescription>
                 </EmptyHeader>
-                <Button onClick={() => setIsCreateModalOpen(true)}>
-                  <Plus className="mr-2 size-4" />
+                <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>
+                  <Plus className="mr-1 size-3" />
                   Create Event
                 </Button>
               </Empty>
@@ -230,14 +234,18 @@ export default function EventsPage() {
 
                 {/* No Results State - when filters applied but no matches */}
                 {filteredEvents.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Search className="size-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No events found</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Try adjusting your filters</p>
-                    <Button variant="outline" onClick={() => setStatusFilter('all')}>
+                  <Empty>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Search className="size-8 text-muted-foreground" />
+                      </EmptyMedia>
+                      <EmptyTitle>No events found</EmptyTitle>
+                      <EmptyDescription>Try adjusting your filters</EmptyDescription>
+                    </EmptyHeader>
+                    <Button variant="outline" size="sm" onClick={() => setStatusFilter('all')}>
                       Clear filters
                     </Button>
-                  </div>
+                  </Empty>
                 ) : (
                   <>
                     {/* Table */}

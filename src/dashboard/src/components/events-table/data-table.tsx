@@ -45,7 +45,12 @@ export function DataTable<TData>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && 'selected'}
-                  onClick={() => onRowClick?.(row.original)}
+                  onClick={(e) => {
+                    // Skip navigation if clicking interactive elements (buttons, dropdowns, checkboxes, links)
+                    const target = e.target as HTMLElement;
+                    if (target.closest('button, a, input, [role="menuitem"], [role="checkbox"], [data-radix-collection-item]')) return;
+                    onRowClick?.(row.original);
+                  }}
                   className={onRowClick ? 'cursor-pointer' : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (

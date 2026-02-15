@@ -192,7 +192,7 @@ export function DashboardPage() {
             <AlertTitle>Error loading dashboard</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
               <span>{error.message}</span>
-              <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
+              <Button variant="destructive" size="sm" onClick={() => refetch()} disabled={isRefetching}>
                 {isRefetching ? (
                   <Spinner className="mr-1 size-3" />
                 ) : (
@@ -210,7 +210,7 @@ export function DashboardPage() {
             {/* Credit Expiry Warning */}
             {dashboardData.credits.nearestExpiry &&
               isExpiringSoon(dashboardData.credits.nearestExpiry) && (
-                <Alert variant="destructive">
+                <Alert variant="warning">
                   <AlertCircle className="size-4" />
                   <AlertTitle>Credits Expiring Soon</AlertTitle>
                   <AlertDescription>
@@ -316,13 +316,19 @@ export function DashboardPage() {
                 <Empty>
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
-                      <Calendar className="size-12 text-muted-foreground" />
+                      <Calendar className="size-8 text-muted-foreground" />
                     </EmptyMedia>
                     <EmptyTitle>No events yet</EmptyTitle>
                     <EmptyDescription>
                       Create your first event to start organizing and sharing photos
                     </EmptyDescription>
                   </EmptyHeader>
+                  <Button size="sm" asChild>
+                    <Link to="/events">
+                      <Calendar className="mr-1 size-3" />
+                      Create Event
+                    </Link>
+                  </Button>
                 </Empty>
               ) : (
                 /* Just the table - no search, no pagination for dashboard */

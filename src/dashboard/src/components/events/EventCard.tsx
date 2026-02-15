@@ -27,14 +27,14 @@ export function EventCard({ event, onClick }: EventCardProps) {
         <CardTitle className="text-xl">{event.name}</CardTitle>
       </CardHeader>
 
-      {event.qrCodeUrl && (
+      {event.logoUrl && (
         <CardContent className="flex justify-center">
           <img
-            src={event.qrCodeUrl}
-            alt={`QR code for ${event.name}`}
+            src={event.logoUrl}
+            alt={`Logo for ${event.name}`}
             className="size-20 object-contain"
             onError={(e) => {
-              // Fallback if QR image fails to load
+              // Fallback if logo image fails to load
               e.currentTarget.style.display = "none";
             }}
           />

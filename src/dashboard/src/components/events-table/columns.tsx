@@ -92,7 +92,7 @@ export function createColumns(actions: EventTableActions): ColumnDef<Event>[] {
 
         return (
           <span
-            className={`text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}
+            className={`text-sm ${isExpired ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
           >
             {format(parseISO(event.expiresAt), 'MMM d, yyyy')}
           </span>
