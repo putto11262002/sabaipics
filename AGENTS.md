@@ -16,6 +16,13 @@ This is a rule/conventional file for FrameFast - an Event photo distribution pla
 - Use shadcn CLI for components: `pnpm --filter=@sabaipics/ui ui:add <component>`
 - `.claude/rules/vc-workflow.md` — Read before any branch, commit, push, or PR operation. Use Graphite (`gt`) stacked PRs, not raw git/gh.
 
+## Product Documentation
+
+- Product decisions, ideas, and discussions are tracked in Notion:
+  **FrameFast > Product Decisions & Ideas** database
+- When exploring a new feature, infra decision, or idea — **always ask the user** if they want to document it in Notion. Never create entries automatically.
+- Use Type: `Decision` for resolved choices, `Discussion` for ongoing exploration, `Idea` for backlog items
+
 ## API Error Handling
 
 **1. neverthrow with Boundary Conversion**
