@@ -5,8 +5,14 @@ on:
     branches: [master]
     paths:
       - 'src/dashboard/**'
-      - 'src/ui/**'
+      - 'src/shared/**'
       - 'src/auth/**'
+      - 'src/db/**'
+      - 'vite.dashboard.config.ts'
+      - 'vite.base.ts'
+      - 'wrangler.dashboard.jsonc'
+      - 'tsconfig.browser.json'
+      - 'tsconfig.json'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/deploy-staging-dashboard.yml'
