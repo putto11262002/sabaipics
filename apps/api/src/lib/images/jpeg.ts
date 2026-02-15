@@ -6,6 +6,10 @@ export function extractJpegDimensions(
   bytes: ArrayBuffer,
 ): { width: number; height: number } | null {
   const view = new DataView(bytes);
+  // Verify SOI marker (0xFFD8). Without this, arbitrary bytes can be misread.
+  if (view.byteLength < 2 || view.getUint16(0, false) !== 0xffd8) {
+    return null;
+  }
   let offset = 2; // Skip SOI marker (0xFFD8)
 
   while (offset < view.byteLength - 8) {

@@ -13,6 +13,8 @@ import { generatePresignedGetUrl, generatePresignedPutUrl } from '../../lib/r2/p
 import {
   applyCubeLutToRgba,
   extractJpegDimensions,
+  extractPngDimensions,
+  extractWebpDimensions,
   parseCubeLut,
   validateImageMagicBytes,
 } from '../../lib/images';
@@ -23,6 +25,7 @@ import {
 
 const PRESIGN_TTL_SECONDS = 300; // 5 minutes
 const PREVIEW_MAX_WIDTH = 1200;
+const PREVIEW_MAX_HEIGHT = 1200;
 const PREVIEW_JPEG_QUALITY = 85;
 const PREVIEW_MAX_PIXELS = 20_000_000; // guard against huge images (e.g. > ~20MP)
 const ALLOWED_REFERENCE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -111,6 +114,30 @@ const safeEncodeJpegBytes = Result.fromThrowable(
   (cause): HandlerError => ({ code: 'UNPROCESSABLE', message: 'Failed to encode JPEG', cause }),
 );
 
+async function transformToPreviewJpeg(params: {
+  images: ImagesBinding;
+  bytes: Uint8Array;
+}): Promise<Uint8Array> {
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(params.bytes);
+      controller.close();
+    },
+  });
+
+  const response = await params.images
+    .input(stream)
+    .transform({
+      width: PREVIEW_MAX_WIDTH,
+      height: PREVIEW_MAX_HEIGHT,
+      fit: 'scale-down',
+    })
+    .output({ format: 'image/jpeg', quality: PREVIEW_JPEG_QUALITY });
+
+  const buf = await response.response().arrayBuffer();
+  return new Uint8Array(buf);
+}
+
 function generatePreviewJpegBytes(params: {
   sampleBytes: Uint8Array;
   lutText: string;
@@ -125,13 +152,19 @@ function generatePreviewJpegBytes(params: {
     });
   }
 
+  if (magic.detectedType !== 'image/jpeg') {
+    return err({
+      code: 'UNPROCESSABLE',
+      message: 'Preview sample must be JPEG (internal)',
+    });
+  }
+
   const parsed = parseCubeLut(params.lutText);
   if (parsed.isErr()) {
     return err({ code: 'UNPROCESSABLE', message: parsed.error.message });
   }
 
-  // Best-effort preflight dimension checks to reduce OOM risk.
-  // (We may still decode to read dimensions for formats we can't parse.)
+  // Preflight dimension checks before decode.
   const sampleBuffer = params.sampleBytes.buffer.slice(
     params.sampleBytes.byteOffset,
     params.sampleBytes.byteOffset + params.sampleBytes.byteLength,
@@ -691,8 +724,54 @@ export const studioLutsRouter = new Hono<Env>()
           ),
         );
 
+        const magic = validateImageMagicBytes(sampleBytes.slice(0, 16));
+        if (!magic.valid || !magic.detectedType) {
+          return err<never, HandlerError>({
+            code: 'UNPROCESSABLE',
+            message: 'Invalid image format (magic bytes check failed)',
+          });
+        }
+
+        // Preflight pixel limit before any Worker-side decode.
+        // For formats where we can cheaply parse dimensions, do it first.
+        const sampleBuffer = sampleBytes.buffer.slice(
+          sampleBytes.byteOffset,
+          sampleBytes.byteOffset + sampleBytes.byteLength,
+        ) as ArrayBuffer;
+
+        const dims =
+          magic.detectedType === 'image/jpeg'
+            ? extractJpegDimensions(sampleBuffer)
+            : magic.detectedType === 'image/png'
+              ? extractPngDimensions(sampleBytes)
+              : magic.detectedType === 'image/webp'
+                ? extractWebpDimensions(sampleBytes)
+                : null;
+
+        if (dims && dims.width * dims.height > PREVIEW_MAX_PIXELS) {
+          return err<never, HandlerError>({
+            code: 'UNPROCESSABLE',
+            message: `Image is too large (${dims.width}x${dims.height}). Please upload a smaller sample for preview.`,
+          });
+        }
+
+        // To avoid Worker OOM on highly-compressible PNG/WebP, transform to a bounded JPEG first.
+        const previewJpegBytes =
+          magic.detectedType === 'image/jpeg' && dims
+            ? sampleBytes
+            : new Uint8Array(
+                yield* ResultAsync.fromPromise(
+                  transformToPreviewJpeg({ images: c.env.IMAGES, bytes: sampleBytes }),
+                  (cause): HandlerError => ({
+                    code: 'BAD_GATEWAY',
+                    message: 'Failed to transform sample image for preview',
+                    cause,
+                  }),
+                ),
+              );
+
         const jpeg = yield* generatePreviewJpegBytes({
-          sampleBytes,
+          sampleBytes: previewJpegBytes,
           lutText,
           intensity,
           includeLuminance,
