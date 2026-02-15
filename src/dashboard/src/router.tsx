@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate, Outlet } from 'react-router';
+
 import { SignedIn, SignedOut } from '@/auth/react';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { SignInPage } from './routes/sign-in';
@@ -20,7 +21,6 @@ import SlideshowPreviewPage from './routes/events/[id]/slideshow/preview';
 import StudioLutsPage from './routes/studio/luts';
 import StudioLutPreviewPage from './routes/studio/luts/preview';
 import { SidebarLayout } from './components/shell/sidebar-layout';
-
 export const router = createBrowserRouter([
   // Public routes
   {

@@ -15,7 +15,7 @@ import { Alert } from '@/shared/components/ui/alert';
 import { Spinner } from '@/shared/components/ui/spinner';
 import { Field, FieldLabel, FieldError } from '@/shared/components/ui/field';
 import { eventFormSchema, type EventFormData } from '../../lib/event-form-schema';
-import { useCreateEvent } from '../../hooks/events/useCreateEvent';
+import { useCreateEvent } from '@/shared/hooks/rq/events/use-create-event';
 
 interface CreateEventModalProps {
   open: boolean;

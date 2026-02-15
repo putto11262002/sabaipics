@@ -4,7 +4,7 @@ import { AuthProvider } from "@/auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { RouterProvider } from "react-router";
-import { Toaster } from "sonner";
+import { Toaster } from "@/shared/components/ui/sonner";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import "@/shared/styles/globals.css";
 import "sonner/dist/styles.css";
@@ -32,7 +32,7 @@ createRoot(document.getElementById("root")!).render(
         <TooltipProvider>
           <RouterProvider router={router} />
           <ReactQueryDevtools initialIsOpen={false} />
-          <Toaster position="top-center" />
+          <Toaster position="bottom-right" />
         </TooltipProvider>
       </QueryClientProvider>
     </AuthProvider>

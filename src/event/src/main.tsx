@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router';
-import { Toaster } from 'sonner';
+import { Toaster } from '@/shared/components/ui/sonner';
 import '@/shared/styles/globals.css';
 import 'react-photo-album/rows.css';
 import { router } from './router';
@@ -17,7 +17,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
-      <Toaster position="top-center" />
+      <Toaster position="bottom-right" />
     </QueryClientProvider>
   </StrictMode>,
 );
