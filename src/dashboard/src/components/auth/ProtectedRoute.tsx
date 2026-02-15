@@ -1,13 +1,6 @@
 import { useAuth } from "@/auth/react";
 import { Navigate, useLocation } from "react-router";
-import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/shared/components/ui/empty";
-import { Spinner } from "@/shared/components/ui/spinner";
+import { LogoMark } from "../icons/logo-mark";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 	const { isLoaded, isSignedIn } = useAuth();
@@ -15,17 +8,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 	if (!isLoaded) {
 		return (
-			<Empty className="min-h-screen">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<Spinner className="size-5" />
-					</EmptyMedia>
-					<EmptyTitle>Checking authentication...</EmptyTitle>
-					<EmptyDescription>
-						Verifying your session. Please wait a moment.
-					</EmptyDescription>
-				</EmptyHeader>
-			</Empty>
+			<div className="flex min-h-screen flex-col items-center justify-center gap-4">
+				<LogoMark className="size-20 text-primary animate-pulse" />
+				<span className="text-lg font-semibold text-foreground">FrameFast</span>
+			</div>
 		);
 	}
 

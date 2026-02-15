@@ -75,8 +75,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     <Sidebar {...props}>
       <SidebarHeader>
         <a href="/dashboard" className="flex items-center gap-2 p-2">
-          <LogoMark className="size-6" />
-          <span className="font-medium">SabaiPics</span>
+          <LogoMark className="size-6 text-primary" />
+          <span className="font-medium">FrameFast</span>
         </a>
       </SidebarHeader>
       <SidebarContent>
