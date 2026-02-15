@@ -1,27 +1,22 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
+
+type DeleteLogoResponse = InferResponseType<
+  typeof api.events[':id']['logo']['$delete'],
+  SuccessStatusCode
+>;
 
 export function useDeleteLogo() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (eventId: string) => {
-      const response = await api.events[':id'].logo.$delete({
-        param: { id: eventId },
-      });
-
-      if (!response.ok) {
-        const error = new Error('Failed to delete logo') as Error & { status: number };
-        error.status = response.status;
-        throw error;
-      }
-
-      const json = await response.json();
-      return json.data;
-    },
+  return useApiMutation<DeleteLogoResponse, string>({
+    apiFn: (eventId, opts) =>
+      api.events[':id'].logo.$delete({ param: { id: eventId } }, opts),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['event'] });
-      queryClient.invalidateQueries({ queryKey: ['logo'] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
     },
   });
 }

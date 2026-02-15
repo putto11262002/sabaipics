@@ -1,79 +1,41 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 import type { InferResponseType, InferRequestType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
 
 const getConfig = api.events[':id']['slideshow-config'].$get;
 const putConfig = api.events[':id']['slideshow-config'].$put;
 
-export type SlideshowConfigResponse = InferResponseType<typeof getConfig, 200>;
+type SlideshowConfigResponse = InferResponseType<typeof getConfig, SuccessStatusCode>;
+type UpdateSlideshowConfigResponse = InferResponseType<typeof putConfig, SuccessStatusCode>;
+
+export type { SlideshowConfigResponse };
+
+export type UpdateSlideshowConfigInput = InferRequestType<typeof putConfig>['json'];
 
 export function useSlideshowConfig(eventId: string | undefined) {
-  return useQuery({
-    queryKey: ['event', eventId, 'slideshow-config'],
-    queryFn: async () => {
-      if (!eventId) {
-        throw new Error('Event ID is required');
-      }
-
-      const res = await getConfig(
-        {
-          param: { id: eventId },
-        },
-        {
-          init: {
-            credentials: 'include',
-          },
-        },
-      );
-
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error('Event not found');
-        }
-        throw new Error(`Failed to fetch slideshow config: ${res.status}`);
-      }
-
-      return (await res.json()) as SlideshowConfigResponse;
-    },
+  return useApiQuery<SlideshowConfigResponse>({
+    queryKey: ['events', 'detail', eventId, 'slideshow-config'],
+    apiFn: (opts) => getConfig({ param: { id: eventId! } }, opts),
     enabled: !!eventId,
     refetchOnWindowFocus: !import.meta.env.DEV,
     refetchOnMount: false,
-    staleTime: 1000 * 60,
+    staleTime: 1000 * 60, // 1 minute
   });
 }
 
 export function useUpdateSlideshowConfig(eventId: string | undefined) {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (config: InferRequestType<typeof putConfig>['json']) => {
-      if (!eventId) {
-        throw new Error('Event ID is required');
-      }
-
-      const res = await putConfig(
-        {
-          param: { id: eventId },
-          json: config,
-        },
-        {
-          init: {
-            credentials: 'include',
-          },
-        },
-      );
-
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error('Event not found');
-        }
-        throw new Error(`Failed to save slideshow config: ${res.status}`);
-      }
-
-      return (await res.json()) as InferResponseType<typeof putConfig, 200>;
-    },
+  return useApiMutation<UpdateSlideshowConfigResponse, UpdateSlideshowConfigInput>({
+    apiFn: (config, opts) =>
+      putConfig({ param: { id: eventId! }, json: config }, opts),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['event', eventId, 'slideshow-config'] });
+      queryClient.invalidateQueries({
+        queryKey: ['events', 'detail', eventId, 'slideshow-config'],
+      });
     },
   });
 }

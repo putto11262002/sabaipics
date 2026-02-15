@@ -1,51 +1,43 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, useApiClient } from '../../lib/api';
+import { api } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
 
-const putColorGrade = api.events[':id']['color-grade'].$put;
+type UpdateColorGradeResponse = InferResponseType<
+  typeof api.events[':id']['color-grade']['$put'],
+  SuccessStatusCode
+>;
+
+export type UpdateColorGradeInput = {
+  eventId: string;
+  enabled: boolean;
+  lutId: string | null;
+  intensity: number;
+  includeLuminance: boolean;
+};
 
 export function useUpdateEventColorGrade() {
   const queryClient = useQueryClient();
-  const { getToken } = useApiClient();
 
-  return useMutation({
-    mutationFn: async ({
-      eventId,
-      enabled,
-      lutId,
-      intensity,
-      includeLuminance,
-    }: {
-      eventId: string;
-      enabled: boolean;
-      lutId: string | null;
-      intensity: number;
-      includeLuminance: boolean;
-    }) => {
-      const token = await getToken();
-      const res = await putColorGrade(
+  return useApiMutation<UpdateColorGradeResponse, UpdateColorGradeInput>({
+    apiFn: (input, opts) =>
+      api.events[':id']['color-grade'].$put(
         {
-          param: { id: eventId },
-          json: { enabled, lutId, intensity, includeLuminance },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
+          param: { id: input.eventId },
+          json: {
+            enabled: input.enabled,
+            lutId: input.lutId,
+            intensity: input.intensity,
+            includeLuminance: input.includeLuminance,
           },
         },
-      );
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
-          error?: { message?: string };
-        } | null;
-        throw new Error(body?.error?.message || 'Failed to save color grade settings');
-      }
-
-      const json = await res.json();
-      return json.data;
-    },
+        opts,
+      ),
     onSuccess: (_data, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['event', vars.eventId, 'color-grade'] });
+      queryClient.invalidateQueries({
+        queryKey: ['events', 'detail', vars.eventId, 'color-grade'],
+      });
     },
   });
 }
