@@ -34,16 +34,11 @@ jobs:
 
       - name: Create Event Env
         run: |
-          echo "VITE_API_URL=https://api.framefast.io" > apps/event/.env.production
-          echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> apps/event/.env.production
-
-      # Build API first so tsc generates .d.ts files for hono client types
-      # Worker types come from committed worker-configuration.d.ts (generated locally)
-      - name: Build API
-        run: pnpm --filter=@sabaipics/api build
+          echo "VITE_API_URL=https://api.framefast.io" > src/event/.env.production
+          echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> src/event/.env.production
 
       - name: Build Event
-        run: pnpm --filter=@sabaipics/event build:prod
+        run: pnpm build:event -- --mode production
 
       - name: Deploy Event
-        run: pnpm --filter=@sabaipics/event exec wrangler pages deploy dist --project-name=event --branch=main
+        run: pnpm exec wrangler pages deploy src/event/dist --project-name=event --branch=main

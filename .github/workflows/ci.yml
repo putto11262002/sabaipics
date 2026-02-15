@@ -41,10 +41,11 @@ jobs:
 
       - run: pnpm install
 
-      - run: pnpm build
+      - name: Type Check
+        run: pnpm check-types
 
       - name: Run Tests
-        run: pnpm --filter=@sabaipics/api test:run
+        run: pnpm test:api
 
   ftp_server_build:
     name: Build FTP Server
@@ -56,7 +57,7 @@ jobs:
         with:
           filters: |
             ftp_server:
-              - 'apps/ftp-server/**'
+              - 'infra/ftp-server/**'
               - '.github/workflows/ci.yml'
 
       - uses: actions/checkout@v4
@@ -71,7 +72,7 @@ jobs:
       - name: Build FTP server
         if: steps.changes.outputs.ftp_server == 'true'
         run: go build ./...
-        working-directory: apps/ftp-server
+        working-directory: infra/ftp-server
 
   neon_preview_db:
     name: Neon Preview DB (Migrate)
@@ -122,7 +123,7 @@ jobs:
           api_key: ${{ env.NEON_API_KEY }}
 
       - name: Run Migrations
-        run: pnpm --filter=@sabaipics/db db:migrate
+        run: pnpm db:migrate
         if: steps.neon_enabled.outputs.enabled == 'true'
         env:
           DATABASE_URL: '${{ steps.neon.outputs.db_url }}'

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "types": ["node"]
+  },
+  "include": [
+    "src/sabaiface/src/**/*",
+    "src/db/**/*",
+    "src/face-eval/**/*"
+  ],
+  "exclude": ["**/node_modules", "**/dist"]
+}

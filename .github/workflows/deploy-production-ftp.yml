@@ -29,8 +29,8 @@ jobs:
       - name: Build and push FTP server image
         uses: docker/build-push-action@v6
         with:
-          context: apps/ftp-server
-          file: apps/ftp-server/Dockerfile
+          context: infra/ftp-server
+          file: infra/ftp-server/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ secrets.GHCR_USER }}/sabaipics-ftp-server:${{ github.sha }}

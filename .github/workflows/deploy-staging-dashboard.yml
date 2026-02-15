@@ -4,13 +4,11 @@ on:
   push:
     branches: [master]
     paths:
-      - 'apps/dashboard/**'
-      - 'packages/ui/**'
-      - 'packages/uiv2/**'
-      - 'packages/auth/**'
+      - 'src/dashboard/**'
+      - 'src/ui/**'
+      - 'src/auth/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
-      - 'turbo.json'
       - '.github/workflows/deploy-staging-dashboard.yml'
 
   workflow_dispatch:
@@ -46,16 +44,11 @@ jobs:
 
       - name: Create Dashboard Env
         run: |
-          echo "VITE_API_URL=https://api-staging.framefast.io" > apps/dashboard/.env.staging
-          echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> apps/dashboard/.env.staging
-
-      # Build API first so tsc generates .d.ts files for hono client types
-      # Worker types come from committed worker-configuration.d.ts (generated locally)
-      - name: Build API
-        run: pnpm --filter=@sabaipics/api build
+          echo "VITE_API_URL=https://api-staging.framefast.io" > src/dashboard/.env.staging
+          echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> src/dashboard/.env.staging
 
       - name: Build Dashboard
-        run: pnpm --filter=@sabaipics/dashboard build:staging
+        run: pnpm build:dashboard -- --mode staging
 
       - name: Deploy Dashboard
-        run: pnpm --filter=@sabaipics/dashboard exec wrangler deploy --env staging
+        run: pnpm exec wrangler deploy --env staging -c wrangler.dashboard.jsonc

@@ -4,13 +4,11 @@ on:
   push:
     branches: [master]
     paths:
-      - 'apps/event/**'
-      - 'packages/ui/**'
-      - 'packages/uiv2/**'
-      - 'packages/auth/**'
+      - 'src/event/**'
+      - 'src/ui-legacy/**'
+      - 'src/auth/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
-      - 'turbo.json'
       - '.github/workflows/deploy-staging-event.yml'
 
   workflow_dispatch:
@@ -47,16 +45,11 @@ jobs:
 
       - name: Create Event Env
         run: |
-          echo "VITE_API_URL=https://api-staging.framefast.io" > apps/event/.env.staging
-          echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> apps/event/.env.staging
-
-      # Build API first so tsc generates .d.ts files for hono client types
-      # Worker types come from committed worker-configuration.d.ts (generated locally)
-      - name: Build API
-        run: pnpm --filter=@sabaipics/api build
+          echo "VITE_API_URL=https://api-staging.framefast.io" > src/event/.env.staging
+          echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> src/event/.env.staging
 
       - name: Build Event
-        run: pnpm --filter=@sabaipics/event build:staging
+        run: pnpm build:event -- --mode staging
 
       - name: Deploy Event
-        run: pnpm --filter=@sabaipics/event exec wrangler pages deploy dist --project-name=event --branch=staging
+        run: pnpm exec wrangler pages deploy src/event/dist --project-name=event --branch=staging
