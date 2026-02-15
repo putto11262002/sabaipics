@@ -145,7 +145,7 @@ export function PhotoViewerSheet({
           </div>
           <Separator />
 
-          <div className="relative flex flex-1 items-center justify-center bg-background">
+          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-background">
             <Carousel
               className="w-full h-full [&_[data-slot=carousel-content]]:h-full [&_[data-slot=carousel-content]>div]:h-full"
               opts={{ startIndex: Math.max(index, 0), loop: false }}
@@ -167,32 +167,29 @@ export function PhotoViewerSheet({
               </CarouselContent>
 
               <div className="hidden md:block">
-                <CarouselPrevious variant="secondary" className="left-4 top-1/2 -translate-y-1/2" />
-                <CarouselNext variant="secondary" className="right-4 top-1/2 -translate-y-1/2" />
+                <CarouselPrevious variant="secondary" className="left-4 top-1/2 -translate-y-1/2 size-12 [&_svg]:size-6" />
+                <CarouselNext variant="secondary" className="right-4 top-1/2 -translate-y-1/2 size-12 [&_svg]:size-6" />
               </div>
             </Carousel>
 
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/20 to-transparent" />
           </div>
 
-          <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center justify-between px-4 py-3 md:hidden">
             <Button
               variant="ghost"
-              size="sm"
               onClick={() => api?.scrollPrev()}
               disabled={!api?.canScrollPrev()}
             >
-              <ArrowLeft className="mr-2 size-4" />
+              <ArrowLeft className="mr-2 size-5" />
               Prev
             </Button>
             <Button
               variant="ghost"
-              size="sm"
               onClick={() => api?.scrollNext()}
               disabled={!api?.canScrollNext()}
             >
               Next
-              <ArrowRight className="ml-2 size-4" />
+              <ArrowRight className="ml-2 size-5" />
             </Button>
           </div>
         </div>

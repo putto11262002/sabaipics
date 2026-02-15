@@ -139,7 +139,7 @@ export default function EventPhotosTab() {
           </div>
         ) : (
           <Button size="sm" variant="outline" onClick={() => setIsSelectionMode(true)}>
-            <CheckSquare className="size-4 mr-1" />
+            <CheckSquare className="mr-1 size-3" />
             Select
           </Button>
         )}
@@ -155,8 +155,8 @@ export default function EventPhotosTab() {
                 deleteMutation.isPending
               }
             >
-              <Download className="size-4 mr-1" />
-              {downloadMutation.isPending ? 'Downloading...' : 'Download'}
+              {downloadMutation.isPending ? <Spinner className="mr-1 size-3" /> : <Download className="mr-1 size-3" />}
+              Download
             </Button>
             <Button
               size="sm"
@@ -168,8 +168,8 @@ export default function EventPhotosTab() {
                 deleteMutation.isPending
               }
             >
-              <Trash2 className="size-4 mr-1" />
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              {deleteMutation.isPending ? <Spinner className="mr-1 size-3" /> : <Trash2 className="mr-1 size-3" />}
+              Delete
             </Button>
           </>
         </div>
