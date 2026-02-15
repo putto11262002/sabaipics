@@ -85,7 +85,7 @@ variable "cors_max_age_seconds" {
 # ------------------------------------------------------------------------------
 
 variable "queues" {
-  type = map(string)
+  type        = map(string)
   description = "Map of queue logical names to actual queue names"
   # Example:
   # {

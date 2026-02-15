@@ -43,9 +43,9 @@ provider "infisical" {
 module "cloudflare_infra" {
   source = "../../modules/cloudflare-infra"
 
-  account_id   = var.account_id
-  environment  = var.environment
-  zone_id      = var.zone_id
+  account_id  = var.account_id
+  environment = var.environment
+  zone_id     = var.zone_id
 
   # R2 Bucket
   photos_bucket_name     = var.photos_bucket_name

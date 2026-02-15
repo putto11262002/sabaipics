@@ -44,6 +44,8 @@ queues = {
   upload_processing_dlq   = "upload-processing-dlq-staging"
   logo_processing         = "logo-processing-staging"
   logo_processing_dlq     = "logo-processing-dlq-staging"
+  lut_processing          = "lut-processing-staging"
+  lut_processing_dlq      = "lut-processing-dlq-staging"
 }
 
 # ------------------------------------------------------------------------------
@@ -61,5 +63,10 @@ bucket_notifications = [
     prefix      = "logos/"
     queue_key   = "logo_processing"
     description = "Trigger logo processing on new logos"
+  },
+  {
+    prefix      = "lut-uploads/"
+    queue_key   = "lut_processing"
+    description = "Trigger LUT processing on new LUT uploads"
   }
 ]
