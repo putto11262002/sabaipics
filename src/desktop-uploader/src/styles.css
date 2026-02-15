@@ -1,0 +1,17 @@
+@import '@/ui/styles/globals.css';
+
+body {
+  margin: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* @supports (-webkit-touch-callout: none) { */
+/*   body { */
+/*     padding-top: 24px; */
+/*   } */
+/* } */

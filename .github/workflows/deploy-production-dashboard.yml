@@ -34,16 +34,11 @@ jobs:
 
       - name: Create Dashboard Env
         run: |
-          echo "VITE_API_URL=https://api.framefast.io" > apps/dashboard/.env.production
-          echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> apps/dashboard/.env.production
-
-      # Build API first so tsc generates .d.ts files for hono client types
-      # Worker types come from committed worker-configuration.d.ts (generated locally)
-      - name: Build API
-        run: pnpm --filter=@sabaipics/api build
+          echo "VITE_API_URL=https://api.framefast.io" > src/dashboard/.env.production
+          echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> src/dashboard/.env.production
 
       - name: Build Dashboard
-        run: pnpm --filter=@sabaipics/dashboard build:prod
+        run: pnpm build:dashboard -- --mode production
 
       - name: Deploy Dashboard
-        run: pnpm --filter=@sabaipics/dashboard exec wrangler deploy --env production
+        run: pnpm exec wrangler deploy --env production -c wrangler.dashboard.jsonc

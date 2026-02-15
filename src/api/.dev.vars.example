@@ -1,0 +1,79 @@
+# Local development overrides
+# Copy this file to .dev.vars and fill in your values
+# Note: CORS_ORIGIN and AUTHORIZED_PARTIES are in wrangler.jsonc
+
+# Clerk Secrets (get from Clerk Dashboard → API Keys)
+CLERK_SECRET_KEY=sk_test_xxxxx
+CLERK_PUBLISHABLE_KEY=pk_test_xxxxx
+
+# Clerk JWT Public Key for networkless verification
+# Get from: Clerk Dashboard → API Keys → Show JWT public key
+# Format: Single line with \n escape characters
+CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\nYOUR_PUBLIC_KEY_HERE\n-----END PUBLIC KEY-----"
+
+# Clerk Webhook Signing Secret
+# Get from: Clerk Dashboard → Webhooks → Add Endpoint → Copy Signing Secret
+# Format: whsec_xxxxx
+CLERK_WEBHOOK_SIGNING_SECRET=whsec_xxxxx
+
+# Frontend URLs (configured in apps/api/wrangler.jsonc vars)
+# You normally don't need to set these in .dev.vars.
+# DASHBOARD_FRONTEND_URL=http://localhost:5173
+# EVENT_FRONTEND_URL=http://localhost:5174
+
+# Neon Database Connection String
+# Get from: Neon Console → Dashboard → Connection Details → Connection String
+# Format: postgres://user:password@host/database?sslmode=require
+DATABASE_URL=postgresql://user:password@host/database?sslmode=require
+
+# Face Recognition Provider Configuration
+# FACE_PROVIDER: 'aws' (default) or 'sabaiface' (for local development)
+# When using sabaiface, set SABAIFACE_ENDPOINT to the local server URL
+FACE_PROVIDER=sabaiface
+SABAIFACE_ENDPOINT=http://localhost:8086
+
+# AWS Credentials for Rekognition (required when FACE_PROVIDER=aws)
+# Get from: AWS IAM Console → Users → Security Credentials
+AWS_ACCESS_KEY_ID=AKIAXXXXXXXXXX
+AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
+AWS_REGION=us-west-2
+
+# Stripe Secret Key (get from Stripe Dashboard → Developers → API Keys)
+# Use TEST mode keys for development (sk_test_xxx)
+# IMPORTANT: NEVER use live keys (sk_live_xxx) in development!
+# Note: Publishable key (pk_test_xxx) is for frontend only, not needed here
+STRIPE_SECRET_KEY=sk_test_xxxxx
+
+# Stripe Webhook Signing Secret
+# Get from: Stripe Dashboard → Developers → Webhooks → Add Endpoint → Copy Signing Secret
+# For local testing with Stripe CLI: stripe listen --forward-to localhost:8787/webhooks/stripe
+# Format: whsec_xxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxx
+
+# Admin API Key (for admin routes)
+# Generate a secure random string for admin operations
+ADMIN_API_KEY=admin-dev-key-change-in-production
+
+# Desktop uploader auth (SabaiPics-issued desktop session)
+# - DESKTOP_ACCESS_JWT_SECRET: HS256 signing secret for short-lived desktop access JWTs
+# - DESKTOP_REFRESH_TOKEN_PEPPER: Secret pepper used to HMAC-hash one-time codes and refresh tokens
+DESKTOP_ACCESS_JWT_SECRET=desktop-access-jwt-secret-change-me
+DESKTOP_REFRESH_TOKEN_PEPPER=desktop-refresh-token-pepper-change-me
+
+# LINE Messaging API Credentials
+# Get from: LINE Developers Console → Your Channel → Basic settings / Messaging API tab
+# Channel Secret: Basic settings → Channel secret
+# Access Token: Messaging API → Channel access token (long-lived) → Issue
+LINE_CHANNEL_SECRET=xxxxx
+LINE_CHANNEL_ACCESS_TOKEN=xxxxx
+
+# Legacy notes (kept for reference)
+# - CF_DOMAIN / R2_BASE_URL were older names; runtime code now uses CF_ZONE + PHOTO_R2_BASE_URL.
+
+# R2 API Credentials for presigned URLs (optional, for download URL protection)
+# Get from: Cloudflare Dashboard → R2 → Manage R2 API Tokens
+# Create API Token with permissions: Object Read & Write for your bucket
+# Note: Only needed if using presigned URLs for downloads
+R2_ACCESS_KEY_ID=xxxxxxxxxxxxxxxxxxxx
+R2_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+CF_ACCOUNT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

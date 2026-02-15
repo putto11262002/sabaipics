@@ -2,6 +2,7 @@
 
 # Dependencies
 node_modules
+.turbo
 .pnp
 .pnp.js
 
@@ -19,9 +20,6 @@ node_modules
 
 # Testing
 coverage
-
-# Turbo
-.turbo
 
 # Vercel
 .vercel
@@ -53,48 +51,48 @@ yarn-error.log*
 
 # Xcode
 ## User settings
-apps/studio/**/*.xcodeproj/xcuserdata/
-apps/studio/**/*.xcodeproj/project.xcworkspace/xcuserdata/
+studio/**/*.xcodeproj/xcuserdata/
+studio/**/*.xcodeproj/project.xcworkspace/xcuserdata/
 
 # Local (developer-specific) Studio config
-apps/studio/Config/Studio.Local.xcconfig
+studio/Config/Studio.Local.xcconfig
 
 ## Local Studio config overrides
 # (If you add additional local-only config files, ignore them here.)
-apps/studio/Studio.Local.xcconfig
+studio/Studio.Local.xcconfig
 
 ## Build generated
-apps/studio/build/
-apps/studio/DerivedData/
+studio/build/
+studio/DerivedData/
 
 ## Various settings
-apps/studio/**/*.pbxuser
-apps/studio/**/*.mode1v3
-apps/studio/**/*.mode2v3
-apps/studio/**/*.perspectivev3
-!apps/studio/**/*.xcodeproj/project.pbxproj
-!apps/studio/**/*.xcodeproj/xcshareddata/
-!apps/studio/**/*.xcworkspace/contents.xcworkspacedata
+studio/**/*.pbxuser
+studio/**/*.mode1v3
+studio/**/*.mode2v3
+studio/**/*.perspectivev3
+!studio/**/*.xcodeproj/project.pbxproj
+!studio/**/*.xcodeproj/xcshareddata/
+!studio/**/*.xcworkspace/contents.xcworkspacedata
 
 ## Other
-apps/studio/**/*.moved-aside
-apps/studio/**/*.xccheckout
-apps/studio/**/*.xcscmblueprint
+studio/**/*.moved-aside
+studio/**/*.xccheckout
+studio/**/*.xcscmblueprint
 
 ## Swift Package Manager
-apps/studio/.swiftpm/
-apps/studio/.build/
+studio/.swiftpm/
+studio/.build/
 
 # Syncthing temp files
 **/.syncthing.*.tmp
 
 # Eval run outputs (keep .gitkeep)
-packages/face-eval/runs/*.json
-packages/face-eval/runs/*.csv
-!packages/face-eval/runs/.gitkeep
+src/face-eval/runs/*.json
+src/face-eval/runs/*.csv
+!src/face-eval/runs/.gitkeep
 
 # Eval dataset cache (downloaded from R2)
-packages/face-eval/data/
+src/face-eval/data/
 
 opencode.json
 
