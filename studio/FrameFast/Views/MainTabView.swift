@@ -77,8 +77,10 @@ struct MainTabView: View {
         .sheet(isPresented: $captureSessionStore.isDetailsPresented) {
             CaptureSessionSheetView(
                 cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
+                eventName: coordinator.selectedEventName,
                 startedAt: captureSessionStore.stats.startedAt,
                 downloadsCount: captureSessionStore.stats.downloadsCount,
+                syncedCount: sheetSyncedCount,
                 lastFilename: captureSessionStore.stats.lastFilename,
                 recentDownloads: captureSessionStore.recentDownloads,
                 captureSession: captureSessionStore.captureSession,
@@ -95,6 +97,16 @@ struct MainTabView: View {
     private var isDisconnecting: Bool {
         if case .connecting = captureSessionStore.state { return true }
         return false
+    }
+
+    private var sheetSyncedCount: Int {
+        guard let session = captureSessionStore.captureSession else { return 0 }
+        return session.photos.reduce(into: 0) { acc, photo in
+            guard case .completed = photo.status else { return }
+            guard let jobId = photo.uploadJobId else { return }
+            guard uploadStatusStore.stateByJobId[jobId] == .completed else { return }
+            acc += 1
+        }
     }
 
     private var statusForBar: CaptureStatusBarView.Status {

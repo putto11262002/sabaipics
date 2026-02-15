@@ -5,8 +5,10 @@ import SwiftUI
 
 struct CaptureSessionSheetView: View {
     let cameraName: String
+    let eventName: String?
     let startedAt: Date?
     let downloadsCount: Int
+    let syncedCount: Int
     let lastFilename: String?
     let recentDownloads: [CaptureSessionStore.DownloadItem]
     let captureSession: CaptureUISink?
@@ -20,11 +22,8 @@ struct CaptureSessionSheetView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                sessionStats
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 12)
-                    .background(Color.Theme.background)
+                sessionInfoList
+                    .padding(.top, 8)
 
                 if let captureSession {
                     CaptureSessionPhotosView(session: captureSession)
@@ -44,24 +43,12 @@ struct CaptureSessionSheetView: View {
                         Spacer()
                     }
                     .frame(maxWidth: .infinity)
-                    .background(Color.Theme.background)
+                    .background(Color(.systemBackground))
                 }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(titleStatusColor)
-                            .frame(width: 10, height: 10)
-
-                        Text(cameraName)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(Color.Theme.foreground)
-                            .lineLimit(1)
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         dismiss()
@@ -80,110 +67,79 @@ struct CaptureSessionSheetView: View {
         .tint(Color.Theme.primary)
     }
 
-    private var titleStatusColor: Color {
-        isDisconnecting ? Color.Theme.warning : Color.Theme.success
+    private var sessionInfoList: some View {
+        VStack(spacing: 0) {
+            sessionInfoRow(
+                icon: "calendar",
+                label: "Event",
+                value: eventName ?? "No event selected"
+            )
+
+            Divider().padding(.leading, 44)
+
+            sessionInfoRow(
+                icon: "camera",
+                label: "Camera",
+                value: cameraName
+            )
+
+            Divider().padding(.leading, 44)
+
+            sessionInfoRow(
+                icon: "arrow.down.circle",
+                label: "Downloaded",
+                value: "\(downloadsCount)"
+            )
+
+            Divider().padding(.leading, 44)
+
+            sessionInfoRow(
+                icon: "checkmark.icloud",
+                label: "Synced",
+                value: "\(syncedCount)"
+            )
+        }
+        .background(Color(.systemBackground))
     }
 
-    private var sessionStats: some View {
+    private func sessionInfoRow(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 12) {
-            durationCard
-            statCard(title: "Downloaded", value: "\(downloadsCount)")
-        }
-    }
+            Image(systemName: icon)
+                .font(.system(size: 15))
+                .foregroundStyle(Color.Theme.mutedForeground)
+                .frame(width: 20)
 
-    private var durationCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Duration")
-                .font(.caption)
+            Text(label)
+                .font(.subheadline)
                 .foregroundStyle(Color.Theme.mutedForeground)
 
-            TimelineView(.periodic(from: .now, by: 60)) { context in
-                Text(formattedDuration(now: context.date))
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(Color.Theme.foreground)
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.Theme.border, lineWidth: 1)
-        )
-    }
-
-    private func statCard(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(Color.Theme.mutedForeground)
+            Spacer()
 
             Text(value)
-                .font(.title3.weight(.semibold))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(Color.Theme.foreground)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.Theme.border, lineWidth: 1)
-        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
     }
 
-
     private var bottomActions: some View {
-        HStack {
-            Button {
-                onDisconnect()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text(isDisconnecting ? "Disconnecting…" : "Disconnect")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .foregroundStyle(Color.Theme.destructive)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity)
-                .background(Color.Theme.destructive.opacity(0.12))
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(Color.Theme.destructive.opacity(0.35), lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(isDisconnecting)
+        Button {
+            onDisconnect()
+        } label: {
+            Text(isDisconnecting ? "Disconnecting…" : "Disconnect")
         }
+        .buttonStyle(.destructiveSecondary)
+        .disabled(isDisconnecting)
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 12)
         .background(
-            Color.Theme.background
+            Color(.systemBackground)
                 .ignoresSafeArea()
         )
     }
 
-    private var startedAtText: String {
-        guard let startedAt else { return "—" }
-        return startedAt.formatted(date: .abbreviated, time: .shortened)
-    }
-
-    private func formattedDuration(now: Date) -> String {
-        guard let startedAt else { return "—" }
-        let seconds = Int(now.timeIntervalSince(startedAt))
-        let minutes = max(0, seconds / 60)
-        if minutes < 60 {
-            return "\(minutes)m"
-        }
-        let hours = minutes / 60
-        let rem = minutes % 60
-        return "\(hours)h \(rem)m"
-    }
 }
 
 private struct CaptureSessionPhotosView: View {
@@ -213,7 +169,7 @@ private struct CaptureSessionPhotosView: View {
                 }
             }
         }
-        .background(Color.Theme.background)
+        .background(Color(.systemBackground))
         .animation(.easeOut(duration: 0.4), value: session.photos.count)
         .overlay {
             if session.isDisconnecting {
@@ -250,7 +206,7 @@ private struct CaptureSessionPhotosView: View {
         .padding(.top, 10)
         .padding(.bottom, session.skippedRawCount > 0 && session.showRawSkipBanner ? 10 : 0)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.Theme.background)
+        .background(Color(.systemBackground))
     }
 
     private var emptyState: some View {
@@ -307,16 +263,145 @@ private struct CaptureSessionPhotosView: View {
 #if DEBUG
 
 #Preview("Capture Session Sheet") {
-    CaptureSessionSheetView(
-        cameraName: "Sony A7 IV",
-        startedAt: Date().addingTimeInterval(-420),
-        downloadsCount: 12,
-        lastFilename: "DSC01234.JPG",
-        recentDownloads: [],
-        captureSession: nil,
-        isDisconnecting: false,
-        onDisconnect: {}
-    )
+    struct SheetPreview: View {
+        @State private var isPresented = true
+
+        var body: some View {
+            let sink = CaptureUISink(startedAt: Date().addingTimeInterval(-420))
+            let photos = Self.mockPhotos()
+            let uploadStore = UploadStatusStore(mockStateByJobId: Self.mockJobStates())
+
+            let _ = {
+                sink.photos = photos
+                sink.completedDownloadsCount = photos.filter {
+                    if case .completed = $0.status { return true }
+                    return false
+                }.count
+            }()
+
+            Color(.systemBackground)
+                .ignoresSafeArea()
+                .sheet(isPresented: $isPresented) {
+                    CaptureSessionSheetView(
+                        cameraName: "Sony A7 IV",
+                        eventName: "Bangkok Wedding",
+                        startedAt: Date().addingTimeInterval(-420),
+                        downloadsCount: sink.completedDownloadsCount,
+                        syncedCount: 2,
+                        lastFilename: "DSC01234.JPG",
+                        recentDownloads: [],
+                        captureSession: sink,
+                        isDisconnecting: false,
+                        onDisconnect: {}
+                    )
+                    .environmentObject(uploadStore)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                }
+        }
+
+        static func mockPhotos() -> [CapturedPhoto] {
+            // 1. Downloading (placeholder)
+            let downloading = CapturedPhoto(
+                id: "00000001",
+                name: "DSC01240.JPG",
+                captureDate: Date().addingTimeInterval(-10),
+                fileSize: 8_500_000,
+                isDownloading: true
+            )
+
+            // 2. Downloaded, queued for upload
+            let queued = CapturedPhoto(
+                id: "00000002",
+                name: "DSC01239.JPG",
+                captureDate: Date().addingTimeInterval(-30),
+                fileSize: 7_200_000,
+                isDownloading: false
+            )
+            queued.status = .completed
+            queued.uploadJobId = "job-queued"
+
+            // 3. Uploading
+            let uploading = CapturedPhoto(
+                id: "00000003",
+                name: "DSC01238.JPG",
+                captureDate: Date().addingTimeInterval(-60),
+                fileSize: 6_800_000,
+                isDownloading: false
+            )
+            uploading.status = .completed
+            uploading.uploadJobId = "job-uploading"
+
+            // 4. Awaiting completion (server processing)
+            let awaiting = CapturedPhoto(
+                id: "00000004",
+                name: "DSC01237.JPG",
+                captureDate: Date().addingTimeInterval(-120),
+                fileSize: 9_100_000,
+                isDownloading: false
+            )
+            awaiting.status = .completed
+            awaiting.uploadJobId = "job-awaiting"
+
+            // 5. Fully synced
+            let synced = CapturedPhoto(
+                id: "00000005",
+                name: "DSC01236.JPG",
+                captureDate: Date().addingTimeInterval(-180),
+                fileSize: 5_400_000,
+                isDownloading: false
+            )
+            synced.status = .completed
+            synced.uploadJobId = "job-completed"
+
+            // 6. Upload failed (retryable)
+            let failed = CapturedPhoto(
+                id: "00000006",
+                name: "DSC01235.JPG",
+                captureDate: Date().addingTimeInterval(-240),
+                fileSize: 7_000_000,
+                isDownloading: false
+            )
+            failed.status = .completed
+            failed.uploadJobId = "job-failed"
+
+            // 7. Terminal failure
+            let terminal = CapturedPhoto(
+                id: "00000007",
+                name: "DSC01234.JPG",
+                captureDate: Date().addingTimeInterval(-300),
+                fileSize: 8_000_000,
+                isDownloading: false
+            )
+            terminal.status = .completed
+            terminal.uploadJobId = "job-terminal"
+
+            // 8. Download failed
+            let dlFailed = CapturedPhoto(
+                id: "00000008",
+                name: "DSC01233.JPG",
+                captureDate: Date().addingTimeInterval(-360),
+                fileSize: 6_500_000,
+                isDownloading: false
+            )
+            dlFailed.status = .failed(NSError(domain: "preview", code: 0))
+
+            return [downloading, queued, uploading, awaiting, synced, failed, terminal, dlFailed]
+        }
+
+        static func mockJobStates() -> [String: UploadJobState] {
+            [
+                "job-queued": .queued,
+                "job-uploading": .uploading,
+                "job-awaiting": .awaitingCompletion,
+                "job-completed": .completed,
+                "job-failed": .failed,
+                "job-terminal": .terminalFailed,
+            ]
+        }
+    }
+
+    return SheetPreview()
 }
 
 #endif
