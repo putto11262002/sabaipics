@@ -4,30 +4,30 @@ import {
   getCoreRowModel,
   createColumnHelper,
 } from '@tanstack/react-table';
-import { Badge } from '@/ui/components/ui/badge';
+import { Badge } from '@/shared/components/ui/badge';
 import {
   Card,
   CardHeader,
   CardTitle,
   CardContent,
   CardDescription,
-} from '@/ui/components/ui/card';
-import { Skeleton } from '@/ui/components/ui/skeleton';
+} from '@/shared/components/ui/card';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/components/ui/select';
-import { ToggleGroup, ToggleGroupItem } from '@/ui/components/toggle-group';
+} from '@/shared/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/shared/components/ui/toggle-group';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from '@/ui/components/ui/chart';
+} from '@/shared/components/ui/chart';
 import { format, parseISO, subDays, eachDayOfInterval } from 'date-fns';
 import { DataTable } from '../../components/events-table/data-table';
 import { DataTablePagination } from '../../components/events-table/data-table-pagination';

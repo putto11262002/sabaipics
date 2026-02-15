@@ -8,12 +8,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/ui/components/ui/dialog';
-import { Button } from '@/ui/components/ui/button';
-import { Input } from '@/ui/components/ui/input';
-import { Alert } from '@/ui/components/ui/alert';
-import { Spinner } from '@/ui/components/ui/spinner';
-import { Field, FieldLabel, FieldError } from '@/ui/components/ui/field';
+} from '@/shared/components/ui/dialog';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Alert } from '@/shared/components/ui/alert';
+import { Spinner } from '@/shared/components/ui/spinner';
+import { Field, FieldLabel, FieldError } from '@/shared/components/ui/field';
 import { eventFormSchema, type EventFormData } from '../../lib/event-form-schema';
 import { useCreateEvent } from '../../hooks/events/useCreateEvent';
 

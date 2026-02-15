@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useBlocker } from 'react-router';
 import { toast } from 'sonner';
-import { SidebarProvider, SidebarInset } from '@/ui/components/ui/sidebar';
-import { Spinner } from '@/ui/components/ui/spinner';
-import { Alert, AlertDescription } from '@/ui/components/ui/alert';
+import { SidebarProvider, SidebarInset } from '@/shared/components/ui/sidebar';
+import { Spinner } from '@/shared/components/ui/spinner';
+import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,7 +13,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/ui/components/ui/alert-dialog';
+} from '@/shared/components/ui/alert-dialog';
 import { AlertCircle } from 'lucide-react';
 import { PageHeader } from '../../../../components/shell/page-header';
 import { useEvent } from '../../../../hooks/events/useEvent';

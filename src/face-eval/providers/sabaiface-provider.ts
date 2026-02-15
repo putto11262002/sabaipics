@@ -126,7 +126,7 @@ export function createSabaiFaceProvider(config: SabaiFaceProviderConfig): FaceRe
       if (!response.ok) {
         let errorBody: HTTPErrorResponse = { message: response.statusText };
         try {
-          errorBody = await response.json();
+          errorBody = (await response.json()) as HTTPErrorResponse;
         } catch {
           // ignore
         }
@@ -167,7 +167,7 @@ export function createSabaiFaceProvider(config: SabaiFaceProviderConfig): FaceRe
       if (!response.ok) {
         let errorBody: HTTPErrorResponse = { message: response.statusText };
         try {
-          errorBody = await response.json();
+          errorBody = (await response.json()) as HTTPErrorResponse;
         } catch {
           // ignore
         }
@@ -191,7 +191,7 @@ export function createSabaiFaceProvider(config: SabaiFaceProviderConfig): FaceRe
       if (!response.ok) {
         let errorBody: HTTPErrorResponse = { message: response.statusText };
         try {
-          errorBody = await response.json();
+          errorBody = (await response.json()) as HTTPErrorResponse;
         } catch {
           // ignore
         }
@@ -215,7 +215,7 @@ export function createSabaiFaceProvider(config: SabaiFaceProviderConfig): FaceRe
       if (!response.ok) {
         let errorBody: HTTPErrorResponse = { message: response.statusText };
         try {
-          errorBody = await response.json();
+          errorBody = (await response.json()) as HTTPErrorResponse;
         } catch {
           // ignore
         }

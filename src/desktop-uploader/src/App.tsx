@@ -13,8 +13,8 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarSeparator,
-} from '@/ui/components/ui/sidebar';
-import { Button } from '@/ui/components/ui/button';
+} from '@/shared/components/ui/sidebar';
+import { Button } from '@/shared/components/ui/button';
 import { useAuth } from './auth/auth-context';
 import { useEvents } from './hooks/use-events';
 import {
@@ -24,15 +24,15 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/ui/components/ui/dialog';
-import { Input } from '@/ui/components/ui/input';
+} from '@/shared/components/ui/dialog';
+import { Input } from '@/shared/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/components/ui/select';
+} from '@/shared/components/ui/select';
 
 function AppShell() {
   const location = useLocation();

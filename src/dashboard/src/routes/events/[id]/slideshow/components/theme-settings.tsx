@@ -1,5 +1,5 @@
-import { Label } from '@/ui/components/ui/label';
-import { ColorPicker } from '@/ui/components/ui/color-picker';
+import { Label } from '@/shared/components/ui/label';
+import { ColorPicker } from '@/shared/components/ui/color-picker';
 import type { SlideshowTheme } from '../types';
 
 interface ThemeSettingsProps {

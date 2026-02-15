@@ -1,12 +1,12 @@
-import { Label } from '@/ui/components/ui/label';
-import { Slider } from '@/ui/components/slider';
+import { Label } from '@/shared/components/ui/label';
+import { Slider } from '@/shared/components/ui/slider';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/components/ui/select';
+} from '@/shared/components/ui/select';
 import type { SlideshowBlock, GalleryProps, GalleryDensity } from '../../types';
 
 export function GallerySettings({

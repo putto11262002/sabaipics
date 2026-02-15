@@ -49,8 +49,8 @@ export function useTopUpCheckout() {
         );
       }
 
-      const json = await response.json();
-      return json.data as TopUpCheckoutResult;
+      const json = (await response.json()) as { data: TopUpCheckoutResult };
+      return json.data;
     },
     retry: false,
   });

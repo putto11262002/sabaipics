@@ -7,7 +7,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/ui/components/ui/alert-dialog';
+} from '@/shared/components/ui/alert-dialog';
 import { parseISO, differenceInDays } from 'date-fns';
 import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
@@ -17,7 +17,7 @@ import { UploadQueueStatus } from './_components/UploadQueueStatus';
 import { RecentUploadsTable } from './_components/RecentUploadsTable';
 import { useUploadQueue } from './_components/useUploadQueue';
 import { useEvent } from '../../../../hooks/events/useEvent';
-import { Spinner } from '@/ui/components/ui/spinner';
+import { Spinner } from '@/shared/components/ui/spinner';
 
 export default function EventUploadTab() {
   const { id } = useParams<{ id: string }>();

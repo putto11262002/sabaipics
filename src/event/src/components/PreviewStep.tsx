@@ -1,6 +1,6 @@
 import { ChevronLeft } from 'lucide-react';
-import { Button } from '@/ui-legacy/components/ui/button';
-import { AspectRatio } from '@/ui-legacy/components/ui/aspect-ratio';
+import { Button } from '@/shared/components/ui/button';
+import { AspectRatio } from '@/shared/components/ui/aspect-ratio';
 import { th } from '../lib/i18n';
 
 interface PreviewStepProps {

@@ -5,10 +5,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/ui/components/ui/table";
-import { Checkbox } from "@/ui/components/ui/checkbox";
-import { Skeleton } from "@/ui/components/ui/skeleton";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/ui/components/ui/empty";
+} from "@/shared/components/ui/table";
+import { Checkbox } from "@/shared/components/ui/checkbox";
+import { Skeleton } from "@/shared/components/ui/skeleton";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/shared/components/ui/empty";
 import { Check, Image as ImageIcon } from "lucide-react";
 import type { Photo } from "../../hooks/photos/usePhotos";
 import { useState, useEffect, useRef } from "react";

@@ -1,5 +1,5 @@
 import { ImageOff } from 'lucide-react';
-import { Button } from '@/ui-legacy/components/ui/button';
+import { Button } from '@/shared/components/ui/button';
 import { th } from '../lib/i18n';
 
 interface EmptyStepProps {

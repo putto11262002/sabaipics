@@ -8,7 +8,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/ui/components/ui/table';
+} from '@/shared/components/ui/table';
 
 interface DataTableProps<TData> {
   table: TanstackTable<TData>;

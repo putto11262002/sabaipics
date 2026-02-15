@@ -1,4 +1,4 @@
-import { cn } from '@/ui/lib/utils';
+import { cn } from '@/shared/utils/ui';
 import type { SlideshowBlock, SlideshowContext, TextBlockProps } from '../../types';
 
 const VARIANT_CLASSES = {

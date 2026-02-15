@@ -2,7 +2,7 @@ import { ChevronsUpDown, LogOut, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useAuth, useClerk, useUser } from '@/auth/react';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/ui/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,13 +10,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/ui/components/ui/dropdown-menu';
+} from '@/shared/components/ui/dropdown-menu';
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from '@/ui/components/ui/sidebar';
+} from '@/shared/components/ui/sidebar';
 
 export function NavUser() {
   const { isMobile } = useSidebar();

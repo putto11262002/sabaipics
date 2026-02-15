@@ -11,8 +11,7 @@
     "src/dashboard/src/**/*",
     "src/event/src/**/*",
     "src/desktop-uploader/src/**/*",
-    "src/ui/**/*",
-    "src/ui-legacy/**/*",
+    "src/shared/**/*",
     "src/auth/**/*",
     "src/db/**/*"
   ],

@@ -20,10 +20,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/ui/components/ui/table';
-import { Badge } from '@/ui/components/ui/badge';
-import { Skeleton } from '@/ui/components/ui/skeleton';
-import { Button } from '@/ui/components/ui/button';
+} from '@/shared/components/ui/table';
+import { Badge } from '@/shared/components/ui/badge';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Button } from '@/shared/components/ui/button';
 import { useRecentUploads, type UploadIntent } from '../../../../../hooks/photos/useRecentUploads';
 
 function formatFileSize(bytes: number): string {

@@ -5,7 +5,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { Spinner } from "@/ui/components/ui/spinner";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { useApiClient } from "../../../lib/api";
 
 interface PurchaseStatusResponse {
@@ -42,7 +42,9 @@ export function CreditSuccessPage() {
       );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
+        const errorData = (await response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
         throw new Error(
           errorData?.error?.message ||
             `HTTP ${response.status}: ${response.statusText}`,

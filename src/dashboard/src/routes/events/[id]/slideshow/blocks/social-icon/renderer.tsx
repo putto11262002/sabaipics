@@ -1,4 +1,4 @@
-import { cn } from '@/ui/lib/utils';
+import { cn } from '@/shared/utils/ui';
 import { Instagram, Facebook, Music2, Twitter, Youtube } from 'lucide-react';
 import type { SlideshowBlock, SlideshowContext, SocialIconProps } from '../../types';
 

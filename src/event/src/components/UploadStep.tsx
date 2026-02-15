@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Camera, ChevronLeft } from 'lucide-react';
-import { Button } from '@/ui-legacy/components/ui/button';
-// import { Alert, AlertTitle, AlertDescription } from '@/ui-legacy/components/ui/alert';
+import { Button } from '@/shared/components/ui/button';
+// import { Alert, AlertTitle, AlertDescription } from '@/shared/components/ui/alert';
 // import { Lightbulb } from 'lucide-react';
 import { th } from '../lib/i18n';
 

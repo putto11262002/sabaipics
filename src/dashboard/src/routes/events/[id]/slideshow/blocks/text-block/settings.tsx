@@ -1,12 +1,12 @@
-import { Label } from '@/ui/components/ui/label';
-import { Textarea } from '@/ui/components/ui/textarea';
+import { Label } from '@/shared/components/ui/label';
+import { Textarea } from '@/shared/components/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/components/ui/select';
+} from '@/shared/components/ui/select';
 import type { SlideshowBlock, TextBlockProps, TextBlockVariant } from '../../types';
 
 export function TextBlockSettings({

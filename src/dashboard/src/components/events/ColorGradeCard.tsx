@@ -7,19 +7,19 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/ui/components/ui/card';
-import { Button } from '@/ui/components/ui/button';
-import { Switch } from '@/ui/components/ui/switch';
-import { Label } from '@/ui/components/ui/label';
-import { Slider } from '@/ui/components/slider';
+} from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Switch } from '@/shared/components/ui/switch';
+import { Label } from '@/shared/components/ui/label';
+import { Slider } from '@/shared/components/ui/slider';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/components/ui/select';
-import { Alert } from '@/ui/components/ui/alert';
+} from '@/shared/components/ui/select';
+import { Alert } from '@/shared/components/ui/alert';
 import { Eye, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 

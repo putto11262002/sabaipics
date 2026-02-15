@@ -1,12 +1,12 @@
-import { Label } from '@/ui/components/ui/label';
-import { Switch } from '@/ui/components/ui/switch';
+import { Label } from '@/shared/components/ui/label';
+import { Switch } from '@/shared/components/ui/switch';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/components/ui/select';
+} from '@/shared/components/ui/select';
 import type { SlideshowBlock, EventHeaderProps, SpacingSize } from '../../types';
 
 export function EventHeaderSettings({

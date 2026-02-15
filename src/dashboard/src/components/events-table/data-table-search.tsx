@@ -1,7 +1,7 @@
 import type { Table as TanstackTable } from '@tanstack/react-table';
 import { Search } from 'lucide-react';
 
-import { Input } from '@/ui/components/ui/input';
+import { Input } from '@/shared/components/ui/input';
 
 interface DataTableSearchProps<TData> {
   table: TanstackTable<TData>;

@@ -3,17 +3,17 @@ import { useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { differenceInDays, parseISO } from 'date-fns';
-import { Button } from '@/ui/components/ui/button';
-import { Alert } from '@/ui/components/ui/alert';
-import { Skeleton } from '@/ui/components/ui/skeleton';
-import { ToggleGroup, ToggleGroupItem } from '@/ui/components/toggle-group';
+import { Button } from '@/shared/components/ui/button';
+import { Alert } from '@/shared/components/ui/alert';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { ToggleGroup, ToggleGroupItem } from '@/shared/components/ui/toggle-group';
 import {
   Empty,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
   EmptyDescription,
-} from '@/ui/components/ui/empty';
+} from '@/shared/components/ui/empty';
 import { Calendar, Plus, Search } from 'lucide-react';
 import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { useEvents } from '../../hooks/events/useEvents';

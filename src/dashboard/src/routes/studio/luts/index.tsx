@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
-import { Button } from '@/ui/components/ui/button';
-import { Badge } from '@/ui/components/ui/badge';
-import { Separator } from '@/ui/components/ui/separator';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+import { Separator } from '@/shared/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +11,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/ui/components/ui/dropdown-menu';
+} from '@/shared/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,8 +21,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/ui/components/ui/alert-dialog';
-import { Input } from '@/ui/components/ui/input';
+} from '@/shared/components/ui/alert-dialog';
+import { Input } from '@/shared/components/ui/input';
 import {
   Table,
   TableBody,
@@ -30,7 +30,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/ui/components/ui/table';
+} from '@/shared/components/ui/table';
 import { ChevronDown, MoreHorizontal, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 

@@ -1,12 +1,12 @@
-import { Label } from '@/ui/components/ui/label';
-import { Checkbox } from '@/ui/components/ui/checkbox';
+import { Label } from '@/shared/components/ui/label';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/components/ui/select';
+} from '@/shared/components/ui/select';
 import type { SlideshowBlock, StatsPanelProps, StatsPanelVariant } from '../../types';
 
 export function StatsPanelSettings({

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { Separator } from '@/ui/components/ui/separator';
-import { SidebarTrigger } from '@/ui/components/ui/sidebar';
+import { Separator } from '@/shared/components/ui/separator';
+import { SidebarTrigger } from '@/shared/components/ui/sidebar';
 import { PageHeader } from './page-header';
 
 interface BreadcrumbItemType {

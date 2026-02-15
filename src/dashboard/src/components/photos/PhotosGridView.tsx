@@ -4,7 +4,7 @@ import {
   EmptyMedia,
   EmptyTitle,
   EmptyDescription,
-} from '@/ui/components/ui/empty';
+} from '@/shared/components/ui/empty';
 import { Check, Image as ImageIcon } from 'lucide-react';
 import type { Photo } from '../../hooks/photos/usePhotos';
 import { useState, useMemo } from 'react';

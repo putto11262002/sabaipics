@@ -1,6 +1,6 @@
 import { AlertCircle, Clock, ServerCrash, SearchX } from 'lucide-react';
-import { Button } from '@/ui-legacy/components/ui/button';
-import { Alert, AlertDescription, AlertTitle } from '@/ui-legacy/components/ui/alert';
+import { Button } from '@/shared/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
 import { th } from '../lib/i18n';
 
 type ErrorType = 'NO_FACE' | 'RATE_LIMITED' | 'NOT_FOUND' | 'SERVER' | null;

@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { AwsClient } from 'aws4fetch';
-import { getGlobalCacheDir } from '../src/repo.ts';
+import { getGlobalCacheDir } from '../repo.ts';
 
 // Types
 interface ManifestFile {

@@ -1,4 +1,4 @@
-import { cn } from '@/ui/lib/utils';
+import { cn } from '@/shared/utils/ui';
 import type { SlideshowBlock, SlideshowContext, FlexProps } from '../../types';
 import { getBlockDef } from '../registry';
 import { gapClass, paddingClass } from '../../lib/spacing';

@@ -4,8 +4,8 @@ import {
   getCoreRowModel,
   createColumnHelper,
 } from '@tanstack/react-table';
-import { Badge } from '@/ui/components/ui/badge';
-import { Skeleton } from '@/ui/components/ui/skeleton';
+import { Badge } from '@/shared/components/ui/badge';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import { ExternalLink } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { DataTable } from '../../components/events-table/data-table';

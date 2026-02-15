@@ -6,8 +6,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/ui/components/ui/table';
-import { Skeleton } from '@/ui/components/ui/skeleton';
+} from '@/shared/components/ui/table';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import type { UploadLogEntry } from './useUploadQueue';
 
 // Format file size utility

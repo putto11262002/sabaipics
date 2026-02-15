@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react';
 import { Download, Check, RefreshCw, Image, Info } from 'lucide-react';
 import { RowsPhotoAlbum, type Photo } from 'react-photo-album';
 import { toast } from 'sonner';
-import { Button } from '@/ui-legacy/components/ui/button';
-import { Alert, AlertDescription } from '@/ui-legacy/components/ui/alert';
+import { Button } from '@/shared/components/ui/button';
+import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { downloadBulk } from '../lib/api';
 import { th } from '../lib/i18n';
 
