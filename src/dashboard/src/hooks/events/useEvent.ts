@@ -1,47 +1,16 @@
-import { useQuery } from '@tanstack/react-query';
-import { useApiClient } from '../../lib/api';
 import { api } from '../../lib/api';
-import { type InferResponseType } from 'hono/client';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
-const getEvent = api.events[':id'].$get;
+type EventResponse = InferResponseType<typeof api.events[':id']['$get'], SuccessStatusCode>;
 
-export type Event = InferResponseType<typeof getEvent, 200>['data'];
+export type Event = EventResponse['data'];
 
 export function useEvent(id: string | undefined) {
-  const { getToken } = useApiClient();
-
-  return useQuery({
-    queryKey: ['event', id],
-    queryFn: async () => {
-      if (!id) {
-        throw new Error('Event ID is required');
-      }
-
-      const token = await getToken();
-
-      const res = await getEvent(
-        {
-          param: { id },
-        },
-        {
-          init: {
-            credentials: 'include',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        },
-      );
-
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error('Event not found');
-        }
-        throw new Error(`Failed to fetch event: ${res.status}`);
-      }
-
-      return (await res.json()) as InferResponseType<typeof getEvent, 200>;
-    },
+  return useApiQuery<EventResponse>({
+    queryKey: ['events', 'detail', id],
+    apiFn: (opts) => api.events[':id'].$get({ param: { id: id! } }, opts),
     enabled: !!id,
     refetchOnWindowFocus: !import.meta.env.DEV,
     refetchOnMount: false,

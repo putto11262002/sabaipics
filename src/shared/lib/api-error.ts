@@ -8,8 +8,8 @@ export type ApiError = {
 };
 
 export type RequestError =
-  | { type: 'API_ERROR'; error: ApiError }
-  | { type: 'UNKNOWN_ERROR'; error: unknown };
+  | { type: 'API_ERROR'; message: string; error: ApiError }
+  | { type: 'UNKNOWN_ERROR'; message: string; error: unknown };
 
 export function isApiError(value: unknown): value is { code: string; message: string } {
   return (
@@ -28,6 +28,7 @@ export function toRequestError(e: unknown): RequestError {
     if (isApiError(maybeError)) {
       return {
         type: 'API_ERROR',
+        message: maybeError.message,
         error: {
           code: maybeError.code as ApiErrorCode,
           message: maybeError.message,
@@ -36,8 +37,10 @@ export function toRequestError(e: unknown): RequestError {
       };
     }
   }
-  return { type: 'UNKNOWN_ERROR', error: e };
+  const message = e instanceof Error ? e.message : 'Something went wrong';
+  return { type: 'UNKNOWN_ERROR', message, error: e };
 }
+
 
 /**
  * Status codes that are worth retrying — transient server/infra issues.

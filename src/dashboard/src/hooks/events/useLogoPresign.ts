@@ -1,51 +1,31 @@
-import { useMutation } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
+
+type LogoPresignResponse = InferResponseType<
+  typeof api.events[':id']['logo']['presign']['$post'],
+  SuccessStatusCode
+>;
+
+export type LogoPresignInput = {
+  eventId: string;
+  file: File;
+};
 
 export function useLogoPresign() {
-  return useMutation({
-    mutationFn: async ({
-      eventId,
-      file,
-    }: {
-      eventId: string;
-      file: File;
-    }): Promise<{
-      uploadId: string;
-      putUrl: string;
-      objectKey: string;
-      expiresAt: string;
-      requiredHeaders: Record<string, string>;
-    }> => {
-      const response = await api.events[':id'].logo.presign.$post(
+  return useApiMutation<LogoPresignResponse, LogoPresignInput>({
+    apiFn: (input, opts) =>
+      api.events[':id'].logo.presign.$post(
         {
-          param: { id: eventId },
+          param: { id: input.eventId },
           json: {
-            contentType: file.type as 'image/jpeg' | 'image/png' | 'image/webp',
-            contentLength: file.size,
+            contentType: input.file.type as 'image/jpeg' | 'image/png' | 'image/webp',
+            contentLength: input.file.size,
           },
         },
-        {
-          init: {
-            credentials: 'include',
-          },
-        },
-      );
-
-      if (!response.ok) {
-        const error = new Error('Failed to get presigned URL') as Error & { status: number };
-        error.status = response.status;
-        throw error;
-      }
-
-      const { data } = await response.json();
-      return {
-        uploadId: data.uploadId,
-        putUrl: data.putUrl,
-        objectKey: data.objectKey,
-        expiresAt: data.expiresAt,
-        requiredHeaders: data.requiredHeaders,
-      };
-    },
+        opts,
+      ),
     retry: false,
   });
 }

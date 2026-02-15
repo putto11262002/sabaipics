@@ -20,6 +20,7 @@
 - These handle auth injection, error normalization, and response parsing
 - Hooks with special constraints (e.g. streaming, non-standard auth, third-party APIs) can use React Query directly
 - Errors normalized to `RequestError` discriminated union — see `src/shared/lib/api-error.ts`
+- `RequestError` has a top-level `message: string` — components use `error.message` directly, no helper needed
 - Response types inferred via `InferResponseType<typeof api.endpoint.$method, SuccessStatusCode>`
 
 ## 3. File Structure

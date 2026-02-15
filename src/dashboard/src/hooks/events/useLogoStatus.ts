@@ -1,5 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
+
+type LogoStatusResponse = InferResponseType<
+  typeof api.events[':id']['logo']['status']['$get'],
+  SuccessStatusCode
+>;
 
 export function useLogoStatus({
   eventId,
@@ -8,29 +15,13 @@ export function useLogoStatus({
   eventId: string;
   uploadId: string | null;
 }) {
-  return useQuery({
-    queryKey: ['logo', 'status', eventId, uploadId],
-    queryFn: async () => {
-      if (!uploadId) {
-        return null;
-      }
-
-      const response = await api.events[':id'].logo.status.$get({
-        param: { id: eventId },
-        query: { id: uploadId },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch logo status');
-      }
-
-      const json = await response.json();
-      return {
-        status: json.data.status,
-        logoUrl: json.data.logoUrl,
-        errorMessage: json.data.errorMessage,
-      };
-    },
+  return useApiQuery<LogoStatusResponse>({
+    queryKey: ['events', 'detail', eventId, 'logo-status', uploadId],
+    apiFn: (opts) =>
+      api.events[':id'].logo.status.$get(
+        { param: { id: eventId }, query: { id: uploadId! } },
+        opts,
+      ),
     enabled: !!uploadId,
     refetchInterval: 2000, // Poll every 2 seconds
     staleTime: 0,

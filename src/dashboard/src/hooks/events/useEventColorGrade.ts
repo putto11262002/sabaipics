@@ -1,27 +1,19 @@
-import { useQuery } from '@tanstack/react-query';
+import { api } from '../../lib/api';
 import type { InferResponseType } from 'hono/client';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
-const getColorGrade = api.events[':id']['color-grade'].$get;
+type ColorGradeResponse = InferResponseType<
+  typeof api.events[':id']['color-grade']['$get'],
+  SuccessStatusCode
+>;
 
-export type EventColorGrade = InferResponseType<typeof getColorGrade, 200>['data'];
+export type EventColorGrade = ColorGradeResponse['data'];
 
 export function useEventColorGrade(eventId: string | undefined) {
-  const { getToken } = useApiClient();
-
-  return useQuery({
-    queryKey: ['event', eventId, 'color-grade'],
-    queryFn: async () => {
-      if (!eventId) throw new Error('Event ID is required');
-
-      const res = await getColorGrade({ param: { id: eventId } }, await withAuth(getToken));
-      if (!res.ok) {
-        throw new Error('Failed to load color grade settings');
-      }
-
-      const json = await res.json();
-      return json.data;
-    },
+  return useApiQuery<ColorGradeResponse>({
+    queryKey: ['events', 'detail', eventId, 'color-grade'],
+    apiFn: (opts) => api.events[':id']['color-grade'].$get({ param: { id: eventId! } }, opts),
     enabled: !!eventId,
     staleTime: 0,
   });

@@ -1,52 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../lib/api";
+import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
-export interface Event {
-  id: string;
-  photographerId: string;
-  name: string;
-  startDate: string | null;
-  endDate: string | null;
-  qrCodeUrl: string | null;
-  rekognitionCollectionId: string | null;
-  expiresAt: string;
-  createdAt: string;
-}
+type EventsResponse = InferResponseType<typeof api.events.$get, SuccessStatusCode>;
 
-interface EventsResponse {
-  data: Event[];
-  pagination: {
-    page: number;
-    limit: number;
-    totalCount: number;
-    totalPages: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
-}
+export type Event = EventsResponse['data'][number];
 
 export function useEvents(page: number = 0, limit: number = 20) {
-  const { getToken } = useApiClient();
-
-  return useQuery({
-    queryKey: ["events", page, limit],
-    queryFn: async () => {
-      const token = await getToken();
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/events?page=${page}&limit=${limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return response.json() as Promise<EventsResponse>;
-    },
+  return useApiQuery<EventsResponse>({
+    queryKey: ['events', 'list', { page, limit }],
+    apiFn: (opts) =>
+      api.events.$get({ query: { page, limit } }, opts),
     staleTime: 1000 * 30, // 30 seconds
   });
 }

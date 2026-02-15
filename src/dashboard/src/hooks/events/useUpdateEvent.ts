@@ -1,42 +1,32 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
+
+type UpdateEventResponse = InferResponseType<
+  typeof api.events[':id']['$put'],
+  SuccessStatusCode
+>;
+
+export type UpdateEventInput = {
+  id: string;
+  name?: string;
+  subtitle?: string | null;
+};
 
 export function useUpdateEvent() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async ({
-      id,
-      name,
-      subtitle,
-    }: {
-      id: string;
-      name?: string;
-      subtitle?: string | null;
-    }) => {
-      const response = await api.events[':id'].$put(
-        {
-          param: { id },
-          json: { name, subtitle },
-        },
-        {
-          init: {
-            credentials: 'include',
-          },
-        },
-      );
-
-      if (!response.ok) {
-        const error = new Error('Failed to update event') as Error & { status: number };
-        error.status = response.status;
-        throw error;
-      }
-
-      const json = await response.json();
-      return json.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['event'] });
+  return useApiMutation<UpdateEventResponse, UpdateEventInput>({
+    apiFn: (input, opts) =>
+      api.events[':id'].$put(
+        { param: { id: input.id }, json: { name: input.name, subtitle: input.subtitle } },
+        opts,
+      ),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['events', 'detail', vars.id] });
     },
   });
 }

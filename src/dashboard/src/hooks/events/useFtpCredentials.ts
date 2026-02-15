@@ -1,89 +1,28 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { useApiClient } from '../../lib/api';
+import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
 
-interface FtpCredentialsResponse {
-  id: string;
-  username: string;
-  expiresAt: string;
-  createdAt: string;
-}
+const getFtpCredentials = api.api.ftp.events[':id']['ftp-credentials'].$get;
+const revealFtpCredentials = api.api.ftp.events[':id']['ftp-credentials'].reveal.$get;
 
-interface RevealCredentialsResponse {
-  username: string;
-  password: string;
-}
+type FtpCredentialsResponse = InferResponseType<typeof getFtpCredentials, SuccessStatusCode>;
+type RevealCredentialsResponse = InferResponseType<typeof revealFtpCredentials, SuccessStatusCode>;
 
 export function useFtpCredentials(eventId: string | undefined) {
-  const { getToken } = useApiClient();
-
-  return useQuery({
-    queryKey: ['ftp-credentials', eventId],
-    queryFn: async () => {
-      if (!eventId) {
-        throw new Error('Event ID is required');
-      }
-
-      const token = await getToken();
-      if (!token) {
-        throw new Error('Not authenticated. Please sign in and try again.');
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/ftp/events/${eventId}/ftp-credentials`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (response.status === 404) {
-        return null;
-      }
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch FTP credentials: ${response.status}`);
-      }
-
-      return (await response.json()) as FtpCredentialsResponse;
-    },
+  return useApiQuery<FtpCredentialsResponse>({
+    queryKey: ['events', 'detail', eventId, 'ftp-credentials'],
+    apiFn: (opts) => getFtpCredentials({ param: { id: eventId! } }, opts),
     enabled: !!eventId,
     refetchOnWindowFocus: !import.meta.env.DEV,
     refetchOnMount: false,
-    staleTime: 1000 * 60,
+    staleTime: 1000 * 60, // 1 minute
   });
 }
 
 export function useRevealFtpCredentials(eventId: string | undefined) {
-  const { getToken } = useApiClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      if (!eventId) {
-        throw new Error('Event ID is required');
-      }
-
-      const token = await getToken();
-      if (!token) {
-        throw new Error('Not authenticated. Please sign in and try again.');
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/ftp/events/${eventId}/ftp-credentials/reveal`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to reveal FTP password: ${response.status}`);
-      }
-
-      return (await response.json()) as RevealCredentialsResponse;
-    },
+  return useApiMutation<RevealCredentialsResponse, void>({
+    apiFn: (_input, opts) => revealFtpCredentials({ param: { id: eventId! } }, opts),
   });
 }
