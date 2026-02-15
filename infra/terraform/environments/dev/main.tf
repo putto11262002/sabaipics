@@ -29,9 +29,9 @@ provider "cloudflare" {
 module "cloudflare_infra" {
   source = "../../modules/cloudflare-infra"
 
-  account_id   = var.account_id
-  environment  = var.environment
-  zone_id      = var.zone_id
+  account_id  = var.account_id
+  environment = var.environment
+  zone_id     = var.zone_id
 
   # R2 Bucket
   photos_bucket_name     = var.photos_bucket_name
@@ -65,8 +65,9 @@ module "dev_notification_proxy" {
   environment        = var.environment
   photos_bucket_name = module.cloudflare_infra.photos_bucket_name
 
-  notification_queue_name     = var.notification_queue_name
-  enable_uploads_notification = var.enable_uploads_notification
-  enable_logos_notification   = var.enable_logos_notification
-  webhook_url                 = var.webhook_url
+  notification_queue_name         = var.notification_queue_name
+  enable_uploads_notification     = var.enable_uploads_notification
+  enable_logos_notification       = var.enable_logos_notification
+  enable_lut_uploads_notification = var.enable_lut_uploads_notification
+  webhook_url                     = var.webhook_url
 }

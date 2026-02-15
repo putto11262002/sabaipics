@@ -25,35 +25,40 @@ resource "cloudflare_queue" "notification_proxy" {
 
 # ------------------------------------------------------------------------------
 # R2 Event Notifications
-# Forward uploads/ and logos/ events to notification proxy queue
+#
+# Cloudflare models event notifications as a configuration per (bucket, queue).
+# We keep a single resource with multiple prefix rules.
 # ------------------------------------------------------------------------------
 
-resource "cloudflare_r2_bucket_event_notification" "uploads" {
-  count = var.enable_uploads_notification ? 1 : 0
-
-  account_id  = var.account_id
-  bucket_name = var.photos_bucket_name
-  queue_id    = cloudflare_queue.notification_proxy.queue_id
-
-  rules = [{
-    prefix      = "uploads/"
-    actions     = ["PutObject", "CopyObject"]
-    description = "Forward uploads/ events to local dev server via notification proxy"
-  }]
+locals {
+  notification_actions = ["PutObject", "CopyObject", "CompleteMultipartUpload"]
+  notification_rules = concat(
+    var.enable_uploads_notification ? [{
+      prefix      = "uploads/"
+      actions     = local.notification_actions
+      description = "Forward uploads/ events to local dev server via notification proxy"
+    }] : [],
+    var.enable_logos_notification ? [{
+      prefix      = "logos/"
+      actions     = local.notification_actions
+      description = "Forward logos/ events to local dev server via notification proxy"
+    }] : [],
+    var.enable_lut_uploads_notification ? [{
+      prefix      = "lut-uploads/"
+      actions     = local.notification_actions
+      description = "Forward lut-uploads/ events to local dev server via notification proxy"
+    }] : [],
+  )
 }
 
-resource "cloudflare_r2_bucket_event_notification" "logos" {
-  count = var.enable_logos_notification ? 1 : 0
+resource "cloudflare_r2_bucket_event_notification" "uploads" {
+  count = length(local.notification_rules) > 0 ? 1 : 0
 
   account_id  = var.account_id
   bucket_name = var.photos_bucket_name
   queue_id    = cloudflare_queue.notification_proxy.queue_id
 
-  rules = [{
-    prefix      = "logos/"
-    actions     = ["PutObject", "CopyObject"]
-    description = "Forward logos/ events to local dev server via notification proxy"
-  }]
+  rules = local.notification_rules
 }
 
 # ------------------------------------------------------------------------------
