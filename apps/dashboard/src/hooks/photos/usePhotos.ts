@@ -7,6 +7,19 @@ const listPhotos = api.events[':eventId'].photos.$post;
 export type Photo = InferResponseType<typeof listPhotos, 200>['data'][0];
 export type PhotoStatus = Photo['status'];
 
+export type PhotoExif = {
+  make?: string;
+  model?: string;
+  lensModel?: string;
+  focalLength?: number;
+  iso?: number;
+  fNumber?: number;
+  exposureTime?: number;
+  dateTimeOriginal?: string;
+  gpsLatitude?: number;
+  gpsLongitude?: number;
+};
+
 export function usePhotos({
   eventId,
   status,
@@ -31,7 +44,7 @@ export function usePhotos({
             ...(status ? { status } : {}),
           },
         },
-        await withAuth(getToken)
+        await withAuth(getToken),
       );
 
       if (!res.ok) {
