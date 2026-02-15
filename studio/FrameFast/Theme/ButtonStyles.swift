@@ -87,6 +87,29 @@ struct DestructiveButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Destructive Secondary Button Style
+
+/// Outlined destructive button — secondary style with destructive color
+struct DestructiveSecondaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: themedButtonCornerRadius, style: .continuous)
+        configuration.label
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(Color.Theme.destructive)
+            .background(Color.Theme.background)
+            .clipShape(shape)
+            .overlay(
+                shape.strokeBorder(Color.Theme.destructive.opacity(0.35), lineWidth: 1)
+            )
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .opacity(isEnabled ? 1.0 : 0.5)
+    }
+}
+
 // MARK: - Compact Button Style
 
 /// Compact capsule-shaped button with auto-width
@@ -128,6 +151,10 @@ extension ButtonStyle where Self == DestructiveButtonStyle {
     static var destructive: DestructiveButtonStyle { DestructiveButtonStyle() }
 }
 
+extension ButtonStyle where Self == DestructiveSecondaryButtonStyle {
+    static var destructiveSecondary: DestructiveSecondaryButtonStyle { DestructiveSecondaryButtonStyle() }
+}
+
 extension ButtonStyle where Self == CompactButtonStyle {
     static var compact: CompactButtonStyle { CompactButtonStyle() }
 }
@@ -147,6 +174,9 @@ extension ButtonStyle where Self == CompactButtonStyle {
 
         Button("Destructive Button") { }
             .buttonStyle(.destructive)
+
+        Button("Destructive Secondary") { }
+            .buttonStyle(.destructiveSecondary)
 
         Button("Compact Button") { }
             .buttonStyle(.compact)

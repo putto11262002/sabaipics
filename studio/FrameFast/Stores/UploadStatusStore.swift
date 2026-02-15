@@ -21,12 +21,20 @@ final class UploadStatusStore: ObservableObject {
 
     @Published private(set) var stateByJobId: [String: UploadJobState] = [:]
 
-    private let uploadManager: UploadManager
+    private let uploadManager: UploadManager?
     private var task: Task<Void, Never>?
 
     init(uploadManager: UploadManager) {
         self.uploadManager = uploadManager
     }
+
+    #if DEBUG
+    /// Preview-only init with pre-populated job states.
+    init(mockStateByJobId: [String: UploadJobState]) {
+        self.uploadManager = nil
+        self.stateByJobId = mockStateByJobId
+    }
+    #endif
 
     func start() {
         guard task == nil else { return }
@@ -41,6 +49,7 @@ final class UploadStatusStore: ObservableObject {
     }
 
     private func loop() async {
+        guard let uploadManager else { return }
         while !Task.isCancelled {
             let s = await uploadManager.summary()
             self.summary = s
