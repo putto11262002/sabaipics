@@ -4,6 +4,8 @@
 
 // Re-export JPEG utilities
 export { extractJpegDimensions } from './jpeg';
+export { extractPngDimensions } from './png';
+export { extractWebpDimensions } from './webp';
 
 // Color grading (LUT)
 export {
