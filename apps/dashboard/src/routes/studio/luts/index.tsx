@@ -170,10 +170,22 @@ export default function StudioLutsPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={async () => {
+                                const newTab = window.open(
+                                  'about:blank',
+                                  '_blank',
+                                  'noopener,noreferrer',
+                                );
                                 try {
                                   const { url } = await download.mutateAsync(lut.id);
-                                  window.open(url, '_blank', 'noopener,noreferrer');
+
+                                  if (newTab) {
+                                    newTab.location.href = url;
+                                  } else {
+                                    // Popup blocked; fall back to same-tab navigation.
+                                    window.location.href = url;
+                                  }
                                 } catch (e) {
+                                  newTab?.close();
                                   toast.error(e instanceof Error ? e.message : 'Download failed');
                                 }
                               }}

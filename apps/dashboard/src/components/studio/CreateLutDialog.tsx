@@ -29,6 +29,18 @@ import { toast } from 'sonner';
 
 type Kind = 'cube' | 'reference';
 
+function isCubeFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.cube')) return true;
+  // Some browsers may set empty type for unknown extensions
+  if (file.type === 'text/plain') return true;
+  return false;
+}
+
+function isReferenceImageFile(file: File): boolean {
+  return file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp';
+}
+
 export function CreateLutDialog({
   open,
   onOpenChange,
@@ -44,15 +56,24 @@ export function CreateLutDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [createdLutId, setCreatedLutId] = useState<string | null>(null);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const resetForm = () => {
     setName('');
     setFile(null);
+    setFileError(null);
     setCreatedLutId(null);
     create.reset();
   };
+
+  // If the creation kind changes, clear any previously selected file.
+  useEffect(() => {
+    setFile(null);
+    setFileError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind]);
 
   const getLutStatus = api.studio.luts.status.$get;
 
@@ -111,10 +132,20 @@ export function CreateLutDialog({
   const title = kind === 'cube' ? 'New LUT (.cube)' : 'New LUT (Reference image)';
   const fileLabel = kind === 'cube' ? 'LUT file (.cube)' : 'Reference image';
 
-  const canSubmit = name.trim().length > 0 && file != null;
+  const canSubmit = name.trim().length > 0 && file != null && fileError == null;
 
   const submit = async () => {
     if (!file) return;
+
+    if (kind === 'cube' && !isCubeFile(file)) {
+      setFileError('Please select a .cube LUT file');
+      return;
+    }
+    if (kind === 'reference' && !isReferenceImageFile(file)) {
+      setFileError('Please select a JPEG, PNG, or WebP image');
+      return;
+    }
+
     const { lutId } = await create.mutateAsync({ kind, name: name.trim(), file });
     setCreatedLutId(lutId);
   };
@@ -204,12 +235,17 @@ export function CreateLutDialog({
                 accept={accept}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) setFile(f);
+                  if (f) {
+                    setFile(f);
+                    setFileError(null);
+                  }
                   e.target.value = '';
                 }}
                 disabled={isProcessing}
               />
             </div>
+
+            {fileError && <Alert variant="destructive">{fileError}</Alert>}
 
             {isProcessing && (
               <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground">
