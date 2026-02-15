@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, asc, and } from 'drizzle-orm';
+import { eq, asc, and, desc, sql, gte } from 'drizzle-orm';
 import { creditPackages, photographers, creditLedger, promoCodeUsage } from '@sabaipics/db';
 import { requirePhotographer } from '../middleware';
 import type { Env } from '../types';
@@ -521,6 +521,134 @@ export const creditsRouter = new Hono<Env>()
       .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
       .match(
         (data) => c.json(data),
+        (e) => apiError(c, e),
+      );
+  })
+  /**
+   * GET /credit-packages/history?page=0&limit=20&type=credit|debit
+   *
+   * Returns paginated credit ledger entries + summary stats.
+   * Requires authenticated photographer.
+   */
+  .get('/history', requirePhotographer(), async (c) => {
+    return safeTry(async function* () {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+
+      const page = Math.max(0, parseInt(c.req.query('page') || '0', 10));
+      const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10)));
+      const typeFilter = c.req.query('type') as 'credit' | 'debit' | undefined;
+      const offset = page * limit;
+
+      // Build where conditions
+      const conditions = [eq(creditLedger.photographerId, photographer.id)];
+      if (typeFilter === 'credit' || typeFilter === 'debit') {
+        conditions.push(eq(creditLedger.type, typeFilter));
+      }
+
+      // Paginated entries
+      const entries = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            id: creditLedger.id,
+            amount: creditLedger.amount,
+            type: creditLedger.type,
+            source: creditLedger.source,
+            promoCode: creditLedger.promoCode,
+            stripeReceiptUrl: creditLedger.stripeReceiptUrl,
+            expiresAt: creditLedger.expiresAt,
+            createdAt: creditLedger.createdAt,
+          })
+          .from(creditLedger)
+          .where(and(...conditions))
+          .orderBy(desc(creditLedger.createdAt))
+          .limit(limit)
+          .offset(offset),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      // Total count for pagination
+      const [countResult] = yield* ResultAsync.fromPromise(
+        db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(creditLedger)
+          .where(and(...conditions)),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+      const totalCount = countResult?.count ?? 0;
+
+      // Summary stats (always for all types)
+      const [summary] = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            balance: sql<number>`coalesce(sum(${creditLedger.amount}), 0)::int`,
+            expiringSoon: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'credit' and ${creditLedger.expiresAt} > now() and ${creditLedger.expiresAt} <= now() + interval '30 days' then ${creditLedger.amount} else 0 end), 0)::int`,
+            usedThisMonth: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'debit' and ${creditLedger.createdAt} >= date_trunc('month', now()) then abs(${creditLedger.amount}) else 0 end), 0)::int`,
+          })
+          .from(creditLedger)
+          .where(eq(creditLedger.photographerId, photographer.id)),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      const totalPages = Math.ceil(totalCount / limit);
+
+      return ok({
+        entries,
+        summary: summary ?? { balance: 0, expiringSoon: 0, usedThisMonth: 0 },
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages,
+          hasNextPage: page < totalPages - 1,
+        },
+      });
+    })
+      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
+  })
+  /**
+   * GET /credit-packages/usage-chart?days=30
+   *
+   * Returns daily aggregated debit amounts for the bar chart.
+   * Requires authenticated photographer.
+   */
+  .get('/usage-chart', requirePhotographer(), async (c) => {
+    return safeTry(async function* () {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+
+      const days = Math.min(90, Math.max(1, parseInt(c.req.query('days') || '30', 10)));
+      const sinceDate = new Date();
+      sinceDate.setDate(sinceDate.getDate() - days);
+
+      const rows = yield* ResultAsync.fromPromise(
+        db
+          .select({
+            date: sql<string>`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`,
+            credits: sql<number>`coalesce(sum(abs(${creditLedger.amount})), 0)::int`,
+          })
+          .from(creditLedger)
+          .where(
+            and(
+              eq(creditLedger.photographerId, photographer.id),
+              eq(creditLedger.type, 'debit'),
+              gte(creditLedger.createdAt, sinceDate.toISOString()),
+            ),
+          )
+          .groupBy(sql`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`)
+          .orderBy(sql`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`),
+        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      );
+
+      return ok(rows);
+    })
+      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+      .match(
+        (data) => c.json({ data }),
         (e) => apiError(c, e),
       );
   });

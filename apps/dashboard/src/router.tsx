@@ -6,6 +6,9 @@ import { SignUpPage } from './routes/sign-up';
 import { DesktopAuthPage } from './routes/auth/desktop';
 import { DashboardPage } from './routes/dashboard';
 import { CreditSuccessPage } from './routes/credits/success';
+import CreditsLayout from './routes/credits/layout';
+import CreditPurchasesTab from './routes/credits/purchases';
+import CreditUsageTab from './routes/credits/usage';
 import EventsPage from './routes/events';
 import EventDetailLayout from './routes/events/[id]/layout';
 import EventDetailsTab from './routes/events/[id]/details';
@@ -91,6 +94,15 @@ export const router = createBrowserRouter([
       {
         path: '/studio/luts/:id/preview',
         element: <StudioLutPreviewPage />,
+      },
+      {
+        path: '/credits',
+        element: <CreditsLayout />,
+        children: [
+          { index: true, element: <Navigate to="purchases" replace /> },
+          { path: 'purchases', element: <CreditPurchasesTab /> },
+          { path: 'usage', element: <CreditUsageTab /> },
+        ],
       },
       {
         path: '/events/:id',
