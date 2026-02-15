@@ -5,11 +5,16 @@ import { RouterProvider } from 'react-router';
 import { Toaster } from '@/shared/components/ui/sonner';
 import '@/shared/styles/globals.css';
 import 'react-photo-album/rows.css';
+import { shouldRetry } from '@/shared/lib/api-error';
 import { router } from './router';
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 1000 * 60, retry: 1 },
+    queries: {
+      staleTime: 1000 * 60,
+      retry: shouldRetry,
+      refetchOnWindowFocus: false,
+    },
   },
 });
 

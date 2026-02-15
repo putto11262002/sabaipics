@@ -1,8 +1,19 @@
 import * as Sentry from '@sentry/cloudflare';
 import { safeTry, type Err, type Result } from 'neverthrow';
 import type { Context, TypedResponse } from 'hono';
-import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { API_ERROR_STATUS, type HandlerError, type ApiErrorCode } from './error';
+import type {
+  ContentlessStatusCode,
+  SuccessStatusCode,
+} from 'hono/utils/http-status';
+
+/** Success codes that carry a JSON body (excludes 204, 205) */
+type ContentfulSuccessStatusCode = Exclude<SuccessStatusCode, ContentlessStatusCode>;
+import {
+  API_ERROR_STATUS,
+  type HandlerError,
+  type ApiErrorCode,
+  type ApiErrorStatus,
+} from './error';
 
 type ErrorResponseBody = { error: { code: ApiErrorCode; message: string } };
 
@@ -28,23 +39,20 @@ type ErrorResponseBody = { error: { code: ApiErrorCode; message: string } };
  *   }, c, { status: 201 });
  * })
  */
-export async function safeHandler<T, S extends ContentfulStatusCode = 200>(
+export async function safeHandler<T, S extends ContentfulSuccessStatusCode = 200>(
   fn: () => AsyncGenerator<Err<never, HandlerError>, Result<T, HandlerError>>,
   c: Context<any, any, any>,
   options?: { status?: S },
-): Promise<
-  TypedResponse<{ data: T }, S> | TypedResponse<ErrorResponseBody, ContentfulStatusCode>
-> {
+): Promise<TypedResponse<{ data: T }, S> | TypedResponse<ErrorResponseBody, ApiErrorStatus>> {
   return safeTry(fn)
     .orTee((e) => {
       if (e.cause) console.error('[safeHandler]', e.code, e.cause);
       captureApiError(c, e);
     })
     .match(
-      (data) =>
-        c.json({ data } as { data: T }, (options?.status ?? 200) as S) as any,
+      (data) => c.json({ data } as { data: T }, (options?.status ?? 200) as S) as any,
       (e) => {
-        const status = API_ERROR_STATUS[e.code] as ContentfulStatusCode;
+        const status = API_ERROR_STATUS[e.code] as ApiErrorStatus;
         if (e.headers) {
           for (const [k, v] of Object.entries(e.headers)) c.header(k, v);
         }
