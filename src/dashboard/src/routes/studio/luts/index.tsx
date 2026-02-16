@@ -22,6 +22,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/shared/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/components/ui/dialog';
 import { Input } from '@/shared/components/ui/input';
 import {
   Table,
@@ -31,7 +39,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/components/ui/table';
-import { ChevronDown, MoreHorizontal, Plus } from 'lucide-react';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Alert, AlertTitle, AlertDescription } from '@/shared/components/ui/alert';
+import { Spinner } from '@/shared/components/ui/spinner';
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from '@/shared/components/ui/empty';
+import { AlertCircle, ChevronDown, MoreHorizontal, Palette, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useStudioLuts } from '../../../hooks/studio/useStudioLuts';
@@ -69,9 +87,9 @@ export default function StudioLutsPage() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm">
-              <Plus className="mr-2 size-4" />
+              <Plus className="mr-1 size-4" />
               New LUT
-              <ChevronDown className="ml-2 size-4 text-muted-foreground" />
+              <ChevronDown className="ml-1 size-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[220px]">
@@ -105,21 +123,48 @@ export default function StudioLutsPage() {
         </div>
 
         <div className="space-y-3">
-          {luts.isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
-          {luts.isError && (
-            <div className="text-sm text-destructive">
-              {luts.error instanceof Error ? luts.error.message : 'Failed to load LUTs'}
+          {luts.isLoading && (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-3">
+                  <Skeleton className="h-4 w-[40%]" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="ml-auto h-8 w-8 rounded-md" />
+                </div>
+              ))}
             </div>
+          )}
+          {luts.isError && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertTitle>Failed to load LUTs</AlertTitle>
+              <AlertDescription className="flex items-center justify-between">
+                <span>{luts.error instanceof Error ? luts.error.message : 'Something went wrong'}</span>
+                <Button variant="destructive" size="sm" onClick={() => luts.refetch()} disabled={luts.isRefetching}>
+                  {luts.isRefetching ? (
+                    <Spinner className="mr-1 size-3" />
+                  ) : (
+                    <RefreshCw className="mr-1 size-3" />
+                  )}
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
           )}
 
           {!luts.isLoading && !luts.isError && lutRows.length === 0 && (
-            <div className="text-sm text-muted-foreground">
-              No LUTs yet. Create one to get started.
-            </div>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon"><Palette /></EmptyMedia>
+                <EmptyTitle>No LUTs yet</EmptyTitle>
+                <EmptyDescription>Create a LUT to start color grading your event photos.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           )}
 
           {!luts.isLoading && !luts.isError && lutRows.length > 0 && (
-            <Table>
+            <Table className="min-w-[600px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[40%]">Name</TableHead>
@@ -187,7 +232,7 @@ export default function StudioLutsPage() {
                                   }
                                 } catch (e) {
                                   newTab?.close();
-                                  toast.error(e instanceof Error ? e.message : 'Download failed');
+                                  toast.error('Download failed', { description: e instanceof Error ? e.message : 'Something went wrong' });
                                 }
                               }}
                             >
@@ -230,6 +275,7 @@ export default function StudioLutsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              disabled={del.isPending}
               onClick={async () => {
                 const id = confirmDeleteId;
                 if (!id) return;
@@ -237,53 +283,68 @@ export default function StudioLutsPage() {
                   await del.mutateAsync(id);
                   toast.success('LUT deleted');
                 } catch (e) {
-                  toast.error(e instanceof Error ? e.message : 'Delete failed');
+                  toast.error('Delete failed', { description: e instanceof Error ? e.message : 'Something went wrong' });
                 } finally {
                   setConfirmDeleteId(null);
                 }
               }}
             >
-              Delete
+              {del.isPending ? (
+                <>
+                  <Spinner className="mr-1 size-3" />
+                  Deleting…
+                </>
+              ) : (
+                'Delete'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
+      <Dialog
         open={renameState != null}
         onOpenChange={(open) => !open && setRenameState(null)}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Rename LUT</AlertDialogTitle>
-            <AlertDialogDescription>Give this LUT a clearer name.</AlertDialogDescription>
-          </AlertDialogHeader>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename LUT</DialogTitle>
+            <DialogDescription>Give this LUT a clearer name.</DialogDescription>
+          </DialogHeader>
           <div className="space-y-2">
             <Input
               value={renameState?.name ?? ''}
               onChange={(e) => setRenameState((s) => (s ? { ...s, name: e.target.value } : s))}
             />
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameState(null)}>Cancel</Button>
+            <Button
+              disabled={rename.isPending}
               onClick={async () => {
                 if (!renameState) return;
                 try {
                   await rename.mutateAsync({ id: renameState.id, name: renameState.name.trim() });
                   toast.success('Renamed');
                 } catch (e) {
-                  toast.error(e instanceof Error ? e.message : 'Rename failed');
+                  toast.error('Rename failed', { description: e instanceof Error ? e.message : 'Something went wrong' });
                 } finally {
                   setRenameState(null);
                 }
               }}
             >
-              Save
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              {rename.isPending ? (
+                <>
+                  <Spinner className="mr-1 size-3" />
+                  Saving…
+                </>
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

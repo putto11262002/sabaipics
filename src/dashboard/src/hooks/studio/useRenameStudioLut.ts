@@ -9,6 +9,8 @@ type RenameStudioLutResponse = InferResponseType<
   SuccessStatusCode
 >;
 
+export type RenameStudioLutInput = { id: string; name: string };
+
 export function useRenameStudioLut() {
   const queryClient = useQueryClient();
 
