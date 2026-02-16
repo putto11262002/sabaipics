@@ -123,6 +123,7 @@ actor UploadsAPIClient {
             "eventId": eventId,
             "contentType": contentType,
             "contentLength": contentLength,
+            "source": "ios",
         ]
         if let filename {
             body["filename"] = filename
