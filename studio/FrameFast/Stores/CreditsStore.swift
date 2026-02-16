@@ -53,9 +53,15 @@ final class CreditsStore: ObservableObject {
         }
     }
 
+    /// Stop polling and clear auth-scoped state (used on sign-out/auth loss).
     func stop() {
+        pause()
+        state = .pending
+    }
+
+    /// Stop polling but preserve the current state (used for app backgrounding).
+    func pause() {
         task?.cancel()
         task = nil
-        state = .pending
     }
 }
