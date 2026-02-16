@@ -10,8 +10,8 @@ import { Button } from '@/shared/components/ui/button';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Label } from '@/shared/components/ui/label';
-import { Alert } from '@/shared/components/ui/alert';
-import { Loader2, Upload } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
+import { AlertCircle, Image as ImageIcon, Loader2, RefreshCw, Upload, X } from 'lucide-react';
 import { usePreviewStudioLut } from '../../hooks/studio/usePreviewStudioLut';
 
 export function LutPreviewDialog({
@@ -90,20 +90,40 @@ export function LutPreviewDialog({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label className="text-xs">Sample image</Label>
-              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm hover:bg-muted/50">
-                <span className="truncate">{file ? file.name : 'Upload an image to preview'}</span>
-                <Upload className="size-4 text-muted-foreground" />
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFile(f);
-                    e.target.value = '';
-                  }}
-                />
-              </label>
+              {file ? (
+                <div className="flex min-w-0 items-center gap-3 overflow-hidden rounded-lg border bg-muted/30 px-3 py-2.5 text-sm">
+                  <ImageIcon className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (originalUrl) URL.revokeObjectURL(originalUrl);
+                      if (gradedUrl) URL.revokeObjectURL(gradedUrl);
+                      setFile(null);
+                      setOriginalUrl(null);
+                      setGradedUrl(null);
+                    }}
+                    className="shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm hover:bg-muted/50">
+                  <span className="text-muted-foreground">Choose an image…</span>
+                  <Upload className="size-4 text-muted-foreground" />
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleFile(f);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -145,7 +165,15 @@ export function LutPreviewDialog({
 
             {preview.isError && (
               <Alert variant="destructive">
-                {preview.error instanceof Error ? preview.error.message : 'Preview failed'}
+                <AlertCircle className="size-4" />
+                <AlertTitle>Preview failed</AlertTitle>
+                <AlertDescription className="flex items-center justify-between">
+                  <span>{preview.error.message}</span>
+                  <Button variant="destructive" size="sm" onClick={handleRunPreview}>
+                    <RefreshCw className="mr-1 size-3" />
+                    Retry
+                  </Button>
+                </AlertDescription>
               </Alert>
             )}
           </div>
@@ -157,8 +185,9 @@ export function LutPreviewDialog({
                 {originalUrl ? (
                   <img src={originalUrl} alt="Original" className="h-full w-full object-contain" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-                    Upload a sample image
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <Upload className="size-8" />
+                    <p className="text-sm">Upload a sample image</p>
                   </div>
                 )}
               </div>
@@ -169,8 +198,9 @@ export function LutPreviewDialog({
                 {gradedUrl ? (
                   <img src={gradedUrl} alt="Preview" className="h-full w-full object-contain" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-                    Render preview to see result
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <ImageIcon className="size-8" />
+                    <p className="text-sm">Preview will appear here</p>
                   </div>
                 )}
               </div>

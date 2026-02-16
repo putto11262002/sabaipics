@@ -4,9 +4,11 @@ import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
-import { Alert } from '@/shared/components/ui/alert';
+import { Alert, AlertTitle, AlertDescription } from '@/shared/components/ui/alert';
+import { Button } from '@/shared/components/ui/button';
 import { Spinner } from '@/shared/components/ui/spinner';
-import { Upload } from 'lucide-react';
+import { AlertCircle, Image as ImageIcon, RefreshCw, Upload } from 'lucide-react';
+import { cn } from '@/shared/utils/ui';
 
 import { useDebounce } from '../../../hooks/useDebounce';
 import { useAuth } from '@/auth/react';
@@ -50,6 +52,8 @@ export default function StudioLutPreviewPage() {
 
   const [isRendering, setIsRendering] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   const debouncedIntensity = useDebounce(intensity, 300);
   const debouncedIncludeLuminance = useDebounce(includeLuminance, 300);
@@ -169,7 +173,7 @@ export default function StudioLutPreviewPage() {
         abortRef.current = null;
       }
     };
-  }, [id, file, debouncedIntensity, debouncedIncludeLuminance]);
+  }, [id, file, debouncedIntensity, debouncedIncludeLuminance, retryCount]);
 
   const canRender = Boolean(id) && Boolean(file);
 
@@ -186,7 +190,26 @@ export default function StudioLutPreviewPage() {
 
       <div className="flex flex-1 flex-col gap-4 p-4">
         {!id && <Alert variant="destructive">Missing LUT id.</Alert>}
-        {renderError && <Alert variant="destructive">{renderError}</Alert>}
+        {renderError && (
+          <Alert variant="destructive">
+            <AlertCircle className="size-4" />
+            <AlertTitle>Preview failed</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+              <span>{renderError}</span>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  setRenderError(null);
+                  setRetryCount((c) => c + 1);
+                }}
+              >
+                <RefreshCw className="mr-1 size-3" />
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <input
           ref={fileInputRef}
@@ -231,15 +254,33 @@ export default function StudioLutPreviewPage() {
             <Label className="text-xs">Before</Label>
             <button
               type="button"
-              className="relative aspect-[4/3] w-full overflow-hidden rounded-md border bg-muted"
+              className={cn(
+                'relative aspect-[4/3] w-full overflow-hidden rounded-lg border-2 border-dashed bg-muted transition-colors',
+                isDragging
+                  ? 'border-primary bg-primary/5'
+                  : originalUrl
+                    ? 'border-transparent'
+                    : 'border-muted-foreground/25 hover:border-muted-foreground/50',
+              )}
               onClick={() => fileInputRef.current?.click()}
+              onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(false);
+                const f = e.dataTransfer.files?.[0];
+                if (f) handleFile(f);
+              }}
             >
               {originalUrl ? (
                 <img src={originalUrl} alt="Original" className="h-full w-full object-contain" />
               ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                  <Upload className="size-5" />
-                  <div className="text-xs">Click to choose a sample image</div>
+                  <Upload className="size-8" />
+                  <p className="text-sm font-medium">Drop image here or click to browse</p>
+                  <p className="text-xs">JPEG, PNG, or WebP</p>
                 </div>
               )}
             </button>
@@ -252,12 +293,13 @@ export default function StudioLutPreviewPage() {
               {gradedUrl ? (
                 <img src={gradedUrl} alt="Preview" className="h-full w-full object-contain" />
               ) : file ? null : (
-                <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-                  Choose a sample image to preview
+                <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                  <ImageIcon className="size-8" />
+                  <p className="text-sm">Preview will appear here</p>
                 </div>
               )}
               {file && isRendering && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm">
                   <Spinner className="size-6 text-muted-foreground" />
                 </div>
               )}
