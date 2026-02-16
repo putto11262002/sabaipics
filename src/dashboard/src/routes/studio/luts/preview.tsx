@@ -224,7 +224,7 @@ export default function StudioLutPreviewPage() {
         />
 
         <FieldGroup>
-          <Field orientation="horizontal">
+          <Field orientation="responsive">
             <FieldContent>
               <FieldLabel>Intensity</FieldLabel>
               <FieldDescription>Strength of the color grade</FieldDescription>
@@ -243,7 +243,7 @@ export default function StudioLutPreviewPage() {
             </div>
           </Field>
 
-          <Field orientation="horizontal" align="end">
+          <Field orientation="responsive" align="end">
             <FieldContent>
               <FieldLabel>Include luminance</FieldLabel>
               <FieldDescription>Allow brightness changes</FieldDescription>

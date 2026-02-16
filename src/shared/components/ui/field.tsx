@@ -53,7 +53,7 @@ const fieldVariants = cva("data-[invalid=true]:text-destructive gap-2 group/fiel
       horizontal:
         "col-span-2 grid grid-cols-subgrid items-center has-[>[data-slot=field-content]]:items-start has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
       responsive:
-        "flex-col *:w-full [&>.sr-only]:w-auto @md/field-group:col-span-2 @md/field-group:grid @md/field-group:grid-cols-subgrid @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+        "flex-col col-span-2 *:w-full [&>.sr-only]:w-auto @md/field-group:grid @md/field-group:grid-cols-subgrid @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
     },
     align: {
       start: "[&>:last-child]:justify-self-start",
