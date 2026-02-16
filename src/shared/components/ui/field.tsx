@@ -37,7 +37,7 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="field-group"
       className={cn(
-        "gap-5 data-[slot=checkbox-group]:gap-3 *:data-[slot=field-group]:gap-4 group/field-group @container/field-group flex w-full flex-col",
+        "gap-5 data-[slot=checkbox-group]:gap-3 *:data-[slot=field-group]:gap-4 group/field-group @container/field-group grid w-full grid-cols-[1fr_2fr]",
         className
       )}
       {...props}
@@ -49,11 +49,15 @@ const fieldVariants = cva("data-[invalid=true]:text-destructive gap-2 group/fiel
   variants: {
     orientation: {
       vertical:
-        "flex-col *:w-full [&>.sr-only]:w-auto",
+        "flex-col col-span-2 *:w-full [&>.sr-only]:w-auto",
       horizontal:
-        "flex-row items-center *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:items-start has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+        "col-span-2 grid grid-cols-subgrid items-center has-[>[data-slot=field-content]]:items-start has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
       responsive:
-        "flex-col *:w-full [&>.sr-only]:w-auto @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:*:data-[slot=field-label]:flex-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+        "flex-col *:w-full [&>.sr-only]:w-auto @md/field-group:col-span-2 @md/field-group:grid @md/field-group:grid-cols-subgrid @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+    },
+    align: {
+      start: "[&>:last-child]:justify-self-start",
+      end: "[&>:last-child]:justify-self-end",
     },
   },
   defaultVariants: {
@@ -64,6 +68,7 @@ const fieldVariants = cva("data-[invalid=true]:text-destructive gap-2 group/fiel
 function Field({
   className,
   orientation = "vertical",
+  align,
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants>) {
   return (
@@ -71,7 +76,7 @@ function Field({
       role="group"
       data-slot="field"
       data-orientation={orientation}
-      className={cn(fieldVariants({ orientation }), className)}
+      className={cn(fieldVariants({ orientation, align }), className)}
       {...props}
     />
   )

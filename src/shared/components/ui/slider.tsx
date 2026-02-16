@@ -11,8 +11,11 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  variant = "default",
   ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root>) {
+}: React.ComponentProps<typeof SliderPrimitive.Root> & {
+  variant?: "default" | "primary"
+}) {
   const _values = React.useMemo(
     () =>
       Array.isArray(value)
@@ -42,7 +45,10 @@ function Slider({
       >
         <SliderPrimitive.Range
           data-slot="slider-range"
-          className="bg-primary absolute select-none data-horizontal:h-full data-vertical:w-full"
+          className={cn(
+            "absolute select-none data-horizontal:h-full data-vertical:w-full",
+            variant === "primary" ? "bg-primary" : "bg-foreground"
+          )}
         />
       </SliderPrimitive.Track>
       {Array.from({ length: _values.length }, (_, index) => (
