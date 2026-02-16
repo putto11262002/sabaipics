@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
-import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
+import { Field, FieldContent, FieldGroup, FieldLabel, FieldDescription } from '@/shared/components/ui/field';
 import { Alert, AlertTitle, AlertDescription } from '@/shared/components/ui/alert';
 import { Button } from '@/shared/components/ui/button';
 import { Spinner } from '@/shared/components/ui/spinner';
@@ -14,10 +14,10 @@ import { useDebounce } from '../../../hooks/useDebounce';
 import { useAuth } from '@/auth/react';
 
 function parseIntensity(value: string | null): number {
-  if (value == null) return 75;
-  if (value.trim() === '') return 75;
+  if (value == null) return 100;
+  if (value.trim() === '') return 100;
   const n = Number(value);
-  if (!Number.isFinite(n)) return 75;
+  if (!Number.isFinite(n)) return 100;
   return Math.min(100, Math.max(0, Math.round(n)));
 }
 
@@ -223,35 +223,42 @@ export default function StudioLutPreviewPage() {
           }}
         />
 
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="min-w-[220px] flex-1">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Intensity</Label>
-              <span className="text-xs text-muted-foreground">{intensity}%</span>
+        <FieldGroup>
+          <Field orientation="horizontal">
+            <FieldContent>
+              <FieldLabel>Intensity</FieldLabel>
+              <FieldDescription>Strength of the color grade</FieldDescription>
+            </FieldContent>
+            <div className="flex items-center gap-3">
+              <Slider
+                className="flex-1"
+                value={[intensity]}
+                min={0}
+                max={100}
+                step={1}
+                onValueChange={(v) => setIntensity(v[0] ?? 100)}
+                disabled={!canRender}
+              />
+              <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">{intensity}%</span>
             </div>
-            <Slider
-              value={[intensity]}
-              min={0}
-              max={100}
-              step={1}
-              onValueChange={(v) => setIntensity(v[0] ?? 75)}
-              disabled={!canRender}
-            />
-          </div>
+          </Field>
 
-          <div className="flex items-center gap-3">
-            <Label className="text-xs">Include luminance</Label>
+          <Field orientation="horizontal" align="end">
+            <FieldContent>
+              <FieldLabel>Include luminance</FieldLabel>
+              <FieldDescription>Allow brightness changes</FieldDescription>
+            </FieldContent>
             <Switch
               checked={includeLuminance}
               onCheckedChange={setIncludeLuminance}
               disabled={!canRender}
             />
-          </div>
-        </div>
+          </Field>
+        </FieldGroup>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label className="text-xs">Before</Label>
+            <FieldLabel>Before</FieldLabel>
             <button
               type="button"
               className={cn(
@@ -288,7 +295,7 @@ export default function StudioLutPreviewPage() {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs">After</Label>
+            <FieldLabel>After</FieldLabel>
             <div className="relative aspect-[4/3] overflow-hidden rounded-md border bg-muted">
               {gradedUrl ? (
                 <img src={gradedUrl} alt="Preview" className="h-full w-full object-contain" />
