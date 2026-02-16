@@ -1,5 +1,5 @@
 import { Link } from '@/i18n/navigation';
-import { LogoMark } from '@/components/icons/logo-mark';
+import { LogoMark } from '@/shared/components/icons/logo-mark';
 
 const footerLinks = {
   product: [
@@ -30,7 +30,7 @@ export function Footer() {
               href="/"
               className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight"
             >
-              <LogoMark className="h-5 w-5 text-foreground" />
+              <LogoMark className="h-5 w-5" />
               FrameFast
             </Link>
             <p className="mt-3 text-sm text-muted-foreground">

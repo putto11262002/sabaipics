@@ -1,7 +1,7 @@
 import { Link } from '@/i18n/navigation';
 
 import { RoundedButton } from '@/components/ui/rounded-button';
-import { LogoMark } from '@/components/icons/logo-mark';
+import { LogoMark } from '@/shared/components/icons/logo-mark';
 
 const navItems = [
   { href: '#features', label: 'Features' },
@@ -19,7 +19,7 @@ export function SiteNav() {
             href="/"
             className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight"
           >
-            <LogoMark className="h-5 w-5 text-foreground" />
+            <LogoMark className="h-5 w-5" />
             FrameFast
           </Link>
 

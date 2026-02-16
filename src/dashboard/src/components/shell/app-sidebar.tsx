@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { LayoutDashboard, CalendarDays, Sparkles, Coins } from 'lucide-react';
 
-import { LogoMark } from '../icons/logo-mark';
+import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { NavMain } from './nav-main';
 import { NavSecondary } from './nav-secondary';
 import { NavUser } from './nav-user';
@@ -75,7 +75,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     <Sidebar {...props}>
       <SidebarHeader>
         <a href="/dashboard" className="flex items-center gap-2 p-2">
-          <LogoMark className="size-6 text-primary" />
+          <LogoMark className="size-6" />
           <span className="font-medium">FrameFast</span>
         </a>
       </SidebarHeader>

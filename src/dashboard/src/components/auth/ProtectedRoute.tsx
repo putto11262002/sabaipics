@@ -1,6 +1,6 @@
 import { useAuth } from "@/auth/react";
 import { Navigate, useLocation } from "react-router";
-import { LogoMark } from "../icons/logo-mark";
+import { LogoMark } from "@/shared/components/icons/logo-mark";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 	const { isLoaded, isSignedIn } = useAuth();
@@ -9,7 +9,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 	if (!isLoaded) {
 		return (
 			<div className="flex min-h-screen flex-col items-center justify-center gap-4">
-				<LogoMark className="size-20 text-primary animate-pulse" />
+				<LogoMark className="size-20 animate-pulse" />
 				<span className="text-lg font-semibold text-foreground">FrameFast</span>
 			</div>
 		);
