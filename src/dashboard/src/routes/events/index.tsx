@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { differenceInDays, parseISO } from 'date-fns';
 import { Button } from '@/shared/components/ui/button';
@@ -35,7 +34,6 @@ type StatusFilter = 'all' | 'active' | 'expiring' | 'expired';
 
 export default function EventsPage() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
@@ -82,13 +80,8 @@ export default function EventsPage() {
       { eventId: deleteEventId },
       {
         onSuccess: () => {
-          // Invalidate all event queries
-          queryClient.invalidateQueries({ queryKey: ['events'] });
-
-          // Show success toast
           toast.success('Event deleted');
-
-          setDeleteEventId(null); // Close dialog
+          setDeleteEventId(null);
         },
         onError: (error) => {
           toast.error('Delete failed', {

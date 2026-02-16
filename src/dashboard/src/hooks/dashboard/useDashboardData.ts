@@ -1,56 +1,41 @@
-import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../lib/api";
+import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
+
+type DashboardDataResponse = InferResponseType<
+  typeof api.dashboard.$get,
+  SuccessStatusCode
+>;
 
 export interface DashboardEvent {
-	id: string;
-	name: string;
-	photoCount: number;
-	faceCount: number;
-	createdAt: string;
-	expiresAt: string;
-	startDate: string | null;
-	endDate: string | null;
+  id: string;
+  name: string;
+  photoCount: number;
+  faceCount: number;
+  createdAt: string;
+  expiresAt: string;
+  startDate: string | null;
+  endDate: string | null;
 }
 
 export interface DashboardResponse {
-	credits: {
-		balance: number;
-		nearestExpiry: string | null;
-	};
-	events: DashboardEvent[];
-	stats: {
-		totalPhotos: number;
-		totalFaces: number;
-	};
-}
-
-interface DashboardData {
-	data: DashboardResponse;
+  credits: {
+    balance: number;
+    nearestExpiry: string | null;
+  };
+  events: DashboardEvent[];
+  stats: {
+    totalPhotos: number;
+    totalFaces: number;
+  };
 }
 
 export function useDashboardData() {
-	const { getToken } = useApiClient();
-
-	return useQuery({
-		queryKey: ["dashboard"],
-		queryFn: async () => {
-			const token = await getToken();
-			const response = await fetch(
-				`${import.meta.env.VITE_API_URL}/dashboard`,
-				{
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				}
-			);
-
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-			}
-
-			return response.json() as Promise<DashboardData>;
-		},
-		staleTime: 1000 * 60, // 1 minute
-		refetchOnWindowFocus: true, // Auto-refresh when user returns from Stripe
-	});
+  return useApiQuery<DashboardDataResponse>({
+    queryKey: ['dashboard'],
+    apiFn: (opts) => api.dashboard.$get({}, opts),
+    staleTime: 1000 * 60, // 1 minute
+    refetchOnWindowFocus: true, // Auto-refresh when user returns from Stripe
+  });
 }

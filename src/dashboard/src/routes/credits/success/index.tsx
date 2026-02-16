@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { useSearchParams, useNavigate } from "react-router";
 import { useEffect } from "react";
 import {
@@ -6,18 +5,17 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Spinner } from "@/shared/components/ui/spinner";
-import { useApiClient } from "../../../lib/api";
+import { api } from "../../../lib/api";
+import type { InferResponseType } from "hono/client";
+import type { SuccessStatusCode } from "hono/utils/http-status";
+import { useApiQuery } from "@/shared/hooks/rq/use-api-query";
 
-interface PurchaseStatusResponse {
-  fulfilled: boolean;
-  credits: number | null;
-  expiresAt?: string;
-}
+const getPurchaseStatus = api["credit-packages"].purchase[":sessionId"].$get;
+type PurchaseApiResponse = InferResponseType<typeof getPurchaseStatus, SuccessStatusCode>;
 
 export function CreditSuccessPage() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get("session_id");
-  const { getToken } = useApiClient();
   const navigate = useNavigate();
 
   // Use React Query for automatic polling
@@ -25,35 +23,15 @@ export function CreditSuccessPage() {
     data: purchaseStatus,
     isLoading,
     error,
-  } = useQuery({
+  } = useApiQuery<PurchaseApiResponse>({
     queryKey: ["credit-purchase", sessionId],
-    queryFn: async (): Promise<PurchaseStatusResponse> => {
-      if (!sessionId) {
-        throw new Error("Missing session_id");
-      }
-      const token = await getToken();
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/credit-packages/purchase/${sessionId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (!response.ok) {
-        const errorData = (await response.json().catch(() => null)) as {
-          error?: { message?: string };
-        } | null;
-        throw new Error(
-          errorData?.error?.message ||
-            `HTTP ${response.status}: ${response.statusText}`,
-        );
-      }
-
-      return response.json() as Promise<PurchaseStatusResponse>;
-    },
-    // Poll every 2 seconds until fulfilled or timeout
+    apiFn: (opts) =>
+      getPurchaseStatus(
+        { param: { sessionId: sessionId! } },
+        opts,
+      ),
+    enabled: !!sessionId,
+    // Poll every 2 seconds until fulfilled
     refetchInterval: (query) => {
       // Stop polling when purchase is fulfilled
       if (query.state.data?.fulfilled) {
@@ -135,7 +113,7 @@ export function CreditSuccessPage() {
           </div>
           {error && (
             <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 text-sm text-destructive">
-              {(error as Error).message}
+              {error.message}
             </div>
           )}
         </div>

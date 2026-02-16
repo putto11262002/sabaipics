@@ -114,9 +114,7 @@ export function DashboardPage() {
   // Show error if promo code validation fails
   useEffect(() => {
     if (validateQuery.isError && promoCodeFromUrl) {
-      const message = validateQuery.error instanceof Error
-        ? validateQuery.error.message
-        : 'This promo code is invalid or expired';
+      const message = validateQuery.error?.message ?? 'This promo code is invalid or expired';
 
       setErrorMessage(message);
       setErrorDialogOpen(true);

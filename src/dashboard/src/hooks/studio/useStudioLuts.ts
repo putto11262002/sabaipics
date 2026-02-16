@@ -1,30 +1,27 @@
-import { useQuery } from '@tanstack/react-query';
+import { api } from '../../lib/api';
 import type { InferResponseType } from 'hono/client';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
 const listLuts = api.studio.luts.$get;
+type StudioLutsResponse = InferResponseType<typeof listLuts, SuccessStatusCode>;
 
-export type StudioLut = InferResponseType<typeof listLuts, 200>['data'][0];
+export type StudioLut = StudioLutsResponse['data'][0];
 
 export function useStudioLuts(options?: { limit?: number }) {
-  const { getToken } = useApiClient();
   const limit = options?.limit ?? 200;
 
-  return useQuery({
+  const query = useApiQuery<StudioLutsResponse>({
     queryKey: ['studio', 'luts', { limit }],
-    queryFn: async () => {
-      const res = await listLuts({ query: { limit } }, await withAuth(getToken));
-
-      if (!res.ok) {
-        throw new Error('Failed to load LUTs');
-      }
-
-      const json = await res.json();
-      return json.data;
-    },
+    apiFn: (opts) => listLuts({ query: { limit } }, opts),
     // LUT creation flow now owns pending/processing state and revalidates on completion.
     // Keep the Studio LUT list stable (no background polling).
     refetchInterval: false,
     staleTime: 0,
   });
+
+  return {
+    ...query,
+    data: query.data?.data,
+  };
 }

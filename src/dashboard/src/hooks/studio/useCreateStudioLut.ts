@@ -1,70 +1,55 @@
 import { useMutation } from '@tanstack/react-query';
-import { api, useApiClient } from '../../lib/api';
+import { parseResponse } from 'hono/client';
+import { useAuth } from '@/auth/react';
+import { api } from '../../lib/api';
+import { toRequestError, type RequestError } from '@/shared/lib/api-error';
 
 type CreateKind = 'cube' | 'reference';
 
 export function useCreateStudioLut() {
-  const { getToken } = useApiClient();
+  const { getToken } = useAuth();
 
-  return useMutation({
-    mutationFn: async ({
-      kind,
-      name,
-      file,
-    }: {
-      kind: CreateKind;
-      name: string;
-      file: File;
-    }): Promise<{ lutId: string }> => {
-      const token = await getToken();
-      const contentLength = file.size;
+  return useMutation<{ lutId: string }, RequestError, { kind: CreateKind; name: string; file: File }>({
+    mutationFn: async ({ kind, name, file }) => {
+      try {
+        const token = await getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const presignRes =
-        kind === 'cube'
-          ? await api.studio.luts.cube.presign.$post(
-              { json: { name, contentLength } },
-              token
-                ? {
-                    headers: {
-                      Authorization: `Bearer ${token}`,
+        // Step 1: Get presigned URL (use parseResponse for Hono client)
+        const presignResponse =
+          kind === 'cube'
+            ? await parseResponse(
+                api.studio.luts.cube.presign.$post({ json: { name, contentLength: file.size } }, { headers }),
+              )
+            : await parseResponse(
+                api.studio.luts.reference.presign.$post(
+                  {
+                    json: {
+                      name,
+                      contentType: file.type as 'image/jpeg' | 'image/png' | 'image/webp',
+                      contentLength: file.size,
                     },
-                  }
-                : undefined,
-            )
-          : await api.studio.luts.reference.presign.$post(
-              {
-                json: {
-                  name,
-                  contentType: file.type as 'image/jpeg' | 'image/png' | 'image/webp',
-                  contentLength,
-                },
-              },
-              token
-                ? {
-                    headers: {
-                      Authorization: `Bearer ${token}`,
-                    },
-                  }
-                : undefined,
-            );
+                  },
+                  { headers },
+                ),
+              );
 
-      if (!presignRes.ok) {
-        throw new Error('Failed to get upload URL');
+        // Step 2: Upload directly to R2
+        const uploadRes = await fetch(presignResponse.data.putUrl, {
+          method: 'PUT',
+          headers: presignResponse.data.requiredHeaders,
+          body: kind === 'cube' ? new Blob([await file.text()], { type: 'text/plain' }) : file,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error('Upload to storage failed');
+        }
+
+        return { lutId: presignResponse.data.lutId };
+      } catch (e) {
+        throw toRequestError(e);
       }
-
-      const { data: presign } = await presignRes.json();
-
-      const uploadRes = await fetch(presign.putUrl, {
-        method: 'PUT',
-        headers: presign.requiredHeaders,
-        body: kind === 'cube' ? new Blob([await file.text()], { type: 'text/plain' }) : file,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error('Upload to storage failed');
-      }
-
-      return { lutId: presign.lutId };
     },
     retry: false,
   });

@@ -1,4 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
+import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
+
+const getPromoCodeValidate = api['credit-packages']['promo-code'].validate.$get;
+type PromoCodeValidateResponse = InferResponseType<typeof getPromoCodeValidate, SuccessStatusCode>;
 
 interface GiftCodeData {
   type: 'gift';
@@ -24,28 +30,14 @@ interface PromoCodeValidationResponse {
 }
 
 export function useValidatePromoCode(code: string, enabled = true) {
-  return useQuery<PromoCodeValidationResponse>({
+  return useApiQuery<PromoCodeValidateResponse>({
     queryKey: ['promo-code-validate', code],
-    queryFn: async () => {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/credit-packages/promo-code/validate?code=${encodeURIComponent(code)}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          (errorData as any).error?.message || `HTTP ${response.status}: ${response.statusText}`
-        );
-      }
-
-      return response.json();
-    },
+    apiFn: (opts) =>
+      getPromoCodeValidate(
+        { query: { code } },
+        opts,
+      ),
+    withAuth: false,
     enabled: enabled && !!code,
     retry: false,
     staleTime: 0, // Always validate fresh

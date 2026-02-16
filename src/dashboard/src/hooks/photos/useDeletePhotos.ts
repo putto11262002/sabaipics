@@ -1,10 +1,12 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { api } from '../../lib/api';
 import { type InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
 
 const deletePhotos = api.events[':eventId'].photos.delete.$post;
 
-type DeletePhotosResponse = InferResponseType<typeof deletePhotos, 200>;
+type DeletePhotosResponse = InferResponseType<typeof deletePhotos, SuccessStatusCode>;
 
 interface DeletePhotosParams {
   eventId: string;
@@ -13,24 +15,16 @@ interface DeletePhotosParams {
 
 export function useDeletePhotos() {
   const queryClient = useQueryClient();
-  const { getToken } = useApiClient();
 
-  return useMutation({
-    mutationFn: async ({ eventId, photoIds }: DeletePhotosParams) => {
-      const res = await api.events[':eventId'].photos.delete.$post(
+  return useApiMutation<DeletePhotosResponse, DeletePhotosParams>({
+    apiFn: (input, opts) =>
+      deletePhotos(
         {
-          param: { eventId },
-          json: { photoIds },
+          param: { eventId: input.eventId },
+          json: { photoIds: input.photoIds },
         },
-        await withAuth(getToken)
-      );
-
-      if (!res.ok) {
-        throw new Error(`Failed to delete photos: ${res.status}`);
-      }
-
-      return (await res.json()) as DeletePhotosResponse;
-    },
+        opts,
+      ),
     onSuccess: (_data, variables) => {
       // Invalidate the photos query to refetch the list
       queryClient.invalidateQueries({

@@ -2,17 +2,21 @@
 
 ## 1. Hook / Component Boundary
 
-**Hook** (data mapping only):
+**Hook** (data mapping + cache ownership):
 - Map client → wire format (`apiFn`)
 - Map wire → client format (`parseResponse`)
 - Auth header injection
-- `onSuccess`: cache invalidation only
+- `onSuccess`: **ALL** cache invalidation and `removeQueries` — the hook is the single source of truth for "what becomes stale when this mutation succeeds"
 
-**Component** (UI feedback):
-- `onSuccess`: navigate, close modal, toast
+**Component** (UI feedback only):
+- `.mutate()` / `.mutateAsync()` callbacks: navigate, close modal, toast, reset form
 - `onError`: show Alert or `toast.error`
 - Loading UI: Spinner in button, disabled state
 - Empty/error states: declarative from hook return
+- **Never** call `invalidateQueries` or `removeQueries` — that's the hook's job
+
+**Multi-step orchestration** (e.g. upload → poll status → complete):
+- When a flow spans multiple hooks (mutation + polling query), the orchestrating hook or component invalidates when the *full flow* completes — this is the one exception where a component may invalidate, because the individual mutation hook doesn't know when the flow is done
 
 ## 2. Wrappers
 

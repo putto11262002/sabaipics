@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Outlet, NavLink, Link } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/shared/components/ui/button';
 import { Alert } from '@/shared/components/ui/alert';
@@ -36,7 +35,6 @@ const tabs = [
 export default function EventDetailLayout() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { data, isLoading, error, refetch } = useEvent(id);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const downloadQR = useDownloadQR();
@@ -58,11 +56,9 @@ export default function EventDetailLayout() {
       { eventId: id },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['events'] });
-          queryClient.removeQueries({ queryKey: ['events', id] }); // Remove specific event from cache
           toast.success('Event deleted');
           setDeleteDialogOpen(false);
-          navigate('/events'); // Redirect to list
+          navigate('/events');
         },
         onError: (error) => {
           toast.error('Delete failed', {
@@ -82,11 +78,9 @@ export default function EventDetailLayout() {
       { eventId: id },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['events'] });
-          queryClient.removeQueries({ queryKey: ['events', id] }); // Remove specific event from cache
           toast.success('Event permanently deleted');
           setHardDeleteDialogOpen(false);
-          navigate('/events'); // Redirect to list
+          navigate('/events');
         },
         onError: (error) => {
           toast.error('Hard delete failed', {

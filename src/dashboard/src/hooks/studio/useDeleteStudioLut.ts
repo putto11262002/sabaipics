@@ -1,23 +1,19 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
+import { useQueryClient } from '@tanstack/react-query';
+
+type DeleteStudioLutResponse = InferResponseType<
+  (typeof api.studio.luts)[':id']['$delete'],
+  SuccessStatusCode
+>;
 
 export function useDeleteStudioLut() {
   const queryClient = useQueryClient();
-  const { getToken } = useApiClient();
 
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const res = await api.studio.luts[':id'].$delete({ param: { id } }, await withAuth(getToken));
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
-          error?: { message?: string };
-        } | null;
-        throw new Error(body?.error?.message || 'Failed to delete LUT');
-      }
-
-      return true;
-    },
+  return useApiMutation<DeleteStudioLutResponse, string>({
+    apiFn: (id, opts) => api.studio.luts[':id'].$delete({ param: { id } }, opts),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['studio', 'luts'] });
     },

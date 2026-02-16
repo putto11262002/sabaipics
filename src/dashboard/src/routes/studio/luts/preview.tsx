@@ -9,7 +9,7 @@ import { Spinner } from '@/shared/components/ui/spinner';
 import { Upload } from 'lucide-react';
 
 import { useDebounce } from '../../../hooks/useDebounce';
-import { useApiClient } from '../../../lib/api';
+import { useAuth } from '@/auth/react';
 
 function parseIntensity(value: string | null): number {
   if (value == null) return 75;
@@ -27,7 +27,7 @@ function parseIncludeLuminance(value: string | null): boolean {
 export default function StudioLutPreviewPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  const { getToken } = useApiClient();
+  const { getToken } = useAuth();
 
   // `getToken` identity is not guaranteed stable; keep a ref to avoid re-triggering
   // preview renders on every auth state re-render.

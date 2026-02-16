@@ -1,8 +1,11 @@
-import { useMutation } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
-import type { InferRequestType } from 'hono';
+import { api } from '../../lib/api';
+import type { InferRequestType, InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
 
 const uploadPhoto = api.photos.$post;
+
+type UploadPhotoResponse = InferResponseType<typeof uploadPhoto, SuccessStatusCode>;
 
 export type UploadPhotoInput = InferRequestType<typeof uploadPhoto>;
 
@@ -17,29 +20,17 @@ export interface UploadPhotoResult {
 }
 
 export function useUploadPhoto() {
-  const { getToken } = useApiClient();
-
-  return useMutation({
-    mutationFn: async ({ eventId, file }: { eventId: string; file: File }): Promise<UploadPhotoResult> => {
-      const response = await uploadPhoto(
+  return useApiMutation<UploadPhotoResponse, { eventId: string; file: File }>({
+    apiFn: (input, opts) =>
+      uploadPhoto(
         {
           form: {
-            file,
-            eventId,
+            file: input.file,
+            eventId: input.eventId,
           },
         },
-        await withAuth(getToken)
-      );
-
-      if (!response.ok) {
-        const error = new Error('Upload failed') as Error & { status: number };
-        error.status = response.status;
-        throw error;
-      }
-
-      const json = await response.json();
-      return json.data as UploadPhotoResult;
-    },
+        opts,
+      ),
     // No onSuccess invalidation - optimistic updates handled in useUploadQueue
     retry: false,
   });

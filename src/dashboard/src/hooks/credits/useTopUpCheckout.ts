@@ -1,5 +1,10 @@
-import { useMutation } from '@tanstack/react-query';
-import { useApiClient } from '../../lib/api';
+import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
+
+const postCheckout = api['credit-packages'].checkout.$post;
+type TopUpCheckoutResponse = InferResponseType<typeof postCheckout, SuccessStatusCode>;
 
 export interface TopUpCheckoutInput {
   amount: number;
@@ -20,38 +25,9 @@ export interface TopUpCheckoutResult {
 }
 
 export function useTopUpCheckout() {
-  const { getToken } = useApiClient();
-
-  return useMutation({
-    mutationFn: async (input: TopUpCheckoutInput): Promise<TopUpCheckoutResult> => {
-      const token = await getToken();
-
-      if (!token) {
-        throw new Error('Not authenticated. Please sign in and try again.');
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/credit-packages/checkout`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(input),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          (errorData as any).error?.message || `HTTP ${response.status}: ${response.statusText}`
-        );
-      }
-
-      const json = (await response.json()) as { data: TopUpCheckoutResult };
-      return json.data;
-    },
+  return useApiMutation<TopUpCheckoutResponse, TopUpCheckoutInput>({
+    apiFn: (input, opts) =>
+      postCheckout({ json: input }, opts),
     retry: false,
   });
 }

@@ -5,7 +5,6 @@ import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 const getStatus = api.photos.status.$get;
 
 type PhotoStatusResponse = InferResponseType<typeof getStatus, 200>;
-
 export type PhotoStatus = PhotoStatusResponse['data'][0];
 
 /**
@@ -20,11 +19,20 @@ export function usePhotosStatus(
 ) {
   const query = useApiQuery<PhotoStatusResponse>({
     queryKey: ['photos', 'status', photoIds],
-    apiFn: (opts) => getStatus({ query: { ids: photoIds.join(',') } }, opts),
+    apiFn: (opts) =>
+      getStatus(
+        {
+          query: { ids: photoIds.join(',') },
+        },
+        opts,
+      ),
     enabled: options?.enabled !== false && photoIds.length > 0,
     refetchInterval: options?.refetchInterval,
     staleTime: 0,
   });
 
-  return { ...query, data: query.data?.data };
+  return {
+    ...query,
+    data: query.data?.data,
+  };
 }

@@ -176,7 +176,8 @@ export default function StudioLutsPage() {
                                   'noopener,noreferrer',
                                 );
                                 try {
-                                  const { url } = await download.mutateAsync(lut.id);
+                                  const res = await download.mutateAsync(lut.id);
+                                  const url = res.data.getUrl;
 
                                   if (newTab) {
                                     newTab.location.href = url;

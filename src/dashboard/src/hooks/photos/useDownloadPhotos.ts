@@ -1,5 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import { useAuth } from '@/auth/react';
+import { api } from '../../lib/api';
+import { toRequestError, type RequestError } from '@/shared/lib/api-error';
 
 interface DownloadPhotosParams {
   eventId: string;
@@ -7,31 +9,36 @@ interface DownloadPhotosParams {
 }
 
 export function useDownloadPhotos() {
-  const { getToken } = useApiClient();
+  const { getToken } = useAuth();
 
-  return useMutation({
-    mutationFn: async ({ eventId, photoIds }: DownloadPhotosParams) => {
-      const response = await api.events[':eventId'].photos.download.$post(
-        {
-          param: { eventId },
-          json: { photoIds },
-        },
-        await withAuth(getToken)
-      );
+  return useMutation<void, RequestError, DownloadPhotosParams>({
+    mutationFn: async ({ eventId, photoIds }) => {
+      try {
+        const token = await getToken();
+        const response = await api.events[':eventId'].photos.download.$post(
+          {
+            param: { eventId },
+            json: { photoIds },
+          },
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+        );
 
-      if (!response.ok) {
-        throw new Error(`Failed to download: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`Failed to download: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${eventId}-photos.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } catch (e) {
+        throw toRequestError(e);
       }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${eventId}-photos.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
     },
   });
 }
