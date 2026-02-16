@@ -34,7 +34,9 @@ struct FrameFastApp: App {
                         Task { try? await clerk.load() }
                         Task { await coordinator.uploadManager.resume() }
                         coordinator.uploadStatusStore.start()
-                        coordinator.creditsStore.start()
+                        if clerk.user != nil {
+                            coordinator.creditsStore.start()
+                        }
                     case .background:
                         coordinator.uploadStatusStore.stop()
                         coordinator.creditsStore.stop()
