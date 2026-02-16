@@ -9,6 +9,8 @@ type DeleteStudioLutResponse = InferResponseType<
   SuccessStatusCode
 >;
 
+export type DeleteStudioLutInput = string;
+
 export function useDeleteStudioLut() {
   const queryClient = useQueryClient();
 

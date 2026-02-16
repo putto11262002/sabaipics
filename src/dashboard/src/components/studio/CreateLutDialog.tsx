@@ -284,7 +284,7 @@ export function CreateLutDialog({
             <Button onClick={submit} disabled={!canSubmit || isProcessing}>
               {isProcessing ? (
                 <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  <Loader2 className="mr-1 size-4 animate-spin" />
                   Working…
                 </>
               ) : (

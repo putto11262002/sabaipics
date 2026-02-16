@@ -6,9 +6,14 @@ import { toRequestError, type RequestError } from '@/shared/lib/api-error';
 
 type CreateKind = 'cube' | 'reference';
 
+export type CreateStudioLutInput = { kind: CreateKind; name: string; file: File };
+export type CreateStudioLutResult = { lutId: string };
+
 export function useCreateStudioLut() {
   const { getToken } = useAuth();
 
+  // Multi-step presign → upload flow requires raw useMutation.
+  // The wrapper's single parseResponse call can't handle the two-phase upload.
   return useMutation<{ lutId: string }, RequestError, { kind: CreateKind; name: string; file: File }>({
     mutationFn: async ({ kind, name, file }) => {
       try {

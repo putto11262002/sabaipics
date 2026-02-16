@@ -8,6 +8,8 @@ type DownloadStudioLutResponse = InferResponseType<
   SuccessStatusCode
 >;
 
+export type DownloadStudioLutInput = string;
+
 export function useDownloadStudioLut() {
   return useApiMutation<DownloadStudioLutResponse, string>({
     apiFn: (id, opts) => api.studio.luts[':id'].download.$get({ param: { id } }, opts),
