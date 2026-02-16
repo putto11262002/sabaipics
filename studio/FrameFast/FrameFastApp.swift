@@ -39,7 +39,7 @@ struct FrameFastApp: App {
                         }
                     case .background:
                         coordinator.uploadStatusStore.stop()
-                        coordinator.creditsStore.stop()
+                        coordinator.creditsStore.pause()
                         Task { await coordinator.scheduleBackgroundDrainIfNeeded() }
                     case .inactive:
                         break
