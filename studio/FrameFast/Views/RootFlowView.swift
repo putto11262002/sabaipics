@@ -42,5 +42,12 @@ struct RootFlowView: View {
                 isInitializing = false
             }
         }
+        .onChange(of: clerk.user?.id) { _, userId in
+            if userId == nil {
+                coordinator.creditsStore.stop()
+            } else {
+                coordinator.creditsStore.start()
+            }
+        }
     }
 }

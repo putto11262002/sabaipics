@@ -53,7 +53,6 @@ class AppCoordinator: ObservableObject {
         self.uploadStatusStore = UploadStatusStore(uploadManager: uploadManager)
 
         connectivityStore.start()
-        creditsStore.start()
         observeConnectivityForAuthRefresh()
 
         // Wire any pending background session completion handler from a system relaunch.

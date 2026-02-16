@@ -46,7 +46,7 @@ final class CreditsStore: ObservableObject {
                         print("[CreditsStore] Fetch failed: \(error)")
                     }
                 }
-                // Skip fetch when offline — keep last known state
+                // Skip fetch when offline -- keep last known state
 
                 try? await Task.sleep(nanoseconds: Self.pollInterval)
             }
@@ -56,5 +56,6 @@ final class CreditsStore: ObservableObject {
     func stop() {
         task?.cancel()
         task = nil
+        state = .pending
     }
 }
