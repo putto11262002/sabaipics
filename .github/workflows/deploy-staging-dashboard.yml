@@ -53,8 +53,26 @@ jobs:
           echo "VITE_API_URL=https://api-staging.framefast.io" > src/dashboard/.env.staging
           echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> src/dashboard/.env.staging
 
+      - name: Debug - Verify env file
+        run: |
+          echo "=== .env.staging location ==="
+          ls -la src/dashboard/.env.staging
+          echo "=== .env.staging contents (masked) ==="
+          sed 's/\(VITE_CLERK_PUBLISHABLE_KEY=\).*/\1****MASKED****/' src/dashboard/.env.staging
+          echo "=== CLERK_PUBLISHABLE_KEY env var set? ==="
+          if [ -n "$CLERK_PUBLISHABLE_KEY" ]; then echo "YES (length: ${#CLERK_PUBLISHABLE_KEY})"; else echo "NO - EMPTY!"; fi
+          echo "=== Vite root / envDir check ==="
+          cat vite.dashboard.config.ts
+
       - name: Build Dashboard
         run: pnpm build:dashboard -- --mode staging
+
+      - name: Debug - Check built output for CLERK key
+        run: |
+          echo "=== Searching built JS for VITE_CLERK ==="
+          grep -r "VITE_CLERK" src/dashboard/dist/ || echo "NOT FOUND in build output"
+          echo "=== Searching for pk_test or pk_live ==="
+          grep -rl "pk_test\|pk_live" src/dashboard/dist/ | head -5 || echo "NO pk_ keys found in build output"
 
       - name: Deploy Dashboard
         run: pnpm exec wrangler deploy --env staging -c wrangler.dashboard.jsonc
