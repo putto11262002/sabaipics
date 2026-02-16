@@ -34,7 +34,6 @@ export const metadata: Metadata = {
   description: 'AI face recognition photo distribution for events.',
   icons: {
     icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
-    shortcut: ['/favicon.ico'],
   },
 };
 

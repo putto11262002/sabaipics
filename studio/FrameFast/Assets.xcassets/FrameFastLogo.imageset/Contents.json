@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "mark-black.svg",
+      "filename" : "mark-gradient.svg",
       "idiom" : "universal"
     },
     {
@@ -11,7 +11,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "mark-white.svg",
+      "filename" : "mark-gradient 1.svg",
       "idiom" : "universal"
     }
   ],
