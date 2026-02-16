@@ -7,8 +7,10 @@
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [{ "name": "next" }],
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
+      "@/shared/*": ["../shared/*"],
       "fumadocs-mdx:collections/*": ["./.source/*"]
     }
   },
