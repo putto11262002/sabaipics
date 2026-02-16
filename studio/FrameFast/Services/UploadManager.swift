@@ -30,10 +30,12 @@ actor UploadManager {
     }
 
     private let store: UploadQueueStore
-    private let api: UploadsAPIClient
+    private let api: any UploadsAPIClienting
     private let fileManager: FileManager
-    private let connectivity: ConnectivityService
-    private let backgroundSession: BackgroundUploadSessionManager
+    private let connectivity: any ConnectivityServicing
+    private let backgroundSession: any BackgroundUploadSessionManaging
+    private let now: @Sendable () -> TimeInterval
+    private let sleepNanoseconds: @Sendable (_ nanoseconds: UInt64) async -> Void
     private let reducer = UploadJobReducer()
     private var workerTask: Task<Void, Never>?
     private var started = false
@@ -48,12 +50,48 @@ actor UploadManager {
         case backgroundDrain
     }
 
-    init(baseURL: String, connectivity: ConnectivityService, backgroundSession: BackgroundUploadSessionManager, fileManager: FileManager = .default) {
+    init(
+        baseURL: String,
+        connectivity: ConnectivityService,
+        backgroundSession: BackgroundUploadSessionManager,
+        fileManager: FileManager = .default
+    ) {
         self.fileManager = fileManager
         self.api = UploadsAPIClient(baseURL: baseURL)
         self.store = UploadQueueStore(dbURL: UploadManager.defaultDBURL(fileManager: fileManager))
         self.connectivity = connectivity
         self.backgroundSession = backgroundSession
+        self.now = { Date().timeIntervalSince1970 }
+        self.sleepNanoseconds = { ns in
+            try? await Task.sleep(nanoseconds: ns)
+        }
+
+        self.backgroundSession.onOrphanUploadCompletion = { [weak self] (jobId: String, result: Result<HTTPURLResponse, Error>) in
+            guard let self else { return }
+            Task {
+                await self.handleOrphanUploadCompletion(jobId: jobId, result: result)
+            }
+        }
+    }
+
+    init(
+        store: UploadQueueStore,
+        api: any UploadsAPIClienting,
+        connectivity: any ConnectivityServicing,
+        backgroundSession: any BackgroundUploadSessionManaging,
+        fileManager: FileManager = .default,
+        now: @Sendable @escaping () -> TimeInterval = { Date().timeIntervalSince1970 },
+        sleepNanoseconds: @Sendable @escaping (_ nanoseconds: UInt64) async -> Void = { ns in
+            try? await Task.sleep(nanoseconds: ns)
+        }
+    ) {
+        self.store = store
+        self.api = api
+        self.connectivity = connectivity
+        self.backgroundSession = backgroundSession
+        self.fileManager = fileManager
+        self.now = now
+        self.sleepNanoseconds = sleepNanoseconds
 
         self.backgroundSession.onOrphanUploadCompletion = { [weak self] (jobId: String, result: Result<HTTPURLResponse, Error>) in
             guard let self else { return }
@@ -83,8 +121,8 @@ actor UploadManager {
     private func recoverStaleJobs() async {
         // Recover jobs that are in `uploading` state but have no active background URLSession task.
         // This avoids resetting legitimate long-running uploads.
-        let now = Date().timeIntervalSince1970
-        let staleThreshold = now - 300
+        let currentTime = now()
+        let staleThreshold = currentTime - 300
         do {
             let tasks = await backgroundSession.getAllTasks()
             let inFlightJobIds = Set(tasks.compactMap { $0.taskDescription })
@@ -96,7 +134,7 @@ actor UploadManager {
                 try await store.markState(
                     jobId: jobId,
                     state: .failed,
-                    nextAttemptAt: now,
+                    nextAttemptAt: currentTime,
                     attemptsDelta: 0,
                     lastError: "recovered: no active URLSessionTask"
                 )
@@ -252,9 +290,9 @@ actor UploadManager {
                 break
             }
 
-            let now = Date().timeIntervalSince1970
+            let currentTime = now()
             do {
-                guard let job = try await store.claimNextRunnable(now: now) else { break }
+                guard let job = try await store.claimNextRunnable(now: currentTime) else { break }
                 print("[UploadManager] bgDrain job=\(job.id) state=\(job.state.rawValue)")
                 let startedUpload = await process(job, mode: .backgroundDrain)
                 if startedUpload {
@@ -285,10 +323,10 @@ actor UploadManager {
                 continue
             }
 
-            let now = Date().timeIntervalSince1970
+            let currentTime = now()
             do {
                 while inProgressJobIds.count < maxConcurrentJobs {
-                    guard let job = try await store.claimNextRunnable(now: now) else {
+                    guard let job = try await store.claimNextRunnable(now: currentTime) else {
                         break
                     }
 
@@ -309,7 +347,7 @@ actor UploadManager {
                 print("[UploadManager] Queue fetch error: \(error)")
             }
 
-            try? await Task.sleep(nanoseconds: 400_000_000)
+            await sleepNanoseconds(400_000_000)
         }
 
         print("[UploadManager] workerLoop stopped")
@@ -373,7 +411,7 @@ actor UploadManager {
             try? await store.markState(
                 jobId: jobForRetry.id,
                 state: .failed,
-                nextAttemptAt: Date().timeIntervalSince1970 + delay,
+                nextAttemptAt: now() + delay,
                 attemptsDelta: 1,
                 lastError: classification.message
             )
@@ -429,7 +467,7 @@ actor UploadManager {
                 try? await store.markState(
                     jobId: jobId,
                     state: .uploaded,
-                    nextAttemptAt: Date().timeIntervalSince1970,
+                    nextAttemptAt: now(),
                     attemptsDelta: 0,
                     lastError: nil
                 )
@@ -463,7 +501,7 @@ actor UploadManager {
         try? await store.markState(
             jobId: job.id,
             state: .failed,
-            nextAttemptAt: Date().timeIntervalSince1970 + delay,
+            nextAttemptAt: now() + delay,
             attemptsDelta: 1,
             lastError: classification.message
         )
@@ -561,7 +599,7 @@ actor UploadManager {
     }
 
     private func upload(_ job: UploadJobRecord) async throws {
-        let now = Date().timeIntervalSince1970
+        let currentTime = now()
 
         // File is required only for the actual PUT upload.
         guard let fileURL = URL(string: job.localFileURL) else {
@@ -585,7 +623,7 @@ actor UploadManager {
             activeJob = refreshed
         }
 
-        try await store.markState(jobId: activeJob.id, state: .uploading, nextAttemptAt: now, attemptsDelta: 0, lastError: nil)
+        try await store.markState(jobId: activeJob.id, state: .uploading, nextAttemptAt: currentTime, attemptsDelta: 0, lastError: nil)
 
         guard let refreshedPutUrl = activeJob.putUrl, let refreshedPutURL = URL(string: refreshedPutUrl) else {
             throw UploadManagerError.missingPresign
@@ -612,11 +650,11 @@ actor UploadManager {
 
         print("[UploadManager] job=\(activeJob.id) upload OK status=\(http.statusCode)")
 
-        try await store.markState(jobId: activeJob.id, state: .uploaded, nextAttemptAt: Date().timeIntervalSince1970, attemptsDelta: 0, lastError: nil)
+        try await store.markState(jobId: activeJob.id, state: .uploaded, nextAttemptAt: now(), attemptsDelta: 0, lastError: nil)
     }
 
     private func startUpload(_ job: UploadJobRecord) async throws {
-        let now = Date().timeIntervalSince1970
+        let currentTime = now()
 
         guard let fileURL = URL(string: job.localFileURL) else {
             print("[UploadManager] job=\(job.id) invalid localFileURL=\(job.localFileURL)")
@@ -638,7 +676,7 @@ actor UploadManager {
             activeJob = refreshed
         }
 
-        try await store.markState(jobId: activeJob.id, state: .uploading, nextAttemptAt: now, attemptsDelta: 0, lastError: nil)
+        try await store.markState(jobId: activeJob.id, state: .uploading, nextAttemptAt: currentTime, attemptsDelta: 0, lastError: nil)
 
         guard let refreshedPutUrl = activeJob.putUrl, let refreshedPutURL = URL(string: refreshedPutUrl) else {
             throw UploadManagerError.missingPresign
@@ -663,12 +701,12 @@ actor UploadManager {
     }
 
     private func checkCompletion(_ job: UploadJobRecord) async throws {
-        let now = Date().timeIntervalSince1970
+        let currentTime = now()
         guard let uploadId = job.uploadId else {
             throw UploadManagerError.missingUploadId
         }
 
-        try await store.markState(jobId: job.id, state: .awaitingCompletion, nextAttemptAt: now, attemptsDelta: 0, lastError: nil)
+        try await store.markState(jobId: job.id, state: .awaitingCompletion, nextAttemptAt: currentTime, attemptsDelta: 0, lastError: nil)
 
         let statuses = try await api.fetchStatus(uploadIds: [uploadId])
         if let status = statuses.first(where: { $0.uploadId == uploadId }) {
@@ -692,12 +730,12 @@ actor UploadManager {
         }
 
         // Not completed yet: schedule a later poll and move on.
-        try await store.markState(jobId: job.id, state: .awaitingCompletion, nextAttemptAt: Date().timeIntervalSince1970 + 5, attemptsDelta: 0, lastError: nil)
+        try await store.markState(jobId: job.id, state: .awaitingCompletion, nextAttemptAt: now() + 5, attemptsDelta: 0, lastError: nil)
     }
 
     private func finalizeCompleted(job: UploadJobRecord) async throws {
         guard let fileURL = URL(string: job.localFileURL) else {
-            try await store.markState(jobId: job.id, state: .completed, nextAttemptAt: Date().timeIntervalSince1970, attemptsDelta: 0, lastError: nil)
+            try await store.markState(jobId: job.id, state: .completed, nextAttemptAt: now(), attemptsDelta: 0, lastError: nil)
             return
         }
 
@@ -712,7 +750,7 @@ actor UploadManager {
 
         print("[UploadManager] job=\(job.id) completed; local file deleted")
 
-        try await store.markState(jobId: job.id, state: .completed, nextAttemptAt: Date().timeIntervalSince1970, attemptsDelta: 0, lastError: nil)
+        try await store.markState(jobId: job.id, state: .completed, nextAttemptAt: now(), attemptsDelta: 0, lastError: nil)
     }
 
     // backoff() replaced by classify() + backoffSeconds(attempt:)
