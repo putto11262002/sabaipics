@@ -37,7 +37,7 @@ export const uploadIntents = pgTable(
     contentLength: integer('content_length'),
 
     // Upload source (for analytics)
-    source: text('source', { enum: ['web', 'ftp'] }).default('web'),
+    source: text('source', { enum: ['web', 'ftp', 'ios'] }).default('web'),
 
     // Lifecycle
     status: text('status', { enum: uploadIntentStatuses }).notNull().default('pending'),

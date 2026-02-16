@@ -42,6 +42,7 @@ const presignRequestSchema = z.object({
     .positive('Content length must be positive')
     .max(PHOTO_MAX_FILE_SIZE, `File size must be less than ${PHOTO_MAX_FILE_SIZE / 1024 / 1024} MB`),
   filename: z.string().optional(),
+  source: z.enum(['web', 'ios']).optional(),
 });
 
 const statusQuerySchema = z.object({
@@ -89,7 +90,7 @@ export const uploadsRouter = new Hono<Env>()
     return safeTry(async function* () {
       const photographer = c.var.photographer;
       const db = c.var.db();
-      const { eventId, contentType, contentLength } = c.req.valid('json');
+      const { eventId, contentType, contentLength, source } = c.req.valid('json');
 
       // 1. Verify event exists, is owned by photographer, and not expired
       const [event] = yield* ResultAsync.fromPromise(
@@ -171,6 +172,7 @@ export const uploadsRouter = new Hono<Env>()
             r2Key,
             contentType,
             contentLength,
+            source: source ?? 'web',
             status: 'pending',
             expiresAt: presignResult.expiresAt.toISOString(),
           })
