@@ -51,10 +51,15 @@ export function GiftCodeDialog({
         promoCode: giftCode,
       });
       // Don't clean URL - Stripe will redirect back to /dashboard?code=XXX on cancel
-      window.location.href = result.checkoutUrl;
+      window.location.href = result.data.checkoutUrl;
     } catch (error) {
       setClaiming(false);
-      const message = error instanceof Error ? error.message : 'Failed to claim gift';
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error !== null && 'message' in error
+            ? String((error as { message: unknown }).message)
+            : 'Failed to claim gift';
       alert(message);
     }
   };
@@ -86,9 +91,7 @@ export function GiftCodeDialog({
             <Alert variant="destructive">
               <AlertCircle className="size-4" />
               <AlertDescription>
-                {validateQuery.error instanceof Error
-                  ? validateQuery.error.message
-                  : 'Invalid or expired gift code'}
+                {validateQuery.error?.message ?? 'Invalid or expired gift code'}
               </AlertDescription>
             </Alert>
           )}

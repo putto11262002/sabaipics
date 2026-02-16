@@ -1,40 +1,39 @@
 import { useMutation } from '@tanstack/react-query';
-import { useApiClient } from '../../lib/api';
+import { useAuth } from '@/auth/react';
+import { toRequestError, type RequestError } from '@/shared/lib/api-error';
 
 export function usePreviewStudioLut() {
-  const { getToken } = useApiClient();
+  const { getToken } = useAuth();
 
-  return useMutation({
-    mutationFn: async ({
-      id,
-      file,
-      intensity,
-      includeLuminance,
-    }: {
-      id: string;
-      file: File;
-      intensity: number;
-      includeLuminance: boolean;
-    }): Promise<Blob> => {
-      const token = await getToken();
+  return useMutation<
+    Blob,
+    RequestError,
+    { id: string; file: File; intensity: number; includeLuminance: boolean }
+  >({
+    mutationFn: async ({ id, file, intensity, includeLuminance }) => {
+      try {
+        const token = await getToken();
 
-      const form = new FormData();
-      form.set('file', file);
-      form.set('intensity', String(intensity));
-      form.set('includeLuminance', includeLuminance ? 'true' : 'false');
+        const form = new FormData();
+        form.set('file', file);
+        form.set('intensity', String(intensity));
+        form.set('includeLuminance', includeLuminance ? 'true' : 'false');
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/studio/luts/${id}/preview`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: form,
-      });
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/studio/luts/${id}/preview`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: form,
+        });
 
-      if (!res.ok) {
-        throw new Error('Preview failed');
+        if (!res.ok) {
+          throw new Error('Preview failed');
+        }
+
+        return await res.blob();
+      } catch (e) {
+        throw toRequestError(e);
       }
-
-      return await res.blob();
     },
     retry: false,
   });

@@ -18,7 +18,7 @@ export interface PresignedUploadResult {
  * Hook for presigned URL upload flow (v2)
  *
  * Flow:
- * 1. POST /uploads/presign -> get uploadId + putUrl
+ * 1. POST /uploads/presign → get uploadId + putUrl
  * 2. PUT to R2 directly with required headers
  * 3. Return uploadId for status polling
  *
@@ -28,57 +28,46 @@ export function usePresignedUpload() {
   const { getToken } = useAuth();
 
   return useMutation<PresignedUploadResult, RequestError, { eventId: string; file: File }>({
-    mutationFn: async ({
-      eventId,
-      file,
-    }): Promise<PresignedUploadResult> => {
-      const token = await getToken();
-
-      // Step 1: Get presigned URL from API
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let presign: any;
+    mutationFn: async ({ eventId, file }) => {
       try {
-        presign = await parseResponse(
+        const token = await getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        // Step 1: Get presigned URL from API (use parseResponse for Hono client)
+        const presign = await parseResponse(
           api.uploads.presign.$post(
             {
               json: {
                 eventId,
-                contentType: file.type as
-                  | 'image/jpeg'
-                  | 'image/png'
-                  | 'image/webp',
+                contentType: file.type as 'image/jpeg' | 'image/png' | 'image/webp',
                 contentLength: file.size,
               },
             },
-            {
-              headers: {
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                'Content-Type': 'application/json',
-              },
-            },
+            { headers },
           ),
         );
+
+        // Step 2: Upload directly to R2
+        const uploadRes = await fetch(presign.data.putUrl, {
+          method: 'PUT',
+          headers: presign.data.requiredHeaders,
+          body: file,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error('Upload to storage failed');
+        }
+
+        // Step 3: Return uploadId for polling
+        return {
+          uploadId: presign.data.uploadId,
+          eventId,
+          fileSize: file.size,
+        };
       } catch (e) {
         throw toRequestError(e);
       }
-
-      // Step 2: Upload directly to R2
-      const uploadRes = await fetch(presign.data.putUrl, {
-        method: 'PUT',
-        headers: presign.data.requiredHeaders,
-        body: file,
-      });
-
-      if (!uploadRes.ok) {
-        throw toRequestError(new Error('Upload to storage failed'));
-      }
-
-      // Step 3: Return uploadId for polling
-      return {
-        uploadId: presign.data.uploadId,
-        eventId,
-        fileSize: file.size,
-      };
     },
     retry: false,
   });

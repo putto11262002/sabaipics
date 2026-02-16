@@ -118,11 +118,10 @@ export function CreditTopUpDialog({
       { amount, promoCode: promoCode || undefined },
       {
         onSuccess: (result) => {
-          window.location.href = result.checkoutUrl;
+          window.location.href = result.data.checkoutUrl;
         },
         onError: (error) => {
-          const message = error instanceof Error ? error.message : 'Failed to create checkout';
-          setErrorMessage(message);
+          setErrorMessage(error.message);
         },
       },
     );

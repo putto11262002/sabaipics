@@ -101,7 +101,13 @@ function DesktopAuthRedirect({
         const returnUrl = buildReturnUrl(redirectUrl, exchanged.code);
         window.location.href = returnUrl;
       } catch (err) {
-        onError(err instanceof Error ? err.message : 'Failed to redirect');
+        const message =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'object' && err !== null && 'message' in err
+              ? String((err as { message: unknown }).message)
+              : 'Failed to redirect';
+        onError(message);
       }
     };
 

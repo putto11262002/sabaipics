@@ -1,31 +1,20 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, useApiClient } from '../../lib/api';
+import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
+import { useQueryClient } from '@tanstack/react-query';
+
+type RenameStudioLutResponse = InferResponseType<
+  (typeof api.studio.luts)[':id']['$patch'],
+  SuccessStatusCode
+>;
 
 export function useRenameStudioLut() {
   const queryClient = useQueryClient();
-  const { getToken } = useApiClient();
 
-  return useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const token = await getToken();
-      const res = await api.studio.luts[':id'].$patch(
-        { param: { id }, json: { name } },
-        token
-          ? {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          : undefined,
-      );
-
-      if (!res.ok) {
-        throw new Error('Failed to rename LUT');
-      }
-
-      const json = await res.json();
-      return json.data;
-    },
+  return useApiMutation<RenameStudioLutResponse, { id: string; name: string }>({
+    apiFn: (input, opts) =>
+      api.studio.luts[':id'].$patch({ param: { id: input.id }, json: { name: input.name } }, opts),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['studio', 'luts'] });
     },

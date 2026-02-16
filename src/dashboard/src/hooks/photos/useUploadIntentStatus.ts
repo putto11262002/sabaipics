@@ -8,10 +8,10 @@ import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
 const getUploadStatus = api.uploads.status.$get;
 
-type IntentStatusResponse = InferResponseType<typeof getUploadStatus, 200>;
+type UploadStatusResponse = InferResponseType<typeof getUploadStatus, 200>;
 
 /** Upload intent status from API (inferred from response type) */
-export type UploadIntent = IntentStatusResponse['data'][0];
+export type UploadIntent = UploadStatusResponse['data'][0];
 
 /** Upload intent status enum (inferred from API) */
 export type UploadIntentStatus = UploadIntent['status'];
@@ -40,10 +40,10 @@ export interface MappedUploadIntent {
 /**
  * Maps API intent status to simplified UI status
  *
- * API statuses -> UI statuses:
- * - pending -> uploading (still in upload flow)
- * - completed -> completed (has photoId, switch to photo polling)
- * - failed/expired -> failed
+ * API statuses → UI statuses:
+ * - pending → uploading (still in upload flow)
+ * - completed → completed (has photoId, switch to photo polling)
+ * - failed/expired → failed
  */
 function mapIntentStatus(status: UploadIntentStatus): MappedIntentStatus {
   switch (status) {
@@ -76,21 +76,28 @@ export function useUploadIntentStatus(
     refetchInterval?: number | false;
   },
 ) {
-  const query = useApiQuery<IntentStatusResponse>({
+  const query = useApiQuery<UploadStatusResponse>({
     queryKey: ['uploads', 'status', uploadIds],
-    apiFn: (opts) => getUploadStatus({ query: { ids: uploadIds.join(',') } }, opts),
+    apiFn: (opts) =>
+      getUploadStatus(
+        {
+          query: { ids: uploadIds.join(',') },
+        },
+        opts,
+      ),
     enabled: options?.enabled !== false && uploadIds.length > 0,
     refetchInterval: options?.refetchInterval,
     staleTime: 0,
   });
 
-  const data = query.data?.data.map((intent) => ({
-    uploadId: intent.uploadId,
-    eventId: intent.eventId,
-    status: mapIntentStatus(intent.status),
-    photoId: intent.photoId,
-    errorMessage: intent.errorMessage,
-  }));
-
-  return { ...query, data };
+  return {
+    ...query,
+    data: query.data?.data.map((intent) => ({
+      uploadId: intent.uploadId,
+      eventId: intent.eventId,
+      status: mapIntentStatus(intent.status),
+      photoId: intent.photoId,
+      errorMessage: intent.errorMessage,
+    })),
+  };
 }

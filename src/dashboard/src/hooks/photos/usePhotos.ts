@@ -1,10 +1,13 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
-import { type InferResponseType } from 'hono/client';
+import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiInfiniteQuery } from '@/shared/hooks/rq/use-api-infinite-query';
 
 const listPhotos = api.events[':eventId'].photos.$post;
 
-export type Photo = InferResponseType<typeof listPhotos, 200>['data'][0];
+type PhotosResponse = InferResponseType<typeof listPhotos, SuccessStatusCode>;
+
+export type Photo = PhotosResponse['data'][0];
 export type PhotoStatus = Photo['status'];
 
 export type PhotoExif = {
@@ -27,32 +30,19 @@ export function usePhotos({
   eventId: string | undefined;
   status?: PhotoStatus[];
 }) {
-  const { getToken } = useApiClient();
-
-  return useInfiniteQuery({
+  return useApiInfiniteQuery<PhotosResponse, string | undefined>({
     queryKey: ['event', eventId, 'photos', status],
-    queryFn: async ({ pageParam }: { pageParam?: string }) => {
-      if (!eventId) {
-        throw new Error('eventId is required');
-      }
-
-      const res = await listPhotos(
+    apiFn: (pageParam, opts) =>
+      listPhotos(
         {
-          param: { eventId },
+          param: { eventId: eventId! },
           json: {
             ...(pageParam ? { cursor: pageParam } : {}),
             ...(status ? { status } : {}),
           },
         },
-        await withAuth(getToken),
-      );
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch photos: ${res.status}`);
-      }
-
-      return (await res.json()) as InferResponseType<typeof listPhotos, 200>;
-    },
+        opts,
+      ),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => {
       return lastPage.pagination.hasMore
@@ -61,6 +51,6 @@ export function usePhotos({
     },
     enabled: !!eventId,
     refetchOnWindowFocus: false,
-    refetchOnMount: 'always', // Always refetch on mount to get fresh data
+    refetchOnMount: 'always',
   });
 }

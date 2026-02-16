@@ -1,5 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
-import { useApiClient } from '../../lib/api';
+import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
+
+const getCreditHistory = api['credit-packages'].history.$get;
+type CreditHistoryApiResponse = InferResponseType<typeof getCreditHistory, SuccessStatusCode>;
 
 export interface CreditEntry {
   id: string;
@@ -35,35 +40,15 @@ export interface CreditHistoryResponse {
 export function useCreditHistory(
   page: number = 0,
   limit: number = 20,
-  type?: 'credit' | 'debit'
+  type?: 'credit' | 'debit',
 ) {
-  const { getToken } = useApiClient();
-
-  return useQuery({
+  return useApiQuery<CreditHistoryApiResponse>({
     queryKey: ['credit-history', page, limit, type],
-    queryFn: async () => {
-      const token = await getToken();
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(limit),
-      });
-      if (type) params.set('type', type);
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/credit-packages/history?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return response.json() as Promise<CreditHistoryResponse>;
-    },
+    apiFn: (opts) =>
+      getCreditHistory(
+        { query: { page, limit, ...(type ? { type } : {}) } },
+        opts,
+      ),
     staleTime: 1000 * 30,
   });
 }

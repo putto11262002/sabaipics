@@ -1,39 +1,26 @@
 import { useMutation } from '@tanstack/react-query';
+import { parseResponse } from 'hono/client';
 import { api } from '../../lib/api';
+import { toRequestError, type RequestError } from '@/shared/lib/api-error';
 
 export function useDesktopAuthExchange() {
-  return useMutation({
-    mutationFn: async ({
-      clerkToken,
-      deviceName,
-    }: {
-      clerkToken: string;
-      deviceName?: string;
-    }): Promise<{ code: string; expiresAt: number }> => {
-      const res = await api.desktop.auth.exchange.$post(
-        {
-          json: { deviceName },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${clerkToken}`,
-          },
-        },
-      );
-
-      if (!res.ok) {
-        let message = `HTTP ${res.status}`;
-        try {
-          const json = (await res.json()) as { error?: { message?: string } };
-          message = json?.error?.message ?? message;
-        } catch {
-          // ignore
-        }
-        throw new Error(message);
+  return useMutation<
+    { code: string; expiresAt: number },
+    RequestError,
+    { clerkToken: string; deviceName?: string }
+  >({
+    mutationFn: async ({ clerkToken, deviceName }) => {
+      try {
+        const { code, expiresAt } = await parseResponse(
+          api.desktop.auth.exchange.$post(
+            { json: { deviceName } },
+            { headers: { Authorization: `Bearer ${clerkToken}` } },
+          ),
+        );
+        return { code, expiresAt };
+      } catch (e) {
+        throw toRequestError(e);
       }
-
-      const { code, expiresAt } = (await res.json()) as { code: string; expiresAt: number };
-      return { code, expiresAt };
     },
     retry: false,
   });

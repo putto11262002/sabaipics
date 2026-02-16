@@ -5,15 +5,14 @@ import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
 const listUploadIntents = api.uploads.events[':eventId'].$get;
 
-type RecentUploadsResponse = InferResponseType<typeof listUploadIntents, 200>;
-
-export type UploadIntent = RecentUploadsResponse['data'][0];
+type UploadIntentsResponse = InferResponseType<typeof listUploadIntents, 200>;
+export type UploadIntent = UploadIntentsResponse['data'][0];
 
 export function useRecentUploads(eventId: string | undefined, limit = 10) {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
 
-  const query = useApiQuery<RecentUploadsResponse>({
+  const query = useApiQuery<UploadIntentsResponse>({
     queryKey: ['event', eventId, 'upload-intents', cursor, limit],
     apiFn: (opts) =>
       listUploadIntents(

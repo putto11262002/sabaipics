@@ -1,22 +1,15 @@
-import { useMutation } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import { api } from '../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
+
+type DownloadStudioLutResponse = InferResponseType<
+  (typeof api.studio.luts)[':id']['download']['$get'],
+  SuccessStatusCode
+>;
 
 export function useDownloadStudioLut() {
-  const { getToken } = useApiClient();
-
-  return useMutation({
-    mutationFn: async (id: string): Promise<{ url: string }> => {
-      const res = await api.studio.luts[':id'].download.$get(
-        { param: { id } },
-        await withAuth(getToken),
-      );
-
-      if (!res.ok) {
-        throw new Error('Failed to get download URL');
-      }
-
-      const json = await res.json();
-      return { url: json.data.getUrl };
-    },
+  return useApiMutation<DownloadStudioLutResponse, string>({
+    apiFn: (id, opts) => api.studio.luts[':id'].download.$get({ param: { id } }, opts),
   });
 }

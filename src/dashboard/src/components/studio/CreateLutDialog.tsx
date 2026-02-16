@@ -23,11 +23,17 @@ import {
   AlertDialogTitle,
 } from '@/shared/components/ui/alert-dialog';
 import { useBlocker } from 'react-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, useApiClient, withAuth } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { api } from '../../lib/api';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { toast } from 'sonner';
 
 type Kind = 'cube' | 'reference';
+
+const getLutStatus = api.studio.luts.status.$get;
+type LutStatusResponse = InferResponseType<typeof getLutStatus, SuccessStatusCode>;
 
 function isCubeFile(file: File): boolean {
   const name = file.name.toLowerCase();
@@ -52,7 +58,6 @@ export function CreateLutDialog({
 }) {
   const create = useCreateStudioLut();
   const queryClient = useQueryClient();
-  const { getToken } = useApiClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -75,29 +80,14 @@ export function CreateLutDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
 
-  const getLutStatus = api.studio.luts.status.$get;
-
-  const lutStatus = useQuery({
+  const lutStatusQuery = useApiQuery<LutStatusResponse>({
     queryKey: ['studio', 'luts', 'status', createdLutId],
-    queryFn: async () => {
-      if (!createdLutId) throw new Error('LUT id missing');
-      const res = await getLutStatus({ query: { id: createdLutId } }, await withAuth(getToken));
-      if (!res.ok) throw new Error('Failed to load LUT status');
-      const json = await res.json();
-      return json.data as {
-        id: string;
-        status: 'pending' | 'processing' | 'completed' | 'failed' | 'expired';
-        errorCode: string | null;
-        errorMessage: string | null;
-        completedAt: string | null;
-        expiresAt: string;
-      };
-    },
+    apiFn: (opts) => getLutStatus({ query: { id: createdLutId! } }, opts),
     enabled: createdLutId != null,
     refetchInterval: (q) => {
-      const data = q.state.data;
-      if (!data) return 2000;
-      if (data.status === 'completed' || data.status === 'failed' || data.status === 'expired') {
+      const status = (q.state.data as LutStatusResponse | undefined)?.data?.status;
+      if (!status) return 2000;
+      if (status === 'completed' || status === 'failed' || status === 'expired') {
         return false;
       }
       return 2000;
@@ -106,12 +96,14 @@ export function CreateLutDialog({
     retry: false,
   });
 
+  const lutStatusData = lutStatusQuery.data?.data;
+
   const isProcessing =
     create.isPending ||
     (createdLutId != null &&
-      (lutStatus.isFetching ||
-        lutStatus.data?.status === 'pending' ||
-        lutStatus.data?.status === 'processing'));
+      (lutStatusQuery.isFetching ||
+        lutStatusData?.status === 'pending' ||
+        lutStatusData?.status === 'processing'));
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen && isProcessing) {
@@ -154,13 +146,13 @@ export function CreateLutDialog({
   useEffect(() => {
     if (!open) return;
     if (!createdLutId) return;
-    if (lutStatus.data?.status !== 'completed') return;
+    if (lutStatusData?.status !== 'completed') return;
 
     toast.success('LUT created');
     queryClient.invalidateQueries({ queryKey: ['studio', 'luts'] });
     onOpenChange(false);
     resetForm();
-  }, [open, createdLutId, lutStatus.data?.status, onOpenChange, queryClient]);
+  }, [open, createdLutId, lutStatusData?.status, onOpenChange, queryClient]);
 
   // Block in-app navigation while processing.
   const blocker = useBlocker(
@@ -254,9 +246,9 @@ export function CreateLutDialog({
                   <span>
                     {create.isPending
                       ? 'Uploading…'
-                      : lutStatus.data?.status === 'processing'
+                      : lutStatusData?.status === 'processing'
                         ? 'Processing…'
-                        : lutStatus.data?.status === 'pending'
+                        : lutStatusData?.status === 'pending'
                           ? 'Queued…'
                           : 'Working…'}
                   </span>
@@ -264,9 +256,9 @@ export function CreateLutDialog({
               </div>
             )}
 
-            {(lutStatus.data?.status === 'failed' || lutStatus.data?.status === 'expired') && (
+            {(lutStatusData?.status === 'failed' || lutStatusData?.status === 'expired') && (
               <Alert variant="destructive">
-                {lutStatus.data.errorMessage || 'Failed to process LUT'}
+                {lutStatusData?.errorMessage || 'Failed to process LUT'}
               </Alert>
             )}
 
@@ -276,10 +268,10 @@ export function CreateLutDialog({
               </Alert>
             )}
 
-            {lutStatus.isError && (
+            {lutStatusQuery.isError && (
               <Alert variant="destructive">
-                {lutStatus.error instanceof Error
-                  ? lutStatus.error.message
+                {lutStatusQuery.error instanceof Error
+                  ? lutStatusQuery.error.message
                   : 'Failed to load LUT status'}
               </Alert>
             )}
