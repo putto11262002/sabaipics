@@ -10,7 +10,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Alert } from '@/shared/components/ui/alert';
-import { Loader2, Upload } from 'lucide-react';
+import { FileUp, Image, Loader2, Upload, X } from 'lucide-react';
 import { useCreateStudioLut } from '../../hooks/studio/useCreateStudioLut';
 import {
   AlertDialog,
@@ -29,6 +29,7 @@ import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 import type { InferResponseType } from 'hono/client';
 import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { toast } from 'sonner';
+import { cn } from '@/shared/utils/ui';
 
 type Kind = 'cube' | 'reference';
 
@@ -124,20 +125,25 @@ export function CreateLutDialog({
   const title = kind === 'cube' ? 'New LUT (.cube)' : 'New LUT (Reference image)';
   const fileLabel = kind === 'cube' ? 'LUT file (.cube)' : 'Reference image';
 
+  const [isDragging, setIsDragging] = useState(false);
+
+  const validateAndSetFile = (f: File) => {
+    if (kind === 'cube' && !isCubeFile(f)) {
+      setFileError('Please select a .cube LUT file');
+      return;
+    }
+    if (kind === 'reference' && !isReferenceImageFile(f)) {
+      setFileError('Please select a JPEG, PNG, or WebP image');
+      return;
+    }
+    setFile(f);
+    setFileError(null);
+  };
+
   const canSubmit = name.trim().length > 0 && file != null && fileError == null;
 
   const submit = async () => {
     if (!file) return;
-
-    if (kind === 'cube' && !isCubeFile(file)) {
-      setFileError('Please select a .cube LUT file');
-      return;
-    }
-    if (kind === 'reference' && !isReferenceImageFile(file)) {
-      setFileError('Please select a JPEG, PNG, or WebP image');
-      return;
-    }
-
     const { lutId } = await create.mutateAsync({ kind, name: name.trim(), file });
     setCreatedLutId(lutId);
   };
@@ -198,7 +204,7 @@ export function CreateLutDialog({
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4 overflow-hidden">
             <div className="space-y-2">
               <Label className="text-xs">Name</Label>
               <Input
@@ -211,15 +217,55 @@ export function CreateLutDialog({
 
             <div className="space-y-2">
               <Label className="text-xs">{fileLabel}</Label>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm hover:bg-muted/50"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isProcessing}
-              >
-                <span className="truncate">{file ? file.name : 'Choose a file…'}</span>
-                <Upload className="size-4 text-muted-foreground" />
-              </button>
+              {file ? (
+                <div className="flex min-w-0 items-center gap-3 overflow-hidden rounded-lg border bg-muted/30 px-3 py-2.5 text-sm">
+                  {kind === 'cube' ? (
+                    <FileUp className="size-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <Image className="size-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                  {!isProcessing && (
+                    <button
+                      type="button"
+                      onClick={() => { setFile(null); setFileError(null); }}
+                      className="shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div
+                  onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (!isProcessing) setIsDragging(true); }}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDragging(false);
+                    if (isProcessing) return;
+                    const f = e.dataTransfer.files?.[0];
+                    if (f) validateAndSetFile(f);
+                  }}
+                  onClick={() => !isProcessing && fileInputRef.current?.click()}
+                  className={cn(
+                    'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-8 transition-colors',
+                    isDragging && !isProcessing
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted-foreground/25 hover:border-muted-foreground/50',
+                    isProcessing && 'cursor-not-allowed opacity-50',
+                  )}
+                >
+                  <Upload className="mb-2 size-8 text-muted-foreground" />
+                  <p className="text-sm font-medium">
+                    {isDragging ? 'Drop file here' : 'Drag file here or click to browse'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {kind === 'cube' ? '.cube file' : 'JPEG, PNG, or WebP'}
+                  </p>
+                </div>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -227,10 +273,7 @@ export function CreateLutDialog({
                 accept={accept}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) {
-                    setFile(f);
-                    setFileError(null);
-                  }
+                  if (f) validateAndSetFile(f);
                   e.target.value = '';
                 }}
                 disabled={isProcessing}
@@ -239,42 +282,16 @@ export function CreateLutDialog({
 
             {fileError && <Alert variant="destructive">{fileError}</Alert>}
 
-            {isProcessing && (
-              <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="size-4 animate-spin" />
-                  <span>
-                    {create.isPending
-                      ? 'Uploading…'
-                      : lutStatusData?.status === 'processing'
-                        ? 'Processing…'
-                        : lutStatusData?.status === 'pending'
-                          ? 'Queued…'
-                          : 'Working…'}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {(lutStatusData?.status === 'failed' || lutStatusData?.status === 'expired') && (
-              <Alert variant="destructive">
-                {lutStatusData?.errorMessage || 'Failed to process LUT'}
-              </Alert>
-            )}
-
-            {create.isError && (
-              <Alert variant="destructive">
-                {create.error instanceof Error ? create.error.message : 'Failed to create LUT'}
-              </Alert>
-            )}
-
-            {lutStatusQuery.isError && (
-              <Alert variant="destructive">
-                {lutStatusQuery.error instanceof Error
-                  ? lutStatusQuery.error.message
-                  : 'Failed to load LUT status'}
-              </Alert>
-            )}
+            {(() => {
+              const errorMessage = create.isError
+                ? (create.error instanceof Error ? create.error.message : 'Failed to create LUT')
+                : lutStatusQuery.isError
+                  ? (lutStatusQuery.error instanceof Error ? lutStatusQuery.error.message : 'Failed to check LUT status')
+                  : (lutStatusData?.status === 'failed' || lutStatusData?.status === 'expired')
+                    ? (lutStatusData?.errorMessage || 'Failed to process LUT')
+                    : null;
+              return errorMessage ? <Alert variant="destructive">{errorMessage}</Alert> : null;
+            })()}
           </div>
 
           <DialogFooter>
@@ -285,7 +302,11 @@ export function CreateLutDialog({
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-1 size-4 animate-spin" />
-                  Working…
+                  {create.isPending
+                    ? 'Uploading…'
+                    : lutStatusData?.status === 'processing'
+                      ? 'Processing…'
+                      : 'Creating…'}
                 </>
               ) : (
                 'Create'
