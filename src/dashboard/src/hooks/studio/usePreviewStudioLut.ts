@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/auth/react';
-import { toRequestError, type RequestError } from '@/shared/lib/api-error';
+import { shouldRetry, toRequestError, type RequestError } from '@/shared/lib/api-error';
 
 export type PreviewStudioLutInput = { id: string; file: File; intensity: number; includeLuminance: boolean };
 export type PreviewStudioLutResult = Blob;
@@ -32,7 +32,20 @@ export function usePreviewStudioLut() {
         });
 
         if (!res.ok) {
-          throw new Error('Preview failed');
+          let message = `Preview failed (${res.status})`;
+          try {
+            const contentType = res.headers.get('content-type') ?? '';
+            if (contentType.includes('application/json')) {
+              const json = await res.json();
+              const apiMsg = (json as any)?.error?.message ?? (json as any)?.message;
+              if (typeof apiMsg === 'string' && apiMsg.trim().length > 0) {
+                message = apiMsg;
+              }
+            }
+          } catch {
+            // ignore parse errors
+          }
+          throw new Error(message);
         }
 
         return await res.blob();
@@ -40,6 +53,6 @@ export function usePreviewStudioLut() {
         throw toRequestError(e);
       }
     },
-    retry: false,
+    retry: shouldRetry,
   });
 }
