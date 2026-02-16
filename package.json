@@ -20,10 +20,10 @@
 
     "deploy:api:staging": "wrangler deploy --env staging --minify -c wrangler.api.jsonc",
     "deploy:api:prod": "wrangler deploy --env production --minify -c wrangler.api.jsonc",
-    "deploy:dashboard:staging": "pnpm build:dashboard -- --mode staging && wrangler deploy --env staging -c wrangler.dashboard.jsonc",
-    "deploy:dashboard:prod": "pnpm build:dashboard -- --mode production && wrangler deploy --env production -c wrangler.dashboard.jsonc",
-    "deploy:event:staging": "pnpm build:event -- --mode staging && wrangler pages deploy src/event/dist --project-name=event --branch=staging",
-    "deploy:event:prod": "pnpm build:event -- --mode production && wrangler pages deploy src/event/dist --project-name=event --branch=main",
+    "deploy:dashboard:staging": "pnpm build:dashboard --mode staging && wrangler deploy --env staging -c wrangler.dashboard.jsonc",
+    "deploy:dashboard:prod": "pnpm build:dashboard --mode production && wrangler deploy --env production -c wrangler.dashboard.jsonc",
+    "deploy:event:staging": "pnpm build:event --mode staging && wrangler pages deploy src/event/dist --project-name=event --branch=staging",
+    "deploy:event:prod": "pnpm build:event --mode production && wrangler pages deploy src/event/dist --project-name=event --branch=main",
     "deploy:www": "cd src/www && opennextjs-cloudflare build && opennextjs-cloudflare deploy --env production",
     "deploy:sabaiface": "fly deploy . -c src/sabaiface/fly.toml",
 

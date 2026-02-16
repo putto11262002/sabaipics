@@ -38,7 +38,7 @@ jobs:
           echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> src/dashboard/.env.production
 
       - name: Build Dashboard
-        run: pnpm build:dashboard -- --mode production
+        run: pnpm build:dashboard --mode production
 
       - name: Deploy Dashboard
         run: pnpm exec wrangler deploy --env production -c wrangler.dashboard.jsonc

@@ -38,7 +38,7 @@ jobs:
           echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> src/event/.env.production
 
       - name: Build Event
-        run: pnpm build:event -- --mode production
+        run: pnpm build:event --mode production
 
       - name: Deploy Event
         run: pnpm exec wrangler pages deploy src/event/dist --project-name=event --branch=main
