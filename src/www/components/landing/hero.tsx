@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 
 import { RoundedButton } from '@/components/ui/rounded-button';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/shared/components/ui/badge';
 import { HeroEventStage } from '@/components/landing/hero-event-stage';
 
 export function LandingHero() {
@@ -36,7 +36,7 @@ export function LandingHero() {
                 <span className="relative inline-block">
                   {chunks}
                   <span
-                    className="absolute -bottom-1 left-0 h-2 w-full -rotate-1 rounded-sm bg-primary-accent/50"
+                    className="absolute -bottom-1 left-0 h-2 w-full -rotate-1 rounded-sm bg-primary/50"
                     aria-hidden="true"
                   />
                 </span>
@@ -49,7 +49,7 @@ export function LandingHero() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <RoundedButton asChild variant="accent">
+            <RoundedButton asChild>
               <Link href="#pricing">Start free trial</Link>
             </RoundedButton>
             <RoundedButton asChild variant="outline">

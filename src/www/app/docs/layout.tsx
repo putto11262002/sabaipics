@@ -5,7 +5,8 @@ import { source } from '@/lib/source';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import { DM_Sans, Noto_Sans_Thai } from 'next/font/google';
 import 'fumadocs-ui/style.css';
-import '../globals.css';
+import '@/shared/styles/globals.css';
+import '../www.css';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],

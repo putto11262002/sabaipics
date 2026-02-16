@@ -9,6 +9,9 @@ const withMDX = createMDX();
 const nextConfig = {
   turbopack: {
     root: '../../',
+    resolveAlias: {
+      '@/shared/*': '../shared/*',
+    },
   },
 };
 

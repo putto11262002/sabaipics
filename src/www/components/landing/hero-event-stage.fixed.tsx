@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/shared/utils/ui';
 
 const frame = {
   src: '/landing/i.png',

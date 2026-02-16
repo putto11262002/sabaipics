@@ -29,7 +29,7 @@ function FaceSearchTile() {
         style={{ transform: 'rotate(-6deg)' }}
       >
         {/* Purple gradient background behind the grid */}
-        <div className="absolute inset-0 bg-gradient-to-t from-primary-accent/40 via-primary-accent/20 via-50% to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/40 via-primary/20 via-50% to-transparent" />
 
         {/* Grid on top */}
         <div className="relative grid grid-cols-6 gap-1.5">
@@ -95,7 +95,7 @@ function UploadWaysTile() {
   return (
     <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border">
       {/* Primary accent gradient - bottom to top */}
-      <div className="absolute inset-0 bg-gradient-to-t from-primary-accent/40 via-primary-accent/15 via-50% to-card to-70%" />
+      <div className="absolute inset-0 bg-gradient-to-t from-primary/40 via-primary/15 via-50% to-card to-70%" />
 
       {/* Upload methods list */}
       <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 ps-2">
@@ -212,7 +212,7 @@ function BrandingTile() {
         <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2">
           <span className="text-xs text-muted-foreground">Color</span>
           <div className="flex gap-1.5">
-            <div className="h-3.5 w-3.5 rounded-full bg-primary-accent/40 ring-1 ring-primary-accent/30" />
+            <div className="h-3.5 w-3.5 rounded-full bg-primary/40 ring-1 ring-primary/30" />
             <div className="h-3.5 w-3.5 rounded-full bg-foreground/30" />
             <div className="h-3.5 w-3.5 rounded-full bg-muted-foreground/30" />
           </div>
@@ -223,7 +223,7 @@ function BrandingTile() {
           <span className="text-xs text-muted-foreground">Opacity</span>
           <div className="flex flex-1 items-center gap-2">
             <div className="h-1 flex-1 rounded-full bg-muted-foreground/20">
-              <div className="h-full w-3/4 rounded-full bg-primary-accent/40" />
+              <div className="h-full w-3/4 rounded-full bg-primary/40" />
             </div>
             <span className="text-[10px] text-muted-foreground">75%</span>
           </div>
@@ -236,7 +236,7 @@ function BrandingTile() {
             {[...Array(9)].map((_, i) => (
               <div
                 key={i}
-                className={`h-2 w-2 rounded-sm ${i === 8 ? 'bg-primary-accent/40' : 'bg-muted-foreground/20'}`}
+                className={`h-2 w-2 rounded-sm ${i === 8 ? 'bg-primary/40' : 'bg-muted-foreground/20'}`}
               />
             ))}
           </div>
@@ -266,7 +266,7 @@ function OrganizerTile() {
           <div className="flex h-full gap-1 rounded-sm bg-background p-1">
             {/* Sidebar */}
             <div className="flex w-8 shrink-0 flex-col gap-1.5 rounded-sm bg-muted p-1">
-              <div className="h-2 w-2 rounded-full bg-primary-accent/50" />
+              <div className="h-2 w-2 rounded-full bg-primary/50" />
               <div className="h-1 w-full rounded bg-muted-foreground/20" />
               <div className="h-1 w-full rounded bg-muted-foreground/30" />
               <div className="h-1 w-full rounded bg-muted-foreground/20" />
@@ -308,7 +308,7 @@ function OrganizerTile() {
                     <div key={i} className="flex items-center gap-1 py-0.5">
                       <div className="h-1.5 w-1.5 rounded-sm bg-muted-foreground/20" />
                       <div className="h-0.5 flex-1 rounded bg-muted-foreground/15" />
-                      <div className="h-0.5 w-3 rounded bg-primary-accent/40" />
+                      <div className="h-0.5 w-3 rounded bg-primary/40" />
                     </div>
                   ))}
                 </div>
@@ -320,7 +320,7 @@ function OrganizerTile() {
                     {[60, 80, 45, 90].map((h, i) => (
                       <div key={i} className="flex items-center gap-0.5">
                         <div
-                          className="h-1 rounded bg-primary-accent/30"
+                          className="h-1 rounded bg-primary/30"
                           style={{ width: `${h}%` }}
                         />
                       </div>

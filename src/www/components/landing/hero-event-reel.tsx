@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/shared/utils/ui';
 
 type ReelFrame = {
   key: string;
