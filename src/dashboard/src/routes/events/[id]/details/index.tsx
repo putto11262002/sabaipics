@@ -189,10 +189,10 @@ export default function EventDetailsTab() {
     );
   };
 
-  const searchUrl = `${window.location.origin}/participant/events/${event.id}/search`;
+  const searchUrl = `${import.meta.env.VITE_EVENT_URL}/participant/events/${event.id}/search`;
 
   const handleCopyLink = (eventId: string) => {
-    copyToClipboard(`${window.location.origin}/participant/events/${eventId}/search`);
+    copyToClipboard(`${import.meta.env.VITE_EVENT_URL}/participant/events/${eventId}/search`);
   };
 
   return (
