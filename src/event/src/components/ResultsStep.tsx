@@ -4,6 +4,7 @@ import { RowsPhotoAlbum, type Photo } from 'react-photo-album';
 import { toast } from 'sonner';
 import { Button } from '@/shared/components/ui/button';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
+import { Spinner } from '@/shared/components/ui/spinner';
 import { downloadBulk } from '../lib/api';
 import { th } from '../lib/i18n';
 
@@ -40,7 +41,9 @@ export function ResultsStep({ eventId, photos, onSearchAgain }: ResultsStepProps
         next.delete(photoId);
       } else {
         if (next.size >= MAX_SELECTION) {
-          toast.error(`สูงสุด ${MAX_SELECTION} รูป`);
+          toast.warning(th.results.maxSelection.title(MAX_SELECTION), {
+            description: th.results.maxSelection.description(MAX_SELECTION),
+          });
           return prev;
         }
         next.add(photoId);
@@ -73,9 +76,11 @@ export function ResultsStep({ eventId, photos, onSearchAgain }: ResultsStepProps
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success('ดาวน์โหลดสำเร็จ');
+      toast.success(th.results.downloadSuccess);
     } catch {
-      toast.error('ดาวน์โหลดไม่สำเร็จ');
+      toast.error(th.results.downloadError.title, {
+        description: th.results.downloadError.description,
+      });
     } finally {
       setIsDownloading(false);
     }
@@ -87,7 +92,7 @@ export function ResultsStep({ eventId, photos, onSearchAgain }: ResultsStepProps
       <div className="sticky top-0 z-30 flex items-center justify-between bg-background px-4 py-4">
         <Button variant="outline" size="sm" onClick={onSearchAgain}>
           <RefreshCw className="mr-1 size-4" />
-          ค้นหาใหม่
+          {th.results.searchAgain}
         </Button>
         <Button variant="ghost" size="sm">
           <Image className="mr-1 size-4" />
@@ -97,7 +102,7 @@ export function ResultsStep({ eventId, photos, onSearchAgain }: ResultsStepProps
 
       {/* Hint Alert */}
       <div className="px-4 pb-4">
-        <Alert>
+        <Alert variant="info">
           <Info />
           <AlertDescription>{th.results.hint}</AlertDescription>
         </Alert>
@@ -143,10 +148,13 @@ export function ResultsStep({ eventId, photos, onSearchAgain }: ResultsStepProps
             disabled={isDownloading}
           >
             {isDownloading ? (
-              'กำลังดาวน์โหลด...'
+              <>
+                <Spinner className="mr-1 size-4" />
+                {th.results.downloading}
+              </>
             ) : (
               <>
-                <Download className="mr-2 size-4" />
+                <Download className="mr-1 size-4" />
                 {th.results.download(selectedIds.size)}
               </>
             )}

@@ -25,6 +25,13 @@ export function SearchPage() {
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [errorType, setErrorType] = useState<ErrorType>(null);
 
+  // Revoke object URL on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (selfiePreview) URL.revokeObjectURL(selfiePreview);
+    };
+  }, [selfiePreview]);
+
   // Check sessionStorage for existing consent in this session
   useEffect(() => {
     const hasConsented = sessionStorage.getItem('pdpa_consent_accepted');
