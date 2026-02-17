@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { LayoutDashboard, CalendarDays, Sparkles, Coins } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Sparkles, Wallet } from 'lucide-react';
 
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { NavMain } from './nav-main';
@@ -32,7 +32,7 @@ const data = {
     {
       title: 'Credits',
       url: '/credits',
-      icon: Coins,
+      icon: Wallet,
     },
     // {
     // 	title: "Galleries",

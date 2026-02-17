@@ -5,11 +5,11 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardContent,
+  CardFooter,
   CardDescription,
 } from '@/shared/components/ui/card';
 import { Skeleton } from '@/shared/components/ui/skeleton';
-import { Wallet, Clock, TrendingDown } from 'lucide-react';
+import { CreditCard, Wallet, Clock, TrendingDown } from 'lucide-react';
 import { cn } from '@/shared/utils/ui';
 import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { CreditTopUpDialog } from '../../components/credits/CreditTopUpDialog';
@@ -34,18 +34,18 @@ export default function CreditsLayout() {
           { label: 'Credits' },
         ]}
       >
-        <Button size="sm" onClick={() => setTopUpOpen(true)}>Buy Credits</Button>
+        <Button size="sm" onClick={() => setTopUpOpen(true)}>
+          <CreditCard className="mr-1 size-4" />
+          Buy Credits
+        </Button>
       </SidebarPageHeader>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Wallet className="size-4" />
-              Balance
-            </CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums">
+      <div className="grid auto-rows-min gap-4 px-4 py-4 md:grid-cols-3">
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Balance</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
               {isLoading ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
@@ -53,18 +53,16 @@ export default function CreditsLayout() {
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">Available credits</p>
-          </CardContent>
+          <CardFooter className="text-sm text-muted-foreground">
+            <Wallet className="mr-1 size-4" />
+            Available credits
+          </CardFooter>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Clock className="size-4" />
-              Expiring Soon
-            </CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums">
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Expiring Soon</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
               {isLoading ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
@@ -72,18 +70,16 @@ export default function CreditsLayout() {
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">Credits expiring in 30 days</p>
-          </CardContent>
+          <CardFooter className={`text-sm ${(summary?.expiringSoon ?? 0) > 0 ? 'text-warning' : 'text-muted-foreground'}`}>
+            <Clock className="mr-1 size-4" />
+            Credits expiring in 30 days
+          </CardFooter>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <TrendingDown className="size-4" />
-              Used This Month
-            </CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums">
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Used This Month</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
               {isLoading ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
@@ -91,9 +87,10 @@ export default function CreditsLayout() {
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">Credits used this month</p>
-          </CardContent>
+          <CardFooter className="text-sm text-destructive">
+            <TrendingDown className="mr-1 size-4" />
+            Credits used this month
+          </CardFooter>
         </Card>
       </div>
 
@@ -120,7 +117,7 @@ export default function CreditsLayout() {
       </div>
 
       {/* Tab Content */}
-      <div className="min-w-0 flex-1 overflow-auto px-4">
+      <div className="min-w-0 flex-1 px-4">
         <Outlet />
       </div>
 
