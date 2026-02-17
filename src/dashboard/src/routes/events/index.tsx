@@ -44,7 +44,7 @@ export default function EventsPage() {
   const deleteEvent = useDeleteEvent();
 
   const handleCopyLink = (eventId: string) => {
-    const searchUrl = `${window.location.origin}/participant/events/${eventId}/search`;
+    const searchUrl = `${import.meta.env.VITE_EVENT_URL}/participant/events/${eventId}/search`;
     copyToClipboard(searchUrl);
   };
 
