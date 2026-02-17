@@ -64,29 +64,31 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
 
   return (
     <div className="space-y-6">
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-medium">Color grade</h2>
-          <Button
-            variant="link"
-            size="sm"
-            onClick={() => {
-              if (!lutId) return;
-              const query = new URLSearchParams({
-                intensity: String(intensity),
-                includeLuminance: includeLuminance ? 'true' : 'false',
-              });
-              navigate(`/studio/luts/${lutId}/preview?${query.toString()}`);
-            }}
-            disabled={lutControlsDisabled || !lutId}
-          >
-            <Eye className="mr-1 size-3" />
-            Preview
-          </Button>
+      <section className="space-y-6">
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-medium">Color grade</h2>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => {
+                if (!lutId) return;
+                const query = new URLSearchParams({
+                  intensity: String(intensity),
+                  includeLuminance: includeLuminance ? 'true' : 'false',
+                });
+                navigate(`/studio/luts/${lutId}/preview?${query.toString()}`);
+              }}
+              disabled={lutControlsDisabled || !lutId}
+            >
+              <Eye className="mr-1 size-3" />
+              Preview
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Apply a Studio LUT automatically to new uploads for this event.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Apply a Studio LUT automatically to new uploads for this event.
-        </p>
 
         {(eventCg.isError || studioLuts.isError) && (
           <Alert variant="destructive">Failed to load color grade settings.</Alert>
@@ -140,7 +142,7 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
                   min={0}
                   max={100}
                   step={1}
-                  onValueChange={(v) => setIntensity(v[0] ?? 75)}
+                  onValueChange={(v) => setIntensity(v[0] ?? 100)}
                   disabled={lutControlsDisabled}
                   className="flex-1"
                 />
@@ -164,7 +166,6 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
 
         <div className="flex gap-2">
           <Button
-            variant="outline"
             size="sm"
             onClick={save}
             disabled={update.isPending || Boolean(disabledReason)}
