@@ -195,7 +195,7 @@ Compared Canon EOS 80D (2016 DSLR) vs R6 Mark II (2022 mirrorless) protocol logs
 **Files:**
 
 - Logging: PTPLogger.swift, LogExporter.swift, PTPIPPacket.swift, PTPIPSession.swift, CanonEventSource.swift, PTPIPPhotoDownloader.swift, PTPIPCommand.swift
-- Validation: 80d.txt (80D logs), r6.txt (R6 Mark II logs)
+- Validation: archive/studio/80d.txt (80D logs), archive/studio/r6.txt (R6 Mark II logs)
 - Docs: SAB-82_LOGGING_STRATEGY.md, SAB-82_IMPLEMENTATION_SUMMARY.md
 
 ---
