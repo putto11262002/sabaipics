@@ -39,7 +39,7 @@ import { useUsageChart } from '../../hooks/credits/useUsageChart';
 const chartConfig = {
   credits: {
     label: 'Credits Used',
-    color: 'hsl(var(--primary))',
+    color: 'var(--color-chart-1)',
   },
 } satisfies ChartConfig;
 
