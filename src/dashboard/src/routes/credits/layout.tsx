@@ -34,7 +34,7 @@ export default function CreditsLayout() {
           { label: 'Credits' },
         ]}
       >
-        <Button onClick={() => setTopUpOpen(true)}>Buy Credits</Button>
+        <Button size="sm" onClick={() => setTopUpOpen(true)}>Buy Credits</Button>
       </SidebarPageHeader>
 
       {/* Summary Cards */}

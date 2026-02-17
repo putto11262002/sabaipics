@@ -6,7 +6,8 @@ import {
 } from '@tanstack/react-table';
 import { Badge } from '@/shared/components/ui/badge';
 import { Skeleton } from '@/shared/components/ui/skeleton';
-import { ExternalLink } from 'lucide-react';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/shared/components/ui/empty';
+import { ExternalLink, Wallet } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { DataTable } from '../../components/events-table/data-table';
 import { DataTablePagination } from '../../components/events-table/data-table-pagination';
@@ -98,18 +99,38 @@ export default function CreditPurchasesTab() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4 py-4">
-        <Skeleton className="h-64 w-full rounded-lg" />
+      <div className="space-y-3 py-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 px-4 py-3">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="ml-auto h-4 w-12" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="py-4">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><Wallet /></EmptyMedia>
+            <EmptyTitle>No purchases yet</EmptyTitle>
+            <EmptyDescription>Buy credits to get started.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </div>
     );
   }
 
   return (
     <div className="space-y-4 py-4">
-      <DataTable
-        table={table}
-        emptyMessage="No purchases yet. Buy credits to get started."
-      />
+      <DataTable table={table} />
       {(pagination?.totalPages ?? 0) > 1 && (
         <DataTablePagination table={table} showSelectedCount={false} />
       )}

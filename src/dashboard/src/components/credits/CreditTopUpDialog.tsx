@@ -8,7 +8,7 @@ import {
 } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Label } from '@/shared/components/ui/label';
+import { Field, FieldLabel, FieldDescription } from '@/shared/components/ui/field';
 import {
   Table,
   TableBody,
@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@/shared/components/ui/table';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
-import { CheckCircle2, XCircle, AlertCircle, X } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertCircle, X, RefreshCw } from 'lucide-react';
 import { Spinner } from '@/shared/components/ui/spinner';
 import { calculateTieredDiscount } from '../../lib/credits/discount';
 import { useTopUpCheckout } from '../../hooks/credits/useTopUpCheckout';
@@ -149,10 +149,8 @@ export function CreditTopUpDialog({
 
         <div className="space-y-6 py-4">
           {/* Amount Input */}
-          <div className="space-y-2">
-            <Label htmlFor="amount" className="text-sm font-medium">
-              Amount (THB)
-            </Label>
+          <Field>
+            <FieldLabel htmlFor="amount">Amount (THB)</FieldLabel>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl font-bold text-muted-foreground">
                 ฿
@@ -167,10 +165,10 @@ export function CreditTopUpDialog({
                 style={{ fontSize: '1.875rem' }}
               />
             </div>
-            <p className="text-xs text-muted-foreground">
+            <FieldDescription>
               Enter amount between {MIN_AMOUNT}-{MAX_AMOUNT.toLocaleString()} THB
-            </p>
-          </div>
+            </FieldDescription>
+          </Field>
 
           {/* Quick Select Buttons */}
           <div className="flex justify-center gap-3">
@@ -197,10 +195,8 @@ export function CreditTopUpDialog({
           </div>
 
           {/* Promo Code Input */}
-          <div className="space-y-2">
-            <Label htmlFor="promoCode" className="text-sm font-medium">
-              Discount Code (Optional)
-            </Label>
+          <Field>
+            <FieldLabel htmlFor="promoCode">Discount Code (Optional)</FieldLabel>
             <div className="relative">
               <Input
                 id="promoCode"
@@ -275,7 +271,7 @@ export function CreditTopUpDialog({
                 Discount code applied!
               </p>
             )}
-          </div>
+          </Field>
 
           {/* Base Minimum Alert (50 THB) */}
           {!isValidAmount && amount > 0 && (
@@ -301,7 +297,13 @@ export function CreditTopUpDialog({
           {errorMessage && (
             <Alert variant="destructive">
               <AlertCircle className="size-4" />
-              <AlertDescription>{errorMessage}</AlertDescription>
+              <AlertDescription className="flex items-center justify-between">
+                <span>{errorMessage}</span>
+                <Button variant="destructive" size="sm" onClick={handleCheckout}>
+                  <RefreshCw className="mr-1 size-3" />
+                  Retry
+                </Button>
+              </AlertDescription>
             </Alert>
           )}
 
