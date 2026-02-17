@@ -248,7 +248,6 @@ export default function EventDetailsTab() {
         </FieldGroup>
         <div className="flex gap-2">
           <Button
-            variant="outline"
             size="sm"
             onClick={form.handleSubmit(handleSave)}
             disabled={updateEvent.isPending}

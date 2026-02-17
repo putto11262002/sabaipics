@@ -64,9 +64,11 @@ export default function EventFtpTab() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 py-6">
-      <section className="space-y-4">
-        <h2 className="text-base font-medium">FTP credentials</h2>
-        <p className="text-sm text-muted-foreground">Use these credentials to upload photos via FTP.</p>
+      <section className="space-y-6">
+        <div className="space-y-1">
+          <h2 className="text-base font-medium">FTP credentials</h2>
+          <p className="text-sm text-muted-foreground">Use these credentials to upload photos via FTP.</p>
+        </div>
         <FieldGroup>
           <Field orientation="responsive">
             <FieldLabel>Username</FieldLabel>
