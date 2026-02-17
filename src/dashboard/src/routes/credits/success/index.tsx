@@ -5,6 +5,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Spinner } from "@/shared/components/ui/spinner";
+import { Alert, AlertDescription } from "@/shared/components/ui/alert";
 import { api } from "../../../lib/api";
 import type { InferResponseType } from "hono/client";
 import type { SuccessStatusCode } from "hono/utils/http-status";
@@ -112,9 +113,10 @@ export function CreditSuccessPage() {
             </p>
           </div>
           {error && (
-            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 text-sm text-destructive">
-              {error.message}
-            </div>
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>{error.message}</AlertDescription>
+            </Alert>
           )}
         </div>
       </div>

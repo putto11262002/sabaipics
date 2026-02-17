@@ -8,7 +8,7 @@ import {
 } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
-import { Gift, Loader2, AlertCircle, Plus, Check } from 'lucide-react';
+import { Gift, Loader2, AlertCircle, Plus, Check, RefreshCw } from 'lucide-react';
 import { useTopUpCheckout } from '../../hooks/credits/useTopUpCheckout';
 import { useValidatePromoCode } from '../../hooks/credits/useValidatePromoCode';
 
@@ -54,12 +54,7 @@ export function GiftCodeDialog({
       window.location.href = result.data.checkoutUrl;
     } catch (error) {
       setClaiming(false);
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === 'object' && error !== null && 'message' in error
-            ? String((error as { message: unknown }).message)
-            : 'Failed to claim gift';
+      const message = error instanceof Error ? error.message : 'Failed to claim gift';
       alert(message);
     }
   };
@@ -90,8 +85,12 @@ export function GiftCodeDialog({
           {validateQuery.isError && (
             <Alert variant="destructive">
               <AlertCircle className="size-4" />
-              <AlertDescription>
-                {validateQuery.error?.message ?? 'Invalid or expired gift code'}
+              <AlertDescription className="flex items-center justify-between">
+                <span>{validateQuery.error?.message ?? 'Invalid or expired gift code'}</span>
+                <Button variant="destructive" size="sm" onClick={() => validateQuery.refetch()}>
+                  <RefreshCw className="mr-1 size-3" />
+                  Retry
+                </Button>
               </AlertDescription>
             </Alert>
           )}
@@ -154,7 +153,7 @@ export function GiftCodeDialog({
               >
                 {claiming ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    <Loader2 className="mr-1 size-4 animate-spin" />
                     Claiming...
                   </>
                 ) : (

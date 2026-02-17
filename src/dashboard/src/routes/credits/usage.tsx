@@ -13,6 +13,8 @@ import {
   CardDescription,
 } from '@/shared/components/ui/card';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/shared/components/ui/empty';
+import { TrendingDown } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -200,13 +202,26 @@ export default function CreditUsageTab() {
 
       {/* Usage Table */}
       {tableLoading ? (
-        <Skeleton className="h-64 w-full rounded-lg" />
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-3">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+              <Skeleton className="ml-auto h-4 w-16" />
+            </div>
+          ))}
+        </div>
+      ) : entries.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><TrendingDown /></EmptyMedia>
+            <EmptyTitle>No usage yet</EmptyTitle>
+            <EmptyDescription>Credits are deducted when you upload photos.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <>
-          <DataTable
-            table={table}
-            emptyMessage="No usage yet. Credits are deducted when you upload photos."
-          />
+          <DataTable table={table} />
           {(pagination?.totalPages ?? 0) > 1 && (
             <DataTablePagination table={table} showSelectedCount={false} />
           )}

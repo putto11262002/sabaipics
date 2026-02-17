@@ -6,7 +6,7 @@ import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 const getPromoCodeValidate = api['credit-packages']['promo-code'].validate.$get;
 type PromoCodeValidateResponse = InferResponseType<typeof getPromoCodeValidate, SuccessStatusCode>;
 
-interface GiftCodeData {
+export interface GiftCodeData {
   type: 'gift';
   code: string;
   credits: number;
@@ -14,7 +14,7 @@ interface GiftCodeData {
   expiresAt: string | null;
 }
 
-interface DiscountCodeData {
+export interface DiscountCodeData {
   type: 'discount';
   code: string;
   discountPercent: number;
@@ -23,9 +23,9 @@ interface DiscountCodeData {
   minAmountThb: number | null;
 }
 
-type PromoCodeData = GiftCodeData | DiscountCodeData;
+export type PromoCodeData = GiftCodeData | DiscountCodeData;
 
-interface PromoCodeValidationResponse {
+export interface PromoCodeValidationResponse {
   data: PromoCodeData;
 }
 
