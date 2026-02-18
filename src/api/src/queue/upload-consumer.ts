@@ -33,6 +33,10 @@ import { normalizeWithPhoton, type PhotonPostProcessHook } from '../lib/images/n
 import { extractExif } from '../lib/images/exif';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 
+// Must match wrangler.api.jsonc consumer max_retries setting.
+// CF Workers: attempts starts at 1, so last attempt = MAX_RETRIES + 1.
+const MAX_RETRIES = 3;
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -727,7 +731,7 @@ export async function queue(
     );
     const db = createDb(env.DATABASE_URL);
 
-    result.match(
+    await result.match(
       () => message.ack(),
       async (error) => {
         // Centralized cleanup using switch statement
@@ -768,7 +772,19 @@ export async function queue(
             message.ack();
             break;
 
-          case 'normalization':
+          case 'normalization': {
+            const isLastAttempt = message.attempts > MAX_RETRIES;
+            const capture = isLastAttempt ? captureUploadError : captureUploadWarning;
+            capture('normalization', {
+              intentId: error.intentId,
+              r2Key: error.key,
+              extra: {
+                attempt: message.attempts,
+                isLastAttempt,
+                cause: unknownToString(error.cause),
+              },
+            });
+
             // Mark as failed so users see the error, but keep R2 object intact
             // and retry. If retry succeeds, the transaction overwrites to 'completed'.
             // If all retries exhaust, the intent is already 'failed' (not stuck 'pending').
@@ -782,13 +798,48 @@ export async function queue(
               .where(eq(uploadIntents.id, error.intentId));
             message.retry();
             break;
+          }
 
           case 'database':
-          case 'r2':
-            // Retryable - don't cleanup, just retry
-            console.error(`[upload-consumer] Retryable error:`, error);
+          case 'r2': {
+            const isLastAttempt = message.attempts > MAX_RETRIES;
+            const errorCode = error.type === 'database' ? 'database_error' : 'r2_error';
+
+            // Escalate to error on last attempt so Sentry alerts fire
+            const capture = isLastAttempt ? captureUploadError : captureUploadWarning;
+            capture(errorCode, {
+              r2Key: event.object.key,
+              extra: {
+                attempt: message.attempts,
+                isLastAttempt,
+                operation: 'operation' in error ? error.operation : undefined,
+                cause: 'cause' in error ? unknownToString(error.cause) : undefined,
+              },
+            });
+
+            // Best-effort: find intent and mark as failed so it doesn't stay
+            // stuck in 'pending' after retries exhaust. If DB itself is down,
+            // this will fail silently — the DLQ is the last safety net.
+            const failedIntent = await db.query.uploadIntents.findFirst({
+              where: eq(uploadIntents.r2Key, event.object.key),
+              columns: { id: true },
+            }).catch(() => null);
+
+            if (failedIntent) {
+              await db
+                .update(uploadIntents)
+                .set({
+                  status: 'failed',
+                  errorCode,
+                  errorMessage: `Upload processing failed: ${errorCode}`,
+                })
+                .where(eq(uploadIntents.id, failedIntent.id))
+                .catch(() => {});
+            }
+
             message.retry();
             break;
+          }
         }
       },
     );

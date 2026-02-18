@@ -17,6 +17,7 @@
  * - WebSocket notifications
  */
 
+import * as Sentry from '@sentry/cloudflare';
 import type { PhotoJob } from '../types/photo-job';
 import type { Bindings } from '../types';
 import {
@@ -36,6 +37,10 @@ import { createDb, createDbTx, type Database, type DatabaseTx } from '@/db';
 import { photos, events, faces } from '@/db';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { ResultAsync, ok, err, safeTry, type Result } from 'neverthrow';
+
+// Must match wrangler.api.jsonc consumer max_retries setting.
+// CF Workers: attempts starts at 1, so last attempt = MAX_RETRIES + 1.
+const MAX_RETRIES = 3;
 
 // =============================================================================
 // Types
@@ -58,6 +63,62 @@ export type PhotoProcessingError =
 interface ProcessedPhoto {
   message: Message<PhotoJob>;
   result: Result<PhotoIndexed, PhotoProcessingError>;
+}
+
+// =============================================================================
+// Sentry Helpers
+// =============================================================================
+
+/** Capture a photo processing error to Sentry */
+function capturePhotoError(
+  errorType: string,
+  context: {
+    photoId: string;
+    eventId: string;
+    r2Key: string;
+    extra?: Record<string, unknown>;
+  },
+): void {
+  Sentry.withScope((scope) => {
+    scope.setTag('error_type', errorType);
+    scope.setTag('queue', 'photo-processing');
+    scope.setTag('photo_id', context.photoId);
+    scope.setTag('event_id', context.eventId);
+    scope.setExtra('r2_key', context.r2Key);
+    if (context.extra) {
+      for (const [k, v] of Object.entries(context.extra)) {
+        scope.setExtra(k, v);
+      }
+    }
+    scope.setLevel('error');
+    Sentry.captureMessage(`Photo processing failed: ${errorType}`);
+  });
+}
+
+/** Capture a retryable photo processing error to Sentry (warning level) */
+function capturePhotoWarning(
+  errorType: string,
+  context: {
+    photoId: string;
+    eventId: string;
+    r2Key: string;
+    extra?: Record<string, unknown>;
+  },
+): void {
+  Sentry.withScope((scope) => {
+    scope.setTag('error_type', errorType);
+    scope.setTag('queue', 'photo-processing');
+    scope.setTag('photo_id', context.photoId);
+    scope.setTag('event_id', context.eventId);
+    scope.setExtra('r2_key', context.r2Key);
+    if (context.extra) {
+      for (const [k, v] of Object.entries(context.extra)) {
+        scope.setExtra(k, v);
+      }
+    }
+    scope.setLevel('warning');
+    Sentry.captureMessage(`Photo processing warning: ${errorType}`);
+  });
 }
 
 // =============================================================================
@@ -334,7 +395,10 @@ function processPhoto(
 
   return safeTry(async function* () {
     // Step 1: Fetch image from R2
-    const object = yield* fetchImageFromR2(env, job.r2_key);
+    const object = yield* Sentry.startSpan(
+      { name: 'photo.r2_fetch', op: 'r2.get' },
+      (): ResultAsync<R2ObjectBody, PhotoProcessingError> => fetchImageFromR2(env, job.r2_key),
+    );
 
     // Step 2: Get image bytes
     const originalBytes = await object.arrayBuffer();
@@ -344,28 +408,39 @@ function processPhoto(
     let imageBytes = originalBytes;
     if (originalBytes.byteLength > MAX_REKOGNITION_SIZE) {
       // Best-effort transform: use orElse to fallback to original bytes on failure
-      imageBytes = yield* transformImageForRekognition(env, originalBytes).orElse(
-        (transformErr) => {
-          console.error(`[Queue] Transform failed, using original`, {
-            photoId: job.photo_id,
-            error: transformErr.type === 'transform' ? transformErr.message : transformErr.type,
-          });
-          return ok(originalBytes);
-        },
+      imageBytes = yield* Sentry.startSpan(
+        { name: 'photo.transform', op: 'image.process' },
+        () =>
+          transformImageForRekognition(env, originalBytes).orElse((transformErr) => {
+            console.error(`[Queue] Transform failed, using original`, {
+              photoId: job.photo_id,
+              error: transformErr.type === 'transform' ? transformErr.message : transformErr.type,
+            });
+            return ok(originalBytes);
+          }),
       );
     }
 
     // Step 4: Ensure collection exists
-    yield* ensureCollection(provider, db, job.event_id);
+    yield* Sentry.startSpan(
+      { name: 'photo.ensure_collection', op: 'face.collection' },
+      () => ensureCollection(provider, db, job.event_id),
+    );
 
     // Step 5: Index faces using unified provider interface
-    const indexResult = yield* provider
-      .indexPhoto({
-        eventId: job.event_id,
-        photoId: job.photo_id,
-        imageData: imageBytes,
-      })
-      .mapErr((e): PhotoProcessingError => ({ type: 'face_service', cause: e }));
+    const indexResult = yield* Sentry.startSpan(
+      { name: 'photo.index_faces', op: 'face.index' },
+      (span) => {
+        span.setAttribute('photo.image_size', imageBytes.byteLength);
+        return provider
+          .indexPhoto({
+            eventId: job.event_id,
+            photoId: job.photo_id,
+            imageData: imageBytes,
+          })
+          .mapErr((e): PhotoProcessingError => ({ type: 'face_service', cause: e }));
+      },
+    );
 
     return ok(indexResult);
   }).mapErr((error) => {
@@ -493,7 +568,28 @@ export async function queue(
         await sleep(index * intervalMs);
       }
 
-      const result = await processPhoto(env, provider, db, message);
+      const result = await Sentry.startSpan(
+        { name: 'photo.process', op: 'queue.process' },
+        async (span) => {
+          const job = message.body;
+          span.setAttribute('photo.id', job.photo_id);
+          span.setAttribute('photo.event_id', job.event_id);
+          span.setAttribute('photo.r2_key', job.r2_key);
+
+          const r = await processPhoto(env, provider, db, message);
+          r.match(
+            (data) => {
+              span.setAttribute('photo.status', 'ok');
+              span.setAttribute('photo.face_count', data.faces.length);
+            },
+            (error) => {
+              span.setAttribute('photo.status', 'error');
+              span.setAttribute('photo.error_type', error.type);
+            },
+          );
+          return r;
+        },
+      );
       return { message, result };
     }),
   );
@@ -505,76 +601,111 @@ export async function queue(
 
   for (const { message, result } of processed) {
     const job = message.body;
+    const sentryCtx = { photoId: job.photo_id, eventId: job.event_id, r2Key: job.r2_key };
 
     await result
       .orTee((error) => {
         // Centralized error logging
         const logData: Record<string, unknown> = { photoId: job.photo_id, errorType: error.type };
+        const extra: Record<string, unknown> = {};
 
         switch (error.type) {
           case 'face_service': {
             const faceErr = error.cause;
             logData.faceErrorType = faceErr.type;
+            extra.faceErrorType = faceErr.type;
             if (faceErr.type === 'provider_failed') {
               logData.provider = faceErr.provider;
               logData.retryable = faceErr.retryable;
               logData.throttle = faceErr.throttle;
               logData.cause = faceErr.cause;
+              extra.provider = faceErr.provider;
+              extra.retryable = faceErr.retryable;
+              extra.throttle = faceErr.throttle;
             }
             break;
           }
           case 'not_found':
             logData.key = error.key;
+            extra.key = error.key;
             break;
           case 'database':
             logData.operation = error.operation;
+            extra.operation = error.operation;
             break;
           case 'transform':
             logData.errorMessage = error.message;
+            extra.errorMessage = error.message;
             break;
         }
 
         console.error(`[Queue] Photo processing failed`, logData);
+
+        // Escalate to error level on last attempt or non-retryable errors
+        const isLastAttempt = message.attempts > MAX_RETRIES;
+        const isRetryable = isRetryableProcessingError(error);
+        extra.attempt = message.attempts;
+        extra.isLastAttempt = isLastAttempt;
+
+        const captureFn = !isRetryable || isLastAttempt
+          ? capturePhotoError
+          : capturePhotoWarning;
+        captureFn(error.type, { ...sentryCtx, extra });
       })
       .match(
         // Success path - persist faces and update photo
         async (indexResult) => {
-          await persistFacesAndUpdatePhoto(db, env.DATABASE_URL, job, indexResult, provider)
-            .orTee((persistErr) => {
-              console.error(`[Queue] Persist error`, {
-                photoId: job.photo_id,
-                type: persistErr.type,
-                ...(persistErr.type === 'database' ? { operation: persistErr.operation } : {}),
-                ...(persistErr.type === 'face_service'
-                  ? { faceErrorType: persistErr.cause.type }
-                  : {}),
-              });
-            })
-            .match(
-              () => {
-                successCount++;
-                message.ack();
-              },
-              async (persistErr) => {
-                failCount++;
-                // Best-effort: mark photo with retryable error
-                const errorName = getErrorName(persistErr);
-                await ResultAsync.fromPromise(
-                  db
-                    .update(photos)
-                    .set({ retryable: true, errorName })
-                    .where(eq(photos.id, job.photo_id)),
-                  (e) => e,
-                ).match(
-                  () => {},
-                  (e) => console.error(`[Queue] Failed to mark retryable error:`, e),
-                );
+          await Sentry.startSpan(
+            { name: 'photo.persist', op: 'db.transaction' },
+            () =>
+              persistFacesAndUpdatePhoto(db, env.DATABASE_URL, job, indexResult, provider)
+                .orTee((persistErr) => {
+                  console.error(`[Queue] Persist error`, {
+                    photoId: job.photo_id,
+                    type: persistErr.type,
+                    ...(persistErr.type === 'database'
+                      ? { operation: persistErr.operation }
+                      : {}),
+                    ...(persistErr.type === 'face_service'
+                      ? { faceErrorType: persistErr.cause.type }
+                      : {}),
+                  });
+                  capturePhotoWarning('persist_failed', {
+                    ...sentryCtx,
+                    extra: {
+                      persistErrorType: persistErr.type,
+                      ...(persistErr.type === 'database'
+                        ? { operation: persistErr.operation }
+                        : {}),
+                    },
+                  });
+                })
+                .match(
+                  () => {
+                    successCount++;
+                    message.ack();
+                  },
+                  async (persistErr) => {
+                    failCount++;
+                    // Best-effort: mark photo with retryable error
+                    const errorName = getErrorName(persistErr);
+                    await ResultAsync.fromPromise(
+                      db
+                        .update(photos)
+                        .set({ retryable: true, errorName })
+                        .where(eq(photos.id, job.photo_id)),
+                      (e) => e,
+                    ).match(
+                      () => {},
+                      (e) => console.error(`[Queue] Failed to mark retryable error:`, e),
+                    );
 
-                message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
-              },
-            );
+                    message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+                  },
+                ),
+          );
         },
-        // Error path - control flow only (logging done in orTee above)
+        // Error path - control flow only (logging + Sentry done in orTee above)
         async (error) => {
           failCount++;
           const isThrottle = isThrottleProcessingError(error);
