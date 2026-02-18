@@ -2,6 +2,11 @@ import type { Bindings } from '../types';
 import { cleanupExpiredEvents } from './cleanup';
 import { hardDeleteCleanup } from './hard-delete-cleanup';
 import { photographerCleanup } from './photographer-cleanup';
+import {
+	cleanupCompletedOriginals,
+	cleanupNonRetryableFailed,
+	cleanupStaleRetryable,
+} from './upload-intent-cleanup';
 
 /**
  * Cloudflare Workers scheduled event handler
@@ -26,6 +31,15 @@ export async function scheduled(
 			break;
 		case '0 22 * * *': // 5 AM Bangkok time (UTC+7) - Hard delete old soft-deleted photographers
 			ctx.waitUntil(photographerCleanup(env));
+			break;
+		case '0 23 * * *': // 6 AM Bangkok time (UTC+7) - Clean up completed upload originals (1 day)
+			ctx.waitUntil(cleanupCompletedOriginals(env));
+			break;
+		case '10 23 * * *': // 6:10 AM Bangkok time (UTC+7) - Hard delete non-retryable failed intents (3 days)
+			ctx.waitUntil(cleanupNonRetryableFailed(env));
+			break;
+		case '20 23 * * *': // 6:20 AM Bangkok time (UTC+7) - Hard delete stale retryable intents (7 days)
+			ctx.waitUntil(cleanupStaleRetryable(env));
 			break;
 		default:
 			console.warn('[Cron] Unknown cron schedule', {
