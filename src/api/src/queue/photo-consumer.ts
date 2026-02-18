@@ -393,12 +393,13 @@ function processPhoto(
 ): ResultAsync<PhotoIndexed, PhotoProcessingError> {
   const job = message.body;
 
+  // Note: Sentry.startSpan cannot wrap yield* inside safeTry because ResultAsync
+  // is thenable — startSpan awaits it, returning Result instead of ResultAsync,
+  // which breaks the async iterator protocol. Per-message spans in the queue
+  // handler (photo.process) provide the top-level tracing instead.
   return safeTry(async function* () {
     // Step 1: Fetch image from R2
-    const object = yield* Sentry.startSpan(
-      { name: 'photo.r2_fetch', op: 'r2.get' },
-      (): ResultAsync<R2ObjectBody, PhotoProcessingError> => fetchImageFromR2(env, job.r2_key),
-    );
+    const object = yield* fetchImageFromR2(env, job.r2_key);
 
     // Step 2: Get image bytes
     const originalBytes = await object.arrayBuffer();
@@ -408,39 +409,28 @@ function processPhoto(
     let imageBytes = originalBytes;
     if (originalBytes.byteLength > MAX_REKOGNITION_SIZE) {
       // Best-effort transform: use orElse to fallback to original bytes on failure
-      imageBytes = yield* Sentry.startSpan(
-        { name: 'photo.transform', op: 'image.process' },
-        () =>
-          transformImageForRekognition(env, originalBytes).orElse((transformErr) => {
-            console.error(`[Queue] Transform failed, using original`, {
-              photoId: job.photo_id,
-              error: transformErr.type === 'transform' ? transformErr.message : transformErr.type,
-            });
-            return ok(originalBytes);
-          }),
+      imageBytes = yield* transformImageForRekognition(env, originalBytes).orElse(
+        (transformErr) => {
+          console.error(`[Queue] Transform failed, using original`, {
+            photoId: job.photo_id,
+            error: transformErr.type === 'transform' ? transformErr.message : transformErr.type,
+          });
+          return ok(originalBytes);
+        },
       );
     }
 
     // Step 4: Ensure collection exists
-    yield* Sentry.startSpan(
-      { name: 'photo.ensure_collection', op: 'face.collection' },
-      () => ensureCollection(provider, db, job.event_id),
-    );
+    yield* ensureCollection(provider, db, job.event_id);
 
     // Step 5: Index faces using unified provider interface
-    const indexResult = yield* Sentry.startSpan(
-      { name: 'photo.index_faces', op: 'face.index' },
-      (span) => {
-        span.setAttribute('photo.image_size', imageBytes.byteLength);
-        return provider
-          .indexPhoto({
-            eventId: job.event_id,
-            photoId: job.photo_id,
-            imageData: imageBytes,
-          })
-          .mapErr((e): PhotoProcessingError => ({ type: 'face_service', cause: e }));
-      },
-    );
+    const indexResult = yield* provider
+      .indexPhoto({
+        eventId: job.event_id,
+        photoId: job.photo_id,
+        imageData: imageBytes,
+      })
+      .mapErr((e): PhotoProcessingError => ({ type: 'face_service', cause: e }));
 
     return ok(indexResult);
   }).mapErr((error) => {
@@ -655,55 +645,51 @@ export async function queue(
       .match(
         // Success path - persist faces and update photo
         async (indexResult) => {
-          await Sentry.startSpan(
-            { name: 'photo.persist', op: 'db.transaction' },
-            () =>
-              persistFacesAndUpdatePhoto(db, env.DATABASE_URL, job, indexResult, provider)
-                .orTee((persistErr) => {
-                  console.error(`[Queue] Persist error`, {
-                    photoId: job.photo_id,
-                    type: persistErr.type,
-                    ...(persistErr.type === 'database'
-                      ? { operation: persistErr.operation }
-                      : {}),
-                    ...(persistErr.type === 'face_service'
-                      ? { faceErrorType: persistErr.cause.type }
-                      : {}),
-                  });
-                  capturePhotoWarning('persist_failed', {
-                    ...sentryCtx,
-                    extra: {
-                      persistErrorType: persistErr.type,
-                      ...(persistErr.type === 'database'
-                        ? { operation: persistErr.operation }
-                        : {}),
-                    },
-                  });
-                })
-                .match(
-                  () => {
-                    successCount++;
-                    message.ack();
-                  },
-                  async (persistErr) => {
-                    failCount++;
-                    // Best-effort: mark photo with retryable error
-                    const errorName = getErrorName(persistErr);
-                    await ResultAsync.fromPromise(
-                      db
-                        .update(photos)
-                        .set({ retryable: true, errorName })
-                        .where(eq(photos.id, job.photo_id)),
-                      (e) => e,
-                    ).match(
-                      () => {},
-                      (e) => console.error(`[Queue] Failed to mark retryable error:`, e),
-                    );
+          await persistFacesAndUpdatePhoto(db, env.DATABASE_URL, job, indexResult, provider)
+            .orTee((persistErr) => {
+              console.error(`[Queue] Persist error`, {
+                photoId: job.photo_id,
+                type: persistErr.type,
+                ...(persistErr.type === 'database'
+                  ? { operation: persistErr.operation }
+                  : {}),
+                ...(persistErr.type === 'face_service'
+                  ? { faceErrorType: persistErr.cause.type }
+                  : {}),
+              });
+              capturePhotoWarning('persist_failed', {
+                ...sentryCtx,
+                extra: {
+                  persistErrorType: persistErr.type,
+                  ...(persistErr.type === 'database'
+                    ? { operation: persistErr.operation }
+                    : {}),
+                },
+              });
+            })
+            .match(
+              () => {
+                successCount++;
+                message.ack();
+              },
+              async (persistErr) => {
+                failCount++;
+                // Best-effort: mark photo with retryable error
+                const errorName = getErrorName(persistErr);
+                await ResultAsync.fromPromise(
+                  db
+                    .update(photos)
+                    .set({ retryable: true, errorName })
+                    .where(eq(photos.id, job.photo_id)),
+                  (e) => e,
+                ).match(
+                  () => {},
+                  (e) => console.error(`[Queue] Failed to mark retryable error:`, e),
+                );
 
-                    message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
-                  },
-                ),
-          );
+                message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+              },
+            );
         },
         // Error path - control flow only (logging + Sentry done in orTee above)
         async (error) => {
