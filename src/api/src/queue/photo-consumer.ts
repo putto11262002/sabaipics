@@ -616,7 +616,7 @@ export async function queue(
                 const errorName = getErrorName(persistErr);
                 const isLastAttempt = message.attempts > MAX_RETRIES;
 
-                await ResultAsync.fromPromise(
+                const writeResult = await ResultAsync.fromPromise(
                   db
                     .update(photos)
                     .set(isLastAttempt
@@ -624,12 +624,14 @@ export async function queue(
                       : { retryable: true, errorName })
                     .where(eq(photos.id, job.photo_id)),
                   (e) => e,
-                ).match(
-                  () => {},
-                  (e) => console.error(`[Queue] Failed to mark photo error:`, e),
                 );
 
-                if (isLastAttempt) {
+                if (writeResult.isErr()) {
+                  console.error(`[Queue] Failed to mark photo error:`, writeResult.error);
+                  // DB write failed — retry so DLQ can catch it rather than
+                  // acking with stale status.
+                  message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+                } else if (isLastAttempt) {
                   message.ack();
                 } else {
                   message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
@@ -653,7 +655,7 @@ export async function queue(
           if (isThrottle) {
             const isLastAttempt = message.attempts > MAX_RETRIES;
 
-            await ResultAsync.fromPromise(
+            const throttleWrite = await ResultAsync.fromPromise(
               db
                 .update(photos)
                 .set(isLastAttempt
@@ -661,12 +663,12 @@ export async function queue(
                   : { retryable: true, errorName })
                 .where(eq(photos.id, job.photo_id)),
               (e) => e,
-            ).match(
-              () => {},
-              (e) => console.error(`[Queue] Failed to mark throttle error:`, e),
             );
 
-            if (isLastAttempt) {
+            if (throttleWrite.isErr()) {
+              console.error(`[Queue] Failed to mark throttle error:`, throttleWrite.error);
+              message.retry({ delaySeconds: getThrottleBackoffDelay(message.attempts) });
+            } else if (isLastAttempt) {
               message.ack();
             } else {
               message.retry({ delaySeconds: getThrottleBackoffDelay(message.attempts) });
@@ -694,7 +696,7 @@ export async function queue(
           // Retryable: retry with backoff, or fail on last attempt
           const isLastAttempt = message.attempts > MAX_RETRIES;
 
-          await ResultAsync.fromPromise(
+          const retryWrite = await ResultAsync.fromPromise(
             db
               .update(photos)
               .set(isLastAttempt
@@ -702,12 +704,12 @@ export async function queue(
                 : { retryable: true, errorName })
               .where(eq(photos.id, job.photo_id)),
             (e) => e,
-          ).match(
-            () => {},
-            (e) => console.error(`[Queue] Failed to mark retryable error:`, e),
           );
 
-          if (isLastAttempt) {
+          if (retryWrite.isErr()) {
+            console.error(`[Queue] Failed to mark retryable error:`, retryWrite.error);
+            message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+          } else if (isLastAttempt) {
             message.ack();
           } else {
             message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
