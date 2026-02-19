@@ -674,20 +674,27 @@ export async function queue(
               },
               async (persistErr) => {
                 failCount++;
-                // Best-effort: mark photo with retryable error
                 const errorName = getErrorName(persistErr);
+                const isLastAttempt = message.attempts > MAX_RETRIES;
+
                 await ResultAsync.fromPromise(
                   db
                     .update(photos)
-                    .set({ retryable: true, errorName })
+                    .set(isLastAttempt
+                      ? { status: 'failed' as const, retryable: false, errorName }
+                      : { retryable: true, errorName })
                     .where(eq(photos.id, job.photo_id)),
                   (e) => e,
                 ).match(
                   () => {},
-                  (e) => console.error(`[Queue] Failed to mark retryable error:`, e),
+                  (e) => console.error(`[Queue] Failed to mark photo error:`, e),
                 );
 
-                message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+                if (isLastAttempt) {
+                  message.ack();
+                } else {
+                  message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+                }
               },
             );
         },
@@ -703,12 +710,16 @@ export async function queue(
             hasThrottleError = true;
           }
 
-          // Throttle: retry with longer backoff
+          // Throttle: retry with longer backoff, or fail on last attempt
           if (isThrottle) {
+            const isLastAttempt = message.attempts > MAX_RETRIES;
+
             await ResultAsync.fromPromise(
               db
                 .update(photos)
-                .set({ retryable: true, errorName })
+                .set(isLastAttempt
+                  ? { status: 'failed' as const, retryable: false, errorName }
+                  : { retryable: true, errorName })
                 .where(eq(photos.id, job.photo_id)),
               (e) => e,
             ).match(
@@ -716,7 +727,11 @@ export async function queue(
               (e) => console.error(`[Queue] Failed to mark throttle error:`, e),
             );
 
-            message.retry({ delaySeconds: getThrottleBackoffDelay(message.attempts) });
+            if (isLastAttempt) {
+              message.ack();
+            } else {
+              message.retry({ delaySeconds: getThrottleBackoffDelay(message.attempts) });
+            }
             return;
           }
 
@@ -737,11 +752,15 @@ export async function queue(
             return;
           }
 
-          // Retryable: retry with backoff
+          // Retryable: retry with backoff, or fail on last attempt
+          const isLastAttempt = message.attempts > MAX_RETRIES;
+
           await ResultAsync.fromPromise(
             db
               .update(photos)
-              .set({ retryable: true, errorName })
+              .set(isLastAttempt
+                ? { status: 'failed' as const, retryable: false, errorName }
+                : { retryable: true, errorName })
               .where(eq(photos.id, job.photo_id)),
             (e) => e,
           ).match(
@@ -749,7 +768,11 @@ export async function queue(
             (e) => console.error(`[Queue] Failed to mark retryable error:`, e),
           );
 
-          message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+          if (isLastAttempt) {
+            message.ack();
+          } else {
+            message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+          }
         },
       );
   }
