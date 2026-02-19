@@ -57,18 +57,8 @@ export async function reprocessInsufficientCredits(
 				continue;
 			}
 
-			// Reset intent to pending
-			await db
-				.update(uploadIntents)
-				.set({
-					status: 'pending',
-					errorCode: null,
-					errorMessage: null,
-					retryable: null,
-				})
-				.where(eq(uploadIntents.id, intent.id));
-
-			// Send synthetic R2 event to upload queue
+			// Send synthetic R2 event to upload queue BEFORE updating intent —
+			// if queue send fails, intent stays in failed/retryable for next top-up.
 			const syntheticEvent: R2EventMessage = {
 				account: '',
 				action: 'PutObject',
@@ -82,6 +72,19 @@ export async function reprocessInsufficientCredits(
 			};
 
 			await env.UPLOAD_QUEUE.send(syntheticEvent);
+
+			// Queue send succeeded — now reset intent to pending with fresh expiry
+			await db
+				.update(uploadIntents)
+				.set({
+					status: 'pending',
+					errorCode: null,
+					errorMessage: null,
+					retryable: null,
+					expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+				})
+				.where(eq(uploadIntents.id, intent.id));
+
 			requeued++;
 		} catch (error) {
 			failed++;
