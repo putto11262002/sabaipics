@@ -120,24 +120,22 @@ export async function cleanupNonRetryableFailed(env: Bindings): Promise<void> {
 
 	for (const intent of intents) {
 		try {
-			// Delete original R2 object (best-effort — may already be gone)
+			// Delete R2 objects first — if these fail, skip intent deletion so
+			// the next cron run can retry (prevents orphaning R2 objects).
 			if (intent.r2Key) {
-				await env.PHOTOS_BUCKET.delete(intent.r2Key).catch(() => {});
+				await env.PHOTOS_BUCKET.delete(intent.r2Key);
 			}
-
-			// Delete normalized JPEG if transaction created a photo record
-			// Key is deterministic: {eventId}/{photoId}.jpg
 			if (intent.photoId) {
 				const normalizedKey = `${intent.eventId}/${intent.photoId}.jpg`;
-				await env.PHOTOS_BUCKET.delete(normalizedKey).catch(() => {});
+				await env.PHOTOS_BUCKET.delete(normalizedKey);
 			}
 
 			// Delete associated photo record if any
 			if (intent.photoId) {
-				await db.delete(photos).where(eq(photos.id, intent.photoId)).catch(() => {});
+				await db.delete(photos).where(eq(photos.id, intent.photoId));
 			}
 
-			// Delete the upload intent record
+			// Delete the upload intent record (only after R2 + photo cleanup succeeds)
 			await db.delete(uploadIntents).where(eq(uploadIntents.id, intent.id));
 
 			deleted++;
@@ -203,24 +201,22 @@ export async function cleanupStaleRetryable(env: Bindings): Promise<void> {
 
 	for (const intent of intents) {
 		try {
-			// Delete original R2 object (best-effort)
+			// Delete R2 objects first — if these fail, skip intent deletion so
+			// the next cron run can retry (prevents orphaning R2 objects).
 			if (intent.r2Key) {
-				await env.PHOTOS_BUCKET.delete(intent.r2Key).catch(() => {});
+				await env.PHOTOS_BUCKET.delete(intent.r2Key);
 			}
-
-			// Delete normalized JPEG if transaction created a photo record
-			// Key is deterministic: {eventId}/{photoId}.jpg
 			if (intent.photoId) {
 				const normalizedKey = `${intent.eventId}/${intent.photoId}.jpg`;
-				await env.PHOTOS_BUCKET.delete(normalizedKey).catch(() => {});
+				await env.PHOTOS_BUCKET.delete(normalizedKey);
 			}
 
 			// Delete associated photo record if any
 			if (intent.photoId) {
-				await db.delete(photos).where(eq(photos.id, intent.photoId)).catch(() => {});
+				await db.delete(photos).where(eq(photos.id, intent.photoId));
 			}
 
-			// Delete the upload intent record
+			// Delete the upload intent record (only after R2 + photo cleanup succeeds)
 			await db.delete(uploadIntents).where(eq(uploadIntents.id, intent.id));
 
 			deleted++;
