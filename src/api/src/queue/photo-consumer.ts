@@ -122,51 +122,6 @@ function capturePhotoWarning(
 }
 
 // =============================================================================
-// Image Transformation
-// =============================================================================
-
-/**
- * Transform image to meet Rekognition size requirements.
- *
- * Uses Cloudflare Images API binding for optimized image transformation:
- * - Resize to max 4096x4096 (maintains aspect ratio)
- * - JPEG encoding at quality 85
- *
- * @param env - Cloudflare bindings (includes IMAGES binding)
- * @param imageBytes - Original image as ArrayBuffer
- * @returns ResultAsync with transformed image or PhotoProcessingError
- */
-function transformImageForRekognition(
-  env: Bindings,
-  imageBytes: ArrayBuffer,
-): ResultAsync<ArrayBuffer, PhotoProcessingError> {
-  return ResultAsync.fromPromise(
-    (async () => {
-      // Convert ArrayBuffer to ReadableStream for CF Images API
-      const stream = new ReadableStream({
-        start(controller) {
-          controller.enqueue(new Uint8Array(imageBytes));
-          controller.close();
-        },
-      });
-
-      // Transform using CF Images API
-      const response = await env.IMAGES.input(stream)
-        .transform({ width: 4096, height: 4096 })
-        .output({ format: 'image/jpeg', quality: 85 });
-
-      // Get the transformed image as ArrayBuffer
-      return await response.response().arrayBuffer();
-    })(),
-    (cause): PhotoProcessingError => ({
-      type: 'transform',
-      message: 'Failed to transform image via CF Images API',
-      cause,
-    }),
-  );
-}
-
-// =============================================================================
 // Database Persistence
 // =============================================================================
 
@@ -401,29 +356,13 @@ function processPhoto(
     // Step 1: Fetch image from R2
     const object = yield* fetchImageFromR2(env, job.r2_key);
 
-    // Step 2: Get image bytes
-    const originalBytes = await object.arrayBuffer();
+    // Step 2: Get image bytes (upload consumer guarantees ≤ 5 MB via adaptive quality)
+    const imageBytes = await object.arrayBuffer();
 
-    // Step 3: Transform if needed (best effort, fallback to original on failure)
-    const MAX_REKOGNITION_SIZE = 5 * 1024 * 1024; // 5 MB
-    let imageBytes = originalBytes;
-    if (originalBytes.byteLength > MAX_REKOGNITION_SIZE) {
-      // Best-effort transform: use orElse to fallback to original bytes on failure
-      imageBytes = yield* transformImageForRekognition(env, originalBytes).orElse(
-        (transformErr) => {
-          console.error(`[Queue] Transform failed, using original`, {
-            photoId: job.photo_id,
-            error: transformErr.type === 'transform' ? transformErr.message : transformErr.type,
-          });
-          return ok(originalBytes);
-        },
-      );
-    }
-
-    // Step 4: Ensure collection exists
+    // Step 3: Ensure collection exists
     yield* ensureCollection(provider, db, job.event_id);
 
-    // Step 5: Index faces using unified provider interface
+    // Step 4: Index faces using unified provider interface
     const indexResult = yield* provider
       .indexPhoto({
         eventId: job.event_id,
