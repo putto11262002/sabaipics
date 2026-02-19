@@ -659,15 +659,16 @@ async function processUpload(
     //   - re-running the entire pipeline (double credit deduction, duplicate photo)
     //   - overwriting the completed intent back to failed
     // The photo will be stuck in 'uploading' but a reconciliation cron can re-enqueue it.
-    try {
-      await Sentry.startSpan({ name: 'upload.enqueue', op: 'queue.send' }, () =>
+    await ResultAsync.fromPromise(
+      Sentry.startSpan({ name: 'upload.enqueue', op: 'queue.send' }, () =>
         env.PHOTO_QUEUE.send({
           photo_id: photo.id,
           event_id: intent.eventId,
           r2_key: photo.r2Key,
         } as PhotoJob),
-      );
-    } catch (enqueueCause) {
+      ),
+      (cause) => cause,
+    ).mapErr((enqueueCause) => {
       captureUploadError('enqueue_failed', {
         ...intentCtx,
         extra: {
@@ -676,7 +677,7 @@ async function processUpload(
           cause: unknownToString(enqueueCause),
         },
       });
-    }
+    });
 
     console.log(`[upload-consumer] Completed: ${photo.id}`);
     return ok(undefined);
