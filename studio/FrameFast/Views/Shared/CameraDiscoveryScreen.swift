@@ -56,12 +56,15 @@ struct CameraDiscoveryScreen: View {
     var body: some View {
         ZStack {
             if showInternetGuide {
-                CameraWiFiInternetGuideView(
+                ConnectivityGuideFlow(
+                    isOnline: connectivityStore.isOnline,
+                    ipAddress: WiFiNetworkInfo.currentWiFiIPv4()?.ipString ?? "192.168.1.10",
+                    subnetMask: WiFiNetworkInfo.currentWiFiIPv4()?.netmaskString ?? "255.255.255.0",
                     onSkip: {
                         showInternetGuide = false
                         Task { await startIfNeeded() }
                     },
-                    onContinue: {
+                    onDone: {
                         showInternetGuide = false
                         Task { await startIfNeeded() }
                     }
@@ -172,22 +175,12 @@ struct CameraDiscoveryScreen: View {
             }
         }
         .task {
-            switch connectivityStore.state.status {
-            case .pending:
-                // Wait for connectivity to be determined before deciding
-                for await state in connectivityStore.$state.values {
-                    if state.status != .pending {
-                        if state.isOffline {
-                            showInternetGuide = true
-                        } else {
-                            await startIfNeeded()
-                        }
-                        break
-                    }
-                }
-            case .offline:
+            // Force a fresh health probe so we don't rely on stale cached state
+            // (e.g. user just switched from home WiFi to camera WiFi with no internet).
+            let fresh = await connectivityStore.probeNow()
+            if fresh.isOffline {
                 showInternetGuide = true
-            case .online:
+            } else {
                 await startIfNeeded()
             }
         }

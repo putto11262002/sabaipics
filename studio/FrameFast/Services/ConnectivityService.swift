@@ -79,6 +79,21 @@ actor ConnectivityService {
         state
     }
 
+    /// Runs an immediate health probe and updates state. Returns the fresh state.
+    func probeNow() async -> ConnectivityState {
+        let reachable = await Self.probeHealth(url: healthURL)
+        let newState = ConnectivityState(
+            status: reachable ? .online : .offline,
+            pathSatisfied: state.pathSatisfied,
+            apiReachable: reachable,
+            isExpensive: state.isExpensive,
+            isConstrained: state.isConstrained,
+            interface: state.interface
+        )
+        applyState(newState)
+        return newState
+    }
+
     func stream() -> AsyncStream<ConnectivityState> {
         start()
 

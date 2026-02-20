@@ -25,6 +25,15 @@ final class ConnectivityStore: ObservableObject {
         self.service = service
     }
 
+    /// Forces an immediate health probe and updates state.
+    /// Returns the fresh state so callers don't have to wait for the stream.
+    @discardableResult
+    func probeNow() async -> ConnectivityState {
+        let fresh = await service.probeNow()
+        state = fresh
+        return fresh
+    }
+
     func start() {
         guard task == nil else { return }
         task = Task.detached { [weak self, service] in
