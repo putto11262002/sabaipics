@@ -44,6 +44,8 @@ export default function StudioLutPreviewPage() {
   const [gradedBaseUrl, setGradedBaseUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const originalImgRef = useRef<HTMLImageElement | null>(null);
+  const gradedImgRef = useRef<HTMLImageElement | null>(null);
 
   const [intensity, setIntensity] = useState<number>(() =>
     parseIntensity(searchParams.get('intensity')),
@@ -59,12 +61,11 @@ export default function StudioLutPreviewPage() {
 
   const debouncedIncludeLuminance = useDebounce(includeLuminance, 300);
 
-  useEffect(() => {
-    return () => {
-      if (originalUrl) URL.revokeObjectURL(originalUrl);
-      if (gradedBaseUrl) URL.revokeObjectURL(gradedBaseUrl);
-    };
-  }, [originalUrl, gradedBaseUrl]);
+  // Blob URL revocation is handled imperatively in handleFile (on new file)
+  // and setGradedBaseUrl updater (on new API response). We avoid revoking in
+  // a deps-based cleanup effect because React StrictMode re-runs effects
+  // and URL.revokeObjectURL is irreversible — the second mount would fail to
+  // load the already-revoked URLs.
 
   // Clear graded base when switching LUT.
   useEffect(() => {
@@ -178,33 +179,41 @@ export default function StudioLutPreviewPage() {
     };
   }, [id, file, debouncedIncludeLuminance, retryCount]);
 
+  // Pre-load images into refs when URLs change. This avoids re-fetching blob
+  // URLs on every intensity tick and is resilient to StrictMode double-execution
+  // (the loaded HTMLImageElement stays valid even if the blob URL is later revoked).
+  useEffect(() => {
+    if (!originalUrl) { originalImgRef.current = null; return; }
+    let cancelled = false;
+    loadImage(originalUrl).then((img) => { if (!cancelled) originalImgRef.current = img; });
+    return () => { cancelled = true; };
+  }, [originalUrl]);
+
+  useEffect(() => {
+    if (!gradedBaseUrl) { gradedImgRef.current = null; return; }
+    let cancelled = false;
+    loadImage(gradedBaseUrl).then((img) => {
+      if (!cancelled) {
+        gradedImgRef.current = img;
+        // Trigger initial blend now that both images are ready.
+        const canvas = canvasRef.current;
+        if (canvas && originalImgRef.current) {
+          blendToCanvas({ canvas, original: originalImgRef.current, graded: img, intensity });
+        }
+      }
+    });
+    return () => { cancelled = true; };
+  }, [gradedBaseUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Client-side intensity blending: draw original + graded at current intensity onto canvas.
   // Runs instantly on every intensity change — no server round-trip needed.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    if (!originalUrl || !gradedBaseUrl) return;
+    if (!originalImgRef.current || !gradedImgRef.current) return;
 
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        const [originalImg, gradedImg] = await Promise.all([
-          loadImage(originalUrl),
-          loadImage(gradedBaseUrl),
-        ]);
-        if (cancelled) return;
-
-        blendToCanvas({ canvas, original: originalImg, graded: gradedImg, intensity });
-      } catch {
-        // Image load failure — server fetch error is already shown via renderError
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [originalUrl, gradedBaseUrl, intensity]);
+    blendToCanvas({ canvas, original: originalImgRef.current, graded: gradedImgRef.current, intensity });
+  }, [intensity]);
 
   const canRender = Boolean(id) && Boolean(file);
 
