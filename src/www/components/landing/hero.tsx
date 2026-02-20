@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 
 import { RoundedButton } from '@/components/ui/rounded-button';
@@ -10,7 +10,7 @@ import { HeroEventStage } from '@/components/landing/hero-event-stage';
 
 // Reference-inspired experiment: cool-to-warm field with layered hotspots.
 const HERO_GRADIENT_EXPERIMENT =
-  'linear-gradient(180deg, transparent 0%, color-mix(in oklab, var(--primary-end) 4%, transparent) 48%, color-mix(in oklab, var(--primary-end) 8%, transparent) 68%, color-mix(in oklab, var(--primary) 12%, transparent) 100%), radial-gradient(142% 90% at 12% 106%, color-mix(in oklab, var(--primary-end) 76%, transparent) 0%, color-mix(in oklab, var(--primary-end) 42%, transparent) 44%, transparent 80%), radial-gradient(142% 90% at 88% 106%, color-mix(in oklab, var(--primary) 76%, transparent) 0%, color-mix(in oklab, var(--primary) 42%, transparent) 44%, transparent 80%), radial-gradient(176% 114% at 50% 122%, color-mix(in oklab, var(--primary) 58%, var(--primary-end) 56%) 0%, color-mix(in oklab, var(--primary) 20%, transparent) 58%, transparent 88%)';
+  'linear-gradient(180deg, transparent 0%, color-mix(in oklab, var(--primary-end) 4%, transparent) 48%, color-mix(in oklab, var(--primary-end) 8%, transparent) 68%, color-mix(in oklab, var(--primary) 12%, transparent) 100%), radial-gradient(142% 90% at 12% 106%, color-mix(in oklab, var(--primary-end) 45%, transparent) 0%, color-mix(in oklab, var(--primary-end) 22%, transparent) 44%, transparent 80%), radial-gradient(142% 90% at 88% 106%, color-mix(in oklab, var(--primary) 45%, transparent) 0%, color-mix(in oklab, var(--primary) 22%, transparent) 44%, transparent 80%), radial-gradient(176% 114% at 50% 122%, color-mix(in oklab, var(--primary) 32%, var(--primary-end) 30%) 0%, color-mix(in oklab, var(--primary) 10%, transparent) 58%, transparent 88%)';
 
 /*
 const HERO_GRADIENT_EXPERIMENT =
@@ -19,6 +19,8 @@ const HERO_GRADIENT_EXPERIMENT =
 
 export function LandingHero() {
   const t = useTranslations('Hero');
+  const locale = useLocale();
+  const isThai = locale === 'th';
 
   return (
     <section className="pb-14 pt-8 sm:pb-20 sm:pt-10 bg-muted/30">
@@ -41,7 +43,7 @@ export function LandingHero() {
           >
             <div className="flex justify-center">
               <Badge variant="secondary" className="text-xs font-medium tracking-wide">
-                Free trial includes 1000 image uploads
+                1,000 free credits to start
               </Badge>
             </div>
 
@@ -50,14 +52,16 @@ export function LandingHero() {
                 highlight: (chunks) => (
                     <span className="relative inline-block">
                       {chunks}
-                      <span
-                        className="absolute -bottom-1 left-0 h-2 w-full -rotate-1 rounded-sm"
-                        style={{
-                          background:
-                            'linear-gradient(90deg, var(--primary-end) 0%, var(--primary) 100%)',
-                        }}
-                        aria-hidden="true"
-                      />
+                      {!isThai && (
+                        <span
+                          className="absolute -bottom-1 left-0 h-2 w-full -rotate-1 rounded-sm"
+                          style={{
+                            background:
+                              'linear-gradient(90deg, var(--primary-end) 0%, var(--primary) 100%)',
+                          }}
+                          aria-hidden="true"
+                        />
+                      )}
                     </span>
                 ),
               })}
@@ -69,14 +73,7 @@ export function LandingHero() {
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <RoundedButton asChild>
-                <Link href="#pricing">Start free trial</Link>
-              </RoundedButton>
-              <RoundedButton
-                asChild
-                variant="outline"
-                className="border-white/45 bg-white/28 text-foreground/80 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.56),0_10px_24px_-20px_rgba(15,23,42,0.35)] supports-[backdrop-filter]:bg-white/20"
-              >
-                <Link href="#features">See features</Link>
+                <Link href="https://app.framefast.io/sign-up">Start free trial</Link>
               </RoundedButton>
             </div>
           </motion.div>

@@ -10,7 +10,7 @@
   "Hero": {
     "eyebrow": "For photographers and event organizers",
     "title": "<highlight>You shoot</highlight>, we handle the rest.",
-    "description": "Upload your way. Guests scan QR, snap a selfie, and AI finds their photos instantly.",
+    "description": "You shoot, upload, and share a QR code. Every guest finds their own photos using AI face search.",
     "ctaPrimary": "Start free trial",
     "ctaSecondary": "See features",
     "trialNote": "Trial includes 1000 photos/credits."
@@ -18,5 +18,41 @@
   "Metadata": {
     "title": "FrameFast - Event Photo Distribution",
     "description": "AI-powered face recognition photo distribution platform for photographers and event organizers."
+  },
+  "FeatureStory": {
+    "faceSearch": {
+      "label": "Face search",
+      "title": "Guests find themselves in seconds.",
+      "description": "Upload your photos. Guests scan a QR, take a selfie, and AI returns their matches instantly.",
+      "features": {
+        "accuracy": "98% match accuracy",
+        "privacy": "Guests only see their own photos",
+        "pdpa": "PDPA compliant"
+      },
+      "cta": "Start free trial"
+    },
+    "lineDelivery": {
+      "label": "LINE delivery",
+      "title": "Photos delivered straight to LINE.",
+      "description": "Guests send a selfie in LINE and receive their matched photos instantly, no app to download, no website to visit.",
+      "cta": "Start free trial"
+    },
+    "colorGrading": {
+      "label": "Auto color grading",
+      "title": "Your signature look, on every photo.",
+      "description": "Upload a LUT once. Every photo gets your color grade automatically, no manual editing, consistent results.",
+      "features": {
+        "upload": "Upload your own LUT or generate from a reference image",
+        "automatic": "Applied automatically during processing",
+        "consistent": "Consistent look across every photo"
+      },
+      "cta": "Start free trial"
+    },
+    "dashboard": {
+      "label": "Organizer UI",
+      "title": "One platform for your entire event workflow.",
+      "description": "Create events, upload photos, and track credits. Less time on logistics, more time behind the camera.",
+      "cta": "Start free trial"
+    }
   }
 }
