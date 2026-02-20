@@ -35,8 +35,10 @@ export type PhotonPostProcessHook = (
 // Constants
 // =============================================================================
 
-const MAX_WIDTH = 4000;
+const MAX_WIDTH = 2500;
 const JPEG_QUALITY = 90;
+const FALLBACK_QUALITY = 75;
+const MAX_OUTPUT_SIZE = 5 * 1024 * 1024; // 5 MB — Rekognition IndexFaces limit
 
 // =============================================================================
 // Photon (Wasm) Normalizer
@@ -53,8 +55,8 @@ const safeResize = Result.fromThrowable(
 );
 
 const safeEncodeJpeg = Result.fromThrowable(
-  (img: PhotonImage) => {
-    const jpegView = img.get_bytes_jpeg(JPEG_QUALITY);
+  (img: PhotonImage, quality: number) => {
+    const jpegView = img.get_bytes_jpeg(quality);
     // Copy bytes out of Wasm memory before freeing — the Uint8Array from
     // get_bytes_jpeg is a view into the Wasm linear memory and becomes
     // invalid once the PhotonImage is freed.
@@ -136,7 +138,14 @@ export function normalizeWithPhoton(
         return out;
       });
     })
-    .andThen((img) => safeEncodeJpeg(img))
+    .andThen((img) =>
+      safeEncodeJpeg(img, JPEG_QUALITY).andThen((result) => {
+        if (result.bytes.byteLength <= MAX_OUTPUT_SIZE) return ok(result);
+        // Re-encode at lower quality — img is still alive, slice() already
+        // copied the first encode's bytes out of Wasm memory.
+        return safeEncodeJpeg(img, FALLBACK_QUALITY);
+      }),
+    )
     .map((result) => {
       cleanup();
       return result;
