@@ -7,8 +7,10 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/shared/utils/ui';
 
 const frames = [
-  { src: '/landing/i.png', alt: 'Event photo example 1' },
-  { src: '/landing/ii.png', alt: 'Event photo example 2' },
+  { src: '/landing/hero/event1_bg_removed.png', alt: 'Event photo example 1' },
+  { src: '/landing/hero/event2_bg_removed.png', alt: 'Event photo example 2' },
+  { src: '/landing/hero/event3_bg_removed.png', alt: 'Event photo example 3' },
+  { src: '/landing/hero/event4_bg_removed.png', alt: 'Event photo example 4' },
 ] as const;
 
 export function HeroEventStage({ className }: { className?: string }) {
@@ -21,26 +23,26 @@ export function HeroEventStage({ className }: { className?: string }) {
   const metrics = React.useMemo(
     () => ({
       // Camera body rounding
-      camRadius: 'clamp(1.15rem, 2.4vw, 1.7rem)',
+      camRadius: 'clamp(0.95rem, 2.4vw, 1.7rem)',
       // Viewfinder size + placement
-      vfW: 'clamp(9rem, 18vw, 11rem)',
-      vfH: 'clamp(2.25rem, 4.8vw, 3rem)',
+      vfW: 'clamp(6.6rem, 24vw, 11rem)',
+      vfH: 'clamp(1.7rem, 5vw, 3rem)',
       vfLeft: '46%',
       // Top border eraser width (to visually attach viewfinder)
-      eraserW: 'clamp(12rem, 28vw, 16rem)',
+      eraserW: 'clamp(8.25rem, 36vw, 16rem)',
       // Shutter button size + placement
-      shW: 'clamp(3.2rem, 6.2vw, 4rem)',
-      shH: 'clamp(1.7rem, 3.2vw, 2rem)',
-      shRight: 'clamp(1.4rem, 4.2vw, 2.5rem)',
+      shW: 'clamp(2.5rem, 8vw, 4rem)',
+      shH: 'clamp(1.3rem, 4vw, 2rem)',
+      shRight: 'clamp(0.65rem, 3vw, 2.5rem)',
       // Control panel sizing
-      controlW: 'clamp(7.25rem, 14vw, 10rem)',
-      controlPadX: 'clamp(0.75rem, 1.6vw, 1.15rem)',
-      controlPadY: 'clamp(0.95rem, 2.0vw, 1.35rem)',
-      controlGap: 'clamp(0.6rem, 1.2vw, 0.9rem)',
-      btnSize: 'clamp(2.05rem, 3.6vw, 2.55rem)',
-      dialSize: 'clamp(3.45rem, 6.2vw, 4.55rem)',
+      controlW: 'clamp(4.35rem, 18vw, 9.5rem)',
+      controlPadX: 'clamp(0.45rem, 1.2vw, 1.15rem)',
+      controlPadY: 'clamp(0.65rem, 1.5vw, 1.35rem)',
+      controlGap: 'clamp(0.35rem, 0.95vw, 0.9rem)',
+      btnSize: 'clamp(1.55rem, 3vw, 2.55rem)',
+      dialSize: 'clamp(2.55rem, 5vw, 4.55rem)',
       // Screen rounding
-      screenRadius: 'clamp(1.05rem, 2.2vw, 1.35rem)',
+      screenRadius: 'clamp(0.8rem, 2.2vw, 1.35rem)',
     }),
     [],
   );
@@ -91,14 +93,15 @@ export function HeroEventStage({ className }: { className?: string }) {
 
         {/* Temporary: no hump/grip. Just the stage body + screen + controls. */}
         <div
-          className="relative border border-primary/20 p-3 shadow-[0_34px_80px_-52px_color-mix(in_oklab,var(--primary)_25%,transparent)]"
+          className="relative border border-white/50 bg-white/30 p-3 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/16 shadow-[0_34px_80px_-52px_color-mix(in_oklab,var(--foreground)_26%,transparent)]"
           style={{
             borderRadius: metrics.camRadius,
-            background: 'color-mix(in oklab, var(--primary) 8%, var(--muted))',
+            background:
+              'linear-gradient(160deg, rgba(255,255,255,0.52) 0%, rgba(255,255,255,0.24) 56%, rgba(255,255,255,0.12) 100%)',
           }}
         >
           <div
-            className="pointer-events-none absolute inset-0 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_55%,transparent),inset_0_0_0_1px_color-mix(in_oklab,var(--foreground)_6%,transparent)]"
+            className="pointer-events-none absolute inset-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_0_0_1px_rgba(255,255,255,0.28)]"
             style={{ borderRadius: metrics.camRadius }}
           />
           <div
@@ -106,7 +109,7 @@ export function HeroEventStage({ className }: { className?: string }) {
             style={{
               borderRadius: metrics.camRadius,
               background:
-                'linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--foreground) 6%, transparent) 48%, transparent 100%)',
+                'linear-gradient(112deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.08) 42%, rgba(255,255,255,0.22) 100%)',
             }}
             aria-hidden="true"
           />
@@ -114,20 +117,21 @@ export function HeroEventStage({ className }: { className?: string }) {
           {/* Erase top border behind viewfinder so it reads attached */}
           <div
             className="pointer-events-none absolute left-1/2 top-0 z-10 h-[2px] -translate-x-1/2 bg-muted/20"
-            style={{ width: metrics.eraserW }}
+            style={{ width: metrics.eraserW, background: 'rgba(255,255,255,0.08)' }}
             aria-hidden="true"
           />
 
           {/* Viewfinder (simple rounded div) */}
           <div
-            className="pointer-events-none absolute top-0 z-20 -translate-x-1/2 -translate-y-full border border-primary/20"
+            className="pointer-events-none absolute top-0 z-20 -translate-x-1/2 -translate-y-full border border-white/55 backdrop-blur-xl supports-[backdrop-filter]:bg-white/14"
             style={{
               left: metrics.vfLeft,
               width: metrics.vfW,
               height: metrics.vfH,
               borderRadius: '2.5rem 2.5rem 0 0',
               borderBottom: 'none',
-              background: 'color-mix(in oklab, var(--primary) 8%, var(--muted))',
+              background:
+                'linear-gradient(170deg, rgba(255,255,255,0.44) 0%, rgba(255,255,255,0.2) 100%)',
             }}
             aria-hidden="true"
           />
@@ -187,32 +191,41 @@ export function HeroEventStage({ className }: { className?: string }) {
           >
             <div className="relative" style={{ width: metrics.shW, height: metrics.shH }}>
               <div
-                className="absolute inset-0 rounded-t-xl border-x border-t border-primary/20 shadow-[0_18px_36px_-28px_color-mix(in_oklab,var(--primary)_20%,transparent)]"
+                className="absolute inset-0 rounded-t-xl border-x border-t border-white/55 shadow-[0_18px_36px_-28px_color-mix(in_oklab,var(--foreground)_18%,transparent)]"
                 style={{
                   background:
-                    'linear-gradient(180deg, color-mix(in oklab, var(--primary) 6%, var(--background)), color-mix(in oklab, var(--primary) 10%, var(--muted)))',
+                    'linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.18))',
                 }}
               />
               <div
-                className="absolute rounded-full bg-background/35"
+                className="absolute rounded-full bg-white/40"
                 style={{ left: '14%', top: '18%', height: '14%', width: '58%' }}
               />
               <div
-                className="absolute rounded-full border border-border/45 bg-muted/20"
+                className="absolute rounded-full border border-white/50 bg-white/24"
                 style={{ right: '12%', top: '32%', height: '34%', width: '20%' }}
               />
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-xl shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--primary)_15%,transparent),inset_0_12px_30px_-20px_color-mix(in_oklab,var(--primary)_18%,transparent)]" style={{ background: 'color-mix(in oklab, var(--primary) 6%, var(--background))' }}>
-            <div className="grid p-2" style={{ gridTemplateColumns: `1fr ${metrics.controlW}` }}>
-              <div className="relative aspect-[4/3] w-full">
+          <div
+            className="relative overflow-hidden rounded-xl border border-white/45 bg-white/24 backdrop-blur-xl supports-[backdrop-filter]:bg-white/14 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.28),inset_0_12px_30px_-20px_rgba(255,255,255,0.22)]"
+            style={{
+              background:
+                'linear-gradient(155deg, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.12) 100%)',
+            }}
+          >
+            <div
+              className="grid min-w-0 p-2"
+              style={{ gridTemplateColumns: `minmax(0, 1fr) ${metrics.controlW}` }}
+            >
+              <div className="relative min-w-0 w-full aspect-[1.1/1] min-[360px]:aspect-[1.2/1] sm:aspect-[4/3]">
                 <div
-                  className="relative h-full w-full bg-background shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--foreground)_8%,transparent),0_10px_24px_-24px_color-mix(in_oklab,var(--foreground)_10%,transparent)]"
+                  className="relative h-full w-full bg-white/58 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.42),0_10px_24px_-24px_color-mix(in_oklab,var(--foreground)_16%,transparent)]"
                   style={{ borderRadius: metrics.screenRadius, padding: 'clamp(8px, 1.2vw, 16px)' }}
                 >
                   <div
-                    className="relative h-full w-full overflow-hidden bg-background"
+                    className="relative h-full w-full overflow-hidden bg-background/95"
                     style={{ borderRadius: 'calc(var(--radius) + 0.4rem)' }}
                   >
                     <motion.div
@@ -291,14 +304,14 @@ export function HeroEventStage({ className }: { className?: string }) {
                 </div>
               </div>
 
-              <div className="relative">
+              <div className="relative min-w-0">
                 <div
-                  className="pointer-events-none absolute right-2 rounded-2xl border border-primary/15"
+                  className="pointer-events-none absolute right-2 rounded-2xl border border-white/52"
                   style={{
                     top: 'clamp(2.1rem, 4vw, 2.9rem)',
-                    width: 'clamp(2.9rem, 5.2vw, 3.7rem)',
-                    height: 'clamp(3.7rem, 6.8vw, 4.6rem)',
-                    background: 'color-mix(in oklab, var(--primary) 8%, var(--muted))',
+                    width: 'clamp(2.1rem, 5vw, 3.7rem)',
+                    height: 'clamp(2.8rem, 6.2vw, 4.6rem)',
+                    background: 'rgba(255,255,255,0.24)',
                   }}
                 />
                 <div
@@ -317,7 +330,10 @@ export function HeroEventStage({ className }: { className?: string }) {
                   <div className="translate-x-1">
                     <HardwareDial />
                   </div>
-                  <div className="flex items-center" style={{ gap: metrics.controlGap }}>
+                  <div
+                    className="hidden min-[360px]:flex items-center"
+                    style={{ gap: metrics.controlGap }}
+                  >
                     <HardwareButton />
                     <HardwareButton />
                   </div>
@@ -334,15 +350,16 @@ export function HeroEventStage({ className }: { className?: string }) {
 function HardwareButton() {
   return (
     <div
-      className="relative rounded-full border border-primary/20 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_70%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--primary)_12%,transparent)]"
+      className="relative rounded-full border border-white/55 bg-white/30 backdrop-blur-md supports-[backdrop-filter]:bg-white/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.74),inset_0_-1px_0_rgba(255,255,255,0.24)]"
       style={{
-        width: 'clamp(2.05rem, 3.6vw, 2.55rem)',
-        height: 'clamp(2.05rem, 3.6vw, 2.55rem)',
-        background: 'color-mix(in oklab, var(--primary) 5%, var(--background))',
+        width: 'clamp(1.55rem, 3vw, 2.55rem)',
+        height: 'clamp(1.55rem, 3vw, 2.55rem)',
+        background:
+          'linear-gradient(160deg, rgba(255,255,255,0.44) 0%, rgba(255,255,255,0.2) 100%)',
       }}
       aria-hidden="true"
     >
-      <div className="absolute rounded-full border border-primary/15" style={{ inset: '18%' }} />
+      <div className="absolute rounded-full border border-white/56" style={{ inset: '18%' }} />
     </div>
   );
 }
@@ -350,20 +367,21 @@ function HardwareButton() {
 function HardwareDial() {
   return (
     <div
-      className="relative rounded-full border border-primary/20 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_70%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--primary)_12%,transparent)]"
+      className="relative rounded-full border border-white/55 bg-white/30 backdrop-blur-md supports-[backdrop-filter]:bg-white/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.74),inset_0_-1px_0_rgba(255,255,255,0.24)]"
       style={{
-        width: 'clamp(3.45rem, 6.2vw, 4.55rem)',
-        height: 'clamp(3.45rem, 6.2vw, 4.55rem)',
-        background: 'color-mix(in oklab, var(--primary) 5%, var(--background))',
+        width: 'clamp(2.55rem, 5vw, 4.55rem)',
+        height: 'clamp(2.55rem, 5vw, 4.55rem)',
+        background:
+          'linear-gradient(165deg, rgba(255,255,255,0.44) 0%, rgba(255,255,255,0.2) 100%)',
       }}
       aria-hidden="true"
     >
-      <div className="absolute rounded-full border border-primary/15" style={{ inset: '12%' }} />
+      <div className="absolute rounded-full border border-white/56" style={{ inset: '12%' }} />
       <div
-        className="absolute rounded-full border border-primary/20"
-        style={{ inset: '32%', background: 'color-mix(in oklab, var(--primary) 8%, var(--muted))' }}
+        className="absolute rounded-full border border-white/52"
+        style={{ inset: '32%', background: 'rgba(255,255,255,0.26)' }}
       />
-      <div className="absolute left-1/2 top-1.5 h-2 w-px -translate-x-1/2 rounded-full bg-primary/40" />
+      <div className="absolute left-1/2 top-1.5 h-2 w-px -translate-x-1/2 rounded-full bg-primary/25" />
     </div>
   );
 }
