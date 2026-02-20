@@ -6,6 +6,7 @@ import {
 	cleanupCompletedOriginals,
 	cleanupNonRetryableFailed,
 	cleanupStaleRetryable,
+	expireStalePendingIntents,
 } from './upload-intent-cleanup';
 
 /**
@@ -40,6 +41,9 @@ export async function scheduled(
 			break;
 		case '20 23 * * *': // 6:20 AM Bangkok time (UTC+7) - Hard delete stale retryable intents (7 days)
 			ctx.waitUntil(cleanupStaleRetryable(env));
+			break;
+		case '30 23 * * *': // 6:30 AM Bangkok time (UTC+7) - Expire stale pending intents (7 days)
+			ctx.waitUntil(expireStalePendingIntents(env));
 			break;
 		default:
 			console.warn('[Cron] Unknown cron schedule', {
