@@ -27,7 +27,14 @@ import {
 } from '@/db';
 import { eq, and, gt, asc, sql } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
-import { applyCubeLutToRgba, parseCubeLut, validateImageMagicBytes } from '../lib/images';
+import {
+  applyCubeLutToRgba,
+  parseCubeLut,
+  validateImageMagicBytes,
+  extractJpegDimensions,
+  extractPngDimensions,
+  extractWebpDimensions,
+} from '../lib/images';
 import type { ParsedCubeLut } from '../lib/images/color-grade';
 import { normalizeWithPhoton, type PhotonPostProcessHook } from '../lib/images/normalize';
 import { extractExif } from '../lib/images/exif';
@@ -36,6 +43,10 @@ import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 // Must match wrangler.api.jsonc consumer max_retries setting.
 // CF Workers: attempts starts at 1, so last attempt = MAX_RETRIES + 1.
 const MAX_RETRIES = 1;
+
+// Max pixel count to prevent OOM during photon decode.
+// 25 MP ≈ 5000×5000 ≈ ~100 MB pixel buffer (4 bytes/pixel).
+const MAX_PIXELS = 25_000_000;
 
 // =============================================================================
 // Types
@@ -275,7 +286,58 @@ async function processUpload(
       });
     }
 
-    // Step 6b: Extract EXIF metadata from original bytes (non-blocking)
+    // Step 6b: Dimension check — prevent OOM on decompression bombs
+    const dims = (() => {
+      switch (magicValidation.detectedType) {
+        case 'image/jpeg':
+          return extractJpegDimensions(imageBytes);
+        case 'image/png':
+          return extractPngDimensions(new Uint8Array(imageBytes));
+        case 'image/webp':
+          return extractWebpDimensions(new Uint8Array(imageBytes));
+        default:
+          return null;
+      }
+    })();
+
+    if (dims && dims.width * dims.height > MAX_PIXELS) {
+      captureUploadError('invalid_file', {
+        ...intentCtx,
+        extra: {
+          reason: 'dimensions_too_large',
+          width: dims.width,
+          height: dims.height,
+          pixels: dims.width * dims.height,
+          maxPixels: MAX_PIXELS,
+        },
+      });
+      return err<never, UploadProcessingError>({
+        type: 'invalid_file',
+        key,
+        intentId: intent.id,
+        reason: 'dimensions_too_large',
+        message: `Image dimensions too large (${dims.width}×${dims.height} = ${dims.width * dims.height} pixels, max ${MAX_PIXELS})`,
+      });
+    }
+
+    if (!dims) {
+      captureUploadError('invalid_file', {
+        ...intentCtx,
+        extra: {
+          reason: 'dimension_parse_failed',
+          detectedType: magicValidation.detectedType,
+        },
+      });
+      return err<never, UploadProcessingError>({
+        type: 'invalid_file',
+        key,
+        intentId: intent.id,
+        reason: 'dimension_parse_failed',
+        message: 'Failed to extract image dimensions from header',
+      });
+    }
+
+    // Step 6c: Extract EXIF metadata from original bytes (non-blocking)
     const exifResult = await extractExif(imageBytes);
     const exifData = exifResult.match(
       (data) => data,
