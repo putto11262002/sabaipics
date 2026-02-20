@@ -94,6 +94,7 @@ export async function cleanupNonRetryableFailed(env: Bindings): Promise<void> {
 			id: uploadIntents.id,
 			r2Key: uploadIntents.r2Key,
 			photoId: uploadIntents.photoId,
+			eventId: uploadIntents.eventId,
 		})
 		.from(uploadIntents)
 		.where(
@@ -119,9 +120,16 @@ export async function cleanupNonRetryableFailed(env: Bindings): Promise<void> {
 
 	for (const intent of intents) {
 		try {
-			// Delete R2 object (best-effort — may already be gone)
+			// Delete original R2 object (best-effort — may already be gone)
 			if (intent.r2Key) {
 				await env.PHOTOS_BUCKET.delete(intent.r2Key).catch(() => {});
+			}
+
+			// Delete normalized JPEG if transaction created a photo record
+			// Key is deterministic: {eventId}/{photoId}.jpg
+			if (intent.photoId) {
+				const normalizedKey = `${intent.eventId}/${intent.photoId}.jpg`;
+				await env.PHOTOS_BUCKET.delete(normalizedKey).catch(() => {});
 			}
 
 			// Delete associated photo record if any
@@ -173,6 +181,7 @@ export async function cleanupStaleRetryable(env: Bindings): Promise<void> {
 			id: uploadIntents.id,
 			r2Key: uploadIntents.r2Key,
 			photoId: uploadIntents.photoId,
+			eventId: uploadIntents.eventId,
 		})
 		.from(uploadIntents)
 		.where(
@@ -194,9 +203,16 @@ export async function cleanupStaleRetryable(env: Bindings): Promise<void> {
 
 	for (const intent of intents) {
 		try {
-			// Delete R2 object (best-effort)
+			// Delete original R2 object (best-effort)
 			if (intent.r2Key) {
 				await env.PHOTOS_BUCKET.delete(intent.r2Key).catch(() => {});
+			}
+
+			// Delete normalized JPEG if transaction created a photo record
+			// Key is deterministic: {eventId}/{photoId}.jpg
+			if (intent.photoId) {
+				const normalizedKey = `${intent.eventId}/${intent.photoId}.jpg`;
+				await env.PHOTOS_BUCKET.delete(normalizedKey).catch(() => {});
 			}
 
 			// Delete associated photo record if any
