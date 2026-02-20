@@ -283,10 +283,12 @@ export async function expireStalePendingIntents(env: Bindings): Promise<void> {
 
 	for (const intent of intents) {
 		try {
+			// Compare-and-set: only expire if still pending (prevents overwriting
+			// a concurrent completed/failed transition from the upload consumer).
 			await db
 				.update(uploadIntents)
 				.set({ status: 'expired' })
-				.where(eq(uploadIntents.id, intent.id));
+				.where(and(eq(uploadIntents.id, intent.id), eq(uploadIntents.status, 'pending')));
 
 			expired++;
 		} catch (error) {
