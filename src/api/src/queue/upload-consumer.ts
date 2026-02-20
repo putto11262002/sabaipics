@@ -40,9 +40,9 @@ import { normalizeWithPhoton, type PhotonPostProcessHook } from '../lib/images/n
 import { extractExif } from '../lib/images/exif';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 
-// Must match wrangler.api.jsonc consumer max_retries setting.
-// CF Workers: attempts starts at 1, so last attempt = MAX_RETRIES + 1.
-const MAX_RETRIES = 1;
+// wrangler.api.jsonc sets max_retries: 1 as a crash safety net.
+// The consumer itself never calls message.retry() — the idempotency guard
+// in processUpload makes redelivery safe (skips completed/failed intents).
 
 // Max pixel count to prevent OOM during photon decode.
 // 25 MP ≈ 5000×5000 ≈ ~100 MB pixel buffer (4 bytes/pixel).
@@ -200,6 +200,12 @@ async function processUpload(
     if (!intent) {
       captureUploadWarning('orphan', { r2Key: key });
       return err<never, UploadProcessingError>({ type: 'orphan', key });
+    }
+
+    // Idempotency guard: skip if already terminal (handles crash redelivery + duplicate R2 events)
+    if (intent.status === 'completed' || intent.status === 'failed') {
+      console.log(`[upload-consumer] Skipping already-${intent.status} intent: ${intent.id}`);
+      return ok(undefined);
     }
 
     // Intent context available from here — used in all Sentry captures below
@@ -574,7 +580,7 @@ async function processUpload(
     );
 
     if (normalizeResult.isErr()) {
-      captureUploadWarning('normalization', {
+      captureUploadError('normalization', {
         ...intentCtx,
         extra: {
           normalization_method: 'photon_wasm',
@@ -797,34 +803,34 @@ export async function queue(
     );
     const db = createDb(env.DATABASE_URL);
 
+    // Process once, always ack. No message.retry() — wrangler max_retries: 1
+    // provides a crash safety net; the idempotency guard makes redelivery safe.
     await result.match(
       () => message.ack(),
       async (error) => {
-        // Centralized cleanup using switch statement
         switch (error.type) {
           case 'orphan':
             // No intent to update — R2 object left for cron cleanup
-            message.ack();
             break;
 
           case 'expired':
             await db
               .update(uploadIntents)
               .set({ status: 'expired', retryable: false })
-              .where(eq(uploadIntents.id, error.intentId));
-            message.ack();
+              .where(eq(uploadIntents.id, error.intentId))
+              .catch(() => {});
             break;
 
           case 'invalid_file':
             await db
               .update(uploadIntents)
               .set({ status: 'failed', errorCode: error.reason, errorMessage: error.message, retryable: false })
-              .where(eq(uploadIntents.id, error.intentId));
-            message.ack();
+              .where(eq(uploadIntents.id, error.intentId))
+              .catch(() => {});
             break;
 
           case 'insufficient_credits':
-            // R2 preserved — user may top up credits and reprocess later
+            // R2 preserved — user may top up credits and reprocess via endpoint
             await db
               .update(uploadIntents)
               .set({
@@ -833,26 +839,16 @@ export async function queue(
                 errorMessage: 'Insufficient credits',
                 retryable: true,
               })
-              .where(eq(uploadIntents.id, error.intentId));
-            message.ack();
+              .where(eq(uploadIntents.id, error.intentId))
+              .catch(() => {});
             break;
 
-          case 'normalization': {
-            const isLastAttempt = message.attempts > MAX_RETRIES;
-            const capture = isLastAttempt ? captureUploadError : captureUploadWarning;
-            capture('normalization', {
+          case 'normalization':
+            captureUploadError('normalization', {
               intentId: error.intentId,
               r2Key: error.key,
-              extra: {
-                attempt: message.attempts,
-                isLastAttempt,
-                cause: unknownToString(error.cause),
-              },
+              extra: { cause: unknownToString(error.cause) },
             });
-
-            // Mark as failed so users see the error, but keep R2 object intact
-            // and retry. If retry succeeds, the transaction overwrites to 'completed'.
-            // If all retries exhaust, the intent is already 'failed' (not stuck 'pending').
             await db
               .update(uploadIntents)
               .set({
@@ -861,31 +857,23 @@ export async function queue(
                 errorMessage: 'Image processing failed',
                 retryable: false,
               })
-              .where(eq(uploadIntents.id, error.intentId));
-            message.retry();
+              .where(eq(uploadIntents.id, error.intentId))
+              .catch(() => {});
             break;
-          }
 
           case 'database':
           case 'r2': {
-            const isLastAttempt = message.attempts > MAX_RETRIES;
             const errorCode = error.type === 'database' ? 'database_error' : 'r2_error';
-
-            // Escalate to error on last attempt so Sentry alerts fire
-            const capture = isLastAttempt ? captureUploadError : captureUploadWarning;
-            capture(errorCode, {
+            captureUploadError(errorCode, {
               r2Key: event.object.key,
               extra: {
-                attempt: message.attempts,
-                isLastAttempt,
                 operation: 'operation' in error ? error.operation : undefined,
                 cause: 'cause' in error ? unknownToString(error.cause) : undefined,
               },
             });
 
-            // Best-effort: find intent and mark as failed so it doesn't stay
-            // stuck in 'pending' after retries exhaust. If DB itself is down,
-            // this will fail silently — the DLQ is the last safety net.
+            // Best-effort: find intent and mark as failed. If DB is down,
+            // this fails silently — cron catches stuck-pending after 7 days.
             const failedIntent = await db.query.uploadIntents.findFirst({
               where: eq(uploadIntents.r2Key, event.object.key),
               columns: { id: true },
@@ -903,11 +891,11 @@ export async function queue(
                 .where(eq(uploadIntents.id, failedIntent.id))
                 .catch(() => {});
             }
-
-            message.retry();
             break;
           }
         }
+
+        message.ack();
       },
     );
   }
