@@ -204,7 +204,7 @@ async function processUpload(
     }
 
     // Idempotency guard: skip if already terminal (handles crash redelivery + duplicate R2 events)
-    if (intent.status === 'completed' || intent.status === 'failed') {
+    if (intent.status === 'completed' || intent.status === 'failed' || intent.status === 'expired') {
       console.log(`[upload-consumer] Skipping already-${intent.status} intent: ${intent.id}`);
       return ok(undefined);
     }
