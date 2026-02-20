@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#0a0f1a"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1627"/>
+      <stop offset="1" stop-color="#0c1220"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+    <style>
+      .title { font: 700 40px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; fill: #e9eefc; }
+      .sub { font: 500 22px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; fill: #a8b3d6; }
+      .label { font: 700 24px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; fill: #dfe7ff; }
+      .small { font: 500 18px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; fill: #a8b3d6; }
+      .mono { font: 700 22px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; fill: #e9eefc; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="720" fill="url(#bg)"/>
+
+  <text x="70" y="95" class="title">Illustration: Join Camera Wi‑Fi on iOS</text>
+  <text x="70" y="132" class="sub">(Not an Apple screenshot) Settings → Wi‑Fi → pick SSID → enter password.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="160" y="180" width="880" height="500" rx="48" fill="url(#card)" stroke="#243255" stroke-width="2"/>
+
+    <text x="220" y="255" class="label">Settings</text>
+    <text x="220" y="292" class="label">Wi‑Fi</text>
+
+    <rect x="220" y="330" width="760" height="78" rx="18" fill="#0d1424" stroke="#243255" stroke-width="2"/>
+    <text x="260" y="380" class="mono">EOS-xxxxxx</text>
+    <text x="860" y="380" class="small" fill="#cfe0ff">JOIN</text>
+
+    <rect x="220" y="430" width="760" height="150" rx="22" fill="#0d1424" stroke="#243255" stroke-width="2"/>
+    <text x="260" y="480" class="small">Password</text>
+    <rect x="260" y="505" width="520" height="44" rx="12" fill="#0b1020" stroke="#1f2a4a" stroke-width="2"/>
+    <text x="280" y="535" class="small" fill="#8894b8">••••••••</text>
+    <rect x="810" y="505" width="170" height="44" rx="12" fill="#102046" stroke="#3553b8" stroke-width="2"/>
+    <text x="855" y="535" class="small" fill="#cfe0ff">Join</text>
+
+    <text x="220" y="630" class="small">Then return to FrameFast iOS and run “Connect Camera”.</text>
+  </g>
+</svg>
+
