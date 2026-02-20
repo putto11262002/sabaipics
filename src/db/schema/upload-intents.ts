@@ -3,7 +3,6 @@ import { sql } from 'drizzle-orm';
 import { timestamptz, createdAtCol } from './common';
 import { events } from './events';
 import { photographers } from './photographers';
-import { photos } from './photos';
 
 // Status enum for upload intent lifecycle
 export const uploadIntentStatuses = [
@@ -47,8 +46,9 @@ export const uploadIntents = pgTable(
     errorMessage: text('error_message'),
     retryable: boolean('retryable'), // true = can be reprocessed after user action (e.g. credit top-up)
 
-    // Result tracking (for completed status)
-    photoId: uuid('photo_id').references(() => photos.id, { onDelete: 'set null' }),
+    // Result tracking — written before R2 PUT so crons can clean orphaned normalized JPEGs.
+    // No FK: photoId is set before the photo record exists (created in a later transaction).
+    photoId: uuid('photo_id'),
 
     // Timestamps
     createdAt: createdAtCol(),

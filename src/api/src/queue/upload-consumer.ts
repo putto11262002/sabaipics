@@ -59,7 +59,8 @@ type UploadProcessingError =
   | { type: 'database'; operation: string; cause: unknown }
   | { type: 'normalization'; key: string; intentId: string; cause: unknown }
   | { type: 'r2'; operation: string; cause: unknown }
-  | { type: 'insufficient_credits'; key: string; intentId: string };
+  | { type: 'insufficient_credits'; key: string; intentId: string }
+  | { type: 'intent_update'; intentId: string; cause: unknown };
 
 type ParsedLutCacheEntry =
   | { kind: 'ok'; lut: ParsedCubeLut }
@@ -608,6 +609,17 @@ async function processUpload(
     const photoId = crypto.randomUUID();
     const finalR2Key = `${intent.eventId}/${photoId}.jpg`;
 
+    // Step 8b: Write photoId to intent BEFORE R2 PUT so crons can clean
+    // orphaned normalized JPEGs if the transaction at step 10 fails.
+    yield* ResultAsync.fromPromise(
+      db.update(uploadIntents)
+        .set({ photoId })
+        .where(eq(uploadIntents.id, intent.id)),
+      (cause): UploadProcessingError => ({
+        type: 'intent_update', intentId: intent.id, cause,
+      }),
+    );
+
     // Step 9: Upload normalized image to final location
     yield* ResultAsync.fromPromise(
       Sentry.startSpan({ name: 'upload.r2_put', op: 'r2.put' }, () =>
@@ -838,6 +850,23 @@ export async function queue(
                 errorCode: 'insufficient_credits',
                 errorMessage: 'Insufficient credits',
                 retryable: true,
+              })
+              .where(eq(uploadIntents.id, error.intentId))
+              .catch(() => {});
+            break;
+
+          case 'intent_update':
+            captureUploadError('intent_update', {
+              intentId: error.intentId,
+              extra: { cause: unknownToString(error.cause) },
+            });
+            await db
+              .update(uploadIntents)
+              .set({
+                status: 'failed',
+                errorCode: 'intent_update_failed',
+                errorMessage: 'Failed to update intent before R2 PUT',
+                retryable: false,
               })
               .where(eq(uploadIntents.id, error.intentId))
               .catch(() => {});
