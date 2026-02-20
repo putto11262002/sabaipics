@@ -87,7 +87,9 @@
       },
       {
         "queue": "upload-processing-dev",
-        "max_batch_size": 10,
+        // CF Images handles the heavy decode externally; Photon is only used for
+        // LUT grading on the already-resized output (~14 MB RGBA). Safe to batch.
+        "max_batch_size": 4,
         "max_batch_timeout": 5,
         "max_retries": 1,
         "max_concurrency": 4,
@@ -236,7 +238,8 @@
           },
           {
             "queue": "upload-processing-staging",
-            "max_batch_size": 10,
+            // CF Images handles heavy decode — see dev comment above
+            "max_batch_size": 4,
             "max_batch_timeout": 5,
             "max_retries": 1,
             "max_concurrency": 4,
@@ -379,7 +382,8 @@
           },
           {
             "queue": "upload-processing",
-            "max_batch_size": 10,
+            // CF Images handles heavy decode — see dev comment above
+            "max_batch_size": 4,
             "max_batch_timeout": 5,
             "max_retries": 1,
             "max_concurrency": 4,
