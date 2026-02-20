@@ -2,12 +2,10 @@ import type { Bindings } from '../types';
 import { cleanupExpiredEvents } from './cleanup';
 import { hardDeleteCleanup } from './hard-delete-cleanup';
 import { photographerCleanup } from './photographer-cleanup';
-import {
-	cleanupCompletedOriginals,
-	cleanupNonRetryableFailed,
-	cleanupStaleRetryable,
-	expireStalePendingIntents,
-} from './upload-intent-cleanup';
+import { cleanupCompletedOriginals } from './upload-clean-completed-originals';
+import { cleanupNonRetryableFailed } from './upload-clean-failed';
+import { cleanupStaleRetryable } from './upload-clean-stale-retryable';
+import { expireStalePendingIntents } from './upload-expire-pending';
 
 /**
  * Cloudflare Workers scheduled event handler
