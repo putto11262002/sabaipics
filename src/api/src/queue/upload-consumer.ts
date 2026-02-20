@@ -35,7 +35,7 @@ import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 
 // Must match wrangler.api.jsonc consumer max_retries setting.
 // CF Workers: attempts starts at 1, so last attempt = MAX_RETRIES + 1.
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 1;
 
 // =============================================================================
 // Types
