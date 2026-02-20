@@ -99,6 +99,13 @@
       "when": 1771082041045,
       "tag": "0013_black_ricochet",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1771427596476,
+      "tag": "0014_silent_cloak",
+      "breakpoints": true
     }
   ]
 }
