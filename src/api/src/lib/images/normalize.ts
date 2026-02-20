@@ -240,7 +240,11 @@ const safeExtractDimensions = Result.fromThrowable(
 export function normalizeWithCfImages(
   imageBytes: ArrayBuffer,
   images: ImagesBinding,
+  options?: { width?: number; quality?: number },
 ): ResultAsync<NormalizeResult, NormalizeError> {
+  const targetWidth = options?.width ?? MAX_WIDTH;
+  const targetQuality = options?.quality ?? JPEG_QUALITY;
+
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(new Uint8Array(imageBytes));
@@ -251,8 +255,8 @@ export function normalizeWithCfImages(
   return ResultAsync.fromPromise(
     images
       .input(stream)
-      .transform({ width: MAX_WIDTH, fit: 'scale-down' })
-      .output({ format: 'image/jpeg', quality: JPEG_QUALITY }),
+      .transform({ width: targetWidth, fit: 'scale-down' })
+      .output({ format: 'image/jpeg', quality: targetQuality }),
     (cause): NormalizeError => ({ stage: 'cf_images_transform', cause }),
   )
     .andThen((transformResponse) =>

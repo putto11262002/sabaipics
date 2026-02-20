@@ -17,9 +17,18 @@ import { createDb, photoLuts } from '@/db';
 import { eq } from 'drizzle-orm';
 import { Result, ResultAsync, safeTry, ok, err, type Result as NtResult } from 'neverthrow';
 import { PhotonImage } from '@cf-wasm/photon/workerd';
-import { validateImageMagicBytes } from '../lib/images';
+import {
+  validateImageMagicBytes,
+  extractJpegDimensions,
+  extractPngDimensions,
+  extractWebpDimensions,
+} from '../lib/images';
+import { normalizeWithCfImages } from '../lib/images/normalize';
 import { parseCubeLut, generateCubeLutFromReferenceRgba } from '../lib/images/color-grade';
 import * as Sentry from '@sentry/cloudflare';
+
+// Max pixel count for reference images — reject decompression bombs.
+const MAX_PIXELS = 25_000_000;
 
 // =============================================================================
 // Types
@@ -41,9 +50,10 @@ type LutProcessingError =
       type: 'invalid_image';
       key: string;
       lutId: string;
-      reason: 'invalid_magic_bytes' | 'decode_failed';
+      reason: 'invalid_magic_bytes' | 'decode_failed' | 'dimensions_too_large' | 'dimension_parse_failed';
       message: string;
     }
+  | { type: 'normalization'; key: string; lutId: string; cause: unknown }
   | { type: 'database'; operation: string; cause: unknown }
   | { type: 'r2'; operation: string; cause: unknown };
 
@@ -241,8 +251,56 @@ async function processLutUpload(
         });
       }
 
-      // Decode to RGBA using photon (in-Worker Wasm)
-      const photon = yield* safePhotonDecode(imageBytes).mapErr((e) => ({
+      // Dimension pre-check — prevent OOM on decompression bombs
+      const dims = (() => {
+        switch (magicValidation.detectedType) {
+          case 'image/jpeg':
+            return extractJpegDimensions(imageBytes.buffer as ArrayBuffer);
+          case 'image/png':
+            return extractPngDimensions(imageBytes);
+          case 'image/webp':
+            return extractWebpDimensions(imageBytes);
+          default:
+            return null;
+        }
+      })();
+
+      if (dims && dims.width * dims.height > MAX_PIXELS) {
+        return err<never, LutProcessingError>({
+          type: 'invalid_image',
+          key,
+          lutId: lut.id,
+          reason: 'dimensions_too_large',
+          message: `Image dimensions too large (${dims.width}x${dims.height} = ${dims.width * dims.height} pixels, max ${MAX_PIXELS})`,
+        });
+      }
+
+      if (!dims) {
+        return err<never, LutProcessingError>({
+          type: 'invalid_image',
+          key,
+          lutId: lut.id,
+          reason: 'dimension_parse_failed',
+          message: 'Failed to extract image dimensions from header',
+        });
+      }
+
+      // Normalize via CF Images (resize to 1200px) — external service, zero Worker memory for decode
+      const cfResult = yield* normalizeWithCfImages(
+        imageBytes.buffer as ArrayBuffer,
+        env.IMAGES,
+        { width: 1200 },
+      ).mapErr(
+        (cause): LutProcessingError => ({
+          type: 'normalization',
+          key,
+          lutId: lut.id,
+          cause,
+        }),
+      );
+
+      // Decode the normalized ~1200px JPEG with Photon (safe — ~3.8 MB RGBA)
+      const photon = yield* safePhotonDecode(new Uint8Array(cfResult.bytes)).mapErr((e) => ({
         ...e,
         key,
         lutId: lut.id,
@@ -402,18 +460,43 @@ async function handleLutProcessingError(env: Bindings, error: LutProcessingError
       await bestEffortDeleteTemp(env, error.key);
       return;
 
-    case 'invalid_image':
+    case 'invalid_image': {
+      const errorCodeMap: Record<string, string> = {
+        decode_failed: 'IMAGE_DECODE_FAILED',
+        dimensions_too_large: 'IMAGE_TOO_LARGE',
+        dimension_parse_failed: 'IMAGE_DIMENSION_PARSE_FAILED',
+        invalid_magic_bytes: 'INVALID_IMAGE',
+      };
       try {
         await db
           .update(photoLuts)
           .set({
             status: 'failed',
-            errorCode: error.reason === 'decode_failed' ? 'IMAGE_DECODE_FAILED' : 'INVALID_IMAGE',
+            errorCode: errorCodeMap[error.reason] ?? 'INVALID_IMAGE',
             errorMessage: error.message,
           })
           .where(eq(photoLuts.id, error.lutId));
       } catch (e) {
         console.error('[lut-processing-consumer] Failed to mark invalid_image:', e);
+        Sentry.captureException(e);
+        throw e;
+      }
+      await bestEffortDeleteTemp(env, error.key);
+      return;
+    }
+
+    case 'normalization':
+      try {
+        await db
+          .update(photoLuts)
+          .set({
+            status: 'failed',
+            errorCode: 'NORMALIZATION_FAILED',
+            errorMessage: 'Image normalization failed',
+          })
+          .where(eq(photoLuts.id, error.lutId));
+      } catch (e) {
+        console.error('[lut-processing-consumer] Failed to mark normalization:', e);
         Sentry.captureException(e);
         throw e;
       }
