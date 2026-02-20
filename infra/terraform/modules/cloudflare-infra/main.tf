@@ -25,6 +25,31 @@ resource "cloudflare_r2_bucket" "photos" {
 }
 
 # ------------------------------------------------------------------------------
+# R2 Bucket Lifecycle
+# ------------------------------------------------------------------------------
+
+resource "cloudflare_r2_bucket_lifecycle" "photos" {
+  account_id  = var.account_id
+  bucket_name = cloudflare_r2_bucket.photos.name
+
+  rules = [{
+    id      = "Delete original uploads after 30 days"
+    enabled = true
+
+    conditions = {
+      prefix = "uploads/"
+    }
+
+    delete_objects_transition = {
+      condition = {
+        max_age = 30
+        type    = "Age"
+      }
+    }
+  }]
+}
+
+# ------------------------------------------------------------------------------
 # R2 Bucket CORS
 # ------------------------------------------------------------------------------
 
