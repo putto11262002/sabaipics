@@ -651,29 +651,32 @@ async function processUpload(
       },
     );
 
-    // Step 11: Delete original upload (keep only normalized) - best-effort
-    await ResultAsync.fromPromise(env.PHOTOS_BUCKET.delete(key), (cause) => cause).match(
-      () => undefined,
-      (cause) => {
-        captureUploadWarning('r2_delete_original_failed', {
-          ...intentCtx,
-          extra: { cause: unknownToString(cause) },
-        });
-        return undefined;
-      },
-    );
+    // Step 11: Original R2 object left in place — cron handles cleanup
 
-    // Step 12: Enqueue for face detection
-    yield* ResultAsync.fromPromise(
-      Sentry.startSpan({ name: 'upload.enqueue', op: 'queue.send' }, () =>
+    // Step 12: Enqueue for face detection (best-effort)
+    // The transaction already committed — credit deducted, photo created, intent completed.
+    // If enqueue fails, we capture to Sentry but still return ok() to avoid:
+    //   - re-running the entire pipeline (double credit deduction, duplicate photo)
+    //   - overwriting the completed intent back to failed
+    // The photo will be stuck in 'uploading' but a reconciliation cron can re-enqueue it.
+    try {
+      await Sentry.startSpan({ name: 'upload.enqueue', op: 'queue.send' }, () =>
         env.PHOTO_QUEUE.send({
           photo_id: photo.id,
           event_id: intent.eventId,
           r2_key: photo.r2Key,
         } as PhotoJob),
-      ),
-      (cause): UploadProcessingError => ({ type: 'r2', operation: 'enqueue', cause }),
-    );
+      );
+    } catch (enqueueCause) {
+      captureUploadError('enqueue_failed', {
+        ...intentCtx,
+        extra: {
+          photoId: photo.id,
+          finalR2Key: photo.r2Key,
+          cause: unknownToString(enqueueCause),
+        },
+      });
+    }
 
     console.log(`[upload-consumer] Completed: ${photo.id}`);
     return ok(undefined);
@@ -737,36 +740,35 @@ export async function queue(
         // Centralized cleanup using switch statement
         switch (error.type) {
           case 'orphan':
-            await env.PHOTOS_BUCKET.delete(error.key);
+            // No intent to update — R2 object left for cron cleanup
             message.ack();
             break;
 
           case 'expired':
-            await env.PHOTOS_BUCKET.delete(error.key);
             await db
               .update(uploadIntents)
-              .set({ status: 'expired' })
+              .set({ status: 'expired', retryable: false })
               .where(eq(uploadIntents.id, error.intentId));
             message.ack();
             break;
 
           case 'invalid_file':
-            await env.PHOTOS_BUCKET.delete(error.key);
             await db
               .update(uploadIntents)
-              .set({ status: 'failed', errorCode: error.reason, errorMessage: error.message })
+              .set({ status: 'failed', errorCode: error.reason, errorMessage: error.message, retryable: false })
               .where(eq(uploadIntents.id, error.intentId));
             message.ack();
             break;
 
           case 'insufficient_credits':
-            // Don't delete R2 - user may top up credits and retry later
+            // R2 preserved — user may top up credits and reprocess later
             await db
               .update(uploadIntents)
               .set({
                 status: 'failed',
                 errorCode: 'insufficient_credits',
                 errorMessage: 'Insufficient credits',
+                retryable: true,
               })
               .where(eq(uploadIntents.id, error.intentId));
             message.ack();
@@ -794,6 +796,7 @@ export async function queue(
                 status: 'failed',
                 errorCode: 'normalization_failed',
                 errorMessage: 'Image processing failed',
+                retryable: false,
               })
               .where(eq(uploadIntents.id, error.intentId));
             message.retry();
@@ -832,6 +835,7 @@ export async function queue(
                   status: 'failed',
                   errorCode,
                   errorMessage: `Upload processing failed: ${errorCode}`,
+                  retryable: false,
                 })
                 .where(eq(uploadIntents.id, failedIntent.id))
                 .catch(() => {});
