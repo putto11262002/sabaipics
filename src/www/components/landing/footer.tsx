@@ -6,6 +6,7 @@ const footerLinks = {
     { href: '#features', label: 'Features' },
     { href: '#pricing', label: 'Pricing' },
     { href: '/compatibility', label: 'Compatibility' },
+    { href: '/guides', label: 'Camera Setup' },
     { href: '#upload', label: 'Upload' },
     { href: '#faq', label: 'FAQ' },
   ],
@@ -22,7 +23,7 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-muted/30">
+    <footer>
       <div className="mx-auto max-w-7xl px-4 py-12 sm:py-16">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
