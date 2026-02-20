@@ -157,6 +157,74 @@ export function normalizeWithPhoton(
 }
 
 // =============================================================================
+// Photon Post-Process (LUT-only, no resize)
+// =============================================================================
+
+/**
+ * Apply a post-process hook (e.g. LUT color grade) to an already-normalized JPEG.
+ * Decodes → applies hook → re-encodes. No resize step.
+ */
+export function applyPostProcessPhoton(
+  jpegBytes: ArrayBuffer,
+  postProcess: PhotonPostProcessHook,
+): Result<NormalizeResult, NormalizeError> {
+  let inputImage: PhotonImage | null = null;
+  let processedImage: PhotonImage | null = null;
+
+  const cleanup = () => {
+    if (processedImage) {
+      safeFree(processedImage);
+      processedImage = null;
+    }
+    if (inputImage) {
+      safeFree(inputImage);
+      inputImage = null;
+    }
+  };
+
+  return safeNewFromBytes(new Uint8Array(jpegBytes))
+    .andThen((img) => {
+      inputImage = img;
+      const width = img.get_width();
+      const height = img.get_height();
+
+      const safeApply = Result.fromThrowable(
+        () => {
+          const pixels = img.get_raw_pixels().slice();
+          const outPixels = postProcess(pixels, width, height);
+          const expected = width * height * 4;
+          if (outPixels.length !== expected) {
+            throw new Error(
+              `postProcess returned invalid buffer length (got ${outPixels.length}, expected ${expected})`,
+            );
+          }
+          return new PhotonImage(outPixels, width, height);
+        },
+        (cause): NormalizeError => ({ stage: 'post_process', cause }),
+      );
+
+      return safeApply().map((out) => {
+        processedImage = out;
+        return out;
+      });
+    })
+    .andThen((img) =>
+      safeEncodeJpeg(img, JPEG_QUALITY).andThen((result) => {
+        if (result.bytes.byteLength <= MAX_OUTPUT_SIZE) return ok(result);
+        return safeEncodeJpeg(img, FALLBACK_QUALITY);
+      }),
+    )
+    .map((result) => {
+      cleanup();
+      return result;
+    })
+    .mapErr((error) => {
+      cleanup();
+      return error;
+    });
+}
+
+// =============================================================================
 // CF Images Normalizer
 // =============================================================================
 

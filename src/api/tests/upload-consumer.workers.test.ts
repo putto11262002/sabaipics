@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { env } from 'cloudflare:test';
-import { ok, err } from 'neverthrow';
+import { ok, err, ResultAsync } from 'neverthrow';
 import type { R2EventMessage } from '../src/types/r2-event';
 import { PHOTO_MAX_FILE_SIZE } from '../src/lib/upload/constants';
 
@@ -22,7 +22,8 @@ const {
   mockUpdateSet,
   mockUpdateFn,
   mockTxTransaction,
-  mockNormalize,
+  mockNormalizeCfImages,
+  mockApplyPostProcess,
   mockExtractExif,
 } = vi.hoisted(() => {
   const mockUpdateWhere = vi.fn().mockResolvedValue([]);
@@ -35,7 +36,8 @@ const {
     mockUpdateSet,
     mockUpdateFn,
     mockTxTransaction: vi.fn(),
-    mockNormalize: vi.fn(),
+    mockNormalizeCfImages: vi.fn(),
+    mockApplyPostProcess: vi.fn(),
     mockExtractExif: vi.fn(),
   };
 });
@@ -91,7 +93,8 @@ vi.mock('@sentry/cloudflare', () => ({
 }));
 
 vi.mock('@/api/src/lib/images/normalize', () => ({
-  normalizeWithPhoton: mockNormalize,
+  normalizeWithCfImages: mockNormalizeCfImages,
+  applyPostProcessPhoton: mockApplyPostProcess,
 }));
 
 vi.mock('@/api/src/lib/images/exif', () => ({
@@ -214,7 +217,12 @@ describe('upload-consumer', () => {
 
     // Default mock behaviors
     mockFindFirstIntent.mockResolvedValue(makePendingIntent());
-    mockNormalize.mockReturnValue(
+    mockNormalizeCfImages.mockReturnValue(
+      ResultAsync.fromSafePromise(
+        Promise.resolve({ bytes: new ArrayBuffer(1000), width: 800, height: 600 }),
+      ),
+    );
+    mockApplyPostProcess.mockReturnValue(
       ok({ bytes: new ArrayBuffer(1000), width: 800, height: 600 }),
     );
     mockExtractExif.mockReturnValue(ok(null));
@@ -503,9 +511,12 @@ describe('upload-consumer', () => {
   // ---------------------------------------------------------------------------
 
   describe('normalization failure', () => {
-    it('6.1 — normalizeWithPhoton error → normalization_failed', async () => {
-      mockNormalize.mockReturnValue(
-        err({ stage: 'decode', cause: new Error('photon decode failed') }),
+    it('6.1 — CF Images error → normalization_failed', async () => {
+      mockNormalizeCfImages.mockReturnValue(
+        ResultAsync.fromPromise(
+          Promise.reject(new Error('cf images transform failed')),
+          (cause) => ({ stage: 'cf_images_transform', cause }),
+        ),
       );
       const msg = createMockMessage(makeR2Event());
       const batch = createMockBatch([msg]);
@@ -523,8 +534,11 @@ describe('upload-consumer', () => {
     });
 
     it('6.2 — no retry on normalization failure', async () => {
-      mockNormalize.mockReturnValue(
-        err({ stage: 'decode', cause: new Error('fail') }),
+      mockNormalizeCfImages.mockReturnValue(
+        ResultAsync.fromPromise(
+          Promise.reject(new Error('fail')),
+          (cause) => ({ stage: 'cf_images_transform', cause }),
+        ),
       );
       const msg = createMockMessage(makeR2Event());
       const batch = createMockBatch([msg]);
@@ -533,6 +547,68 @@ describe('upload-consumer', () => {
 
       expect(msg.retry).not.toHaveBeenCalled();
       expect(msg.ack).toHaveBeenCalled();
+    });
+
+    it('6.3 — LUT apply fails → upload succeeds with un-graded output + warning', async () => {
+      mockApplyPostProcess.mockReturnValue(
+        err({ stage: 'post_process', cause: new Error('LUT apply crashed') }),
+      );
+
+      // Minimal valid .cube LUT (size=2, 8 triplets = identity)
+      const validCubeLut = [
+        'LUT_3D_SIZE 2',
+        '0.0 0.0 0.0',
+        '1.0 0.0 0.0',
+        '0.0 1.0 0.0',
+        '1.0 1.0 0.0',
+        '0.0 0.0 1.0',
+        '1.0 0.0 1.0',
+        '0.0 1.0 1.0',
+        '1.0 1.0 1.0',
+      ].join('\n');
+
+      // Simulate event with color grading enabled + valid LUT
+      const dbSelectMock = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([{
+              settings: { colorGrade: { enabled: true, lutId: 'lut-1', intensity: 75, includeLuminance: false } },
+            }]),
+          }),
+        }),
+      });
+
+      // Re-mock createDb to include the select chain for event settings
+      const { createDb } = await import('@/db');
+      (createDb as any).mockReturnValue({
+        query: {
+          uploadIntents: { findFirst: mockFindFirstIntent },
+          photoLuts: {
+            findFirst: vi.fn().mockResolvedValue({
+              status: 'completed',
+              lutR2Key: 'luts/test-lut.cube',
+            }),
+          },
+        },
+        update: mockUpdateFn,
+        select: dbSelectMock,
+      });
+
+      // Seed R2 with valid .cube LUT file
+      await env.PHOTOS_BUCKET.put('luts/test-lut.cube', validCubeLut);
+
+      const msg = createMockMessage(makeR2Event());
+      const batch = createMockBatch([msg]);
+
+      await queue(batch, env as any, {} as ExecutionContext);
+
+      expect(msg.ack).toHaveBeenCalled();
+      // Upload still succeeds — transaction should have been called
+      expect(mockTxTransaction).toHaveBeenCalled();
+      // Warning captured for LUT failure
+      expect(Sentry.captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('color_grade_apply_failed'),
+      );
     });
   });
 
@@ -762,8 +838,11 @@ describe('upload-consumer', () => {
   describe('DB-down resilience', () => {
     it('12.1 — DB update in error handler fails → still ack, no throw', async () => {
       // Make normalization fail (triggers error handler)
-      mockNormalize.mockReturnValue(
-        err({ stage: 'decode', cause: new Error('fail') }),
+      mockNormalizeCfImages.mockReturnValue(
+        ResultAsync.fromPromise(
+          Promise.reject(new Error('fail')),
+          (cause) => ({ stage: 'cf_images_transform', cause }),
+        ),
       );
       // Make the error handler's DB update reject
       mockUpdateWhere.mockRejectedValue(new Error('DB is down'));

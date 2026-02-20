@@ -36,7 +36,7 @@ import {
   extractWebpDimensions,
 } from '../lib/images';
 import type { ParsedCubeLut } from '../lib/images/color-grade';
-import { normalizeWithPhoton, type PhotonPostProcessHook } from '../lib/images/normalize';
+import { normalizeWithCfImages, applyPostProcessPhoton, type PhotonPostProcessHook } from '../lib/images/normalize';
 import { extractExif } from '../lib/images/exif';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 
@@ -44,8 +44,9 @@ import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 // The consumer itself never calls message.retry() — the idempotency guard
 // in processUpload makes redelivery safe (skips completed/failed intents).
 
-// Max pixel count to prevent OOM during photon decode.
-// 25 MP ≈ 5000×5000 ≈ ~100 MB pixel buffer (4 bytes/pixel).
+// Max pixel count — sanity guard against decompression bombs.
+// CF Images handles the heavy decode externally, so this no longer
+// needs to fit in the 128 MB Workers heap.
 const MAX_PIXELS = 25_000_000;
 
 // =============================================================================
@@ -554,55 +555,91 @@ async function processUpload(
       }
     }
 
-    // Step 7: Normalize image to JPEG using photon (in-Worker Wasm)
-    console.log(`[upload-consumer] Normalizing with photon_wasm: ${key}`);
+    // Step 7: Normalize image to JPEG via CF Images (external — zero Worker memory for decode)
+    console.log(`[upload-consumer] Normalizing with CF Images: ${key}`);
 
-    const normalizeResult = Sentry.startSpan(
+    const cfNormalizeResult = await Sentry.startSpan(
       { name: 'upload.normalize', op: 'image.process' },
-      (span) => {
+      async (span) => {
         span.setAttribute('upload.original_size', imageBytes.byteLength);
+        span.setAttribute('upload.normalization_method', 'cf_images');
         span.setAttribute('upload.color_grade.enabled', colorGrade.enabled);
-        span.setAttribute('upload.color_grade.applied', colorGradeApplied);
-        if (colorGrade.lutId) span.setAttribute('upload.color_grade.lut_id', colorGrade.lutId);
-        if (colorGradeSkip) {
-          span.setAttribute('upload.color_grade.skip_reason', colorGradeSkip.reason);
-        }
+        span.setAttribute('upload.color_grade.will_apply', Boolean(postProcess));
+        if (colorGradeSkip) span.setAttribute('upload.color_grade.skip_reason', colorGradeSkip.reason);
 
-        const result = normalizeWithPhoton(imageBytes, postProcess);
-        if (result.isOk()) {
-          span.setAttribute('upload.width', result.value.width);
-          span.setAttribute('upload.height', result.value.height);
-          span.setAttribute('upload.file_size', result.value.bytes.byteLength);
-        } else {
-          span.setAttribute('upload.error_stage', result.error.stage);
-        }
+        const result = await normalizeWithCfImages(imageBytes, env.IMAGES);
+        result.match(
+          (val) => {
+            span.setAttribute('upload.width', val.width);
+            span.setAttribute('upload.height', val.height);
+            span.setAttribute('upload.file_size', val.bytes.byteLength);
+          },
+          (error) => span.setAttribute('upload.error_stage', error.stage),
+        );
         return result;
       },
     );
 
-    if (normalizeResult.isErr()) {
+    if (cfNormalizeResult.isErr()) {
       captureUploadError('normalization', {
         ...intentCtx,
         extra: {
-          normalization_method: 'photon_wasm',
-          stage: normalizeResult.error.stage,
-          cause:
-            normalizeResult.error.cause instanceof Error
-              ? normalizeResult.error.cause.message
-              : String(normalizeResult.error.cause),
+          normalization_method: 'cf_images',
+          stage: cfNormalizeResult.error.stage,
+          cause: cfNormalizeResult.error.cause instanceof Error
+            ? cfNormalizeResult.error.cause.message
+            : String(cfNormalizeResult.error.cause),
           detectedType: magicValidation.detectedType,
           originalSize: imageBytes.byteLength,
         },
       });
       return err<never, UploadProcessingError>({
-        type: 'normalization',
-        key,
-        intentId: intent.id,
-        cause: normalizeResult.error.cause,
+        type: 'normalization', key, intentId: intent.id, cause: cfNormalizeResult.error.cause,
       });
     }
 
-    const { bytes: normalizedBytes, width, height } = normalizeResult.value;
+    let { bytes: normalizedBytes, width, height } = cfNormalizeResult.value;
+
+    // Step 7b: Apply LUT color grading via Photon (only when postProcess is defined).
+    // CF Images output is ≤2500px JPEG (~3-5 MB). applyPostProcessPhoton decodes this
+    // to ~14 MB RGBA — completely safe within the 128 MB Workers limit.
+    if (postProcess) {
+      const lutResult = Sentry.startSpan(
+        { name: 'upload.color_grade.apply', op: 'image.process' },
+        (span) => {
+          span.setAttribute('upload.color_grade.input_size', normalizedBytes.byteLength);
+          span.setAttribute('upload.color_grade.intensity', colorGrade.intensity);
+          if (colorGrade.lutId) span.setAttribute('upload.color_grade.lut_id', colorGrade.lutId);
+
+          const result = applyPostProcessPhoton(normalizedBytes, postProcess);
+          result.match(
+            (val) => {
+              span.setAttribute('upload.color_grade.output_size', val.bytes.byteLength);
+              colorGradeApplied = true;
+            },
+            (error) => span.setAttribute('upload.color_grade.error_stage', error.stage),
+          );
+          return result;
+        },
+      );
+
+      if (lutResult.isErr()) {
+        // LUT failure is non-fatal — use un-graded CF Images output + warn.
+        colorGradeApplied = false;
+        captureUploadWarning('color_grade_apply_failed', {
+          ...intentCtx,
+          extra: {
+            stage: lutResult.error.stage,
+            cause: lutResult.error.cause instanceof Error
+              ? lutResult.error.cause.message : String(lutResult.error.cause),
+            lut_id: colorGrade.lutId,
+          },
+        });
+      } else {
+        ({ bytes: normalizedBytes, width, height } = lutResult.value);
+      }
+    }
+
     const fileSize = normalizedBytes.byteLength;
 
     // Step 8: Generate final photo ID and key
