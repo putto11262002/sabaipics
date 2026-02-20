@@ -5,6 +5,8 @@ on:
     branches: [master]
     paths:
       - 'src/www/**'
+      - 'src/auth/**'
+      - 'src/shared/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/deploy-www.yml'
@@ -29,7 +31,20 @@ jobs:
         with:
           version: 9.0.0
 
+      - name: Inject Secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.15
+        with:
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          project-slug: frame-fast-pu-xi
+          env-slug: prod
+
       - run: pnpm install
+
+      - name: Create WWW Env
+        run: |
+          echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" > src/www/.env.production
+          echo "NEXT_PUBLIC_DASHBOARD_BASE_URL=https://app.framefast.io" >> src/www/.env.production
 
       - name: Build and Deploy
         run: pnpm deploy:www

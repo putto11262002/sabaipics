@@ -93,25 +93,15 @@ export function HeroEventStage({ className }: { className?: string }) {
 
         {/* Temporary: no hump/grip. Just the stage body + screen + controls. */}
         <div
-          className="relative border border-white/50 bg-white/30 p-3 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/16 shadow-[0_34px_80px_-52px_color-mix(in_oklab,var(--foreground)_26%,transparent)]"
+          className="relative border border-white/30 p-3 backdrop-blur-2xl shadow-[0_34px_80px_-52px_color-mix(in_oklab,var(--foreground)_26%,transparent)]"
           style={{
             borderRadius: metrics.camRadius,
-            background:
-              'linear-gradient(160deg, rgba(255,255,255,0.52) 0%, rgba(255,255,255,0.24) 56%, rgba(255,255,255,0.12) 100%)',
+            background: 'rgba(255,255,255,0.12)',
           }}
         >
           <div
-            className="pointer-events-none absolute inset-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_0_0_1px_rgba(255,255,255,0.28)]"
+            className="pointer-events-none absolute inset-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_0_0_1px_rgba(255,255,255,0.20)]"
             style={{ borderRadius: metrics.camRadius }}
-          />
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              borderRadius: metrics.camRadius,
-              background:
-                'linear-gradient(112deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.08) 42%, rgba(255,255,255,0.22) 100%)',
-            }}
-            aria-hidden="true"
           />
 
           {/* Erase top border behind viewfinder so it reads attached */}
@@ -221,11 +211,11 @@ export function HeroEventStage({ className }: { className?: string }) {
             >
               <div className="relative min-w-0 w-full aspect-[1.1/1] min-[360px]:aspect-[1.2/1] sm:aspect-[4/3]">
                 <div
-                  className="relative h-full w-full bg-white/58 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.42),0_10px_24px_-24px_color-mix(in_oklab,var(--foreground)_16%,transparent)]"
+                  className="relative h-full w-full shadow-[inset_0_0_0_1px_rgba(255,255,255,0.42),0_10px_24px_-24px_color-mix(in_oklab,var(--foreground)_16%,transparent)]"
                   style={{ borderRadius: metrics.screenRadius, padding: 'clamp(8px, 1.2vw, 16px)' }}
                 >
                   <div
-                    className="relative h-full w-full overflow-hidden bg-background/95"
+                    className="relative h-full w-full overflow-hidden"
                     style={{ borderRadius: 'calc(var(--radius) + 0.4rem)' }}
                   >
                     <motion.div

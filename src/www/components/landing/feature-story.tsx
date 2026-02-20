@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowRight,
   Calendar,
+  Check,
   CreditCard,
   Image as ImageIcon,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
   Smile,
   User,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { Slider } from '@/shared/components/ui/slider';
@@ -124,8 +126,6 @@ function FaceVariant() {
         <motion.div
           key={`terminal-${cycleKey}`}
           className="w-full space-y-2"
-          animate={{ y: [0, -2, 0] }}
-          transition={{ duration: 3, ease: 'easeInOut', repeat: Infinity }}
         >
           {steps.map((step, index) => {
             const stepNumber = index + 1;
@@ -564,7 +564,7 @@ const steps: Step[] = [
     label: 'Face search',
     title: 'Guests find themselves in seconds.',
     description: 'One selfie. AI matches faces and returns their photos instantly.',
-    ctaLabel: 'See how it works',
+    ctaLabel: 'Start free trial',
     pageGradient: STACKED_PRIMARY_END_GRADIENT,
     Variant: FaceVariant,
   },
@@ -573,7 +573,7 @@ const steps: Step[] = [
     label: 'LINE delivery',
     title: 'Share with a link guests already trust.',
     description: 'Send albums through LINE, plus QR for on-site scanning.',
-    ctaLabel: 'View attendee flow',
+    ctaLabel: 'Start free trial',
     pageGradient: STACKED_PRIMARY_END_GRADIENT,
     Variant: LineVariant,
   },
@@ -582,7 +582,7 @@ const steps: Step[] = [
     label: 'Auto color grading',
     title: 'Apply your look automatically.',
     description: 'Pick a Studio LUT per event and apply it during processing.',
-    ctaLabel: 'Explore color grade',
+    ctaLabel: 'Start free trial',
     pageGradient: STACKED_PRIMARY_END_GRADIENT,
     Variant: ColorVariant,
   },
@@ -591,13 +591,68 @@ const steps: Step[] = [
     label: 'Organizer UI',
     title: 'Stay in control from one dashboard.',
     description: 'Manage events, branding, and delivery without extra tools.',
-    ctaLabel: 'See the dashboard',
+    ctaLabel: 'Start free trial',
     pageGradient: STACKED_PRIMARY_END_GRADIENT,
     Variant: DashboardVariant,
   },
 ];
 
 export function FeatureStory() {
+  const tFaceSearch = useTranslations('FeatureStory.faceSearch');
+  const tLineDelivery = useTranslations('FeatureStory.lineDelivery');
+  const tColorGrading = useTranslations('FeatureStory.colorGrading');
+  const tDashboard = useTranslations('FeatureStory.dashboard');
+
+  // Build face search step with i18n
+  const faceSearchStep = {
+    ...steps[0],
+    label: tFaceSearch('label'),
+    title: tFaceSearch('title'),
+    description: tFaceSearch('description'),
+    ctaLabel: tFaceSearch('cta'),
+  };
+
+  // Build line delivery step with i18n
+  const lineDeliveryStep = {
+    ...steps[1],
+    label: tLineDelivery('label'),
+    title: tLineDelivery('title'),
+    description: tLineDelivery('description'),
+    ctaLabel: tLineDelivery('cta'),
+  };
+
+  // Build color grading step with i18n
+  const colorGradingStep = {
+    ...steps[2],
+    label: tColorGrading('label'),
+    title: tColorGrading('title'),
+    description: tColorGrading('description'),
+    ctaLabel: tColorGrading('cta'),
+  };
+
+  // Build dashboard step with i18n
+  const dashboardStep = {
+    ...steps[3],
+    label: tDashboard('label'),
+    title: tDashboard('title'),
+    description: tDashboard('description'),
+    ctaLabel: tDashboard('cta'),
+  };
+
+  const allSteps = [faceSearchStep, lineDeliveryStep, colorGradingStep, dashboardStep];
+
+  const faceSearchFeatures = [
+    tFaceSearch('features.accuracy'),
+    tFaceSearch('features.privacy'),
+    tFaceSearch('features.pdpa'),
+  ];
+
+  const colorGradingFeatures = [
+    tColorGrading('features.upload'),
+    tColorGrading('features.automatic'),
+    tColorGrading('features.consistent'),
+  ];
+
   return (
     <section id="features" className="relative scroll-mt-24">
       <div className="mx-auto max-w-7xl px-4 pb-8 pt-2 sm:pt-6">
@@ -613,7 +668,7 @@ export function FeatureStory() {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 pb-20 md:pb-28">
-        {steps.map((step, index) => (
+        {allSteps.map((step, index) => (
           <article
             key={step.id}
             id={`feature-step-${step.id}`}
@@ -639,13 +694,37 @@ export function FeatureStory() {
                       {step.description}
                     </p>
 
-                    <button
-                      type="button"
-                      className="mt-6 inline-flex w-fit items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium lg:mt-auto"
+                    {/* Feature list for Face Search card */}
+                    {step.id === '01' && (
+                      <ul className="mt-4 space-y-2">
+                        {faceSearchFeatures.map((feature) => (
+                          <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Check className="h-4 w-4 text-primary" />
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {/* Feature list for Color Grading card */}
+                    {step.id === '03' && (
+                      <ul className="mt-4 space-y-2">
+                        {colorGradingFeatures.map((feature) => (
+                          <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Check className="h-4 w-4 text-primary" />
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    <a
+                      href="https://app.framefast.io/sign-up"
+                      className="mt-6 inline-flex w-fit items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-muted/50 lg:mt-auto"
                     >
                       {step.ctaLabel}
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                    </button>
+                    </a>
                   </div>
 
                   <div className="relative h-[50svh] min-h-[15rem] max-h-[22rem] overflow-hidden sm:h-[50svh] sm:min-h-[17rem] sm:max-h-[25rem] lg:h-full lg:min-h-0 lg:max-h-none lg:min-w-0 lg:flex-1">
