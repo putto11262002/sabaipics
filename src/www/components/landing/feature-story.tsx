@@ -738,7 +738,7 @@ export function FeatureStory() {
 
                     {/* Feature list for Face Search card */}
                     {step.id === '01' && (
-                      <ul className="mt-4 space-y-2">
+                      <ul className="mt-4 hidden space-y-2 lg:block">
                         {faceSearchFeatures.map((feature) => (
                           <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Check className="h-4 w-4 text-primary" />
@@ -750,7 +750,7 @@ export function FeatureStory() {
 
                     {/* Feature list for Color Grading card */}
                     {step.id === '03' && (
-                      <ul className="mt-4 space-y-2">
+                      <ul className="mt-4 hidden space-y-2 lg:block">
                         {colorGradingFeatures.map((feature) => (
                           <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Check className="h-4 w-4 text-primary" />
