@@ -42,6 +42,10 @@ actor DiskCache {
         try? FileManager.default.removeItem(at: url)
     }
 
+    func deleteAll() {
+        try? FileManager.default.removeItem(at: directoryURL)
+    }
+
     private func fileURL(forKey key: String) -> URL {
         directoryURL.appendingPathComponent("\(hashedFilename(forKey: key)).json", isDirectory: false)
     }

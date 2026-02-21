@@ -102,6 +102,9 @@ class AppCoordinator: ObservableObject {
 
     func forceSignOut() {
         Task {
+            // Wipe cached data before sign-out for security.
+            await DiskCache(directoryName: "FrameFastCache").deleteAll()
+
             do {
                 try await Clerk.shared.signOut()
             } catch {
