@@ -54,5 +54,10 @@
       "description": "Create events, upload photos, and track credits. Less time on logistics, more time behind the camera.",
       "cta": "Start free trial"
     }
+  },
+  "IosApp": {
+    "label": "iOS app",
+    "title": "Capture, sync, and deliver from your pocket.",
+    "description": "Import from camera, monitor upload status, and keep event delivery moving while you are still on-site."
   }
 }
