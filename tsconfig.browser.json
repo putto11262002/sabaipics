@@ -10,6 +10,7 @@
     "src/api/worker-configuration.d.ts",
     "src/dashboard/src/**/*",
     "src/event/src/**/*",
+    "src/admin/src/**/*",
     "src/desktop-uploader/src/**/*",
     "src/shared/**/*",
     "src/auth/**/*",
