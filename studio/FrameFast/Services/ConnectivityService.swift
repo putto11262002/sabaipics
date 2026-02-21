@@ -204,7 +204,7 @@ actor ConnectivityService {
     private static func probeHealth(url: URL) async -> Bool {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.timeoutInterval = 5
+        request.timeoutInterval = 2
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse else { return false }
