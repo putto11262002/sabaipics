@@ -10,9 +10,9 @@ struct CaptureTabRootView: View {
     // MARK: - Sheet
 
     private enum ActiveSheet: Identifiable {
-        case sony(SonyConnectFlowView.StartMode)
-        case canon(CanonConnectFlowView.StartMode)
-        case nikon(NikonConnectFlowView.StartMode)
+        case sony(CameraConnectStartMode)
+        case canon(CameraConnectStartMode)
+        case nikon(CameraConnectStartMode)
 
         var id: String {
             switch self {
@@ -24,7 +24,6 @@ struct CaptureTabRootView: View {
     }
 
     @State private var activeSheet: ActiveSheet? = nil
-    @State private var isShowingEventPicker: Bool = false
     @State private var recentCameras: [APCameraConnectionRecord] = []
 
     @State private var isShowingAddCameraDialog: Bool = false
@@ -68,24 +67,6 @@ struct CaptureTabRootView: View {
                     .presentationDragIndicator(.hidden)
                     .presentationBackground(Color(uiColor: .systemGroupedBackground))
             }
-            .sheet(isPresented: $isShowingEventPicker) {
-                EventPickerSheetView(
-                    preselectedEventId: coordinator.selectedEventId,
-                    onCancel: {
-                        isShowingEventPicker = false
-                        sessionStore.disconnect()
-                    },
-                    onConfirm: { eventId, eventName in
-                        coordinator.selectEvent(id: eventId, name: eventName)
-                        isShowingEventPicker = false
-
-                        sessionStore.startPendingCamera()
-                        reloadRecent()
-                    }
-                )
-                .interactiveDismissDisabled(true)
-                .presentationDragIndicator(.hidden)
-            }
             .onAppear {
                 reloadRecent()
             }
@@ -97,17 +78,10 @@ struct CaptureTabRootView: View {
                     CreditsToolbarView()
                 }
             }
-            .confirmationDialog(
-                "Add camera",
-                isPresented: $isShowingAddCameraDialog,
-                titleVisibility: .visible
-            ) {
-                ForEach(CameraManufacturer.allCases, id: \.self) { manufacturer in
-                    Button(manufacturer.rawValue) {
-                        handleConnectNew(manufacturer)
-                    }
+            .sheet(isPresented: $isShowingAddCameraDialog) {
+                ManufacturerPickerSheet { manufacturer in
+                    handleConnectNew(manufacturer)
                 }
-                Button("Cancel", role: .cancel) { }
             }
             .onChange(of: sessionStore.state) { _, newState in
                 if newState != .idle {
@@ -174,62 +148,65 @@ struct CaptureTabRootView: View {
     @ViewBuilder
     private func sheetContent(_ sheet: ActiveSheet) -> some View {
         switch sheet {
-        case .sony(let startMode):
-            NavigationStack {
-                SonyConnectFlowView(
-                    startMode: startMode,
-                    onConnected: { activeCamera in
-                        sessionStore.setPendingCamera(activeCamera)
-                        activeSheet = nil
-                        reloadRecent()
-                        DispatchQueue.main.async {
-                            isShowingEventPicker = true
-                        }
-                    },
-                    onCancel: {
-                        activeSheet = nil
-                        reloadRecent()
-                    }
-                )
-            }
         case .canon(let startMode):
             NavigationStack {
-                CanonConnectFlowView(
+                CameraConnectFlow(
                     startMode: startMode,
-                    onConnected: { activeCamera in
-                        sessionStore.setPendingCamera(activeCamera)
-                        activeSheet = nil
-                        reloadRecent()
-                        DispatchQueue.main.async {
-                            isShowingEventPicker = true
-                        }
+                    config: .canon,
+                    onConnected: { camera, eventId, eventName in
+                        handleConnected(camera, eventId: eventId, eventName: eventName)
                     },
-                    onCancel: {
-                        activeSheet = nil
-                        reloadRecent()
-                    }
-                )
+                    onCancel: { handleSheetCancel() }
+                ) { onReady, _, _ in
+                    CanonAPSetupView(onNext: onReady)
+                }
             }
 
         case .nikon(let startMode):
             NavigationStack {
-                NikonConnectFlowView(
+                CameraConnectFlow(
                     startMode: startMode,
-                    onConnected: { activeCamera in
-                        sessionStore.setPendingCamera(activeCamera)
-                        activeSheet = nil
-                        reloadRecent()
-                        DispatchQueue.main.async {
-                            isShowingEventPicker = true
-                        }
+                    config: .nikon,
+                    onConnected: { camera, eventId, eventName in
+                        handleConnected(camera, eventId: eventId, eventName: eventName)
                     },
-                    onCancel: {
-                        activeSheet = nil
-                        reloadRecent()
-                    }
-                )
+                    onCancel: { handleSheetCancel() }
+                ) { onReady, _, _ in
+                    NikonHotspotSetupView(onNext: onReady)
+                }
+            }
+
+        case .sony(let startMode):
+            NavigationStack {
+                CameraConnectFlow(
+                    startMode: startMode,
+                    config: .sony,
+                    onConnected: { camera, eventId, eventName in
+                        handleConnected(camera, eventId: eventId, eventName: eventName)
+                    },
+                    onCancel: { handleSheetCancel() }
+                ) { onReady, ssid, cameraId in
+                    SonySetupFlowView(
+                        onReady: onReady,
+                        ssid: ssid,
+                        cameraId: cameraId
+                    )
+                }
             }
         }
+    }
+
+    private func handleConnected(_ activeCamera: ActiveCamera, eventId: String, eventName: String) {
+        sessionStore.setPendingCamera(activeCamera)
+        coordinator.selectEvent(id: eventId, name: eventName)
+        activeSheet = nil
+        sessionStore.startPendingCamera()
+        reloadRecent()
+    }
+
+    private func handleSheetCancel() {
+        activeSheet = nil
+        reloadRecent()
     }
 
     // MARK: - Reconnect handlers
