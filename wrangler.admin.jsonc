@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "framefast-admin",
+  "compatibility_date": "2025-12-06",
+
+  // Static assets configuration - SPA routing handled automatically
+  "assets": {
+    "directory": "src/admin/dist",
+    "not_found_handling": "single-page-application"
+  },
+
+  "env": {
+    // Production environment
+    "production": {
+      "routes": [
+        {
+          "pattern": "admin.framefast.io",
+          "zone_name": "framefast.io",
+          "custom_domain": true
+        }
+      ]
+    }
+  }
+}

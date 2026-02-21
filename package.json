@@ -11,9 +11,11 @@
     "dev:event": "vite --config vite.event.config.ts",
     "dev:desktop": "vite --config vite.desktop.config.ts",
     "dev:www": "cd src/www && next dev",
+    "dev:admin": "vite --config vite.admin.config.ts",
     "dev:sabaiface": "cd src/sabaiface && tsx watch src/server.ts",
 
     "build:api": "wrangler deploy --dry-run --outdir=src/api/dist -c wrangler.api.jsonc",
+    "build:admin": "vite build --config vite.admin.config.ts",
     "build:dashboard": "vite build --config vite.dashboard.config.ts",
     "build:event": "vite build --config vite.event.config.ts",
     "build:www": "cd src/www && next build",
@@ -25,6 +27,7 @@
     "deploy:event:staging": "pnpm build:event --mode staging && wrangler pages deploy src/event/dist --project-name=event --branch=staging",
     "deploy:event:prod": "pnpm build:event --mode production && wrangler pages deploy src/event/dist --project-name=event --branch=main",
     "deploy:www": "cd src/www && opennextjs-cloudflare build && opennextjs-cloudflare deploy --env production",
+    "deploy:admin:prod": "pnpm build:admin --mode production && wrangler deploy --env production -c wrangler.admin.jsonc",
     "deploy:sabaiface": "fly deploy . -c src/sabaiface/fly.toml",
 
     "db:generate": "drizzle-kit generate --config src/db/drizzle.config.ts",
