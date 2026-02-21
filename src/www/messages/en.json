@@ -59,5 +59,35 @@
     "label": "iOS app",
     "title": "Capture, sync, and deliver from your pocket.",
     "description": "Import from camera, monitor upload status, and keep event delivery moving while you are still on-site."
+  },
+  "Faq": {
+    "title": "Frequently asked questions",
+    "subtitle": "Privacy, attendee flow, and credit-based delivery.",
+    "items": {
+      "accuracy": {
+        "question": "How accurate is face search?",
+        "answer": "FrameFast is tuned for real event conditions and typically returns strong matches fast. Guests confirm with one selfie and see their photos in seconds."
+      },
+      "privacy": {
+        "question": "Is attendee privacy protected?",
+        "answer": "Yes. Guests only see photos matched to their own selfie. You control album visibility and event access."
+      },
+      "formats": {
+        "question": "What formats are supported, and how long are photos retained?",
+        "answer": "We support JPEG, PNG, and WebP uploads up to 10 MB per image. Event photo access is set to a 30-day window by default (about 1 month)."
+      },
+      "credits": {
+        "question": "Do free credits expire?",
+        "answer": "Yes. Your 1,000 free credits are valid for 1 month. After that, you can continue with paid top-ups at transparent tier pricing."
+      },
+      "upload": {
+        "question": "Which upload methods are supported?",
+        "answer": "Upload via iOS app, web uploader, or desktop uploader, then deliver through QR and LINE links."
+      },
+      "sales": {
+        "question": "Can I talk to sales for high-volume events?",
+        "answer": "Yes. Email {email} for volume pricing and support."
+      }
+    }
   }
 }
