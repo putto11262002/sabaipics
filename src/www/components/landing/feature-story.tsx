@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import {
   ArrowRight,
   Calendar,
@@ -16,7 +16,7 @@ import {
   User,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
@@ -28,6 +28,8 @@ type Step = {
   description: string;
   ctaLabel: string;
   pageGradient: string;
+  gradientBase: string;
+  gradientRadial: string;
   Variant: () => ReactElement;
 };
 
@@ -45,7 +47,7 @@ function VisualShell({ children }: { children: ReactNode }) {
         }}
         aria-hidden="true"
       />
-      <div className="relative h-full p-4 sm:p-5">{children}</div>
+      <div className="relative h-full px-[4.8%] py-4 sm:py-5">{children}</div>
     </div>
   );
 }
@@ -54,11 +56,24 @@ const FACE_MATCH_RESULTS = [98, 96, 95, 94, 97, 93, 92, 95, 91, 94, 96, 93, 90, 
 const LINE_REPLY_RESULTS = FACE_MATCH_RESULTS.slice(0, 10);
 
 function FaceVariant() {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: false, margin: '-100px' });
+  const [hasStarted, setHasStarted] = useState(false);
   const [phase, setPhase] = useState(0);
   const [revealedCount, setRevealedCount] = useState(0);
   const [cycleKey, setCycleKey] = useState(0);
 
+  // Start animation when first entering view
   useEffect(() => {
+    if (isInView && !hasStarted) {
+      setHasStarted(true);
+    }
+  }, [isInView, hasStarted]);
+
+  // Run animation cycle when started
+  useEffect(() => {
+    if (!hasStarted) return;
+
     let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -96,7 +111,7 @@ function FaceVariant() {
       cancelled = true;
       timers.forEach((timer) => clearTimeout(timer));
     };
-  }, []);
+  }, [hasStarted]);
 
   const streamedPercent = Math.min(
     100,
@@ -121,7 +136,7 @@ function FaceVariant() {
   ];
 
   return (
-    <div className="relative h-full overflow-visible">
+    <div ref={ref} className="relative h-full overflow-visible px-[4.8%] pt-[5.2%]">
       <div className="relative flex h-full flex-col justify-start pt-1">
         <motion.div
           key={`terminal-${cycleKey}`}
@@ -147,7 +162,7 @@ function FaceVariant() {
                 initial={{ opacity: 0, y: 8, scale: 0.99 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ duration: 0.24, ease: 'easeOut' }}
-                className="flex items-center gap-3 rounded-xl border border-border bg-background/82 px-2.5 py-2 shadow-[0_14px_28px_-24px_color-mix(in_oklab,var(--foreground)_34%,transparent)] sm:px-3 sm:py-2.5"
+                className="flex items-center gap-3 rounded-xl border border-border bg-card px-2.5 py-2 shadow-[0_14px_28px_-24px_color-mix(in_oklab,var(--foreground)_34%,transparent)] sm:px-3 sm:py-2.5"
               >
                 <span
                   className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${dotClass}`}
@@ -214,11 +229,24 @@ function FaceVariant() {
 }
 
 function LineVariant() {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: false, margin: '-100px' });
+  const [hasStarted, setHasStarted] = useState(false);
   const [phase, setPhase] = useState(0);
   const [revealedCount, setRevealedCount] = useState(0);
   const [cycleKey, setCycleKey] = useState(0);
 
+  // Start animation when first entering view
   useEffect(() => {
+    if (isInView && !hasStarted) {
+      setHasStarted(true);
+    }
+  }, [isInView, hasStarted]);
+
+  // Run animation cycle when started
+  useEffect(() => {
+    if (!hasStarted) return;
+
     let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -253,10 +281,10 @@ function LineVariant() {
       cancelled = true;
       timers.forEach((timer) => clearTimeout(timer));
     };
-  }, []);
+  }, [hasStarted]);
 
   return (
-    <div className="relative flex h-full items-start justify-center px-[1.8%] pt-[16%]">
+    <div ref={ref} className="relative flex h-full items-start justify-center px-[1.8%] pt-[16%]">
       <div className="relative h-auto w-[clamp(14rem,56vw,17rem)] aspect-[9/19.5] overflow-hidden rounded-[2.3rem] border border-border/70 shadow-[0_30px_54px_-38px_color-mix(in_oklab,var(--foreground)_40%,transparent)] backdrop-blur-xl sm:w-[clamp(15rem,46vw,18rem)] lg:w-[clamp(16.8rem,35.7vw,20rem)]">
         <div
           className="absolute inset-[1.8%] rounded-[2rem] border border-border/70"
@@ -266,7 +294,7 @@ function LineVariant() {
           }}
           aria-hidden="true"
         />
-        <div className="pointer-events-none absolute left-1/2 top-[3.2%] h-[3.4%] w-[34%] -translate-x-1/2 rounded-full border border-foreground/12 bg-foreground/8" />
+        <div className="pointer-events-none absolute left-1/2 top-[3.2%] h-[3.4%] w-[34%] -translate-x-1/2 rounded-full border border-border/70 bg-background/40 backdrop-blur-sm" />
 
         <div className="absolute inset-[4.2%] rounded-[1.75rem] px-1 pb-[4.6%] pt-[9.8%]">
           <motion.div
@@ -369,21 +397,21 @@ function ColorVariant() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden px-[4.8%] pb-[4.8%] pt-[5.2%]">
       <div className="z-20 flex shrink-0 flex-col gap-2.5">
-        <div className="flex flex-row items-center justify-between gap-3 rounded-xl border border-border/65 bg-background/46 px-4 py-3 shadow-[0_18px_38px_-28px_color-mix(in_oklab,var(--foreground)_45%,transparent),inset_0_1px_0_color-mix(in_oklab,white_58%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_10%,transparent)] backdrop-blur-xl">
+        <div className="flex flex-row items-center justify-between gap-3 rounded-xl border border-border/65 bg-card px-4 py-3 shadow-[0_18px_38px_-28px_color-mix(in_oklab,var(--foreground)_45%,transparent),inset_0_1px_0_color-mix(in_oklab,white_58%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_10%,transparent)]">
           <span className="text-xs font-medium text-foreground">LUT strength</span>
           <div className="w-[52%] min-w-[8rem]">
             <Slider defaultValue={[72]} max={100} step={1} variant="primary" />
           </div>
         </div>
 
-        <div className="flex flex-row items-center justify-between gap-3 rounded-xl border border-border/65 bg-background/46 px-4 py-3 shadow-[0_18px_38px_-28px_color-mix(in_oklab,var(--foreground)_45%,transparent),inset_0_1px_0_color-mix(in_oklab,white_58%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_10%,transparent)] backdrop-blur-xl">
+        <div className="flex flex-row items-center justify-between gap-3 rounded-xl border border-border/65 bg-card px-4 py-3 shadow-[0_18px_38px_-28px_color-mix(in_oklab,var(--foreground)_45%,transparent),inset_0_1px_0_color-mix(in_oklab,white_58%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_10%,transparent)]">
           <span className="text-xs font-medium text-foreground">Warmth bias</span>
           <div className="w-[52%] min-w-[8rem]">
             <Slider defaultValue={[58]} max={100} step={1} variant="primary" />
           </div>
         </div>
 
-        <div className="flex flex-row items-center justify-between gap-3 rounded-xl border border-border/65 bg-background/46 px-4 py-3 shadow-[0_18px_38px_-28px_color-mix(in_oklab,var(--foreground)_45%,transparent),inset_0_1px_0_color-mix(in_oklab,white_58%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_10%,transparent)] backdrop-blur-xl">
+        <div className="flex flex-row items-center justify-between gap-3 rounded-xl border border-border/65 bg-card px-4 py-3 shadow-[0_18px_38px_-28px_color-mix(in_oklab,var(--foreground)_45%,transparent),inset_0_1px_0_color-mix(in_oklab,white_58%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_10%,transparent)]">
           <span className="text-xs font-medium text-foreground">Skin tone protect</span>
           <div className="flex w-[52%] min-w-[8rem] items-center justify-end">
             <Switch defaultChecked variant="primary" />
@@ -392,7 +420,7 @@ function ColorVariant() {
       </div>
 
       <div className="mt-4 min-h-0 flex-1 sm:mt-5">
-        <div className="grid h-full grid-cols-3 content-start gap-2 p-3 sm:gap-2.5 sm:p-4">
+        <div className="grid h-full grid-cols-3 content-start gap-2 sm:gap-2.5">
           {Array.from({ length: 6 }).map((_, index) => (
             <div
               key={`grade-tile-${index}`}
@@ -443,7 +471,7 @@ function DashboardVariant() {
 
   return (
     <div className="relative h-full overflow-hidden">
-      <div className="absolute left-0 top-[7%] h-auto w-[clamp(26rem,128vw,38rem)] aspect-[16/9] origin-top-left overflow-hidden rounded-lg border border-border bg-background shadow-[0_24px_48px_-36px_color-mix(in_oklab,var(--foreground)_38%,transparent)] sm:w-[clamp(30rem,118vw,44rem)] md:w-[clamp(32rem,104vw,48rem)] lg:top-1/2 lg:-translate-y-1/2 lg:w-[clamp(30rem,80vw,46rem)] lg:scale-[0.96] xl:w-[clamp(35rem,84vw,54rem)] xl:scale-100">
+      <div className="absolute left-[4.8%] top-[7%] h-auto w-[clamp(26rem,128vw,38rem)] aspect-[16/9] origin-top-left overflow-hidden rounded-lg border border-border bg-background shadow-[0_24px_48px_-36px_color-mix(in_oklab,var(--foreground)_38%,transparent)] sm:w-[clamp(30rem,118vw,44rem)] md:w-[clamp(32rem,104vw,48rem)] lg:top-1/2 lg:-translate-y-1/2 lg:w-[clamp(30rem,80vw,46rem)] lg:scale-[0.96] xl:w-[clamp(35rem,84vw,54rem)] xl:scale-100">
         <div className="grid h-full grid-cols-[23%_1fr]">
         <aside className="border-r border-border/80 bg-card/55 p-2.5">
           <div className="flex items-center gap-1.5">
@@ -558,6 +586,12 @@ function DashboardVariant() {
   );
 }
 
+// Default illustration gradients
+const DEFAULT_GRADIENT_BASE =
+  'linear-gradient(150deg, color-mix(in oklab, var(--primary-end) 18%, transparent) 0%, color-mix(in oklab, var(--primary) 12%, transparent) 42%, transparent 72%)';
+const DEFAULT_GRADIENT_RADIAL =
+  'radial-gradient(122% 96% at 8% 106%, color-mix(in oklab, var(--primary) 45%, transparent) 0%, color-mix(in oklab, var(--primary) 28%, transparent) 44%, color-mix(in oklab, var(--primary) 12%, transparent) 72%, transparent 97%), radial-gradient(122% 96% at 92% 106%, color-mix(in oklab, var(--primary-end) 45%, transparent) 0%, color-mix(in oklab, var(--primary-end) 28%, transparent) 44%, color-mix(in oklab, var(--primary-end) 12%, transparent) 72%, transparent 97%)';
+
 const steps: Step[] = [
   {
     id: '01',
@@ -566,6 +600,8 @@ const steps: Step[] = [
     description: 'One selfie. AI matches faces and returns their photos instantly.',
     ctaLabel: 'Start free trial',
     pageGradient: STACKED_PRIMARY_END_GRADIENT,
+    gradientBase: DEFAULT_GRADIENT_BASE,
+    gradientRadial: DEFAULT_GRADIENT_RADIAL,
     Variant: FaceVariant,
   },
   {
@@ -575,6 +611,8 @@ const steps: Step[] = [
     description: 'Send albums through LINE, plus QR for on-site scanning.',
     ctaLabel: 'Start free trial',
     pageGradient: STACKED_PRIMARY_END_GRADIENT,
+    gradientBase: DEFAULT_GRADIENT_BASE,
+    gradientRadial: DEFAULT_GRADIENT_RADIAL,
     Variant: LineVariant,
   },
   {
@@ -584,6 +622,8 @@ const steps: Step[] = [
     description: 'Pick a Studio LUT per event and apply it during processing.',
     ctaLabel: 'Start free trial',
     pageGradient: STACKED_PRIMARY_END_GRADIENT,
+    gradientBase: DEFAULT_GRADIENT_BASE,
+    gradientRadial: DEFAULT_GRADIENT_RADIAL,
     Variant: ColorVariant,
   },
   {
@@ -593,6 +633,8 @@ const steps: Step[] = [
     description: 'Manage events, branding, and delivery without extra tools.',
     ctaLabel: 'Start free trial',
     pageGradient: STACKED_PRIMARY_END_GRADIENT,
+    gradientBase: DEFAULT_GRADIENT_BASE,
+    gradientRadial: DEFAULT_GRADIENT_RADIAL,
     Variant: DashboardVariant,
   },
 ];
@@ -654,7 +696,7 @@ export function FeatureStory() {
   ];
 
   return (
-    <section id="features" className="relative scroll-mt-24">
+    <section id="features" className="relative scroll-mt-24 bg-muted/30">
       <div className="mx-auto max-w-7xl px-4 pb-8 pt-2 sm:pt-6">
         <div className="max-w-4xl">
           <h2 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -732,16 +774,14 @@ export function FeatureStory() {
                       className="absolute inset-0"
                       style={{
                         backgroundColor: 'var(--card)',
-                        backgroundImage:
-                          'linear-gradient(150deg, color-mix(in oklab, var(--primary-end) 18%, transparent) 0%, color-mix(in oklab, var(--primary) 12%, transparent) 42%, transparent 72%)',
+                        backgroundImage: step.gradientBase,
                       }}
                       aria-hidden="true"
                     />
                     <div
                       className="absolute inset-0"
                       style={{
-                        background:
-                          'radial-gradient(122% 96% at 8% 106%, color-mix(in oklab, var(--primary) 76%, transparent) 0%, color-mix(in oklab, var(--primary) 48%, transparent) 44%, color-mix(in oklab, var(--primary) 22%, transparent) 72%, transparent 97%), radial-gradient(122% 96% at 92% 106%, color-mix(in oklab, var(--primary-end) 76%, transparent) 0%, color-mix(in oklab, var(--primary-end) 48%, transparent) 44%, color-mix(in oklab, var(--primary-end) 22%, transparent) 72%, transparent 97%)',
+                        background: step.gradientRadial,
                       }}
                       aria-hidden="true"
                     />
