@@ -91,6 +91,7 @@ struct MainTabView: View {
             )
             .presentationDetents([.large], selection: $captureSheetDetent)
             .presentationDragIndicator(.visible)
+            .presentationBackground(Color(uiColor: .systemGroupedBackground))
         }
     }
 
