@@ -40,6 +40,7 @@ struct ConnectivityGuideFlow: View {
             stepContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 .padding(.horizontal, 28)
+                .padding(.top, 16)
 
             bottomBar
                 .padding(.horizontal, 28)
@@ -102,7 +103,7 @@ struct ConnectivityGuideFlow: View {
 
     private var bottomBar: some View {
         HStack(spacing: 0) {
-            navButton(systemName: "chevron.left", action: { navigate(by: -1) })
+            CircleNavButton(.back) { navigate(by: -1) }
                 .opacity(showNav && !hidePrevButton && currentStep > 0 ? 1 : 0)
                 .disabled(!showNav || hidePrevButton || currentStep == 0)
 
@@ -117,7 +118,7 @@ struct ConnectivityGuideFlow: View {
                     .tint(Color.primary.opacity(0.5))
                     .frame(width: 40, height: 40)
             } else {
-                navButton(systemName: "chevron.right", action: { navigate(by: 1) })
+                CircleNavButton { navigate(by: 1) }
                     .opacity(showNav && currentStep < stepCount - 2 ? 1 : 0)
                     .disabled(!showNav || currentStep >= stepCount - 2)
             }
@@ -133,19 +134,6 @@ struct ConnectivityGuideFlow: View {
                           : Color.primary.opacity(0.2))
                     .frame(width: 6, height: 6)
                     .animation(.easeInOut(duration: 0.3), value: currentStep)
-            }
-        }
-    }
-
-    private func navButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            ZStack {
-                Circle()
-                    .stroke(Color.primary.opacity(0.25), lineWidth: 1.5)
-                    .frame(width: 40, height: 40)
-                Image(systemName: systemName)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Color.primary)
             }
         }
     }

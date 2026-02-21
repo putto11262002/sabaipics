@@ -49,7 +49,7 @@ struct ConnectivityGuideOnlineCheckStep: View {
     // MARK: - Status Text
 
     private var statusText: some View {
-        Text("Connected")
+        Text("Online")
             .font(.body)
             .fontWeight(.semibold)
             .foregroundStyle(Color(.systemGreen))

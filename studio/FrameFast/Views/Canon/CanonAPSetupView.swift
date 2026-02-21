@@ -2,60 +2,53 @@
 //  FrameFast
 //
 //  Canon camera AP setup instructions.
+//  Shows a mock WiFi settings list with a pulsing beacon on the camera network.
 
 import SwiftUI
 
 struct CanonAPSetupView: View {
     let onNext: () -> Void
 
-    @State private var showWiFiWarning = false
-
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-
-            Image(systemName: "wifi")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.Theme.primary)
-
-            Text("Connect to Camera's WiFi")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(Color.Theme.foreground)
-
-            Text("Connect to your Canon camera's WiFi network in **Settings** before continuing.")
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Connect to your Canon camera's WiFi network in Settings before continuing.")
                 .font(.subheadline)
                 .foregroundColor(Color.Theme.mutedForeground)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 32)
 
-            Button("Continue") {
-                if WiFiNetworkInfo.currentWiFiIPv4() != nil {
-                    onNext()
-                } else {
-                    showWiFiWarning = true
-                }
-            }
-            .buttonStyle(.compact)
-            .padding(.top, 4)
+            CameraWiFiJoinScene(ssid: "Canon camera Wi‑Fi")
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 28)
 
             Spacer()
+
+            HStack {
+                Spacer()
+                CircleNavButton { onNext() }
+            }
+            .padding(.horizontal, 28)
+            .padding(.bottom, 24)
         }
-        .alert("WiFi not detected", isPresented: $showWiFiWarning) {
-            Button("Cancel", role: .cancel) {}
-            Button("Continue anyway") { onNext() }
-        } message: {
-            Text("You don't appear to be connected to a WiFi network. Make sure you're connected to your camera's WiFi before continuing.")
-        }
+        .navigationTitle("Connect to WiFi")
+        .navigationBarTitleDisplayMode(.large)
     }
 }
 
 #if DEBUG
 
-#Preview("Canon AP Setup") {
+#Preview("Canon AP Setup — Dark") {
     NavigationStack {
         CanonAPSetupView(onNext: {})
     }
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Canon AP Setup — Light") {
+    NavigationStack {
+        CanonAPSetupView(onNext: {})
+    }
+    .preferredColorScheme(.light)
 }
 
 #endif
