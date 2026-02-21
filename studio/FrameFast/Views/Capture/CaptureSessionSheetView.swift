@@ -43,9 +43,9 @@ struct CaptureSessionSheetView: View {
                         Spacer()
                     }
                     .frame(maxWidth: .infinity)
-                    .background(Color(.systemBackground))
                 }
             }
+            .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -99,7 +99,7 @@ struct CaptureSessionSheetView: View {
                 value: "\(syncedCount)"
             )
         }
-        .background(Color(.systemBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
     private func sessionInfoRow(icon: String, label: String, value: String) -> some View {
@@ -128,14 +128,17 @@ struct CaptureSessionSheetView: View {
             onDisconnect()
         } label: {
             Text(isDisconnecting ? "Disconnecting…" : "Disconnect")
+                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.destructiveSecondary)
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .tint(.red)
         .disabled(isDisconnecting)
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 12)
         .background(
-            Color(.systemBackground)
+            Color(uiColor: .systemGroupedBackground)
                 .ignoresSafeArea()
         )
     }
@@ -169,26 +172,19 @@ private struct CaptureSessionPhotosView: View {
                 }
             }
         }
-        .background(Color(.systemBackground))
+        .scrollContentBackground(.hidden)
+        .background(Color(uiColor: .systemGroupedBackground))
         .animation(.easeOut(duration: 0.4), value: session.photos.count)
         .overlay {
             if session.isDisconnecting {
                 ZStack {
-                    Color.black.opacity(0.4)
+                    Color.black.opacity(0.2)
                         .ignoresSafeArea()
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                            .tint(Color.white)
-                        Text("Disconnecting...")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                    }
-                    .padding(32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.black.opacity(0.8))
-                    )
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .padding(20)
+                        .background(.regularMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
         }
@@ -206,7 +202,7 @@ private struct CaptureSessionPhotosView: View {
         .padding(.top, 10)
         .padding(.bottom, session.skippedRawCount > 0 && session.showRawSkipBanner ? 10 : 0)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
     private var emptyState: some View {
