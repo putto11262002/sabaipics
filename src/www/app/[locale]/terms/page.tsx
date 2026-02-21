@@ -24,7 +24,7 @@ function TermsEn() {
       <p>
         <strong>Service provider:</strong> <em>FrameFast operated by Put Suthisrisinlpa</em>
         <br />
-        <strong>Contact:</strong> <em>support@framefast.io</em>
+        <strong>Contact:</strong> <em>contact@framefast.io</em>
       </p>
 
       <h2>2) The Service</h2>
@@ -138,7 +138,7 @@ function TermsEn() {
 
       <h2>16) Contact</h2>
       <p>
-        Questions about these Terms: <em>support@framefast.io</em>
+        Questions about these Terms: <em>contact@framefast.io</em>
       </p>
     </article>
   );
@@ -161,7 +161,7 @@ function TermsTh() {
       <p>
         <strong>ผู้ให้บริการ:</strong> <em>FrameFast ดำเนินการโดย Put Suthisrisinlpa</em>
         <br />
-        <strong>ติดต่อ:</strong> <em>support@framefast.io</em>
+        <strong>ติดต่อ:</strong> <em>contact@framefast.io</em>
       </p>
 
       <h2>2) คำอธิบายบริการ</h2>
@@ -266,7 +266,7 @@ function TermsTh() {
 
       <h2>16) ติดต่อเรา</h2>
       <p>
-        คำถามเกี่ยวกับข้อกำหนดนี้: <em>support@framefast.io</em>
+        คำถามเกี่ยวกับข้อกำหนดนี้: <em>contact@framefast.io</em>
       </p>
     </article>
   );

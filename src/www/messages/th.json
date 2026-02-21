@@ -89,5 +89,58 @@
         "answer": "ได้ ส่งอีเมลไปที่ {email} เพื่อสอบถามราคาและการสนับสนุนสำหรับปริมาณมาก"
       }
     }
+  },
+  "Footer": {
+    "brandDescription": "แพลตฟอร์มแจกจ่ายภาพงานอีเวนต์ด้วย AI จดจำใบหน้า สำหรับช่างภาพและผู้จัดงานอีเวนต์",
+    "product": "Product",
+    "company": "Company",
+    "legal": "Legal",
+    "contact": "Contact",
+    "features": "ฟีเจอร์",
+    "pricing": "ราคา",
+    "compatibility": "ความเข้ากันได้",
+    "cameraSetup": "ตั้งค่ากล้อง",
+    "upload": "อัปโหลด",
+    "faq": "คำถามที่พบบ่อย",
+    "privacy": "นโยบายความเป็นส่วนตัว",
+    "terms": "ข้อกำหนดการใช้งาน",
+    "copyright": "© {year} FrameFast สงวนลิขสิทธิ์"
+  },
+  "Pricing": {
+    "title": "สมัครฟรี รับ {credits} สำหรับงานอีเวนต์จริง",
+    "titleHighlight": "1,000 เครดิต",
+    "subtitle": "<highlight>ใช้แล้วจ่าย</highlight> หลังจากใช้เครดิตฟรีหมด",
+    "cta": "เริ่มทดลองใช้ฟรี",
+    "creditEquivalence": "1 เครดิต = 1 รูป",
+    "uploadRequirements": "รูปแบบไฟล์ที่รองรับ",
+    "uploadFormats": "JPEG, PNG, WebP · 10 MB",
+    "imageRetention": "ระยะเก็บรูป",
+    "imageRetentionValue": "1 เดือน",
+    "creditExpiration": "อายุเครดิต",
+    "creditExpirationValue": "เครดิตที่เติม: 6 เดือน",
+    "topupTiers": "ระดับราคา",
+    "salesCta": "ต้องการราคาสำหรับงานขนาดใหญ่? ติดต่อฝ่ายขาย"
+  },
+  "UploadWay": {
+    "title": "อัปโหลดตามสไตล์คุณ",
+    "subtitle": "เลือกวิธีอัปโหลดที่เหมาะกับงาน ทุกช่องทางเชื่อมต่อเข้าระบบจัดส่งเดียวกัน",
+    "methods": {
+      "ios": {
+        "title": "แอป iOS",
+        "description": "เชื่อมต่อกล้องแบบไร้สาย ถ่ายตามปกติ อัปโหลดซิงค์ในพื้นหลังโดยอัตโนมัติ"
+      },
+      "web": {
+        "title": "อัปโหลดผ่านเว็บ",
+        "description": "ลากวางและอัปโหลดเป็นชุดจากเบราว์เซอร์ที่คุณใช้อยู่"
+      },
+      "desktop": {
+        "title": "โปรแกรมเดสก์ท็อป",
+        "description": "ถ่ายโอนไฟล์จำนวนมากอย่างเสถียรจากเครื่องคอมพิวเตอร์"
+      }
+    },
+    "seeIosApp": "ดูแอป iOS",
+    "compatibleCameras": "กล้องที่รองรับ",
+    "startFreeTrial": "เริ่มทดลองใช้ฟรี",
+    "download": "ดาวน์โหลด"
   }
 }

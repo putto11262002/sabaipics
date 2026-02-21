@@ -30,7 +30,7 @@ function PrivacyPolicyEn() {
       <p>
         <strong>Data Controller:</strong> <em>FrameFast operated by Put Suthisrisinlpa</em>
         <br />
-        <strong>Contact:</strong> <em>support@framefast.io</em>
+        <strong>Contact:</strong> <em>contact@framefast.io</em>
       </p>
 
       <h2 id="data-we-collect">2) Personal data we collect</h2>
@@ -178,7 +178,7 @@ function PrivacyPolicyEn() {
       </p>
       <p>
         Exact retention may vary based on configuration, event lifecycle, and legal requirements. If
-        you need urgent deletion, contact us at <em>support@framefast.io</em> and include any
+        you need urgent deletion, contact us at <em>contact@framefast.io</em> and include any
         relevant details (such as the event name/link and what you want deleted). We will handle
         urgent deletion requests as soon as reasonably possible.
       </p>
@@ -201,7 +201,7 @@ function PrivacyPolicyEn() {
         <li>data portability (where applicable).</li>
       </ul>
       <p>
-        To exercise these rights, contact us at <em>support@framefast.io</em>. We may need to verify
+        To exercise these rights, contact us at <em>contact@framefast.io</em>. We may need to verify
         your identity before responding.
       </p>
 
@@ -229,7 +229,7 @@ function PrivacyPolicyEn() {
 
       <h2 id="contact">14) Contact</h2>
       <p>
-        For privacy questions or requests, contact: <em>support@framefast.io</em>
+        For privacy questions or requests, contact: <em>contact@framefast.io</em>
       </p>
     </article>
   );
@@ -261,7 +261,7 @@ function PrivacyPolicyTh() {
         <strong>ผู้ควบคุมข้อมูลส่วนบุคคล:</strong>{' '}
         <em>FrameFast ดำเนินการโดย Put Suthisrisinlpa</em>
         <br />
-        <strong>ติดต่อ:</strong> <em>support@framefast.io</em>
+        <strong>ติดต่อ:</strong> <em>contact@framefast.io</em>
       </p>
 
       <h2 id="th-data-we-collect">2) ข้อมูลส่วนบุคคลที่เราเก็บรวบรวม</h2>
@@ -398,7 +398,7 @@ function PrivacyPolicyTh() {
         อีเวนต์มักตั้งค่าให้หมดอายุประมาณ 30 วัน และอาจมีช่วงผ่อนผันเพื่อการลบข้อมูลเชิงปฏิบัติการ)
       </p>
       <p>
-        หากต้องการให้ลบข้อมูลแบบเร่งด่วน โปรดติดต่อ <em>support@framefast.io</em>{' '}
+        หากต้องการให้ลบข้อมูลแบบเร่งด่วน โปรดติดต่อ <em>contact@framefast.io</em>{' '}
         พร้อมรายละเอียดที่เกี่ยวข้อง (เช่น ชื่ออีเวนต์/ลิงก์ และข้อมูลที่ต้องการให้ลบ)
         เราจะดำเนินการคำขอลบแบบเร่งด่วนโดยเร็วที่สุดเท่าที่สมควร
       </p>
@@ -421,7 +421,7 @@ function PrivacyPolicyTh() {
         <li>ขอรับหรือโอนย้ายข้อมูล (ตามที่กฎหมายกำหนด)</li>
       </ul>
       <p>
-        หากต้องการใช้สิทธิ โปรดติดต่อ <em>support@framefast.io</em>{' '}
+        หากต้องการใช้สิทธิ โปรดติดต่อ <em>contact@framefast.io</em>{' '}
         โดยเราอาจขอข้อมูลเพิ่มเติมเพื่อยืนยันตัวตนก่อนดำเนินการ
       </p>
 
@@ -445,7 +445,7 @@ function PrivacyPolicyTh() {
 
       <h2 id="th-contact">14) ติดต่อเรา</h2>
       <p>
-        สำหรับคำถามหรือคำขอเกี่ยวกับความเป็นส่วนตัว โปรดติดต่อ: <em>support@framefast.io</em>
+        สำหรับคำถามหรือคำขอเกี่ยวกับความเป็นส่วนตัว โปรดติดต่อ: <em>contact@framefast.io</em>
       </p>
     </article>
   );
