@@ -3,13 +3,13 @@
 import { useTranslations } from 'next-intl';
 
 const FAQ_ITEMS = ['accuracy', 'privacy', 'formats', 'credits', 'upload', 'sales'] as const;
-const SUPPORT_EMAIL = 'support@framefast.io';
+const SALES_EMAIL = 'sales@framefast.io';
 
 export function FaqSection() {
   const t = useTranslations('Faq');
 
   return (
-    <section id="faq" className="scroll-mt-24 py-16">
+    <section id="faq" className="scroll-mt-24 bg-muted/30 py-16">
       <div className="mx-auto max-w-7xl px-4">
         <div className="grid gap-8 lg:grid-cols-12 lg:gap-12">
           <div className="lg:col-span-4">
@@ -35,14 +35,14 @@ export function FaqSection() {
                   <p className="max-w-2xl px-1 pb-6 text-sm leading-6 text-muted-foreground">
                     {item === 'sales' ? (
                       <>
-                        {t(`items.${item}.answer`, { email: SUPPORT_EMAIL }).split('{email}')[0]}
+                        {t(`items.${item}.answer`, { email: SALES_EMAIL }).split('{email}')[0]}
                         <a
                           className="font-medium text-foreground underline-offset-4 hover:underline"
-                          href={`mailto:${SUPPORT_EMAIL}`}
+                          href={`mailto:${SALES_EMAIL}`}
                         >
-                          {SUPPORT_EMAIL}
+                          {SALES_EMAIL}
                         </a>
-                        {t(`items.${item}.answer`, { email: SUPPORT_EMAIL }).split('{email}')[1]}
+                        {t(`items.${item}.answer`, { email: SALES_EMAIL }).split('{email}')[1]}
                       </>
                     ) : (
                       t(`items.${item}.answer`)

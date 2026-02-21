@@ -2,36 +2,13 @@
 
 import { AlertCircle, CheckCircle2, ExternalLink, Hourglass, LoaderCircle, Upload } from 'lucide-react';
 import Image from 'next/image';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { UploadCameraStage } from './upload-camera-stage';
 
-
-type UploadMethod = {
-  title: string;
-  description: string;
-  kind: 'ios' | 'web' | 'desktop';
-};
-
-const uploadMethods: UploadMethod[] = [
-  {
-    title: 'iOS app',
-    description:
-      'Connect to your camera wirelessly, shoot as usual, and keep uploads syncing in the background.',
-    kind: 'ios',
-  },
-  {
-    title: 'Web upload',
-    description: 'Drag, drop, and batch upload from any modern browser.',
-    kind: 'web',
-  },
-  {
-    title: 'Desktop uploader',
-    description: 'Stable large-batch transfer from your workstation.',
-    kind: 'desktop',
-  },
-];
+type UploadMethodKind = 'ios' | 'web' | 'desktop';
+const UPLOAD_METHOD_KINDS: UploadMethodKind[] = ['ios', 'web', 'desktop'];
 
 const CONNECTOR_BAND_HEIGHT = 110;
 const CONNECTOR_START_Y = 0;
@@ -49,7 +26,7 @@ const defaultConnectorLayout: ConnectorLayout = {
   cameraEdges: { left: 580, right: 620 },
 };
 
-function UploadMethodVisual({ kind }: Pick<UploadMethod, 'kind'>) {
+function UploadMethodVisual({ kind }: { kind: UploadMethodKind }) {
   if (kind === 'ios') {
     const rows = [
       { name: 'IMG_2834.JPG', meta: '540 KB · just now', state: 'downloading' as const },
@@ -303,7 +280,7 @@ function UploadMethodVisual({ kind }: Pick<UploadMethod, 'kind'>) {
   );
 }
 
-function UploadMethodCard({ title, description, kind }: UploadMethod) {
+function UploadMethodCard({ kind, t }: { kind: UploadMethodKind; t: ReturnType<typeof useTranslations<'UploadWay'>> }) {
   const locale = useLocale();
   const compatibilityHref = `/${locale}/compatibility`;
 
@@ -312,21 +289,21 @@ function UploadMethodCard({ title, description, kind }: UploadMethod) {
       <UploadMethodVisual kind={kind} />
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col">
-        <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
-        <p className="mt-2 min-h-[3.5rem] text-sm leading-5 text-muted-foreground">{description}</p>
+        <h3 className="text-sm font-semibold tracking-tight">{t(`methods.${kind}.title`)}</h3>
+        <p className="mt-2 min-h-[3.5rem] text-sm leading-5 text-muted-foreground">{t(`methods.${kind}.description`)}</p>
         {kind === 'ios' && (
           <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
             <a
               href="#ios-app"
               className="inline-flex w-fit items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/55"
             >
-              See iOS app
+              {t('seeIosApp')}
             </a>
             <a
               href={compatibilityHref}
               className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
             >
-              Compatible cameras
+              {t('compatibleCameras')}
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>
@@ -337,7 +314,7 @@ function UploadMethodCard({ title, description, kind }: UploadMethod) {
               href="#pricing"
               className="inline-flex w-fit items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/55"
             >
-              Start free trial
+              {t('startFreeTrial')}
             </a>
           </div>
         )}
@@ -347,7 +324,7 @@ function UploadMethodCard({ title, description, kind }: UploadMethod) {
               href="#desktop-app"
               className="inline-flex w-fit items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/55"
             >
-              Download
+              {t('download')}
             </a>
           </div>
         )}
@@ -356,7 +333,7 @@ function UploadMethodCard({ title, description, kind }: UploadMethod) {
   );
 }
 
-function UploadMethodCardMobile({ title, description, kind }: UploadMethod) {
+function UploadMethodCardMobile({ kind, t }: { kind: UploadMethodKind; t: ReturnType<typeof useTranslations<'UploadWay'>> }) {
   const locale = useLocale();
   const compatibilityHref = `/${locale}/compatibility`;
 
@@ -366,21 +343,21 @@ function UploadMethodCardMobile({ title, description, kind }: UploadMethod) {
         <UploadMethodVisual kind={kind} />
       </div>
       <div className="mt-3">
-        <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
-        <p className="mt-2 text-sm leading-5 text-muted-foreground">{description}</p>
+        <h3 className="text-sm font-semibold tracking-tight">{t(`methods.${kind}.title`)}</h3>
+        <p className="mt-2 text-sm leading-5 text-muted-foreground">{t(`methods.${kind}.description`)}</p>
         {kind === 'ios' && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <a
               href="#ios-app"
               className="inline-flex w-fit items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/55"
             >
-              See iOS app
+              {t('seeIosApp')}
             </a>
             <a
               href={compatibilityHref}
               className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
             >
-              Compatible cameras
+              {t('compatibleCameras')}
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>
@@ -390,7 +367,7 @@ function UploadMethodCardMobile({ title, description, kind }: UploadMethod) {
             href="#pricing"
             className="mt-3 inline-flex w-fit items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/55"
           >
-            Start free trial
+            {t('startFreeTrial')}
           </a>
         )}
         {kind === 'desktop' && (
@@ -398,7 +375,7 @@ function UploadMethodCardMobile({ title, description, kind }: UploadMethod) {
             href="#desktop-app"
             className="mt-3 inline-flex w-fit items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/55"
           >
-            Download
+            {t('download')}
           </a>
         )}
       </div>
@@ -467,6 +444,7 @@ function DesktopConnectors({
 }
 
 export function UploadWaySection() {
+  const t = useTranslations('UploadWay');
   const showcaseRef = useRef<HTMLDivElement>(null);
   const connectorAreaRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef<HTMLDivElement>(null);
@@ -589,9 +567,9 @@ export function UploadWaySection() {
     <section id="upload" className="scroll-mt-24 bg-muted/30 pb-16 pt-6 sm:pb-20 sm:pt-8">
       <div className="mx-auto max-w-7xl px-4">
         <div className="max-w-xl">
-        <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Upload your way</h2>
+        <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('title')}</h2>
         <p className="mt-2 text-muted-foreground">
-          Pick the ingest path that fits the job, all feeding one delivery workflow.
+          {t('subtitle')}
         </p>
         </div>
 
@@ -614,14 +592,14 @@ export function UploadWaySection() {
                 <div className="grid grid-cols-3 gap-6 lg:gap-8" style={{ paddingTop: CONNECTOR_BAND_HEIGHT }}> */}
             <div ref={connectorAreaRef}>
               <div className="grid grid-cols-3 gap-6 lg:gap-8">
-                  {uploadMethods.map((method, index) => (
+                  {UPLOAD_METHOD_KINDS.map((kind, index) => (
                     <div
-                      key={method.title}
+                      key={kind}
                       ref={(element) => {
                         cardRefs.current[index] = element;
                       }}
                     >
-                    <UploadMethodCard {...method} />
+                    <UploadMethodCard kind={kind} t={t} />
                   </div>
                 ))}
               </div>
@@ -631,8 +609,8 @@ export function UploadWaySection() {
           </div>
 
           <div className="grid gap-3 md:hidden">
-            {uploadMethods.map((method) => (
-              <UploadMethodCardMobile key={method.title} {...method} />
+            {UPLOAD_METHOD_KINDS.map((kind) => (
+              <UploadMethodCardMobile key={kind} kind={kind} t={t} />
             ))}
           </div>
         </div>

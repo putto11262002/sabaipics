@@ -89,5 +89,58 @@
         "answer": "Yes. Email {email} for volume pricing and support."
       }
     }
+  },
+  "Footer": {
+    "brandDescription": "Event photo distribution with AI-powered face recognition. Made for photographers and event organizers.",
+    "product": "Product",
+    "company": "Company",
+    "legal": "Legal",
+    "contact": "Contact",
+    "features": "Features",
+    "pricing": "Pricing",
+    "compatibility": "Compatibility",
+    "cameraSetup": "Camera Setup",
+    "upload": "Upload",
+    "faq": "FAQ",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "copyright": "© {year} FrameFast. All rights reserved."
+  },
+  "Pricing": {
+    "title": "Sign up free. Get {credits} for real event workloads.",
+    "titleHighlight": "1,000 credits",
+    "subtitle": "<highlight>Pay as you go</highlight> after your free credits are used.",
+    "cta": "Start free trial",
+    "creditEquivalence": "1 credit = 1 image",
+    "uploadRequirements": "Upload requirements",
+    "uploadFormats": "JPEG, PNG, WebP · 10 MB",
+    "imageRetention": "Image retention",
+    "imageRetentionValue": "1 month",
+    "creditExpiration": "Credit expiration",
+    "creditExpirationValue": "Paid top-up credits: 6 months",
+    "topupTiers": "Top-up tiers",
+    "salesCta": "Need high-volume event pricing? Contact sales"
+  },
+  "UploadWay": {
+    "title": "Upload your way",
+    "subtitle": "Pick the ingest path that fits the job, all feeding one delivery workflow.",
+    "methods": {
+      "ios": {
+        "title": "iOS app",
+        "description": "Connect to your camera wirelessly, shoot as usual, and keep uploads syncing in the background."
+      },
+      "web": {
+        "title": "Web upload",
+        "description": "Drag, drop, and batch upload from any modern browser."
+      },
+      "desktop": {
+        "title": "Desktop uploader",
+        "description": "Stable large-batch transfer from your workstation."
+      }
+    },
+    "seeIosApp": "See iOS app",
+    "compatibleCameras": "Compatible cameras",
+    "startFreeTrial": "Start free trial",
+    "download": "Download"
   }
 }

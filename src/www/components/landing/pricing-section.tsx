@@ -1,5 +1,7 @@
+'use client';
+
 import { ArrowRight, ArrowRightLeft } from 'lucide-react';
-import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 
 type TierRow = {
   amount: string;
@@ -211,6 +213,8 @@ function PhotoPrint() {
 }
 
 export function PricingSection() {
+  const t = useTranslations('Pricing');
+
   return (
     <section id="pricing" className="scroll-mt-24 bg-muted/30">
 
@@ -220,15 +224,20 @@ export function PricingSection() {
           <article className="relative flex min-h-[360px] flex-col justify-between p-6 sm:p-8 lg:col-span-6">
             <div>
               <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-                Sign up free. Get{' '}
-                <span className="bg-[linear-gradient(135deg,var(--primary),var(--primary-end))] bg-clip-text text-transparent">
-                  1,000 credits
-                </span>{' '}
-                for real event workloads.
+                {t.rich('title', {
+                  credits: () => (
+                    <span className="bg-[linear-gradient(135deg,var(--primary),var(--primary-end))] bg-clip-text text-transparent">
+                      {t('titleHighlight')}
+                    </span>
+                  ),
+                })}
               </h2>
               <p className="mt-4 max-w-md text-lg text-muted-foreground sm:text-xl">
-                <span className="font-medium text-foreground">Pay as you go</span>{' '}
-                <span>after your free credits are used.</span>
+                {t.rich('subtitle', {
+                  highlight: (chunks) => (
+                    <span className="font-medium text-foreground">{chunks}</span>
+                  ),
+                })}
               </p>
             </div>
 
@@ -237,7 +246,7 @@ export function PricingSection() {
                 href="https://app.framefast.io/sign-up"
                 className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
               >
-                Start free trial
+                {t('cta')}
                 <ArrowRight className="h-4 w-4" />
               </a>
             </div>
@@ -246,7 +255,7 @@ export function PricingSection() {
           <article className="flex min-h-[360px] flex-col border-t border-border/70 p-6 sm:p-7 lg:col-span-3 lg:border-l lg:border-t-0">
             <div className="flex h-full flex-col">
               <p className="text-lg font-medium tracking-tight text-foreground sm:text-xl">
-                1 credit = 1 image
+                {t('creditEquivalence')}
               </p>
 
               <div className="grid h-28 place-items-center py-2">
@@ -261,16 +270,16 @@ export function PricingSection() {
 
               <div className="mt-auto divide-y divide-border/80">
                 <div className="py-3.5">
-                  <p className="text-sm text-muted-foreground">Upload requirements</p>
-                  <p className="text-base text-foreground">JPEG, PNG, WebP · 10 MB</p>
+                  <p className="text-sm text-muted-foreground">{t('uploadRequirements')}</p>
+                  <p className="text-base text-foreground">{t('uploadFormats')}</p>
                 </div>
                 <div className="py-3.5">
-                  <p className="text-sm text-muted-foreground">Image retention</p>
-                  <p className="text-base text-foreground">1 month</p>
+                  <p className="text-sm text-muted-foreground">{t('imageRetention')}</p>
+                  <p className="text-base text-foreground">{t('imageRetentionValue')}</p>
                 </div>
                 <div className="py-3.5">
-                  <p className="text-sm text-muted-foreground">Credit expiration</p>
-                  <p className="text-base text-foreground">Paid top-up credits: 6 months</p>
+                  <p className="text-sm text-muted-foreground">{t('creditExpiration')}</p>
+                  <p className="text-base text-foreground">{t('creditExpirationValue')}</p>
                 </div>
               </div>
             </div>
@@ -279,7 +288,7 @@ export function PricingSection() {
           <article className="flex min-h-[360px] flex-col border-t border-border/70 p-6 sm:p-7 lg:col-span-3 lg:border-l lg:border-t-0">
             <div className="flex h-full flex-col">
               <p className="text-lg font-medium tracking-tight text-foreground sm:text-xl">
-                Top-up tiers
+                {t('topupTiers')}
               </p>
               <div className="grid h-28 place-items-center py-2">
                 <CreditStack />
@@ -318,7 +327,7 @@ export function PricingSection() {
             href="mailto:sales@framefast.io"
             className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
           >
-            Need high-volume event pricing? Contact sales
+            {t('salesCta')}
             <ArrowRight className="h-4 w-4" />
           </a>
         </div>
