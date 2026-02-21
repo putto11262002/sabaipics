@@ -85,8 +85,7 @@ struct EventPickerSheetView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .sabaiCardRow()
-                }
+                                    }
             } header: {
                 Text("Events")
                     .foregroundStyle(Color.Theme.mutedForeground)
@@ -177,8 +176,7 @@ private struct EventPickerSkeletonEventRow: View {
 
             Spacer(minLength: 0)
         }
-        .sabaiCardRow()
-    }
+            }
 }
 
 private struct EventPickerOfflineEventsPlaceholderView: View {

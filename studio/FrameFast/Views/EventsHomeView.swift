@@ -336,8 +336,7 @@ private struct UploadEventStatusRow: View {
 
             UploadEventSyncIndicator(isOnline: isOnline, summary: summary)
         }
-        .sabaiCardRow()
-    }
+            }
 }
 
 private struct UploadEventSyncIndicator: View {
@@ -386,8 +385,7 @@ struct SkeletonEventRow: View {
 
             Spacer(minLength: 0)
         }
-        .sabaiCardRow()
-    }
+            }
 }
 
 struct OfflineEventsPlaceholderView: View {
@@ -446,8 +444,7 @@ struct OfflineEventsPlaceholderView: View {
                     .foregroundStyle(Color.Theme.mutedForeground)
             }
         }
-        .sabaiList()
-    }
+            }
     .padding(.horizontal, 16)
     .padding(.top, 8)
     .background(Color.Theme.background)

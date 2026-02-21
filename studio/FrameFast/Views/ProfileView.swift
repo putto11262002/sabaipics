@@ -44,12 +44,10 @@ struct ProfileView: View {
                             Spacer(minLength: 0)
                         }
                         .padding(.vertical, 4)
-                        .sabaiCardRow()
-                    } else {
+                                            } else {
                         Text("Not signed in")
                             .foregroundStyle(.secondary)
-                            .sabaiCardRow()
-                    }
+                                                }
                 }
 
                 Section {
@@ -64,8 +62,7 @@ struct ProfileView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .sabaiCardRow()
-                    .disabled(!connectivityStore.isOnline)
+                                        .disabled(!connectivityStore.isOnline)
                     .opacity(connectivityStore.isOnline ? 1 : 0.5)
 
                     Button {
@@ -86,8 +83,7 @@ struct ProfileView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .sabaiCardRow()
-                    .disabled(!connectivityStore.isOnline)
+                                        .disabled(!connectivityStore.isOnline)
                     .opacity(connectivityStore.isOnline ? 1 : 0.5)
                 }
 
@@ -103,8 +99,7 @@ struct ProfileView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .sabaiCardRow()
-                    .disabled(!connectivityStore.isOnline)
+                                        .disabled(!connectivityStore.isOnline)
                     .opacity(connectivityStore.isOnline ? 1 : 0.5)
 
                     Button {
@@ -118,8 +113,7 @@ struct ProfileView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .sabaiCardRow()
-                    .disabled(!connectivityStore.isOnline)
+                                        .disabled(!connectivityStore.isOnline)
                     .opacity(connectivityStore.isOnline ? 1 : 0.5)
                 }
             }
