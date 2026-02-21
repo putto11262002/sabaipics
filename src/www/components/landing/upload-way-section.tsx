@@ -1,9 +1,11 @@
 'use client';
 
-import { AlertCircle, CheckCircle2, Hourglass, LoaderCircle, Upload } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ExternalLink, Hourglass, LoaderCircle, Upload } from 'lucide-react';
 import Image from 'next/image';
 import { useLocale } from 'next-intl';
 import { useEffect, useId, useRef, useState } from 'react';
+
+import { UploadCameraStage } from './upload-camera-stage';
 
 
 type UploadMethod = {
@@ -38,11 +40,13 @@ const CONNECTOR_END_Y = CONNECTOR_BAND_HEIGHT;
 type ConnectorLayout = {
   width: number;
   endpoints: [number, number, number];
+  cameraEdges: { left: number; right: number };
 };
 
 const defaultConnectorLayout: ConnectorLayout = {
   width: 1200,
   endpoints: [200, 600, 1000],
+  cameraEdges: { left: 580, right: 620 },
 };
 
 function UploadMethodVisual({ kind }: Pick<UploadMethod, 'kind'>) {
@@ -320,9 +324,10 @@ function UploadMethodCard({ title, description, kind }: UploadMethod) {
             </a>
             <a
               href={compatibilityHref}
-              className="inline-flex w-fit items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/55 hover:text-foreground"
+              className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
             >
               Compatible cameras
+              <ExternalLink className="h-3 w-3" />
             </a>
           </div>
         )}
@@ -373,9 +378,10 @@ function UploadMethodCardMobile({ title, description, kind }: UploadMethod) {
             </a>
             <a
               href={compatibilityHref}
-              className="inline-flex w-fit items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/55 hover:text-foreground"
+              className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
             >
               Compatible cameras
+              <ExternalLink className="h-3 w-3" />
             </a>
           </div>
         )}
@@ -427,54 +433,34 @@ function FlowToken({ pathId, begin, dur }: FlowTokenProps) {
 function DesktopConnectors({
   width,
   endpoints,
+  cameraEdges,
   prefersReducedMotion,
 }: ConnectorLayout & { prefersReducedMotion: boolean }) {
   const uid = useId().replace(/:/g, '');
-  const [leftX, middleX, rightX] = endpoints;
-  const rootX = width / 2;
-  const splitY = 12;
-  const baseCorner = 12;
-  const leftCorner = Math.max(4, Math.min(baseCorner, Math.abs(rootX - leftX) - 2));
-  const rightCorner = Math.max(4, Math.min(baseCorner, Math.abs(rightX - rootX) - 2));
+  const [, middleX] = endpoints;
+  const { left: cameraLeft, right: cameraRight } = cameraEdges;
 
-  const leftPath = `M ${rootX} ${splitY}
-    L ${leftX + leftCorner} ${splitY}
-    Q ${leftX} ${splitY} ${leftX} ${splitY + leftCorner}
-    L ${leftX} ${CONNECTOR_END_Y}`;
-  const middlePath = `M ${rootX} ${splitY} L ${middleX} ${CONNECTOR_END_Y}`;
-  const rightPath = `M ${rootX} ${splitY}
-    L ${rightX - rightCorner} ${splitY}
-    Q ${rightX} ${splitY} ${rightX} ${splitY + rightCorner}
-    L ${rightX} ${CONNECTOR_END_Y}`;
-
-  const leftId = `${uid}-left`;
+  // Middle path: from center bottom of camera, straight down
+  const cameraCenterX = (cameraLeft + cameraRight) / 2;
+  const middlePath = `M ${cameraCenterX} 0 L ${middleX} ${CONNECTOR_END_Y}`;
   const middleId = `${uid}-middle`;
-  const rightId = `${uid}-right`;
 
   return (
     <svg
       className="pointer-events-none absolute inset-x-0 top-0 w-full overflow-visible"
       style={{ height: CONNECTOR_BAND_HEIGHT, overflow: 'visible' }}
-      viewBox={`0 ${CONNECTOR_START_Y} ${Math.max(1, width)} ${CONNECTOR_BAND_HEIGHT - CONNECTOR_START_Y}`}
+      viewBox={`0 0 ${Math.max(1, width)} ${CONNECTOR_BAND_HEIGHT}`}
       preserveAspectRatio="none"
       aria-hidden="true"
     >
       <defs>
-        <path id={leftId} d={leftPath} />
         <path id={middleId} d={middlePath} />
-        <path id={rightId} d={rightPath} />
       </defs>
 
-      <use href={`#${leftId}`} fill="none" stroke="var(--muted-foreground)" strokeWidth="1.4" strokeLinecap="round" opacity="0.3" />
       <use href={`#${middleId}`} fill="none" stroke="var(--muted-foreground)" strokeWidth="1.4" strokeLinecap="round" opacity="0.3" />
-      <use href={`#${rightId}`} fill="none" stroke="var(--muted-foreground)" strokeWidth="1.4" strokeLinecap="round" opacity="0.3" />
 
       {!prefersReducedMotion && (
-        <>
-          <FlowToken pathId={leftId} begin="-0.2s" dur="4.2s" />
-          <FlowToken pathId={middleId} begin="-1.4s" dur="4.0s" />
-          <FlowToken pathId={rightId} begin="-2.2s" dur="4.4s" />
-        </>
+        <FlowToken pathId={middleId} begin="-1.4s" dur="4.0s" />
       )}
     </svg>
   );
@@ -483,6 +469,7 @@ function DesktopConnectors({
 export function UploadWaySection() {
   const showcaseRef = useRef<HTMLDivElement>(null);
   const connectorAreaRef = useRef<HTMLDivElement>(null);
+  const cameraRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [connectorLayout, setConnectorLayout] = useState<ConnectorLayout>(defaultConnectorLayout);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -531,9 +518,21 @@ export function UploadWaySection() {
   useEffect(() => {
     const updateLayout = () => {
       const connectorArea = connectorAreaRef.current;
+      const camera = cameraRef.current;
       if (!connectorArea) return;
 
       const areaRect = connectorArea.getBoundingClientRect();
+
+      // Measure camera edges relative to connector area
+      let cameraEdges = { left: areaRect.width / 2 - 60, right: areaRect.width / 2 + 60 };
+      if (camera) {
+        const cameraRect = camera.getBoundingClientRect();
+        cameraEdges = {
+          left: cameraRect.left - areaRect.left,
+          right: cameraRect.right - areaRect.left,
+        };
+      }
+
       const points = cardRefs.current
         .slice(0, 3)
         .map((card) => {
@@ -548,6 +547,7 @@ export function UploadWaySection() {
       const nextLayout: ConnectorLayout = {
         width: Math.max(areaRect.width, 1),
         endpoints: [points[0], points[1], points[2]],
+        cameraEdges,
       };
 
       setConnectorLayout((prevLayout) => {
@@ -555,7 +555,10 @@ export function UploadWaySection() {
         const endpointsStable = prevLayout.endpoints.every(
           (value, index) => Math.abs(value - nextLayout.endpoints[index]) < 0.5,
         );
-        return widthStable && endpointsStable ? prevLayout : nextLayout;
+        const cameraStable =
+          Math.abs(prevLayout.cameraEdges.left - nextLayout.cameraEdges.left) < 0.5 &&
+          Math.abs(prevLayout.cameraEdges.right - nextLayout.cameraEdges.right) < 0.5;
+        return widthStable && endpointsStable && cameraStable ? prevLayout : nextLayout;
       });
     };
 
@@ -563,6 +566,10 @@ export function UploadWaySection() {
 
     if (connectorAreaRef.current) {
       observer.observe(connectorAreaRef.current);
+    }
+
+    if (cameraRef.current) {
+      observer.observe(cameraRef.current);
     }
 
     cardRefs.current.forEach((card) => {
@@ -579,9 +586,9 @@ export function UploadWaySection() {
   }, []);
 
   return (
-    <section id="upload" className="scroll-mt-24 pb-16 pt-10 sm:pb-20 sm:pt-12">
+    <section id="upload" className="scroll-mt-24 bg-muted/30 pb-16 pt-6 sm:pb-20 sm:pt-8">
       <div className="mx-auto max-w-7xl px-4">
-        <div className="mx-auto max-w-3xl text-center">
+        <div className="max-w-xl">
         <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Upload your way</h2>
         <p className="mt-2 text-muted-foreground">
           Pick the ingest path that fits the job, all feeding one delivery workflow.
@@ -597,22 +604,16 @@ export function UploadWaySection() {
           ].join(' ')}
         >
           <div className="hidden md:block">
-            <div className="mx-auto w-full max-w-[112px] lg:max-w-[132px]">
-              <Image
-                src="/landing/camera-illustration.png"
-                alt="Camera illustration"
-              width={699}
-              height={574}
-              sizes="(min-width: 1024px) 132px, 112px"
-              className="h-auto w-full"
-              priority
-            />
-          </div>
+            {/* <div ref={cameraRef} className="mx-auto w-full max-w-[160px] lg:max-w-[200px]">
+              <UploadCameraStage />
+            </div>
 
             <div ref={connectorAreaRef} className="-mt-2 overflow-visible">
               <div className="relative overflow-visible">
                 <DesktopConnectors {...connectorLayout} prefersReducedMotion={prefersReducedMotion} />
-                <div className="grid grid-cols-3 gap-6 lg:gap-8" style={{ paddingTop: CONNECTOR_BAND_HEIGHT }}>
+                <div className="grid grid-cols-3 gap-6 lg:gap-8" style={{ paddingTop: CONNECTOR_BAND_HEIGHT }}> */}
+            <div ref={connectorAreaRef}>
+              <div className="grid grid-cols-3 gap-6 lg:gap-8">
                   {uploadMethods.map((method, index) => (
                     <div
                       key={method.title}
@@ -624,8 +625,9 @@ export function UploadWaySection() {
                   </div>
                 ))}
               </div>
-              </div>
             </div>
+            {/* </div>
+            </div> */}
           </div>
 
           <div className="grid gap-3 md:hidden">
