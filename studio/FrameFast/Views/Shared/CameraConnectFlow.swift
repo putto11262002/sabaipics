@@ -3,7 +3,7 @@
 //
 //  Unified camera connection flow for all manufacturers.
 //
-//  New connection:  Setup → Upload Mode → Event Selection → (real-time → Guide → Discovery | offline → Discovery) → Persist
+//  New connection:  Setup → Event Selection → Upload Mode → (real-time → probe → Guide/Discovery | offline → Discovery) → Persist
 //  Reconnect:       Event Selection → Discovery → Persist
 
 import SwiftUI
@@ -64,8 +64,8 @@ enum CameraConnectStartMode: Equatable {
 struct CameraConnectFlow<Setup: View>: View {
     private enum Step: Equatable {
         case setup
-        case uploadMode
         case eventSelection
+        case uploadMode
         case connectivityGuide
         case discovery(preferredRecordID: String?)
     }
@@ -98,9 +98,10 @@ struct CameraConnectFlow<Setup: View>: View {
     var body: some View {
         Group {
             switch step {
+            // MARK: Step 1 — Setup (manufacturer-specific WiFi join)
             case .setup:
                 setup(
-                    { step = .uploadMode },
+                    { step = .eventSelection },
                     $persistenceSSID,
                     $persistenceCameraId
                 )
@@ -117,43 +118,7 @@ struct CameraConnectFlow<Setup: View>: View {
                     }
                 }
 
-            case .uploadMode:
-                UploadModePickerView(
-                    onRealTime: {
-                        isRealTimeMode = true
-                        step = .eventSelection
-                    },
-                    onOffline: {
-                        isRealTimeMode = false
-                        step = .eventSelection
-                    }
-                )
-                .navigationTitle("Upload Mode")
-                .navigationBarTitleDisplayMode(.large)
-                .navigationBarBackButtonHidden(true)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button {
-                            step = .setup
-                        } label: {
-                            Image(systemName: "chevron.left")
-                                .fontWeight(.semibold)
-                                .foregroundStyle(Color.Theme.primary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            onCancel()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.Theme.primary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
+            // MARK: Step 2 — Event Selection (while still online)
             case .eventSelection:
                 EventSelectionStepView(
                     preselectedEventId: coordinator.selectedEventId,
@@ -162,11 +127,7 @@ struct CameraConnectFlow<Setup: View>: View {
                         selectedEventName = eventName
                         switch startMode {
                         case .new:
-                            if isRealTimeMode {
-                                step = .connectivityGuide
-                            } else {
-                                step = .discovery(preferredRecordID: nil)
-                            }
+                            step = .uploadMode
                         case .reconnect(let recordID):
                             step = .discovery(preferredRecordID: recordID)
                         }
@@ -179,7 +140,7 @@ struct CameraConnectFlow<Setup: View>: View {
                     ToolbarItem(placement: .navigationBarLeading) {
                         if startMode == .new {
                             Button {
-                                step = .uploadMode
+                                step = .setup
                             } label: {
                                 Image(systemName: "chevron.left")
                                     .fontWeight(.semibold)
@@ -200,20 +161,26 @@ struct CameraConnectFlow<Setup: View>: View {
                     }
                 }
 
-            case .connectivityGuide:
-                ConnectivityGuideFlow(
-                    isOnline: connectivityStore.isOnline,
-                    ipAddress: WiFiNetworkInfo.currentWiFiIPv4()?.ipString ?? "192.168.1.10",
-                    subnetMask: WiFiNetworkInfo.currentWiFiIPv4()?.netmaskString ?? "255.255.255.0",
-                    onSkip: {
+            // MARK: Step 3 — Upload Mode
+            case .uploadMode:
+                UploadModePickerView(
+                    onRealTime: {
+                        isRealTimeMode = true
+                    },
+                    onOffline: {
+                        isRealTimeMode = false
                         step = .discovery(preferredRecordID: nil)
                     },
-                    onDone: {
-                        step = .discovery(preferredRecordID: nil)
+                    onProbeResult: { isOnline in
+                        if isOnline {
+                            step = .discovery(preferredRecordID: nil)
+                        } else {
+                            step = .connectivityGuide
+                        }
                     }
                 )
-                .navigationTitle(config.navigationTitle)
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationTitle("Upload Mode")
+                .navigationBarTitleDisplayMode(.large)
                 .navigationBarBackButtonHidden(true)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
@@ -238,6 +205,46 @@ struct CameraConnectFlow<Setup: View>: View {
                     }
                 }
 
+            // MARK: Step 4 — Connectivity Guide (real-time only, when offline)
+            case .connectivityGuide:
+                ConnectivityGuideFlow(
+                    isOnline: connectivityStore.isOnline,
+                    ipAddress: WiFiNetworkInfo.currentWiFiIPv4()?.ipString ?? "192.168.1.10",
+                    subnetMask: WiFiNetworkInfo.currentWiFiIPv4()?.netmaskString ?? "255.255.255.0",
+                    onSkip: {
+                        step = .discovery(preferredRecordID: nil)
+                    },
+                    onDone: {
+                        step = .discovery(preferredRecordID: nil)
+                    }
+                )
+                .navigationTitle(config.navigationTitle)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarBackButtonHidden(true)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            step = .uploadMode
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.Theme.primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            onCancel()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.Theme.primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+            // MARK: Step 5 — Discovery (scan for camera)
             case .discovery(let preferredRecordID):
                 let preferredIP: String? = {
                     guard let preferredRecordID else { return nil }
@@ -256,7 +263,11 @@ struct CameraConnectFlow<Setup: View>: View {
                     onBack: {
                         switch startMode {
                         case .new:
-                            step = .eventSelection
+                            if isRealTimeMode {
+                                step = .connectivityGuide
+                            } else {
+                                step = .uploadMode
+                            }
                         case .reconnect:
                             onCancel()
                         }
