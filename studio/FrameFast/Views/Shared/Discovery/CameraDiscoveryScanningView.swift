@@ -10,31 +10,33 @@ struct CameraDiscoveryScanningView: View {
     let title: String
     let message: String
 
+    @State private var sweep = false
+
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 50))
-                .foregroundColor(Color.Theme.mutedForeground.opacity(0.6))
-
-            VStack(spacing: 10) {
-                Text(title)
-                    .font(.title3)
-                    .fontWeight(.medium)
-
-                if !message.isEmpty {
-                    Text(message)
-                        .font(.subheadline)
-                        .foregroundColor(Color.Theme.mutedForeground)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            if !message.isEmpty {
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundColor(Color.Theme.mutedForeground)
+                    .padding(.horizontal, 20)
             }
 
             Spacer()
+
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 48))
+                .foregroundColor(Color.Theme.mutedForeground.opacity(0.6))
+                .offset(x: sweep ? 24 : -24, y: sweep ? -8 : 8)
+                .rotationEffect(.degrees(sweep ? 12 : -12))
+                .animation(
+                    .easeInOut(duration: 1.8).repeatForever(autoreverses: true),
+                    value: sweep
+                )
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { sweep = true }
     }
 }
 

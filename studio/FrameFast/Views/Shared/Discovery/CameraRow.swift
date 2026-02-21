@@ -43,3 +43,33 @@ struct CameraRow: View {
         }
     }
 }
+
+#if DEBUG
+
+#Preview("Camera Row") {
+    CameraRow(
+        camera: DiscoveredCamera(
+            name: "Canon EOS R5",
+            ipAddress: "192.168.1.2",
+            connectionNumber: 1,
+            session: nil
+        ),
+        onSelect: {}
+    )
+    .padding()
+}
+
+#Preview("Camera Row — Active Session") {
+    CameraRow(
+        camera: DiscoveredCamera(
+            name: "Nikon Z8",
+            ipAddress: "192.168.1.3",
+            connectionNumber: 2,
+            session: nil
+        ),
+        onSelect: {}
+    )
+    .padding()
+}
+
+#endif
