@@ -82,8 +82,7 @@ struct EventSelectionStepView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .sabaiCardRow()
-                }
+                                    }
             } header: {
                 Text("Events")
                     .foregroundStyle(Color.Theme.mutedForeground)
@@ -106,8 +105,7 @@ struct EventSelectionStepView: View {
                             .foregroundStyle(Color.Theme.foreground)
                         Spacer(minLength: 0)
                     }
-                    .sabaiCardRow()
-                }
+                                    }
             } header: {
                 Text("Events")
                     .foregroundStyle(Color.Theme.mutedForeground)

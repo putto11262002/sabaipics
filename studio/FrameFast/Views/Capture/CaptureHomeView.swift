@@ -25,16 +25,14 @@ struct CaptureHomeView: View {
                     Section {
                         Text("Disconnect the current camera to connect another.")
                             .foregroundStyle(Color.Theme.mutedForeground)
-                            .sabaiCardRow()
-                    }
+                                                }
                 }
 
                 Section("Recent cameras") {
                     if recentCameras.isEmpty {
                         Text("No recent cameras yet")
                             .foregroundStyle(.secondary)
-                            .sabaiCardRow()
-                    } else {
+                                                } else {
                         ForEach(recentCameras) { record in
                             Button {
                                 onReconnect(record.manufacturer, record.id)
@@ -59,8 +57,7 @@ struct CaptureHomeView: View {
                             }
                             .disabled(isConnectionMuted)
                             .buttonStyle(.plain)
-                            .sabaiCardRow()
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
                                     onRemoveRecent(record.manufacturer, record.id)
                                 } label: {
