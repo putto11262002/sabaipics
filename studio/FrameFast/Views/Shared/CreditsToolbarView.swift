@@ -32,6 +32,8 @@ struct CreditsToolbarView: View {
                         .contentTransition(.numericText())
                         .animation(.default, value: balance)
                 }
+                .fixedSize()
+                .padding(.horizontal, 6)
                 .accessibilityLabel("\(balance) credits")
             }
 
@@ -50,5 +52,7 @@ struct CreditsToolbarView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.Theme.mutedForeground)
         }
+        .fixedSize()
+        .padding(.horizontal, 6)
     }
 }

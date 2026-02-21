@@ -11,29 +11,18 @@ struct ConnectivityStatusToolbarView: View {
 
         switch status {
         case .pending:
-            HStack(spacing: 6) {
-                ProgressView()
-                    .controlSize(.mini)
-                Text("Checking...")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.Theme.mutedForeground)
-            }
-            .accessibilityLabel("Checking connectivity")
+            ProgressView()
+                .controlSize(.mini)
+                .accessibilityLabel("Checking connectivity")
         case .online, .offline:
             let isOnline = status == .online
-            let leftText = isOnline ? "Online" : "Offline"
             let interfaceIcon = interfaceIconName(isOnline: isOnline, interface: connectivityStore.state.interface)
             let interfaceTint: Color = isOnline ? Color.Theme.success : Color.Theme.warning
 
-            HStack(spacing: 6) {
-                Image(systemName: interfaceIcon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(interfaceTint)
-                Text(leftText)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.Theme.foreground)
-            }
-            .accessibilityLabel(leftText)
+            Image(systemName: interfaceIcon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(interfaceTint)
+                .accessibilityLabel(isOnline ? "Online" : "Offline")
         }
     }
 
