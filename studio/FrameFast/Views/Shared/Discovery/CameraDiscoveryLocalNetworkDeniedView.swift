@@ -18,41 +18,38 @@ struct CameraDiscoveryLocalNetworkDeniedView: View {
     let onRetry: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: 0) {
+            if !message.isEmpty {
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundColor(Color.Theme.mutedForeground)
+                    .padding(.horizontal, 20)
+            }
+
+            if !bullets.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(bullets, id: \.self) { bullet in
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("-")
+                                .foregroundColor(Color.Theme.mutedForeground)
+                            Text(bullet)
+                                .foregroundColor(Color.Theme.mutedForeground)
+                        }
+                        .font(.subheadline)
+                    }
+                }
+                .padding(.top, 12)
+                .padding(.horizontal, 20)
+            }
+
             Spacer()
 
             Image(systemName: "lock.shield")
-                .font(.system(size: 50))
+                .font(.system(size: 32))
                 .foregroundColor(Color.Theme.mutedForeground.opacity(0.6))
+                .frame(maxWidth: .infinity, alignment: .center)
 
-            VStack(spacing: 10) {
-                Text(title)
-                    .font(.title3)
-                    .fontWeight(.medium)
-
-                if !message.isEmpty {
-                    Text(message)
-                        .font(.subheadline)
-                        .foregroundColor(Color.Theme.mutedForeground)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
-
-                if !bullets.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(bullets, id: \.self) { bullet in
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("-")
-                                    .foregroundColor(Color.Theme.mutedForeground)
-                                Text(bullet)
-                                    .foregroundColor(Color.Theme.mutedForeground)
-                            }
-                            .font(.subheadline)
-                        }
-                    }
-                    .padding(.horizontal, 40)
-                }
-            }
+            Spacer()
 
             VStack(spacing: 10) {
                 Button("Open Settings") {
@@ -66,11 +63,10 @@ struct CameraDiscoveryLocalNetworkDeniedView: View {
                 .font(.subheadline)
                 .foregroundColor(Color.Theme.mutedForeground)
             }
-            .padding(.top, 8)
-
-            Spacer()
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 24)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func openSettings() {
