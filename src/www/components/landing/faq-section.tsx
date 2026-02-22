@@ -1,12 +1,10 @@
-'use client';
-
-import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
 
 const FAQ_ITEMS = ['accuracy', 'privacy', 'formats', 'credits', 'upload', 'sales'] as const;
 const SALES_EMAIL = 'sales@framefast.io';
 
-export function FaqSection() {
-  const t = useTranslations('Faq');
+export async function FaqSection() {
+  const t = await getTranslations('Faq');
 
   return (
     <section id="faq" className="scroll-mt-24 bg-muted/30 py-16">
