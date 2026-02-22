@@ -107,8 +107,7 @@
     "copyright": "© {year} FrameFast. All rights reserved."
   },
   "Pricing": {
-    "title": "Sign up free. Get {credits} for real event workloads.",
-    "titleHighlight": "1,000 credits",
+    "title": "Sign up free. Get <credits>1,000 credits</credits> for real event workloads.",
     "subtitle": "<highlight>Pay as you go</highlight> after your free credits are used.",
     "cta": "Start free trial",
     "creditEquivalence": "1 credit = 1 image",

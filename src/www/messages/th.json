@@ -107,8 +107,7 @@
     "copyright": "© {year} FrameFast สงวนลิขสิทธิ์"
   },
   "Pricing": {
-    "title": "สมัครฟรี รับ {credits} สำหรับงานอีเวนต์จริง",
-    "titleHighlight": "1,000 เครดิต",
+    "title": "สมัครฟรี รับ <credits>1,000 เครดิต</credits> สำหรับงานอีเวนต์จริง",
     "subtitle": "<highlight>ใช้แล้วจ่าย</highlight> หลังจากใช้เครดิตฟรีหมด",
     "cta": "เริ่มทดลองใช้ฟรี",
     "creditEquivalence": "1 เครดิต = 1 รูป",
