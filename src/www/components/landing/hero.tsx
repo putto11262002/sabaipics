@@ -82,7 +82,7 @@ export function LandingHero() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1, ease: [0.2, 0.8, 0.2, 1] }}
-            className="relative mx-auto mt-4 max-w-[780px] px-3 pb-6 sm:mt-6 sm:px-6 sm:pb-8 lg:max-w-[720px]"
+            className="relative mx-auto mt-4 max-w-[340px] px-3 pb-6 sm:mt-6 sm:max-w-[780px] sm:px-6 sm:pb-8 lg:max-w-[720px]"
           >
             <HeroEventStage className="mx-auto" />
           </motion.div>
