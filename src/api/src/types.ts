@@ -9,6 +9,8 @@ export type Bindings = Cloudflare.Env & {
   FTP_JWT_SECRET_PREVIOUS?: string;
   DESKTOP_ACCESS_JWT_SECRET: string;
   DESKTOP_REFRESH_TOKEN_PEPPER: string;
+  CF_ACCESS_TEAM_DOMAIN: string;
+  CF_ACCESS_AUD: string;
 };
 
 export type Variables = AuthVariables & {

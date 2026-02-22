@@ -9,14 +9,11 @@ type UseAdminMutationOptions<TData, TVariables> = {
   apiFn: (input: TVariables, opts: ClientOpts) => Promise<ClientResponse<any>>;
 } & Omit<UseMutationOptions<TData, RequestError, TVariables>, 'mutationFn'>;
 
-// TODO: Replace with CF Access JWT when wired up
-const ADMIN_API_KEY = 'admin-dev-key-change-in-production';
-
 /**
  * Admin variant of useApiMutation.
  *
- * Injects `X-Admin-API-Key` header instead of Clerk Bearer token.
- * When CF Access JWT replaces the API key, only this file changes.
+ * Behind CF Access, the `Cf-Access-Jwt-Assertion` cookie/header is sent
+ * automatically by the browser — no manual header injection needed.
  */
 export function useAdminMutation<TData, TVariables>(
   options: UseAdminMutationOptions<TData, TVariables>,
@@ -26,11 +23,8 @@ export function useAdminMutation<TData, TVariables>(
   return useMutation<TData, RequestError, TVariables>({
     ...rest,
     mutationFn: async (input) => {
-      const headers: Record<string, string> = {
-        'X-Admin-API-Key': ADMIN_API_KEY,
-      };
       try {
-        return (await parseResponse(apiFn(input, { headers }))) as TData;
+        return (await parseResponse(apiFn(input, { headers: {} }))) as TData;
       } catch (e) {
         throw toRequestError(e);
       }

@@ -50,9 +50,11 @@ STRIPE_SECRET_KEY=sk_test_xxxxx
 # Format: whsec_xxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxx
 
-# Admin API Key (for admin routes)
-# Generate a secure random string for admin operations
-ADMIN_API_KEY=admin-dev-key-change-in-production
+# Cloudflare Access (admin dashboard auth)
+# These are non-secret vars set in wrangler.api.jsonc.
+# Listed here for documentation only — no .dev.vars override needed.
+# CF_ACCESS_TEAM_DOMAIN=https://framefast.cloudflareaccess.com
+# CF_ACCESS_AUD=<AUD tag from CF Access dashboard>
 
 # Desktop uploader auth (SabaiPics-issued desktop session)
 # - DESKTOP_ACCESS_JWT_SECRET: HS256 signing secret for short-lived desktop access JWTs

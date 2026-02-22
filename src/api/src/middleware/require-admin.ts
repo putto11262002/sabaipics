@@ -1,14 +1,17 @@
 import type { MiddlewareHandler, TypedResponse } from "hono";
 import { AuthErrorResponse, createAuthError } from "@/auth/errors";
+import { verifyCfAccessToken } from "../lib/cf-access/jwt";
 import type { Env } from "../types";
 
 /**
- * Middleware that requires admin API key authentication.
+ * Middleware that requires Cloudflare Access JWT authentication.
  *
- * Checks X-Admin-API-Key header against ADMIN_API_KEY env binding.
- * This bypasses Clerk auth - admin endpoints use API key auth only.
+ * In production/staging, verifies the `Cf-Access-Jwt-Assertion` header
+ * against the CF Access JWKS endpoint.
  *
- * @returns 401 if API key is missing or invalid
+ * In development, skips JWT verification (no CF Access locally).
+ *
+ * @returns 401 if JWT is missing or invalid
  */
 export function requireAdmin(): MiddlewareHandler<
   Env,
@@ -17,18 +20,29 @@ export function requireAdmin(): MiddlewareHandler<
   TypedResponse<AuthErrorResponse, 401, "json">
 > {
   return async (c, next) => {
-    const apiKey = c.req.header("X-Admin-API-Key");
+    // Dev bypass — no CF Access tunnel locally
+    if (c.env.NODE_ENV === "development") {
+      return next();
+    }
 
-    if (!apiKey) {
+    const token = c.req.header("Cf-Access-Jwt-Assertion");
+
+    if (!token) {
       return c.json(
-        createAuthError("UNAUTHENTICATED", "Admin API key required"),
+        createAuthError("UNAUTHENTICATED", "CF Access token required"),
         401,
       );
     }
 
-    if (apiKey !== c.env.ADMIN_API_KEY) {
+    try {
+      await verifyCfAccessToken(
+        token,
+        c.env.CF_ACCESS_TEAM_DOMAIN,
+        c.env.CF_ACCESS_AUD,
+      );
+    } catch {
       return c.json(
-        createAuthError("UNAUTHENTICATED", "Invalid admin API key"),
+        createAuthError("UNAUTHENTICATED", "Invalid CF Access token"),
         401,
       );
     }

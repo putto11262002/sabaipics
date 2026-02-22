@@ -10,14 +10,11 @@ type UseAdminQueryOptions<TData> = {
   apiFn: (opts: ClientOpts) => Promise<ClientResponse<any>>;
 } & Omit<UseQueryOptions<TData, RequestError>, 'queryKey' | 'queryFn'>;
 
-// TODO: Replace with CF Access JWT when wired up
-const ADMIN_API_KEY = 'admin-dev-key-change-in-production';
-
 /**
  * Admin variant of useApiQuery.
  *
- * Injects `X-Admin-API-Key` header instead of Clerk Bearer token.
- * When CF Access JWT replaces the API key, only this file changes.
+ * Behind CF Access, the `Cf-Access-Jwt-Assertion` cookie/header is sent
+ * automatically by the browser — no manual header injection needed.
  */
 export function useAdminQuery<TData>(options: UseAdminQueryOptions<TData>) {
   const { apiFn, ...rest } = options;
@@ -25,11 +22,8 @@ export function useAdminQuery<TData>(options: UseAdminQueryOptions<TData>) {
   return useQuery<TData, RequestError>({
     ...rest,
     queryFn: async () => {
-      const headers: Record<string, string> = {
-        'X-Admin-API-Key': ADMIN_API_KEY,
-      };
       try {
-        return (await parseResponse(apiFn({ headers }))) as TData;
+        return (await parseResponse(apiFn({ headers: {} }))) as TData;
       } catch (e) {
         throw toRequestError(e);
       }

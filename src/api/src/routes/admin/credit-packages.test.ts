@@ -15,8 +15,6 @@ import type { Database } from "@/db";
 // Test Setup
 // =============================================================================
 
-const TEST_API_KEY = "test-admin-key";
-
 // Mock credit package data - use valid UUIDs
 const MOCK_UUID_1 = "11111111-1111-1111-1111-111111111111";
 const MOCK_UUID_2 = "22222222-2222-2222-2222-222222222222";
@@ -66,11 +64,16 @@ function createBaseMockDb() {
 }
 
 // Create test app with mock DB
+// Uses NODE_ENV=development so requireAdmin() dev-bypasses JWT verification
 function createTestApp(
   mockDb: ReturnType<typeof createMockDb> = createMockDb(),
 ) {
   type Env = {
-    Bindings: { ADMIN_API_KEY: string };
+    Bindings: {
+      NODE_ENV: string;
+      CF_ACCESS_TEAM_DOMAIN: string;
+      CF_ACCESS_AUD: string;
+    };
     Variables: { db: () => Database };
   };
 
@@ -83,53 +86,21 @@ function createTestApp(
 }
 
 const MOCK_ENV = {
-  ADMIN_API_KEY: TEST_API_KEY,
+  NODE_ENV: "development",
+  CF_ACCESS_TEAM_DOMAIN: "https://test.cloudflareaccess.com",
+  CF_ACCESS_AUD: "test-aud",
 };
 
 // =============================================================================
-// Auth Tests
+// Auth Tests (dev bypass — JWT skipped in NODE_ENV=development)
 // =============================================================================
 
 describe("Admin Auth", () => {
-  it("rejects request without API key", async () => {
+  it("allows requests in development mode (dev bypass)", async () => {
     const app = createTestApp();
     const client = testClient(app, MOCK_ENV);
 
     const res = await client["credit-packages"].$get();
-
-    expect(res.status).toBe(401);
-    const body = await res.json();
-    if ("error" in body) {
-      expect(body.error.code).toBe("UNAUTHENTICATED");
-    } else {
-      throw new Error("Expected error response");
-    }
-  });
-
-  it("rejects request with invalid API key", async () => {
-    const app = createTestApp();
-    const client = testClient(app, MOCK_ENV);
-
-    const res = await client["credit-packages"].$get(undefined, {
-      headers: { "X-Admin-API-Key": "wrong-key" },
-    });
-
-    expect(res.status).toBe(401);
-    const body = await res.json();
-    if ("error" in body) {
-      expect(body.error.code).toBe("UNAUTHENTICATED");
-    } else {
-      throw new Error("Expected error response");
-    }
-  });
-
-  it("accepts request with valid API key", async () => {
-    const app = createTestApp();
-    const client = testClient(app, MOCK_ENV);
-
-    const res = await client["credit-packages"].$get(undefined, {
-      headers: { "X-Admin-API-Key": TEST_API_KEY },
-    });
 
     expect(res.status).toBe(200);
   });
@@ -145,9 +116,7 @@ describe("GET /credit-packages", () => {
     const app = createTestApp(mockDb);
     const client = testClient(app, MOCK_ENV);
 
-    const res = await client["credit-packages"].$get(undefined, {
-      headers: { "X-Admin-API-Key": TEST_API_KEY },
-    });
+    const res = await client["credit-packages"].$get();
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -165,9 +134,7 @@ describe("GET /credit-packages", () => {
     const app = createTestApp(mockDb);
     const client = testClient(app, MOCK_ENV);
 
-    const res = await client["credit-packages"].$get(undefined, {
-      headers: { "X-Admin-API-Key": TEST_API_KEY },
-    });
+    const res = await client["credit-packages"].$get();
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -200,20 +167,15 @@ describe("POST /credit-packages", () => {
     const app = createTestApp(mockDb);
     const client = testClient(app, MOCK_ENV);
 
-    const res = await client["credit-packages"].$post(
-      {
-        json: {
-          name: "New Package",
-          credits: 200,
-          priceThb: 499,
-          active: false,
-          sortOrder: 5,
-        },
+    const res = await client["credit-packages"].$post({
+      json: {
+        name: "New Package",
+        credits: 200,
+        priceThb: 499,
+        active: false,
+        sortOrder: 5,
       },
-      {
-        headers: { "X-Admin-API-Key": TEST_API_KEY },
-      },
-    );
+    });
 
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -229,18 +191,13 @@ describe("POST /credit-packages", () => {
     const app = createTestApp(mockDb);
     const client = testClient(app, MOCK_ENV);
 
-    const res = await client["credit-packages"].$post(
-      {
-        json: {
-          name: "Basic",
-          credits: 100,
-          priceThb: 299,
-        },
+    const res = await client["credit-packages"].$post({
+      json: {
+        name: "Basic",
+        credits: 100,
+        priceThb: 299,
       },
-      {
-        headers: { "X-Admin-API-Key": TEST_API_KEY },
-      },
-    );
+    });
 
     expect(res.status).toBe(201);
     expect(mockDb.values).toHaveBeenCalledWith(
@@ -269,15 +226,10 @@ describe("PATCH /credit-packages/:id", () => {
     const app = createTestApp(mockDb);
     const client = testClient(app, MOCK_ENV);
 
-    const res = await client["credit-packages"][":id"].$patch(
-      {
-        param: { id: MOCK_UUID_1 },
-        json: { name: "Updated Name" },
-      },
-      {
-        headers: { "X-Admin-API-Key": TEST_API_KEY },
-      },
-    );
+    const res = await client["credit-packages"][":id"].$patch({
+      param: { id: MOCK_UUID_1 },
+      json: { name: "Updated Name" },
+    });
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -302,19 +254,14 @@ describe("PATCH /credit-packages/:id", () => {
     const app = createTestApp(mockDb);
     const client = testClient(app, MOCK_ENV);
 
-    const res = await client["credit-packages"][":id"].$patch(
-      {
-        param: { id: MOCK_UUID_1 },
-        json: {
-          name: "Updated",
-          credits: 500,
-          active: false,
-        },
+    const res = await client["credit-packages"][":id"].$patch({
+      param: { id: MOCK_UUID_1 },
+      json: {
+        name: "Updated",
+        credits: 500,
+        active: false,
       },
-      {
-        headers: { "X-Admin-API-Key": TEST_API_KEY },
-      },
-    );
+    });
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -331,15 +278,10 @@ describe("PATCH /credit-packages/:id", () => {
     const app = createTestApp(mockDb);
     const client = testClient(app, MOCK_ENV);
 
-    const res = await client["credit-packages"][":id"].$patch(
-      {
-        param: { id: "00000000-0000-0000-0000-000000000000" },
-        json: { name: "Updated" },
-      },
-      {
-        headers: { "X-Admin-API-Key": TEST_API_KEY },
-      },
-    );
+    const res = await client["credit-packages"][":id"].$patch({
+      param: { id: "00000000-0000-0000-0000-000000000000" },
+      json: { name: "Updated" },
+    });
 
     expect(res.status).toBe(404);
     const body = await res.json();

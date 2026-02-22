@@ -28,6 +28,8 @@
     "HARD_DELETE_GRACE_DAYS": "30",
     "HARD_DELETE_BATCH_SIZE": "5",
     "SENTRY_DSN": "",
+    "CF_ACCESS_TEAM_DOMAIN": "https://framefast.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "505392355047ad894d5d55809c271e356dcfb45ba1123ed5ede28daf543e58d7",
   },
 
   // R2 bucket for photo storage
@@ -182,6 +184,8 @@
         "HARD_DELETE_GRACE_DAYS": "30",
         "HARD_DELETE_BATCH_SIZE": "5",
         "SENTRY_DSN": "https://fa797a451625d1341a655aabbc83ff6c@o4508085109850112.ingest.us.sentry.io/4510853502402560",
+        "CF_ACCESS_TEAM_DOMAIN": "https://framefast.cloudflareaccess.com",
+        "CF_ACCESS_AUD": "505392355047ad894d5d55809c271e356dcfb45ba1123ed5ede28daf543e58d7",
       },
       "routes": [
         {
@@ -326,6 +330,8 @@
         "HARD_DELETE_GRACE_DAYS": "30",
         "HARD_DELETE_BATCH_SIZE": "5",
         "SENTRY_DSN": "",
+        "CF_ACCESS_TEAM_DOMAIN": "https://framefast.cloudflareaccess.com",
+        "CF_ACCESS_AUD": "505392355047ad894d5d55809c271e356dcfb45ba1123ed5ede28daf543e58d7",
       },
       "routes": [
         {
