@@ -225,9 +225,9 @@ export function PricingSection() {
             <div>
               <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
                 {t.rich('title', {
-                  credits: () => (
+                  credits: (chunks) => (
                     <span className="bg-[linear-gradient(135deg,var(--primary),var(--primary-end))] bg-clip-text text-transparent">
-                      {t('titleHighlight')}
+                      {chunks}
                     </span>
                   ),
                 })}
