@@ -6,11 +6,16 @@ import { motion, useReducedMotion } from 'framer-motion';
 
 import { cn } from '@/shared/utils/ui';
 
+import event1 from '@/assets/hero/event1.webp';
+import event2 from '@/assets/hero/event2.webp';
+import event3 from '@/assets/hero/event3.webp';
+import event4 from '@/assets/hero/event4.webp';
+
 const frames = [
-  { src: '/landing/hero/event1_bg_removed.png', alt: 'Event photo example 1' },
-  { src: '/landing/hero/event2_bg_removed.png', alt: 'Event photo example 2' },
-  { src: '/landing/hero/event3_bg_removed.png', alt: 'Event photo example 3' },
-  { src: '/landing/hero/event4_bg_removed.png', alt: 'Event photo example 4' },
+  { src: event1, alt: 'Event photo example 1' },
+  { src: event2, alt: 'Event photo example 2' },
+  { src: event3, alt: 'Event photo example 3' },
+  { src: event4, alt: 'Event photo example 4' },
 ] as const;
 
 export function HeroEventStage({ className }: { className?: string }) {
