@@ -37,6 +37,14 @@ jobs:
         with:
           version: 9.0.0
 
+      - name: Inject Secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.15
+        with:
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          project-slug: frame-fast-pu-xi
+          env-slug: prod
+
       - run: pnpm install
 
       - name: Create Admin Env
