@@ -238,10 +238,11 @@ export function HeroEventStage({ className }: { className?: string }) {
                       className="absolute inset-0"
                     >
                       <Image
-                        src={currentFrame.src}
+                        src={frameIndex === 0 ? event1 : currentFrame.src}
                         alt={currentFrame.alt}
                         fill
-                        priority
+                        priority={frameIndex === 0}
+                        loading={frameIndex === 0 ? 'eager' : 'lazy'}
                         sizes="(max-width: 1024px) 100vw, 720px"
                         className="object-contain"
                       />
