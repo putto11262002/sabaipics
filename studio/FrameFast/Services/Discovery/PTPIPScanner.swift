@@ -145,6 +145,24 @@ final class PTPIPScanner: ObservableObject {
         }
     }
 
+    /// Start scanning continuously — loops waves indefinitely until cancelled via `stop()`.
+    /// Use this when the user controls cancellation (back/close button).
+    func scanContinuously(targets: [String], config: ScanConfig = .default) async {
+        guard !targets.isEmpty else {
+            state = .error(.noTargets)
+            log(.error, "No targets provided")
+            return
+        }
+
+        await stop()
+        state = .scanning(current: 0, total: targets.count, currentIP: nil)
+        log(.info, "Starting continuous scan: \(targets.count) target(s)")
+
+        scanTask = Task {
+            await performContinuousScan(targets: targets, config: config)
+        }
+    }
+
     /// Stop current scan and wait for it to finish
     func stop(timeout: TimeInterval = 2.0) async {
         guard let task = scanTask else { return }
@@ -254,6 +272,88 @@ final class PTPIPScanner: ObservableObject {
 
         let duration = Date().timeIntervalSince(scanStart)
         log(.info, "Scan complete - found: \(totalFound), duration: \(String(format: "%.2f", duration))s")
+
+        await MainActor.run {
+            state = .completed(found: totalFound)
+        }
+    }
+
+    /// Continuous variant — loops waves indefinitely until cancelled.
+    private func performContinuousScan(targets: [String], config: ScanConfig) async {
+        let scanStart = Date()
+        var totalFound = 0
+        var foundIPs: Set<String> = []
+        var wave = 0
+
+        while !Task.isCancelled {
+            wave += 1
+
+            let waveTargets = targets.filter { !foundIPs.contains($0) }
+            guard !waveTargets.isEmpty else {
+                log(.info, "Wave \(wave) skipped — all targets already found")
+                break
+            }
+
+            log(.info, "Wave \(wave) starting (\(waveTargets.count) target(s), continuous)")
+            var completedCount = 0
+            var waveFound = 0
+
+            await withTaskGroup(of: DiscoveredCamera?.self) { group in
+                for ip in waveTargets {
+                    group.addTask {
+                        guard !Task.isCancelled else { return nil }
+                        return await self.scanIP(ip, config: config)
+                    }
+                }
+
+                for await result in group {
+                    completedCount += 1
+
+                    let currentIP = completedCount < targets.count ? targets[completedCount] : nil
+                    await MainActor.run {
+                        state = .scanning(
+                            current: completedCount,
+                            total: targets.count,
+                            currentIP: currentIP
+                        )
+                    }
+
+                    if let camera = result {
+                        waveFound += 1
+                        foundIPs.insert(camera.ipAddress)
+                        log(.info, "Found: \(camera.name) at \(camera.ipAddress)")
+                        await MainActor.run {
+                            onCameraDiscovered?(camera)
+                        }
+                    }
+
+                    if Task.isCancelled {
+                        log(.info, "Cancelled during wave \(wave) at \(completedCount)/\(targets.count)")
+                        group.cancelAll()
+                        await MainActor.run { state = .idle }
+                        return
+                    }
+                }
+            }
+
+            totalFound += waveFound
+            log(.info, "Wave \(wave) done - found: \(waveFound)")
+
+            // Wait before next wave (only if no cameras found yet)
+            if foundIPs.isEmpty {
+                log(.info, "No cameras found, waiting \(config.waveDelay)s before wave \(wave + 1)")
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(config.waveDelay * 1_000_000_000))
+                } catch {
+                    log(.info, "Cancelled during wave delay")
+                    await MainActor.run { state = .idle }
+                    return
+                }
+            }
+        }
+
+        let duration = Date().timeIntervalSince(scanStart)
+        log(.info, "Continuous scan ended - found: \(totalFound), duration: \(String(format: "%.2f", duration))s")
 
         await MainActor.run {
             state = .completed(found: totalFound)

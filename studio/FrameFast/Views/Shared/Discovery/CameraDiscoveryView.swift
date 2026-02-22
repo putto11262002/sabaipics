@@ -18,10 +18,13 @@ struct CameraDiscoveryView: View {
     private let onSelect: (_ camera: DiscoveredCamera, _ allCameras: [DiscoveredCamera]) -> Void
     private let onDone: (() -> Void)?
 
+    private let continuous: Bool
+
     @MainActor
     init(
         preferredIP: String? = nil,
         showsManualIP: Bool = true,
+        continuous: Bool = false,
         makeScanTargets: @escaping (_ preferredIP: String?) -> [String],
         scanConfig: ScanConfig = .default,
         preflight: @escaping () -> CameraDiscoveryPreflightResult = {
@@ -43,6 +46,7 @@ struct CameraDiscoveryView: View {
         )
         self.preferredIP = preferredIP
         self.showsManualIP = showsManualIP
+        self.continuous = continuous
         self.onBack = onBack
         self.onManualIP = onManualIP
         self.onSelect = onSelect
@@ -141,7 +145,11 @@ struct CameraDiscoveryView: View {
             }
         }
         .task {
-            await viewModel.start(preferredIP: preferredIP)
+            if continuous {
+                await viewModel.startContinuous(preferredIP: preferredIP)
+            } else {
+                await viewModel.start(preferredIP: preferredIP)
+            }
         }
         .onChange(of: viewModel.autoSelectCamera) { camera in
             guard let camera else { return }
