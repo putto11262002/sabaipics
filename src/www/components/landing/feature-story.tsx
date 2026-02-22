@@ -640,6 +640,7 @@ const steps: Step[] = [
 ];
 
 export function FeatureStory() {
+  const t = useTranslations('FeatureStory');
   const tFaceSearch = useTranslations('FeatureStory.faceSearch');
   const tLineDelivery = useTranslations('FeatureStory.lineDelivery');
   const tColorGrading = useTranslations('FeatureStory.colorGrading');
@@ -700,11 +701,10 @@ export function FeatureStory() {
       <div className="mx-auto max-w-7xl px-4 pb-8 pt-2 sm:pt-6">
         <div className="max-w-4xl">
           <h2 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
-            A guided tour of the workflow
+            {t('title')}
           </h2>
           <p className="mt-3 max-w-3xl text-base text-muted-foreground sm:text-lg">
-            Built for event photographers in Thailand: fast delivery, face search, and Studio tools
-            that do not get in your way.
+            {t('subtitle')}
           </p>
         </div>
       </div>

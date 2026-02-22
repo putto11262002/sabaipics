@@ -20,6 +20,8 @@
     "description": "AI-powered face recognition photo distribution platform for photographers and event organizers."
   },
   "FeatureStory": {
+    "title": "One platform. Your entire workflow.",
+    "subtitle": "Face search that finds every guest, LINE delivery they already trust, and tools that match your style.",
     "faceSearch": {
       "label": "Face search",
       "title": "Guests find themselves in seconds.",
