@@ -110,6 +110,12 @@ struct MainTabView: View {
         }
     }
 
+    private var isSyncing: Bool {
+        let hasDownloads = captureSessionStore.captureSession?.photos.contains { $0.isDownloading } ?? false
+        let hasUploads = uploadStatusStore.summary.inFlight > 0
+        return hasDownloads || hasUploads
+    }
+
     private var statusForBar: CaptureStatusBarView.Status {
         switch captureSessionStore.state {
         case .idle:
@@ -137,6 +143,7 @@ struct MainTabView: View {
                 status: statusForBar,
                 cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
                 eventName: coordinator.selectedEventName,
+                isSyncing: isSyncing,
                 onOpen: {
                     captureSheetDetent = .large
                     captureSessionStore.isDetailsPresented = true

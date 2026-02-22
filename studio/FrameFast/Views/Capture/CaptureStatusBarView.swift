@@ -13,6 +13,7 @@ struct CaptureStatusBarView: View {
     let status: Status
     let cameraName: String
     let eventName: String?
+    var isSyncing: Bool = false
     let onOpen: () -> Void
     let onDisconnect: () -> Void
 
@@ -88,6 +89,11 @@ struct CaptureStatusBarView: View {
             Image(systemName: "dot.radiowaves.left.and.right")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Color.green)
+                .overlay {
+                    if isSyncing {
+                        SyncRingOverlay()
+                    }
+                }
         case .error:
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 14, weight: .semibold))
@@ -107,6 +113,20 @@ struct CaptureStatusBarView: View {
     }
 }
 
+private struct SyncRingOverlay: View {
+    @State private var isRotating = false
+
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: 0.3)
+            .stroke(Color.green.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            .frame(width: 22, height: 22)
+            .rotationEffect(.degrees(isRotating ? 360 : 0))
+            .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isRotating)
+            .onAppear { isRotating = true }
+    }
+}
+
 #if DEBUG
 
 #Preview("Capture Status Bar") {
@@ -117,13 +137,24 @@ struct CaptureStatusBarView: View {
                 .navigationBarTitleDisplayMode(.large)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            CaptureStatusBarView(
-                status: .active,
-                cameraName: "Sony A7 IV",
-                eventName: "Bangkok Wedding",
-                onOpen: {},
-                onDisconnect: {}
-            )
+            VStack(spacing: 8) {
+                CaptureStatusBarView(
+                    status: .active,
+                    cameraName: "Sony A7 IV",
+                    eventName: "Bangkok Wedding",
+                    onOpen: {},
+                    onDisconnect: {}
+                )
+
+                CaptureStatusBarView(
+                    status: .active,
+                    cameraName: "Sony A7 IV",
+                    eventName: "Bangkok Wedding",
+                    isSyncing: true,
+                    onOpen: {},
+                    onDisconnect: {}
+                )
+            }
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 12)
