@@ -1,14 +1,12 @@
-'use client';
-
 import { Link } from '@/i18n/navigation';
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { Mail } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
 
 const CONTACT_EMAIL = 'contact@framefast.io';
 
-export function Footer() {
-  const t = useTranslations('Footer');
+export async function Footer() {
+  const t = await getTranslations('Footer');
   const year = new Date().getFullYear();
 
   const productLinks = [

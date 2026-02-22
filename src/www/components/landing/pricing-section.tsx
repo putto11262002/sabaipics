@@ -1,7 +1,5 @@
-'use client';
-
 import { ArrowRight, ArrowRightLeft } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
 
 type TierRow = {
   amount: string;
@@ -212,8 +210,8 @@ function PhotoPrint() {
   );
 }
 
-export function PricingSection() {
-  const t = useTranslations('Pricing');
+export async function PricingSection() {
+  const t = await getTranslations('Pricing');
 
   return (
     <section id="pricing" className="scroll-mt-24 bg-muted/30">

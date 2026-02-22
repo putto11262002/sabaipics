@@ -1,12 +1,11 @@
-'use client';
-
 import Image from 'next/image';
-import { useLocale, useTranslations } from 'next-intl';
+import { getLocale, getTranslations } from 'next-intl/server';
 
-export function IosAppSection() {
-  const locale = useLocale();
-  const t = useTranslations('IosApp');
+export async function IosAppSection() {
+  const locale = await getLocale();
+  const t = await getTranslations('IosApp');
   const appStoreBadgeSrc = locale === 'th' ? '/badges/app-store-th.svg' : '/badges/app-store-en.svg';
+  const appStoreAlt = locale === 'th' ? 'ดาวน์โหลดบน App Store' : 'Download on the App Store';
 
   return (
     <section id="ios-app" className="scroll-mt-24 bg-muted/30 py-16 sm:py-20">
@@ -39,7 +38,7 @@ export function IosAppSection() {
                 >
                   <Image
                     src={appStoreBadgeSrc}
-                    alt={locale === 'th' ? 'ดาวน์โหลดบน App Store' : 'Download on the App Store'}
+                    alt={appStoreAlt}
                     width={162}
                     height={48}
                     className="h-11 w-auto"
