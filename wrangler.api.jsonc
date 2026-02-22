@@ -172,7 +172,7 @@
         "NODE_ENV": "staging",
         "DASHBOARD_FRONTEND_URL": "https://app-staging.framefast.io",
         "EVENT_FRONTEND_URL": "https://event-staging.framefast.io",
-        "CORS_ORIGIN": "https://app-staging.framefast.io,https://event-staging.framefast.io,http://localhost:5175",
+        "CORS_ORIGIN": "https://app-staging.framefast.io,https://event-staging.framefast.io,https://admin-staging.framefast.io,http://localhost:5175",
         "AUTHORIZED_PARTIES": "https://app-staging.framefast.io,https://event-staging.framefast.io",
         "AWS_REGION": "us-west-2",
         "CF_ZONE": "framefast.io",
