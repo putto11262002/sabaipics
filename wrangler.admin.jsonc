@@ -10,6 +10,16 @@
   },
 
   "env": {
+    // Staging environment - auto-deploy from master
+    "staging": {
+      "routes": [
+        {
+          "pattern": "admin-staging.framefast.io",
+          "zone_name": "framefast.io",
+          "custom_domain": true
+        }
+      ]
+    },
     // Production environment
     "production": {
       "routes": [
