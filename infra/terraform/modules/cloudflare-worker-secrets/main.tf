@@ -56,7 +56,6 @@ locals {
     STRIPE_WEBHOOK_SECRET        = local.infisical["STRIPE_WEBHOOK_SECRET"].value
     FTP_PASSWORD_ENCRYPTION_KEY  = local.infisical["FTP_PASSWORD_ENCRYPTION_KEY"].value
     FTP_JWT_SECRET               = local.infisical["FTP_JWT_SECRET"].value
-    ADMIN_API_KEY                = local.infisical["ADMIN_API_KEY"].value
     DESKTOP_ACCESS_JWT_SECRET    = local.infisical["DESKTOP_ACCESS_JWT_SECRET"].value
     DESKTOP_REFRESH_TOKEN_PEPPER = local.infisical["DESKTOP_REFRESH_TOKEN_PEPPER"].value
   }
