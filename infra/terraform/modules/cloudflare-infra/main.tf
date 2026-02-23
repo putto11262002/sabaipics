@@ -110,25 +110,33 @@ resource "cloudflare_r2_bucket_event_notification" "notifications" {
 }
 
 # ------------------------------------------------------------------------------
-# Cache Rules
+# Cache Rules (via Rulesets)
 # ------------------------------------------------------------------------------
 
-resource "cloudflare_cache_rule" "rules" {
+resource "cloudflare_ruleset" "cache_rules" {
   for_each = { for rule in var.cache_rules : rule.name => rule }
 
   zone_id     = var.zone_id
+  name        = each.value.name
   description = each.value.name
-  expression  = each.value.expression
-  action      = "set_cache_settings"
+  kind        = "zone"
+  phase       = "http_request_cache_settings"
 
-  cache_settings {
-    edge_ttl {
-      mode  = "override_origin"
-      value = each.value.edge_ttl
+  rules = [{
+    action      = "set_cache_settings"
+    expression  = each.value.expression
+    enabled     = true
+    description = each.value.name
+
+    action_parameters = {
+      edge_ttl = {
+        mode    = "override_origin"
+        default = each.value.edge_ttl
+      }
+      browser_ttl = {
+        mode    = "override_origin"
+        default = each.value.browser_ttl
+      }
     }
-    browser_ttl {
-      mode  = "override_origin"
-      value = each.value.browser_ttl
-    }
-  }
+  }]
 }
