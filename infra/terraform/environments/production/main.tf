@@ -66,6 +66,9 @@ module "cloudflare_infra" {
 
   # Event Notifications
   bucket_notifications = var.bucket_notifications
+
+  # Cache Rules
+  cache_rules = var.cache_rules
 }
 
 # ------------------------------------------------------------------------------

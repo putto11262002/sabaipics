@@ -73,3 +73,17 @@ bucket_notifications = [
 # ------------------------------------------------------------------------------
 
 worker_script_name = "framefast-api-production"
+
+# ------------------------------------------------------------------------------
+# Cache Rules
+# Edge cache for SSG landing pages - 1 week TTL
+# ------------------------------------------------------------------------------
+
+cache_rules = [
+  {
+    name        = "WWW Landing Pages"
+    expression  = "(http.host eq \"framefast.io\" or http.host eq \"www.framefast.io\") and (http.request.uri.path eq \"/\" or http.request.uri.path eq \"/en\" or http.request.uri.path eq \"/th\" or http.request.uri.path eq \"/en/\" or http.request.uri.path eq \"/th/\")"
+    edge_ttl    = 604800  # 1 week in seconds
+    browser_ttl = 3600    # 1 hour
+  }
+]

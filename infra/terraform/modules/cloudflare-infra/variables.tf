@@ -107,3 +107,18 @@ variable "bucket_notifications" {
   default     = []
   description = "List of R2 bucket event notifications to create"
 }
+
+# ------------------------------------------------------------------------------
+# Cache Rules Configuration
+# ------------------------------------------------------------------------------
+
+variable "cache_rules" {
+  type = list(object({
+    name        = string
+    expression  = string
+    edge_ttl    = number
+    browser_ttl = number
+  }))
+  default     = []
+  description = "List of Cloudflare cache rules to create"
+}
