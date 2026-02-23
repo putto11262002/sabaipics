@@ -108,3 +108,27 @@ resource "cloudflare_r2_bucket_event_notification" "notifications" {
     description = var.bucket_notifications[count.index].description
   }]
 }
+
+# ------------------------------------------------------------------------------
+# Cache Rules
+# ------------------------------------------------------------------------------
+
+resource "cloudflare_cache_rule" "rules" {
+  for_each = { for rule in var.cache_rules : rule.name => rule }
+
+  zone_id     = var.zone_id
+  description = each.value.name
+  expression  = each.value.expression
+  action      = "set_cache_settings"
+
+  cache_settings {
+    edge_ttl {
+      mode  = "override_origin"
+      value = each.value.edge_ttl
+    }
+    browser_ttl {
+      mode  = "override_origin"
+      value = each.value.browser_ttl
+    }
+  }
+}
