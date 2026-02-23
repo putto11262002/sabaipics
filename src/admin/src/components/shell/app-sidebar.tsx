@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, Users } from 'lucide-react';
 
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { NavMain } from './nav-main';
@@ -12,6 +12,11 @@ import {
 
 const data = {
   navMain: [
+    {
+      title: 'Users',
+      url: '/users',
+      icon: Users,
+    },
     {
       title: 'Credit Packages',
       url: '/credit-packages',

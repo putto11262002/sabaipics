@@ -9,6 +9,14 @@ export const router = createBrowserRouter([
         path: '/credit-packages',
         lazy: () => import('./routes/credit-packages'),
       },
+      {
+        path: '/users',
+        lazy: () => import('./routes/users'),
+      },
+      {
+        path: '/users/:id',
+        lazy: () => import('./routes/users/[id]'),
+      },
     ],
   },
 
