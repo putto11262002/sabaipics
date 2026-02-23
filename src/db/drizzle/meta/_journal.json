@@ -169,6 +169,13 @@
       "when": 1771850371167,
       "tag": "0023_stiff_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1771867953619,
+      "tag": "0024_glorious_swarm",
+      "breakpoints": true
     }
   ]
 }
