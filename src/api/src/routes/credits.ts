@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { eq, asc, and, desc, sql, gte } from 'drizzle-orm';
-import { creditPackages, photographers, creditLedger, promoCodeUsage } from '@/db';
+import { creditPackages, photographers, creditLedger, promoCodeUsage, giftCodes, giftCodeRedemptions } from '@/db';
 import { requirePhotographer } from '../middleware';
+import { zValidator } from '@hono/zod-validator';
 import type { Env } from '../types';
 import {
   createStripeClient,
@@ -14,6 +16,7 @@ import { apiError, type HandlerError } from '../lib/error';
 import { calculateTieredDiscount, getDiscountTiers } from '../lib/pricing/discounts';
 import { topUpSchema } from '../lib/pricing/validation';
 import { getCreditHistory } from '../lib/credits';
+import { grantCredits } from '../lib/credits/grant';
 
 /**
  * Credits API
@@ -592,4 +595,125 @@ export const creditsRouter = new Hono<Env>()
         (data) => c.json({ data }),
         (e) => apiError(c, e),
       );
-  });
+  })
+  /**
+   * POST /credit-packages/redeem
+   *
+   * Redeem an in-house gift code for instant credits.
+   * No Stripe involved — direct DB transaction.
+   */
+  .post(
+    '/redeem',
+    requirePhotographer(),
+    zValidator('json', z.object({ code: z.string().min(1).max(30) })),
+    async (c) => {
+      const { code } = c.req.valid('json');
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const dbTx = c.var.dbTx();
+
+      return safeTry(async function* () {
+        // 1. Code exists and active (read via HTTP adapter — no transaction needed)
+        const [giftCode] = yield* ResultAsync.fromPromise(
+          db
+            .select()
+            .from(giftCodes)
+            .where(and(eq(giftCodes.code, code), eq(giftCodes.active, true)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!giftCode) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Invalid or inactive gift code' });
+        }
+
+        // 2. Not expired
+        if (giftCode.expiresAt && new Date(giftCode.expiresAt) < new Date()) {
+          return err<never, HandlerError>({ code: 'GONE', message: 'This gift code has expired' });
+        }
+
+        // 3. User eligible (targetPhotographerIds)
+        if (
+          giftCode.targetPhotographerIds &&
+          giftCode.targetPhotographerIds.length > 0 &&
+          !giftCode.targetPhotographerIds.includes(photographer.id)
+        ) {
+          return err<never, HandlerError>({ code: 'FORBIDDEN', message: 'This gift code is not available for your account' });
+        }
+
+        // Transaction: check limits + grant credits + record redemption (atomic)
+        const creditExpiresAt = new Date();
+        creditExpiresAt.setDate(creditExpiresAt.getDate() + giftCode.creditExpiresInDays);
+
+        const txResult = yield* ResultAsync.fromPromise(
+          dbTx.transaction(async (tx) => {
+            // 4. Per-user limit (inside transaction for atomicity)
+            const [userRedemptions] = await tx
+              .select({ count: sql<number>`count(*)`.mapWith(Number) })
+              .from(giftCodeRedemptions)
+              .where(
+                and(
+                  eq(giftCodeRedemptions.giftCodeId, giftCode.id),
+                  eq(giftCodeRedemptions.photographerId, photographer.id),
+                ),
+              );
+
+            if (userRedemptions.count >= giftCode.maxRedemptionsPerUser) {
+              throw Object.assign(new Error('You have already redeemed this gift code'), { handlerCode: 'CONFLICT' as const });
+            }
+
+            // 5. Global limit (inside transaction for atomicity)
+            if (giftCode.maxRedemptions != null) {
+              const [totalRedemptions] = await tx
+                .select({ count: sql<number>`count(*)`.mapWith(Number) })
+                .from(giftCodeRedemptions)
+                .where(eq(giftCodeRedemptions.giftCodeId, giftCode.id));
+
+              if (totalRedemptions.count >= giftCode.maxRedemptions) {
+                throw Object.assign(new Error('This gift code has reached its maximum redemptions'), { handlerCode: 'CONFLICT' as const });
+              }
+            }
+
+            // Grant credits
+            const grantResult = await grantCredits(tx, {
+              photographerId: photographer.id,
+              amount: giftCode.credits,
+              source: 'gift',
+              expiresAt: creditExpiresAt.toISOString(),
+              promoCode: giftCode.code,
+            }).match(
+              (r) => r,
+              (e) => { throw new Error(`Grant failed: ${e.type}`); },
+            );
+
+            // Record redemption
+            await tx.insert(giftCodeRedemptions).values({
+              giftCodeId: giftCode.id,
+              photographerId: photographer.id,
+              creditsGranted: giftCode.credits,
+              creditLedgerEntryId: grantResult.ledgerEntryId,
+            });
+
+            return grantResult;
+          }),
+          (cause): HandlerError => {
+            const err = cause as Error & { handlerCode?: string };
+            if (err.handlerCode === 'CONFLICT') {
+              return { code: 'CONFLICT', message: err.message };
+            }
+            return { code: 'INTERNAL_ERROR', message: 'Failed to grant credits', cause };
+          },
+        );
+
+        return ok({
+          creditsGranted: giftCode.credits,
+          expiresAt: creditExpiresAt.toISOString(),
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+        .match(
+          (data) => c.json({ data }),
+          (e) => apiError(c, e),
+        );
+    },
+  );
