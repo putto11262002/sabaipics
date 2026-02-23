@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="640" height="640" fill="none">
+  <defs>
+    <linearGradient id="logo-gradient" x1="0" y1="0" x2="96" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#EF4444"/>
+    </linearGradient>
+  </defs>
+
+  <!-- White background -->
+  <rect width="640" height="640" fill="#FFFFFF"/>
+
+  <!-- Same centering as favicon: translate(320 320) scale(4.25) translate(-48 -55) -->
+  <g transform="translate(320 320) scale(4.25) translate(-48 -55)" stroke="url(#logo-gradient)" stroke-width="10" stroke-linecap="round">
+    <line x1="48" y1="5" x2="70.71" y2="41.5"/>
+    <line x1="91.3" y1="30" x2="70.71" y2="68.5"/>
+    <line x1="91.3" y1="80" x2="48" y2="80"/>
+    <line x1="48" y1="105" x2="25.29" y2="68.5"/>
+    <line x1="4.7" y1="80" x2="25.29" y2="41.5"/>
+    <line x1="4.7" y1="30" x2="48" y2="30"/>
+  </g>
+</svg>
