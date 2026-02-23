@@ -4,7 +4,7 @@ import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { useAdminQuery } from '../use-admin-query';
 
 type RedemptionsResponse = InferResponseType<
-  (typeof api.admin)['gift-codes-v2'][':id']['redemptions']['$get'],
+  (typeof api.admin)['gift-codes'][':id']['redemptions']['$get'],
   SuccessStatusCode
 >;
 
@@ -20,7 +20,7 @@ export function useGiftCodeRedemptions(params: UseGiftCodeRedemptionsParams) {
   return useAdminQuery<RedemptionsResponse>({
     queryKey: ['admin', 'gift-codes', 'detail', params.id, 'redemptions', { cursor: params.cursor }],
     apiFn: (opts) =>
-      api.admin['gift-codes-v2'][':id'].redemptions.$get(
+      api.admin['gift-codes'][':id'].redemptions.$get(
         {
           param: { id: params.id },
           query: {

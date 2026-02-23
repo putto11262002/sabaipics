@@ -5,7 +5,7 @@ import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { useAdminMutation } from '../use-admin-mutation';
 
 type UpdateGiftCodeResponse = InferResponseType<
-  (typeof api.admin)['gift-codes-v2'][':id']['$patch'],
+  (typeof api.admin)['gift-codes'][':id']['$patch'],
   SuccessStatusCode
 >;
 
@@ -25,7 +25,7 @@ export function useUpdateGiftCode() {
 
   return useAdminMutation<UpdateGiftCodeResponse, UpdateGiftCodeInput>({
     apiFn: ({ id, ...json }, opts) =>
-      api.admin['gift-codes-v2'][':id'].$patch(
+      api.admin['gift-codes'][':id'].$patch(
         { param: { id }, json },
         opts,
       ),

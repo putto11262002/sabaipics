@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { eq, asc, and, desc, sql, gte } from 'drizzle-orm';
-import { creditPackages, photographers, creditLedger, promoCodeUsage, giftCodes, giftCodeRedemptions } from '@/db';
+import { eq, and, desc, sql, gte } from 'drizzle-orm';
+import { photographers, creditLedger, promoCodeUsage, giftCodes, giftCodeRedemptions } from '@/db';
 import { requirePhotographer } from '../middleware';
 import { zValidator } from '@hono/zod-validator';
 import type { Env } from '../types';
@@ -144,39 +144,6 @@ export const creditsRouter = new Hono<Env>()
    */
   .get('/tiers', async (c) => {
     return c.json({ tiers: getDiscountTiers() });
-  })
-  /**
-   * GET /credit-packages
-   *
-   * [DEPRECATED] Returns all active credit packages sorted by sortOrder.
-   * Public endpoint - no authentication required.
-   * Keep for backward compatibility during migration.
-   */
-  .get('/', async (c) => {
-    return safeTry(async function* () {
-      const db = c.var.db();
-
-      const packages = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            id: creditPackages.id,
-            name: creditPackages.name,
-            credits: creditPackages.credits,
-            priceThb: creditPackages.priceThb,
-          })
-          .from(creditPackages)
-          .where(eq(creditPackages.active, true))
-          .orderBy(asc(creditPackages.sortOrder)),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-      );
-
-      return ok(packages);
-    })
-      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
-      .match(
-        (data) => c.json({ data }),
-        (e) => apiError(c, e),
-      );
   })
   /**
    * POST /credit-packages/checkout

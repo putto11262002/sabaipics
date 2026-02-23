@@ -30,7 +30,6 @@
     "db:migrate": "drizzle-kit migrate --config src/db/drizzle.config.ts",
     "db:push": "drizzle-kit push --config src/db/drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config src/db/drizzle.config.ts",
-    "db:seed:credit-packages": "tsx src/db/scripts/seed-credit-packages.ts",
     "test:api": "vitest run --config vitest.api.node.config.ts && vitest run --config vitest.api.workers.config.ts",
     "test:sabaiface": "vitest run --config src/sabaiface/vitest.config.ts",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
