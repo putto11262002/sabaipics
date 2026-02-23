@@ -30,6 +30,14 @@ export const router = createBrowserRouter([
         lazy: () => import('./routes/events/[id]'),
       },
       {
+        path: '/announcements',
+        lazy: () => import('./routes/announcements'),
+      },
+      {
+        path: '/announcements/:id',
+        lazy: () => import('./routes/announcements/[id]'),
+      },
+      {
         path: '/settings',
         lazy: () => import('./routes/settings'),
       },
