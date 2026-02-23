@@ -162,6 +162,13 @@
       "when": 1771844368092,
       "tag": "0022_melodic_captain_flint",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1771850371167,
+      "tag": "0023_stiff_guardian",
+      "breakpoints": true
     }
   ]
 }
