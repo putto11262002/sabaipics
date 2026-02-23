@@ -19,6 +19,7 @@ export * from './photo-luts';
 export * from './participant-searches';
 export * from './ftp-credentials';
 export * from './desktop-auth';
+export * from './announcements';
 
 // Relations
 export * from './relations';
