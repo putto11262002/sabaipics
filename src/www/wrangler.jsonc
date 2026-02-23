@@ -24,14 +24,16 @@
 
   // Development environment (default) - localhost
   "vars": {
-    "NODE_ENV": "development"
+    "NODE_ENV": "development",
+    "API_URL": "http://localhost:8787"
   },
 
   "env": {
     // Production environment
     "production": {
       "vars": {
-        "NODE_ENV": "production"
+        "NODE_ENV": "production",
+        "API_URL": "https://api.framefast.io"
       },
       "routes": [
         {
