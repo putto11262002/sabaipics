@@ -7,6 +7,7 @@ import { photos } from './photos';
 import { faces } from './faces';
 import { consentRecords } from './consent-records';
 import { participantSearches } from './participant-searches';
+import { giftCodes, giftCodeRedemptions } from './gift-codes';
 import { photoLuts } from './photo-luts';
 
 // Photographer relations
@@ -89,5 +90,26 @@ export const participantSearchesRelations = relations(participantSearches, ({ on
   event: one(events, {
     fields: [participantSearches.eventId],
     references: [events.id],
+  }),
+}));
+
+// Gift code relations
+export const giftCodesRelations = relations(giftCodes, ({ many }) => ({
+  redemptions: many(giftCodeRedemptions),
+}));
+
+// Gift code redemption relations
+export const giftCodeRedemptionsRelations = relations(giftCodeRedemptions, ({ one }) => ({
+  giftCode: one(giftCodes, {
+    fields: [giftCodeRedemptions.giftCodeId],
+    references: [giftCodes.id],
+  }),
+  photographer: one(photographers, {
+    fields: [giftCodeRedemptions.photographerId],
+    references: [photographers.id],
+  }),
+  creditLedgerEntry: one(creditLedger, {
+    fields: [giftCodeRedemptions.creditLedgerEntryId],
+    references: [creditLedger.id],
   }),
 }));
