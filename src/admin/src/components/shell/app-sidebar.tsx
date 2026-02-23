@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Gift, Settings, Users } from 'lucide-react';
+import { Calendar, Gift, Settings, Users } from 'lucide-react';
 
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { NavMain } from './nav-main';
@@ -21,6 +21,11 @@ const data = {
       title: 'Gift Codes',
       url: '/gift-codes',
       icon: Gift,
+    },
+    {
+      title: 'Events',
+      url: '/events',
+      icon: Calendar,
     },
     {
       title: 'Settings',
