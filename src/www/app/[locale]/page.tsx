@@ -1,11 +1,7 @@
 import { setRequestLocale } from 'next-intl/server';
 import { Footer } from '@/components/landing/footer';
 import { LandingHero } from '@/components/landing/hero';
-import { FeatureStory } from '@/components/landing/feature-story';
-import { UploadWaySection } from '@/components/landing/upload-way-section';
-import { IosAppSection } from '@/components/landing/ios-app-section';
-import { PricingSection } from '@/components/landing/pricing-section';
-import { FaqSection } from '@/components/landing/faq-section';
+import { LazyBelowFold } from '@/components/landing/lazy-sections';
 import { SiteNav } from '@/components/site-nav';
 
 type Props = {
@@ -21,11 +17,7 @@ export default async function Page({ params }: Props) {
       <SiteNav />
       <main>
         <LandingHero />
-        <FeatureStory />
-        <UploadWaySection />
-        <PricingSection />
-        <IosAppSection />
-        <FaqSection />
+        <LazyBelowFold />
       </main>
       <Footer />
     </div>
