@@ -22,10 +22,11 @@ import {
   uploadIntents,
   photos,
   creditLedger,
+  creditAllocations,
   photographers,
   type EventSettings,
 } from '@/db';
-import { eq, and, gt, asc, sql } from 'drizzle-orm';
+import { eq, and, gt, asc, sql, or, isNull } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
 import {
   applyCubeLutToRgba,
@@ -668,59 +669,74 @@ async function processUpload(
     );
 
     // Step 10: Credit deduction + photo creation (transactional)
+    // Uses atomic balance decrement: UPDATE balance = balance - 1 WHERE balance >= 1
+    // No SELECT FOR UPDATE needed — concurrent uploads race on the decrement.
     const dbTx = createDbTx(env.DATABASE_URL);
 
     const photo = yield* ResultAsync.fromPromise(
       Sentry.startSpan({ name: 'upload.transaction', op: 'db.transaction' }, () =>
         dbTx.transaction(async (tx) => {
-          // Lock photographer row
-          await tx
-            .select({ id: photographers.id })
-            .from(photographers)
-            .where(eq(photographers.id, intent.photographerId))
-            .for('update');
-
-          // Check balance under lock
-          const [balanceResult] = await tx
-            .select({ balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int` })
-            .from(creditLedger)
+          // Step 10a: Atomic balance decrement — replaces SELECT FOR UPDATE + SUM
+          const decrementResult = await tx
+            .update(photographers)
+            .set({ balance: sql`${photographers.balance} - 1` })
             .where(
               and(
-                eq(creditLedger.photographerId, intent.photographerId),
-                gt(creditLedger.expiresAt, sql`NOW()`),
-              ),
-            );
-
-          if ((balanceResult?.balance ?? 0) < 1) {
-            throw new Error('INSUFFICIENT_CREDITS');
-          }
-
-          // Find oldest unexpired credit (FIFO)
-          const [oldestCredit] = await tx
-            .select({ expiresAt: creditLedger.expiresAt })
-            .from(creditLedger)
-            .where(
-              and(
-                eq(creditLedger.photographerId, intent.photographerId),
-                gt(creditLedger.amount, 0),
-                gt(creditLedger.expiresAt, sql`NOW()`),
+                eq(photographers.id, intent.photographerId),
+                sql`${photographers.balance} >= 1`,
               ),
             )
-            .orderBy(asc(creditLedger.expiresAt))
-            .limit(1);
+            .returning({ id: photographers.id });
 
-          if (!oldestCredit) {
+          if (decrementResult.length === 0) {
             throw new Error('INSUFFICIENT_CREDITS');
           }
 
-          // Deduct 1 credit
-          await tx.insert(creditLedger).values({
+          // Step 10b: Find oldest non-expired credit entry with remainingCredits > 0 (FIFO)
+          const [creditEntry] = await tx
+            .select({ id: creditLedger.id, expiresAt: creditLedger.expiresAt })
+            .from(creditLedger)
+            .where(
+              and(
+                eq(creditLedger.photographerId, intent.photographerId),
+                eq(creditLedger.type, 'credit'),
+                gt(creditLedger.remainingCredits, 0),
+                or(
+                  isNull(creditLedger.expiresAt),
+                  gt(creditLedger.expiresAt, sql`NOW()`),
+                ),
+              ),
+            )
+            .orderBy(asc(creditLedger.expiresAt), sql`${creditLedger.expiresAt} IS NULL`)
+            .limit(1);
+
+          if (!creditEntry) {
+            throw new Error('INSUFFICIENT_CREDITS');
+          }
+
+          // Step 10c: Decrement remainingCredits on the credit entry
+          await tx
+            .update(creditLedger)
+            .set({ remainingCredits: sql`${creditLedger.remainingCredits} - 1` })
+            .where(eq(creditLedger.id, creditEntry.id));
+
+          // Step 10d: Insert credit_ledger debit row with audit fields
+          const [debitEntry] = await tx.insert(creditLedger).values({
             photographerId: intent.photographerId,
             amount: -1,
             type: 'debit',
             source: 'upload',
-            expiresAt: oldestCredit.expiresAt,
+            operationType: 'image_upload',
+            operationId: photoId,
+            expiresAt: creditEntry.expiresAt,
             stripeSessionId: null,
+          }).returning({ id: creditLedger.id });
+
+          // Step 10e: Insert credit_allocations row (attribution)
+          await tx.insert(creditAllocations).values({
+            debitLedgerEntryId: debitEntry.id,
+            creditLedgerEntryId: creditEntry.id,
+            amount: 1,
           });
 
           // Create photo record
