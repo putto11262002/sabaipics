@@ -22,6 +22,14 @@ export const router = createBrowserRouter([
         lazy: () => import('./routes/gift-codes/[id]'),
       },
       {
+        path: '/events',
+        lazy: () => import('./routes/events'),
+      },
+      {
+        path: '/events/:id',
+        lazy: () => import('./routes/events/[id]'),
+      },
+      {
         path: '/settings',
         lazy: () => import('./routes/settings'),
       },
