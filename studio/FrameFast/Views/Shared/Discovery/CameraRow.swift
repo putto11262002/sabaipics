@@ -15,14 +15,14 @@ struct CameraRow: View {
             HStack(spacing: 16) {
                 Image(systemName: "camera.fill")
                     .font(.title2)
-                    .foregroundColor(Color.Theme.primary)
+                    .foregroundColor(Color.accentColor)
                     .frame(width: 50, height: 50)
-                    .background(Color.Theme.primary.opacity(0.1))
+                    .background(Color.accentColor.opacity(0.1))
                     .cornerRadius(10)
 
                 Text(camera.name)
                     .font(.headline)
-                    .foregroundColor(Color.Theme.foreground)
+                    .foregroundColor(Color.primary)
 
                 Spacer()
 
@@ -33,12 +33,12 @@ struct CameraRow: View {
                 }
 
                 Image(systemName: "chevron.right")
-                    .foregroundColor(Color.Theme.mutedForeground)
+                    .foregroundColor(Color.secondary)
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.Theme.border, lineWidth: 1)
+                    .stroke(Color(UIColor.separator), lineWidth: 1)
             )
         }
     }

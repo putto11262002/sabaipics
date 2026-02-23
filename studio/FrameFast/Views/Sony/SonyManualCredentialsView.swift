@@ -23,24 +23,24 @@ struct SonyManualCredentialsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("WiFi name (SSID)")
                         .font(.subheadline)
-                        .foregroundColor(Color.Theme.mutedForeground)
+                        .foregroundColor(Color.secondary)
                     TextField("DIRECT-...", text: $ssid)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .keyboardType(.asciiCapable)
-                        .textFieldStyle(.themed(isFocused: $ssidFocused))
+                        .textFieldStyle(.roundedBorder)
                         .focused($ssidFocused)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Password")
                         .font(.subheadline)
-                        .foregroundColor(Color.Theme.mutedForeground)
+                        .foregroundColor(Color.secondary)
                     SecureField("Password", text: $password)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .keyboardType(.asciiCapable)
-                        .textFieldStyle(.themed(isFocused: $passwordFocused))
+                        .textFieldStyle(.roundedBorder)
                         .focused($passwordFocused)
                 }
 
@@ -58,7 +58,8 @@ struct SonyManualCredentialsView: View {
                     passwordFocused = false
                     joinWiFi()
                 }
-                .buttonStyle(.primary)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
             .padding(20)
         }

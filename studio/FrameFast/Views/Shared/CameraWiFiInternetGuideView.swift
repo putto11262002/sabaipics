@@ -33,16 +33,16 @@ struct CameraWiFiInternetGuideView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
                 .padding(.bottom, 12)
-                .background(Color.Theme.background)
+                .background(Color(UIColor.systemBackground))
         }
-        .background(Color.Theme.background.ignoresSafeArea())
+        .background(Color(UIColor.systemBackground).ignoresSafeArea())
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Keep internet while connected")
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -109,7 +109,7 @@ struct CameraWiFiInternetGuideView: View {
         return VStack(alignment: .leading, spacing: 12) {
             stepLine(step.parts)
                 .font(.footnote)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Image(step.imageName)
@@ -119,7 +119,7 @@ struct CameraWiFiInternetGuideView: View {
                 .clipShape(imageShape)
                 .background {
                     imageShape
-                        .fill(Color.Theme.card.opacity(0.001))
+                        .fill(Color(UIColor.secondarySystemGroupedBackground).opacity(0.001))
                         .shadow(color: Color.black.opacity(0.14), radius: 16, x: 0, y: 10)
                 }
         }
@@ -155,7 +155,8 @@ struct CameraWiFiInternetGuideView: View {
                 Button("Skip") {
                     onSkip()
                 }
-                .buttonStyle(.secondary)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
             } else {
                 Button {
                     goToPreviousStep()
@@ -165,7 +166,8 @@ struct CameraWiFiInternetGuideView: View {
                         Text("Back")
                     }
                 }
-                .buttonStyle(.secondary)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
             }
 
             Spacer(minLength: 0)
@@ -179,7 +181,8 @@ struct CameraWiFiInternetGuideView: View {
                         Image(systemName: "chevron.right")
                     }
                 }
-                .buttonStyle(.primary)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             } else {
                 Button("Continue") {
                     if connectivityStore.isOnline {
@@ -188,7 +191,8 @@ struct CameraWiFiInternetGuideView: View {
                         showOfflineContinueAlert = true
                     }
                 }
-                .buttonStyle(.primary)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .alert("Internet still unavailable", isPresented: $showOfflineContinueAlert) {
                     Button("Go back", role: .cancel) {}
                     Button("Continue anyway") {

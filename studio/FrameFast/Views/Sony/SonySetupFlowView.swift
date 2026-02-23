@@ -20,7 +20,7 @@ struct SonySetupFlowView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Connect to your Sony camera's WiFi network in Settings before continuing.")
                 .font(.subheadline)
-                .foregroundColor(Color.Theme.mutedForeground)
+                .foregroundColor(Color.secondary)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 32)
 

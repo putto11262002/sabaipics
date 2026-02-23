@@ -32,12 +32,12 @@ struct ProfileView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(displayName(for: user))
                                     .font(.body.weight(.medium))
-                                    .foregroundStyle(Color.Theme.foreground)
+                                    .foregroundStyle(Color.primary)
 
                                 if let email = user.primaryEmailAddress?.emailAddress {
                                     Text(email)
                                         .font(.footnote)
-                                        .foregroundStyle(Color.Theme.mutedForeground)
+                                        .foregroundStyle(Color.secondary)
                                 }
                             }
 
@@ -57,7 +57,7 @@ struct ProfileView: View {
                         profileRowLabel(
                             title: "Manage Account",
                             systemImage: connectivityStore.isOnline ? "person.crop.circle" : "wifi.slash",
-                            foreground: Color.Theme.foreground,
+                            foreground: Color.primary,
                             showsChevron: true
                         )
                     }
@@ -78,7 +78,7 @@ struct ProfileView: View {
                         profileRowLabel(
                             title: "Sign Out",
                             systemImage: "rectangle.portrait.and.arrow.right",
-                            foreground: Color.Theme.destructive,
+                            foreground: Color.red,
                             showsChevron: false
                         )
                     }
@@ -94,7 +94,7 @@ struct ProfileView: View {
                         profileRowLabel(
                             title: "Terms of Service",
                             systemImage: "doc.text",
-                            foreground: Color.Theme.foreground,
+                            foreground: Color.primary,
                             showsChevron: true
                         )
                     }
@@ -108,7 +108,7 @@ struct ProfileView: View {
                         profileRowLabel(
                             title: "Privacy Policy",
                             systemImage: "hand.raised",
-                            foreground: Color.Theme.foreground,
+                            foreground: Color.primary,
                             showsChevron: true
                         )
                     }

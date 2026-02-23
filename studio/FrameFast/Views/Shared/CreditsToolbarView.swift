@@ -25,10 +25,10 @@ struct CreditsToolbarView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "creditcard.fill")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.Theme.success)
+                        .foregroundStyle(Color.green)
                     Text(balance.formatted(.number.notation(.compactName)))
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.Theme.foreground)
+                        .foregroundStyle(Color.primary)
                         .contentTransition(.numericText())
                         .animation(.default, value: balance)
                 }
@@ -47,10 +47,10 @@ struct CreditsToolbarView: View {
         HStack(spacing: 6) {
             Image(systemName: "creditcard.fill")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
             Text("-")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
         }
         .fixedSize()
         .padding(.horizontal, 6)

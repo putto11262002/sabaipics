@@ -24,12 +24,12 @@ struct CaptureStatusBarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(cameraName)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.Theme.foreground)
+                        .foregroundStyle(Color.primary)
                         .lineLimit(1)
 
                     Text(subtitleText)
                         .font(.caption)
-                        .foregroundStyle(Color.Theme.mutedForeground)
+                        .foregroundStyle(Color.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -46,7 +46,7 @@ struct CaptureStatusBarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(Color.Theme.destructive)
+            .foregroundStyle(Color.red)
             .accessibilityLabel("Disconnect")
         }
         .padding(.horizontal, 14)
@@ -55,7 +55,7 @@ struct CaptureStatusBarView: View {
             Color(uiColor: .secondarySystemGroupedBackground),
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
-        .shadow(color: Color.Theme.foreground.opacity(0.08), radius: 10, x: 0, y: 4)
+        .shadow(color: Color.primary.opacity(0.08), radius: 10, x: 0, y: 4)
         .contentShape(Rectangle())
         .onTapGesture {
             onOpen()
@@ -87,11 +87,11 @@ struct CaptureStatusBarView: View {
         case .active:
             Image(systemName: "dot.radiowaves.left.and.right")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.Theme.success)
+                .foregroundStyle(Color.green)
         case .error:
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.Theme.destructive)
+                .foregroundStyle(Color.red)
         }
     }
 

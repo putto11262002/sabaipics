@@ -24,7 +24,7 @@ struct FrameFastApp: App {
                 .environmentObject(coordinator.connectivityStore)
                 .environmentObject(coordinator.creditsStore)
                 .environment(\.clerk, clerk)
-                .tint(Color.Theme.primary)
+                .tint(Color.accentColor)
                 .task {
                     await configureAndLoadClerk()
                 }

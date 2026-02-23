@@ -98,11 +98,11 @@ struct SonyWiFiOnboardingView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     Text("Connect with QR")
                         .font(.headline)
-                        .foregroundColor(Color.Theme.foreground)
+                        .foregroundColor(Color.primary)
 
                     Text("Follow these steps on the camera, then scan the QR.")
                         .font(.subheadline)
-                        .foregroundColor(Color.Theme.mutedForeground)
+                        .foregroundColor(Color.secondary)
 
                     VStack(alignment: .leading, spacing: 10) {
                         qrGuideLine(index: 1, text: "MENU -> Network -> Control w/ Smartphone -> Connection")
@@ -112,7 +112,7 @@ struct SonyWiFiOnboardingView: View {
 
                     Text("Then tap Scan QR in FrameFast.")
                         .font(.subheadline)
-                        .foregroundColor(Color.Theme.mutedForeground)
+                        .foregroundColor(Color.secondary)
 
                     if let qrError {
                         Text(qrError)
@@ -128,7 +128,8 @@ struct SonyWiFiOnboardingView: View {
                 qrError = nil
                 showQRScanner = true
             }
-            .buttonStyle(.primary)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 10)
@@ -139,18 +140,18 @@ struct SonyWiFiOnboardingView: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             ZStack {
                 Circle()
-                    .stroke(Color.Theme.border, lineWidth: 1)
+                    .stroke(Color(UIColor.separator), lineWidth: 1)
                     .frame(width: 22, height: 22)
                 Text("\(index)")
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(Color.Theme.foreground)
+                    .foregroundColor(Color.primary)
             }
             .padding(.top, 1)
 
             Text(text)
                 .font(.subheadline)
-                .foregroundColor(Color.Theme.foreground)
+                .foregroundColor(Color.primary)
 
             Spacer(minLength: 0)
         }
@@ -162,24 +163,24 @@ struct SonyWiFiOnboardingView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("WiFi name (SSID)")
                         .font(.subheadline)
-                        .foregroundColor(Color.Theme.mutedForeground)
+                        .foregroundColor(Color.secondary)
                     TextField("DIRECT-...", text: $ssid)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .keyboardType(.asciiCapable)
-                        .textFieldStyle(.themed(isFocused: $ssidFocused))
+                        .textFieldStyle(.roundedBorder)
                         .focused($ssidFocused)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Password")
                         .font(.subheadline)
-                        .foregroundColor(Color.Theme.mutedForeground)
+                        .foregroundColor(Color.secondary)
                     SecureField("Password", text: $password)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .keyboardType(.asciiCapable)
-                        .textFieldStyle(.themed(isFocused: $passwordFocused))
+                        .textFieldStyle(.roundedBorder)
                         .focused($passwordFocused)
                 }
 
@@ -197,7 +198,8 @@ struct SonyWiFiOnboardingView: View {
                     passwordFocused = false
                     joinFromManualInput()
                 }
-                .buttonStyle(.primary)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
             .padding(20)
         }

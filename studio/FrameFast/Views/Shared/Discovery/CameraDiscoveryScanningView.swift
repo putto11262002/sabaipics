@@ -17,7 +17,7 @@ struct CameraDiscoveryScanningView: View {
             if !message.isEmpty {
                 Text(message)
                     .font(.subheadline)
-                    .foregroundColor(Color.Theme.mutedForeground)
+                    .foregroundColor(Color.secondary)
                     .padding(.horizontal, 20)
             }
 
@@ -25,7 +25,7 @@ struct CameraDiscoveryScanningView: View {
 
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 48))
-                .foregroundColor(Color.Theme.mutedForeground.opacity(0.6))
+                .foregroundColor(Color.secondary.opacity(0.6))
                 .offset(x: sweep ? 24 : -24, y: sweep ? -8 : 8)
                 .rotationEffect(.degrees(sweep ? 12 : -12))
                 .animation(

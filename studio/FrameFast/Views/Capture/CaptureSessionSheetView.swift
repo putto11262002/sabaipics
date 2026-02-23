@@ -33,13 +33,13 @@ struct CaptureSessionSheetView: View {
                         Spacer()
                         Image(systemName: "photo.on.rectangle")
                             .font(.system(size: 44))
-                            .foregroundStyle(Color.Theme.mutedForeground)
+                            .foregroundStyle(Color.secondary)
                         Text("No live session")
                             .font(.headline)
-                            .foregroundStyle(Color.Theme.foreground)
+                            .foregroundStyle(Color.primary)
                         Text("Connect a camera to see photos here.")
                             .font(.subheadline)
-                            .foregroundStyle(Color.Theme.mutedForeground)
+                            .foregroundStyle(Color.secondary)
                         Spacer()
                     }
                     .frame(maxWidth: .infinity)
@@ -55,7 +55,7 @@ struct CaptureSessionSheetView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.Theme.primary)
+                            .foregroundStyle(Color.accentColor)
                     }
                     .buttonStyle(.plain)
                 }
@@ -64,7 +64,7 @@ struct CaptureSessionSheetView: View {
                 bottomActions
             }
         }
-        .tint(Color.Theme.primary)
+        .tint(Color.accentColor)
     }
 
     private var sessionInfoList: some View {
@@ -106,18 +106,18 @@ struct CaptureSessionSheetView: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 15))
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .frame(width: 20)
 
             Text(label)
                 .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
 
             Spacer()
 
             Text(value)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 11)
@@ -163,7 +163,7 @@ private struct CaptureSessionPhotosView: View {
                                     .padding(.vertical, 10)
 
                                 Divider()
-                                    .background(Color.Theme.border)
+                                    .background(Color(UIColor.separator))
                             }
                         }
                     }
@@ -210,14 +210,14 @@ private struct CaptureSessionPhotosView: View {
             Spacer(minLength: 30)
             Image(systemName: "camera.viewfinder")
                 .font(.system(size: 56))
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
             VStack(spacing: 6) {
                 Text("Ready to Capture")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(Color.Theme.foreground)
+                    .foregroundStyle(Color.primary)
                 Text("Take photos with your camera.\nThey'll appear here automatically.")
                     .font(.subheadline)
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
                     .multilineTextAlignment(.center)
             }
             Spacer(minLength: 30)
@@ -235,7 +235,7 @@ private struct CaptureSessionPhotosView: View {
 
             Text("\(session.skippedRawCount) RAW file\(session.skippedRawCount == 1 ? "" : "s") skipped")
                 .font(.subheadline)
-                .foregroundColor(Color.Theme.foreground)
+                .foregroundColor(Color.primary)
 
             Spacer()
 
@@ -246,7 +246,7 @@ private struct CaptureSessionPhotosView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption)
-                    .foregroundColor(Color.Theme.mutedForeground)
+                    .foregroundColor(Color.secondary)
             }
             .buttonStyle(.plain)
         }

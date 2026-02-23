@@ -20,7 +20,7 @@ struct PhotoListRow: View {
                     .cornerRadius(8)
             } else {
                 Rectangle()
-                    .fill(Color.Theme.muted)
+                    .fill(Color(UIColor.tertiarySystemFill))
                     .frame(width: 60, height: 60)
                     .cornerRadius(8)
                     .overlay(
@@ -31,13 +31,13 @@ struct PhotoListRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(photo.name)
                     .font(.headline)
-                    .foregroundColor(Color.Theme.foreground)
+                    .foregroundColor(Color.primary)
                     .lineLimit(1)
 
                 let displaySize = photo.data.isEmpty ? photo.fileSize : photo.data.count
                 Text("\(formatFileSize(displaySize)) · \(formatRelativeTime(photo.captureDate))")
                     .font(.caption)
-                    .foregroundColor(Color.Theme.mutedForeground)
+                    .foregroundColor(Color.secondary)
             }
 
             Spacer()
@@ -58,7 +58,7 @@ struct PhotoListRow: View {
             switch uploadState {
             case .queued, .presigned:
                 Image(systemName: "arrow.up.circle")
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
                     .font(.title3)
 
             case .uploading:
@@ -67,32 +67,32 @@ struct PhotoListRow: View {
 
             case .uploaded, .awaitingCompletion:
                 Image(systemName: "hourglass")
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
                     .font(.title3)
 
             case .completed:
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Color.Theme.success)
+                    .foregroundStyle(Color.green)
                     .font(.title3)
 
             case .failed:
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .foregroundStyle(Color.Theme.warning)
+                    .foregroundStyle(Color.orange)
                     .font(.title3)
 
             case .terminalFailed:
                 Image(systemName: "xmark.octagon.fill")
-                    .foregroundStyle(Color.Theme.destructive)
+                    .foregroundStyle(Color.red)
                     .font(.title3)
             }
         } else if case .completed = photo.status {
             // Download completed but not enqueued (should be rare with forced event selection)
             Image(systemName: "arrow.down.circle.fill")
-                .foregroundStyle(Color.Theme.primary)
+                .foregroundStyle(Color.accentColor)
                 .font(.title3)
         } else if case .failed = photo.status {
             Image(systemName: "exclamationmark.circle.fill")
-                .foregroundStyle(Color.Theme.destructive)
+                .foregroundStyle(Color.red)
                 .font(.title3)
         }
     }
