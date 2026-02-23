@@ -122,6 +122,7 @@ export function HeroEventStageShell({ className }: { className?: string }) {
                         alt="Event photo example 1"
                         fill
                         fetchPriority="high"
+                        loading="eager"
                         sizes="(max-width: 1024px) 100vw, 720px"
                         className="object-contain"
                       />
