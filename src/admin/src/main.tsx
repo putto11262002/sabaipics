@@ -6,6 +6,7 @@ import { RouterProvider } from 'react-router';
 import { Toaster } from '@/shared/components/ui/sonner';
 import { TooltipProvider } from '@/shared/components/ui/tooltip';
 import '@/shared/styles/globals.css';
+import './admin.css';
 import 'sonner/dist/styles.css';
 import { shouldRetry } from '@/shared/lib/api-error';
 import { router } from './router';
