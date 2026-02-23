@@ -8,6 +8,7 @@ export * from './credit-packages';
 export * from './credit-ledger';
 export * from './credit-allocations';
 export * from './promo-code-usage';
+export * from './gift-codes';
 export * from './events';
 export * from './photos';
 export * from './faces';
