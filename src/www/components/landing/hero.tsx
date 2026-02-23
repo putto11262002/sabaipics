@@ -1,6 +1,3 @@
-'use client';
-
-import { motion } from 'framer-motion';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 
@@ -35,12 +32,7 @@ export function LandingHero() {
             }}
             aria-hidden="true"
           />
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
-            className="relative mx-auto max-w-5xl px-4 pb-12 pt-12 text-center sm:pb-16 sm:pt-16"
-          >
+          <div className="relative mx-auto max-w-5xl px-4 pb-12 pt-12 text-center sm:pb-16 sm:pt-16">
             <div className="flex justify-center">
               <Badge variant="secondary" className="text-xs font-medium tracking-wide">
                 1,000 free credits to start
@@ -76,16 +68,11 @@ export function LandingHero() {
                 <Link href="https://app.framefast.io/sign-up">Start free trial</Link>
               </RoundedButton>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.1, ease: [0.2, 0.8, 0.2, 1] }}
-            className="relative mx-auto mt-4 max-w-[340px] px-3 pb-6 sm:mt-6 sm:max-w-[780px] sm:px-6 sm:pb-8 lg:max-w-[720px]"
-          >
+          <div className="relative mx-auto mt-4 max-w-[340px] px-3 pb-6 sm:mt-6 sm:max-w-[780px] sm:px-6 sm:pb-8 lg:max-w-[720px]">
             <HeroEventStage className="mx-auto" />
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>
