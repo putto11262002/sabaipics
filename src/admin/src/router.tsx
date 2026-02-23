@@ -21,6 +21,10 @@ export const router = createBrowserRouter([
         path: '/gift-codes/:id',
         lazy: () => import('./routes/gift-codes/[id]'),
       },
+      {
+        path: '/settings',
+        lazy: () => import('./routes/settings'),
+      },
     ],
   },
 
