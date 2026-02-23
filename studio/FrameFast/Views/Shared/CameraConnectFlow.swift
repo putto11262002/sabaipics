@@ -258,6 +258,7 @@ struct CameraConnectFlow<Setup: View>: View {
                 CameraDiscoveryView(
                     preferredIP: preferredIP,
                     showsManualIP: config.showsManualIP,
+                    continuous: true,
                     makeScanTargets: config.makeScanTargets,
                     scanConfig: config.scanConfig,
                     onBack: {
