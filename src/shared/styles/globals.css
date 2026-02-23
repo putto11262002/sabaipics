@@ -4,8 +4,7 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
 
-@source "../../";
-@source "../../www/**/*.{js,ts,jsx,tsx,md,mdx}";
+/* @source directives moved to app-specific CSS files for tree-shaking */
 
 @custom-variant dark (&:is(.dark *));
 
