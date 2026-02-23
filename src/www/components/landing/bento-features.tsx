@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 import { Smartphone, Globe, Monitor, Aperture } from 'lucide-react';
 
 const searchMessages = [

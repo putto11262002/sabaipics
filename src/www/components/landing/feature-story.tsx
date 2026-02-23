@@ -1,6 +1,5 @@
 'use client';
 
-import { motion, useInView } from 'framer-motion';
 import {
   ArrowRight,
   Calendar,
@@ -9,7 +8,6 @@ import {
   Image as ImageIcon,
   LayoutDashboard,
   MoreHorizontal,
-  Plus,
   RefreshCw,
   SlidersHorizontal,
   Smile,
@@ -20,6 +18,7 @@ import { useEffect, useRef, useState, type ReactElement, type ReactNode } from '
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
+import { cn } from '@/shared/utils/ui';
 
 type Step = {
   id: string;
@@ -35,6 +34,104 @@ type Step = {
 
 const STACKED_PRIMARY_END_GRADIENT =
   'linear-gradient(90deg, color-mix(in oklab, var(--primary) 6%, transparent) 0%, color-mix(in oklab, var(--primary-end) 10%, transparent) 52%, color-mix(in oklab, var(--primary) 5%, transparent) 100%), radial-gradient(138% 88% at 50% 104%, color-mix(in oklab, var(--primary-end) 44%, transparent) 0%, color-mix(in oklab, var(--primary-end) 22%, transparent) 42%, transparent 78%), radial-gradient(96% 72% at 18% 102%, color-mix(in oklab, var(--primary) 20%, transparent) 0%, transparent 84%), radial-gradient(96% 72% at 82% 102%, color-mix(in oklab, var(--primary-end) 24%, transparent) 0%, transparent 84%)';
+
+// CSS keyframes matching Framer Motion animations exactly
+const animationStyles = `
+  /* Fade in + slide up - duration 0.24s easeOut (step cards) */
+  @keyframes fadeInSlideUp24 {
+    from { opacity: 0; transform: translateY(8px) scale(0.99); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Fade in + slide up - duration 0.22s easeOut (line message) */
+  @keyframes fadeInSlideUp22 {
+    from { opacity: 0; transform: translateY(8px) scale(0.99); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Fade in + slide up - duration 0.26s easeOut (line reply) */
+  @keyframes fadeInSlideUp26 {
+    from { opacity: 0; transform: translateY(10px) scale(0.99); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Scale in + slide up - duration 0.25s easeOut (face match results) */
+  @keyframes scaleInSlideUp25 {
+    from { opacity: 0; transform: translateY(6px) scale(0.92); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Scale in + slide up - duration 0.2s easeOut (line results) */
+  @keyframes scaleInSlideUp20 {
+    from { opacity: 0; transform: translateY(6px) scale(0.92); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Pulse opacity - duration 0.8s linear infinite */
+  @keyframes pulseOpacity {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* Color wipe width - duration 4.2s easeInOut infinite */
+  @keyframes colorWipe {
+    0% { width: 0%; }
+    50% { width: 100%; }
+    100% { width: 0%; }
+  }
+
+  .animate-fade-in-slide-up-24 {
+    animation: fadeInSlideUp24 0.24s ease-out forwards;
+  }
+
+  .animate-fade-in-slide-up-22 {
+    animation: fadeInSlideUp22 0.22s ease-out forwards;
+  }
+
+  .animate-fade-in-slide-up-26 {
+    animation: fadeInSlideUp26 0.26s ease-out forwards;
+  }
+
+  .animate-scale-in-slide-up-25 {
+    animation: scaleInSlideUp25 0.25s ease-out forwards;
+  }
+
+  .animate-scale-in-slide-up-20 {
+    animation: scaleInSlideUp20 0.2s ease-out forwards;
+  }
+
+  .animate-pulse-opacity {
+    animation: pulseOpacity 0.8s linear infinite;
+  }
+
+  .animate-color-wipe {
+    animation: colorWipe 4.2s ease-in-out infinite;
+  }
+`;
+
+// Hook to replace Framer's useInView
+function useInView(ref: React.RefObject<HTMLElement | null>, options?: IntersectionObserverInit) {
+  const [isInView, setIsInView] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+        }
+      },
+      { threshold: 0, ...options }
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref, options?.rootMargin, options?.threshold]);
+
+  return isInView;
+}
 
 function VisualShell({ children }: { children: ReactNode }) {
   return (
@@ -57,7 +154,7 @@ const LINE_REPLY_RESULTS = FACE_MATCH_RESULTS.slice(0, 10);
 
 function FaceVariant() {
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: false, margin: '-100px' });
+  const isInView = useInView(ref, { rootMargin: '-100px' });
   const [hasStarted, setHasStarted] = useState(false);
   const [phase, setPhase] = useState(0);
   const [revealedCount, setRevealedCount] = useState(0);
@@ -138,10 +235,7 @@ function FaceVariant() {
   return (
     <div ref={ref} className="relative h-full overflow-visible px-[4.8%] pt-[5.2%]">
       <div className="relative flex h-full flex-col justify-start pt-1">
-        <motion.div
-          key={`terminal-${cycleKey}`}
-          className="w-full space-y-2"
-        >
+        <div key={`terminal-${cycleKey}`} className="w-full space-y-2">
           {steps.map((step, index) => {
             const stepNumber = index + 1;
             const isVisible = phase >= stepNumber;
@@ -157,12 +251,9 @@ function FaceVariant() {
                 : 'bg-foreground/10 text-muted-foreground';
 
             return (
-              <motion.div
+              <div
                 key={step.title}
-                initial={{ opacity: 0, y: 8, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.24, ease: 'easeOut' }}
-                className="flex items-center gap-3 rounded-xl border border-border bg-card px-2.5 py-2 shadow-[0_14px_28px_-24px_color-mix(in_oklab,var(--foreground)_34%,transparent)] sm:px-3 sm:py-2.5"
+                className="flex items-center gap-3 rounded-xl border border-border bg-card px-2.5 py-2 shadow-[0_14px_28px_-24px_color-mix(in_oklab,var(--foreground)_34%,transparent)] animate-fade-in-slide-up-24 sm:px-3 sm:py-2.5"
               >
                 <span
                   className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${dotClass}`}
@@ -178,16 +269,12 @@ function FaceVariant() {
                   </span>
                 </span>
                 {isActive && (
-                  <motion.span
-                    className="inline-block h-2.5 w-2.5 rounded-full bg-primary/75"
-                    animate={{ opacity: [1, 0, 1] }}
-                    transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                  />
+                  <span className="inline-block h-2.5 w-2.5 rounded-full bg-primary/75 animate-pulse-opacity" />
                 )}
-              </motion.div>
+              </div>
             );
           })}
-        </motion.div>
+        </div>
 
         <div className="mt-4 w-full min-h-[208px]">
           <div className="grid grid-cols-3 gap-2">
@@ -195,18 +282,15 @@ function FaceVariant() {
               const isVisible = index < revealedCount;
               if (!isVisible) return null;
               return (
-                <motion.div
+                <div
                   key={`match-${index}`}
-                  className="relative aspect-square overflow-hidden rounded-md border backdrop-blur-lg"
+                  className="relative aspect-square overflow-hidden rounded-md border backdrop-blur-lg animate-scale-in-slide-up-25"
                   style={{
                     borderColor: 'color-mix(in oklab, var(--background) 90%, var(--foreground) 10%)',
                     background: 'color-mix(in oklab, var(--background) 46%, transparent)',
                     boxShadow:
                       '0 12px 28px -24px color-mix(in oklab, var(--foreground) 26%, transparent), inset 0 1px 0 color-mix(in oklab, white 55%, transparent), inset 0 -1px 0 color-mix(in oklab, var(--foreground) 6%, transparent)',
                   }}
-                  initial={{ opacity: 0, scale: 0.92, y: 6 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ duration: 0.25, ease: 'easeOut' }}
                 >
                   <div
                     className="absolute inset-x-0 top-0 h-1/2 opacity-80"
@@ -218,7 +302,7 @@ function FaceVariant() {
                   <div className="absolute right-2 top-2 rounded-full border border-border bg-background/80 px-1.5 py-0.5 text-[9px] font-semibold text-foreground/80">
                     ✓ {confidence}%
                   </div>
-                </motion.div>
+                </div>
               );
             })}
           </div>
@@ -230,7 +314,7 @@ function FaceVariant() {
 
 function LineVariant() {
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: false, margin: '-100px' });
+  const isInView = useInView(ref, { rootMargin: '-100px' });
   const [hasStarted, setHasStarted] = useState(false);
   const [phase, setPhase] = useState(0);
   const [revealedCount, setRevealedCount] = useState(0);
@@ -297,19 +381,9 @@ function LineVariant() {
         <div className="pointer-events-none absolute left-1/2 top-[3.2%] h-[3.4%] w-[34%] -translate-x-1/2 rounded-full border border-border/70 bg-background/40 backdrop-blur-sm" />
 
         <div className="absolute inset-[4.2%] rounded-[1.75rem] px-1 pb-[4.6%] pt-[9.8%]">
-          <motion.div
-            key={`line-${cycleKey}`}
-            className="space-y-6"
-            // animate={{ y: [0, -2, 0] }}
-            // transition={{ duration: 3.2, ease: 'easeInOut', repeat: Infinity }}
-          >
+          <div key={`line-${cycleKey}`} className="space-y-6">
             {phase >= 1 && (
-              <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.22, ease: 'easeOut' }}
-                className="flex items-start justify-end gap-[2.4%]"
-              >
+              <div className="flex items-start justify-end gap-[2.4%] animate-fade-in-slide-up-22">
                 <div className="flex w-full flex-col items-end gap-2">
                   <div className="flex w-[80%] justify-end md:w-[60%] lg:w-[50%]">
                     <div className="w-fit rounded-2xl border border-border bg-background/60 px-3 py-1.5 text-xs text-foreground shadow-[0_10px_22px_-18px_color-mix(in_oklab,var(--foreground)_34%,transparent)] backdrop-blur-md sm:text-xs">
@@ -339,16 +413,11 @@ function LineVariant() {
                 <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-[0_8px_18px_-14px_color-mix(in_oklab,var(--foreground)_40%,transparent)]">
                   <User className="h-3.5 w-3.5" />
                 </span>
-              </motion.div>
+              </div>
             )}
 
             {phase >= 2 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.26, ease: 'easeOut' }}
-                className="flex items-start gap-[2.4%]"
-              >
+              <div className="flex items-start gap-[2.4%] animate-fade-in-slide-up-26">
                 <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-background/92 text-[10px] font-semibold text-foreground shadow-[0_8px_18px_-14px_color-mix(in_oklab,var(--foreground)_40%,transparent)]">
                   <LogoMark className="h-3.5 w-3.5 text-primary" />
                 </span>
@@ -358,18 +427,15 @@ function LineVariant() {
                     {LINE_REPLY_RESULTS.map((_, index) => {
                       if (index >= revealedCount) return null;
                       return (
-                        <motion.div
+                        <div
                           key={`line-result-${index}`}
-                          className="relative aspect-square overflow-hidden rounded-md border backdrop-blur-lg"
+                          className="relative aspect-square overflow-hidden rounded-md border backdrop-blur-lg animate-scale-in-slide-up-20"
                           style={{
                             borderColor: 'color-mix(in oklab, var(--background) 90%, var(--foreground) 10%)',
                             background: 'color-mix(in oklab, var(--background) 44%, transparent)',
                             boxShadow:
                               '0 12px 28px -24px color-mix(in oklab, var(--foreground) 24%, transparent), inset 0 1px 0 color-mix(in oklab, white 55%, transparent), inset 0 -1px 0 color-mix(in oklab, var(--foreground) 6%, transparent)',
                           }}
-                          initial={{ opacity: 0, scale: 0.92, y: 6 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          transition={{ duration: 0.2, ease: 'easeOut' }}
                         >
                           <div
                             className="absolute inset-x-0 top-0 h-1/2 opacity-80"
@@ -378,14 +444,14 @@ function LineVariant() {
                                 'linear-gradient(180deg, color-mix(in oklab, white 52%, transparent) 0%, transparent 100%)',
                             }}
                           />
-                        </motion.div>
+                        </div>
                       );
                     })}
                   </div>
                 </div>
-              </motion.div>
+              </div>
             )}
-          </motion.div>
+          </div>
         </div>
 
       </div>
@@ -434,11 +500,7 @@ function ColorVariant() {
                 }}
               />
 
-              <motion.div
-                className="absolute inset-y-0 left-0 overflow-hidden"
-                animate={{ width: ['0%', '100%', '0%'] }}
-                transition={{ duration: 4.2, ease: 'easeInOut', repeat: Infinity }}
-              >
+              <div className="absolute inset-y-0 left-0 overflow-hidden animate-color-wipe">
                 <div
                   className="h-full w-[120%]"
                   style={{
@@ -446,7 +508,7 @@ function ColorVariant() {
                       'radial-gradient(88% 76% at 24% 28%, color-mix(in oklab, var(--primary-end) 38%, transparent) 0%, transparent 70%), radial-gradient(84% 74% at 78% 70%, color-mix(in oklab, var(--primary) 38%, transparent) 0%, transparent 72%), linear-gradient(160deg, color-mix(in oklab, var(--primary-end) 26%, transparent) 0%, color-mix(in oklab, var(--primary) 30%, transparent) 58%, color-mix(in oklab, var(--primary-end) 18%, transparent) 100%)',
                   }}
                 />
-              </motion.div>
+              </div>
             </div>
           ))}
         </div>
@@ -698,6 +760,9 @@ export function FeatureStory() {
 
   return (
     <section id="features" className="relative scroll-mt-24 bg-muted/30">
+      {/* Inject CSS keyframes */}
+      <style dangerouslySetInnerHTML={{ __html: animationStyles }} />
+
       <div className="mx-auto max-w-7xl px-4 pb-8 pt-2 sm:pt-6">
         <div className="max-w-4xl">
           <h2 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
