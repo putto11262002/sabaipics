@@ -24,7 +24,7 @@ struct CaptureHomeView: View {
                 if isConnectionMuted {
                     Section {
                         Text("Disconnect the current camera to connect another.")
-                            .foregroundStyle(Color.Theme.mutedForeground)
+                            .foregroundStyle(Color.secondary)
                                                 }
                 }
 
@@ -42,7 +42,7 @@ struct CaptureHomeView: View {
                                         HStack(spacing: 8) {
                                             Text(record.cameraName)
                                                 .font(.body)
-                                                .foregroundStyle(Color.Theme.foreground)
+                                                .foregroundStyle(Color.primary)
 
                                             ManufacturerBadge(manufacturer: record.manufacturer)
                                         }
@@ -63,7 +63,7 @@ struct CaptureHomeView: View {
                                 } label: {
                                     Label("Remove", systemImage: "trash")
                                 }
-                                .tint(Color.Theme.destructive)
+                                .tint(Color.red)
                             }
                         }
                     }
@@ -83,7 +83,7 @@ struct CaptureHomeView: View {
         HStack(alignment: .firstTextBaseline) {
             Text("Cameras")
                 .font(.largeTitle.weight(.bold))
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
 
             Spacer(minLength: 0)
 
@@ -94,8 +94,8 @@ struct CaptureHomeView: View {
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .semibold))
                     .frame(width: 36, height: 36)
-                    .foregroundStyle(Color.Theme.primaryForeground)
-                    .background(Color.Theme.primary, in: Circle())
+                    .foregroundStyle(Color.white)
+                    .background(Color.accentColor, in: Circle())
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
@@ -116,10 +116,10 @@ private struct ManufacturerBadge: View {
     var body: some View {
         Text(manufacturer.rawValue)
             .font(.caption2.weight(.semibold))
-            .foregroundStyle(Color.Theme.mutedForeground)
+            .foregroundStyle(Color.secondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(Color.Theme.muted)
+            .background(Color(UIColor.tertiarySystemFill))
             .clipShape(Capsule())
     }
 }

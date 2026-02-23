@@ -17,7 +17,7 @@ struct ConnectivityStatusToolbarView: View {
         case .online, .offline:
             let isOnline = status == .online
             let interfaceIcon = interfaceIconName(isOnline: isOnline, interface: connectivityStore.state.interface)
-            let interfaceTint: Color = isOnline ? Color.Theme.success : Color.Theme.warning
+            let interfaceTint: Color = isOnline ? Color.green : Color.orange
 
             Image(systemName: interfaceIcon)
                 .font(.system(size: 14, weight: .semibold))

@@ -155,7 +155,7 @@ struct EventsHomeView: View {
                 }
             } header: {
                 Text("Events")
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
             }
         }
         .redacted(reason: .placeholder)
@@ -176,7 +176,7 @@ struct EventsHomeView: View {
                 }
             } header: {
                 Text("Events")
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
             }
         }
         .refreshable {
@@ -190,15 +190,15 @@ struct EventsHomeView: View {
         VStack(spacing: 16) {
             Image(systemName: "calendar")
                 .font(.system(size: 60))
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
 
             Text("No events yet")
                 .font(.headline)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
 
             Text("Your events will appear here once created")
                 .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
         }
         .padding()
@@ -216,15 +216,15 @@ struct EventsHomeView: View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.Theme.destructive)
+                .foregroundStyle(Color.red)
 
             Text("Error Loading Events")
                 .font(.headline)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
 
             Text(error.localizedDescription)
                 .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
@@ -235,7 +235,7 @@ struct EventsHomeView: View {
             } label: {
                 Text("Retry")
             }
-            .buttonStyle(.compact)
+            .buttonStyle(.bordered)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -261,7 +261,7 @@ private struct UploadStatsCardsRow: View {
             UploadSyncCard(pendingJobs: pendingJobs)
             UploadStatCard(
                 icon: "tray.and.arrow.up",
-                iconTint: Color.Theme.success,
+                iconTint: Color.green,
                 title: "Uploaded (7d)",
                 value: String(uploadedLast7Days)
             )
@@ -274,7 +274,7 @@ private struct UploadSyncCard: View {
 
     var body: some View {
         let icon = "tray.and.arrow.up"
-        let tint: Color = Color.Theme.warning
+        let tint: Color = Color.orange
         let value = pendingJobs == 0 ? "—" : "\(pendingJobs)"
 
         return UploadStatCard(
@@ -296,7 +296,7 @@ private struct UploadStatCard: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.caption2)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
 
             HStack(spacing: 8) {
                 Image(systemName: icon)
@@ -305,18 +305,18 @@ private struct UploadStatCard: View {
                 Spacer(minLength: 8)
                 Text(value)
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(Color.Theme.foreground)
+                    .foregroundStyle(Color.primary)
             }
             .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.Theme.card)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.Theme.border.opacity(0.6), lineWidth: 1)
+                .stroke(Color(UIColor.separator).opacity(0.6), lineWidth: 1)
         )
     }
 }
@@ -330,7 +330,7 @@ private struct UploadEventStatusRow: View {
         HStack(spacing: 12) {
             Text(title)
                 .font(.body)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
 
             Spacer(minLength: 10)
 
@@ -348,7 +348,7 @@ private struct UploadEventSyncIndicator: View {
         let pending = summary?.pending ?? 0
 
         if pending > 0 {
-            let tint: Color = isOnline ? Color.Theme.primary : Color.Theme.warning
+            let tint: Color = isOnline ? Color.accentColor : Color.orange
             if isOnline {
                 ProgressView()
                     .controlSize(.mini)
@@ -357,18 +357,18 @@ private struct UploadEventSyncIndicator: View {
             } else {
                 Image(systemName: "minus")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
                     .accessibilityLabel("Pending")
             }
         } else if completed > 0 {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.Theme.success)
+                .foregroundStyle(Color.green)
                 .accessibilityLabel("Synced")
         } else {
             Text("—")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .accessibilityLabel("No uploads")
         }
     }
@@ -381,7 +381,7 @@ struct SkeletonEventRow: View {
         HStack {
             Text(title)
                 .font(.body)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
 
             Spacer(minLength: 0)
         }
@@ -393,15 +393,15 @@ struct OfflineEventsPlaceholderView: View {
         VStack(spacing: 14) {
             Image(systemName: "wifi.slash")
                 .font(.system(size: 52))
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
 
             Text("Offline")
                 .font(.headline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
 
             Text("Events can't be loaded right now. Uploads will resume when you're back online.")
                 .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
         }
@@ -441,13 +441,13 @@ struct OfflineEventsPlaceholderView: View {
                 )
             } header: {
                 Text("Events")
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
             }
         }
             }
     .padding(.horizontal, 16)
     .padding(.top, 8)
-    .background(Color.Theme.background)
+    .background(Color(UIColor.systemBackground))
 }
 
 #Preview("Events Upload - Offline Cold Start") {
@@ -464,7 +464,7 @@ struct OfflineEventsPlaceholderView: View {
     }
     .padding(.horizontal, 16)
     .padding(.top, 8)
-    .background(Color.Theme.background)
+    .background(Color(UIColor.systemBackground))
 }
 
 #Preview("1. Skeleton Loading") {
@@ -490,7 +490,7 @@ private struct EventsHomeSkeletonPreview: View {
                 }
             } header: {
                 Text("Recent Events")
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
             }
         }
         .listStyle(.insetGrouped)

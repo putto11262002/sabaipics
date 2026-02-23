@@ -112,7 +112,7 @@ struct CameraConnectFlow<Setup: View>: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.Theme.primary)
+                                .foregroundStyle(Color.accentColor)
                         }
                         .buttonStyle(.plain)
                     }
@@ -144,7 +144,7 @@ struct CameraConnectFlow<Setup: View>: View {
                             } label: {
                                 Image(systemName: "chevron.left")
                                     .fontWeight(.semibold)
-                                    .foregroundStyle(Color.Theme.primary)
+                                    .foregroundStyle(Color.accentColor)
                             }
                             .buttonStyle(.plain)
                         }
@@ -155,7 +155,7 @@ struct CameraConnectFlow<Setup: View>: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.Theme.primary)
+                                .foregroundStyle(Color.accentColor)
                         }
                         .buttonStyle(.plain)
                     }
@@ -189,7 +189,7 @@ struct CameraConnectFlow<Setup: View>: View {
                         } label: {
                             Image(systemName: "chevron.left")
                                 .fontWeight(.semibold)
-                                .foregroundStyle(Color.Theme.primary)
+                                .foregroundStyle(Color.accentColor)
                         }
                         .buttonStyle(.plain)
                     }
@@ -199,7 +199,7 @@ struct CameraConnectFlow<Setup: View>: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.Theme.primary)
+                                .foregroundStyle(Color.accentColor)
                         }
                         .buttonStyle(.plain)
                     }
@@ -228,7 +228,7 @@ struct CameraConnectFlow<Setup: View>: View {
                         } label: {
                             Image(systemName: "chevron.left")
                                 .fontWeight(.semibold)
-                                .foregroundStyle(Color.Theme.primary)
+                                .foregroundStyle(Color.accentColor)
                         }
                         .buttonStyle(.plain)
                     }
@@ -238,7 +238,7 @@ struct CameraConnectFlow<Setup: View>: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.Theme.primary)
+                                .foregroundStyle(Color.accentColor)
                         }
                         .buttonStyle(.plain)
                     }

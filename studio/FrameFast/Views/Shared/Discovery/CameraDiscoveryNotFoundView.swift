@@ -18,7 +18,7 @@ struct CameraDiscoveryNotFoundView: View {
             if !message.isEmpty {
                 Text(message)
                     .font(.subheadline)
-                    .foregroundColor(Color.Theme.mutedForeground)
+                    .foregroundColor(Color.secondary)
                     .padding(.horizontal, 20)
             }
 
@@ -27,9 +27,9 @@ struct CameraDiscoveryNotFoundView: View {
                     ForEach(bullets, id: \.self) { bullet in
                         HStack(alignment: .top, spacing: 8) {
                             Text("•")
-                                .foregroundColor(Color.Theme.mutedForeground)
+                                .foregroundColor(Color.secondary)
                             Text(bullet)
-                                .foregroundColor(Color.Theme.mutedForeground)
+                                .foregroundColor(Color.secondary)
                         }
                         .font(.subheadline)
                     }
@@ -43,7 +43,7 @@ struct CameraDiscoveryNotFoundView: View {
             if let icon = iconSystemName {
                 Image(systemName: icon)
                     .font(.system(size: 48))
-                    .foregroundColor(Color.Theme.mutedForeground.opacity(0.6))
+                    .foregroundColor(Color.secondary.opacity(0.6))
                     .frame(maxWidth: .infinity, alignment: .center)
             }
 

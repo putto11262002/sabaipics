@@ -17,7 +17,7 @@ struct CameraDiscoveryNetworkHelpView: View {
             if !message.isEmpty {
                 Text(message)
                     .font(.subheadline)
-                    .foregroundColor(Color.Theme.mutedForeground)
+                    .foregroundColor(Color.secondary)
                     .padding(.horizontal, 20)
             }
 
@@ -26,9 +26,9 @@ struct CameraDiscoveryNetworkHelpView: View {
                     ForEach(bullets, id: \.self) { bullet in
                         HStack(alignment: .top, spacing: 8) {
                             Text("•")
-                                .foregroundColor(Color.Theme.mutedForeground)
+                                .foregroundColor(Color.secondary)
                             Text(bullet)
-                                .foregroundColor(Color.Theme.mutedForeground)
+                                .foregroundColor(Color.secondary)
                         }
                         .font(.subheadline)
                     }
@@ -41,7 +41,7 @@ struct CameraDiscoveryNetworkHelpView: View {
 
             Image(systemName: "wifi.slash")
                 .font(.system(size: 48))
-                .foregroundColor(Color.Theme.mutedForeground.opacity(0.6))
+                .foregroundColor(Color.secondary.opacity(0.6))
                 .frame(maxWidth: .infinity, alignment: .center)
 
             Spacer()

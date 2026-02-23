@@ -19,7 +19,7 @@ struct UploadModePickerView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Choose how photos are handled during your shoot.")
                 .font(.subheadline)
-                .foregroundColor(Color.Theme.mutedForeground)
+                .foregroundColor(Color.secondary)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 32)
 
@@ -69,18 +69,18 @@ struct UploadModePickerView: View {
             HStack(spacing: 14) {
                 Image(systemName: icon)
                     .font(.title2)
-                    .foregroundStyle(Color.Theme.primary)
+                    .foregroundStyle(Color.accentColor)
                     .frame(width: 36, alignment: .center)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                        .foregroundColor(Color.Theme.foreground)
+                        .foregroundColor(Color.primary)
 
                     Text(description)
                         .font(.caption)
-                        .foregroundColor(Color.Theme.mutedForeground)
+                        .foregroundColor(Color.secondary)
                 }
 
                 Spacer(minLength: 0)
@@ -91,15 +91,15 @@ struct UploadModePickerView: View {
                 } else {
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.Theme.mutedForeground)
+                        .foregroundStyle(Color.secondary)
                 }
             }
             .padding(16)
-            .background(Color.Theme.card)
+            .background(Color(UIColor.secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.Theme.border, lineWidth: 1)
+                    .stroke(Color(UIColor.separator), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

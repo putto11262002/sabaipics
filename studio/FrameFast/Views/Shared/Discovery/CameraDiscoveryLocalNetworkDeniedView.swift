@@ -22,7 +22,7 @@ struct CameraDiscoveryLocalNetworkDeniedView: View {
             if !message.isEmpty {
                 Text(message)
                     .font(.subheadline)
-                    .foregroundColor(Color.Theme.mutedForeground)
+                    .foregroundColor(Color.secondary)
                     .padding(.horizontal, 20)
             }
 
@@ -31,9 +31,9 @@ struct CameraDiscoveryLocalNetworkDeniedView: View {
                     ForEach(bullets, id: \.self) { bullet in
                         HStack(alignment: .top, spacing: 8) {
                             Text("-")
-                                .foregroundColor(Color.Theme.mutedForeground)
+                                .foregroundColor(Color.secondary)
                             Text(bullet)
-                                .foregroundColor(Color.Theme.mutedForeground)
+                                .foregroundColor(Color.secondary)
                         }
                         .font(.subheadline)
                     }
@@ -46,7 +46,7 @@ struct CameraDiscoveryLocalNetworkDeniedView: View {
 
             Image(systemName: "lock.shield")
                 .font(.system(size: 32))
-                .foregroundColor(Color.Theme.mutedForeground.opacity(0.6))
+                .foregroundColor(Color.secondary.opacity(0.6))
                 .frame(maxWidth: .infinity, alignment: .center)
 
             Spacer()
@@ -55,13 +55,13 @@ struct CameraDiscoveryLocalNetworkDeniedView: View {
                 Button("Open Settings") {
                     openSettings()
                 }
-                .buttonStyle(.compact)
+                .buttonStyle(.bordered)
 
                 Button("Try Again") {
                     onRetry()
                 }
                 .font(.subheadline)
-                .foregroundColor(Color.Theme.mutedForeground)
+                .foregroundColor(Color.secondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 20)

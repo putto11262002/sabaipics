@@ -16,7 +16,7 @@ struct WiFiJoiningView: View {
 
             Text(displayTitle)
                 .font(.headline)
-                .foregroundColor(Color.Theme.foreground)
+                .foregroundColor(Color.primary)
 
             Spacer()
         }
@@ -45,16 +45,16 @@ struct WiFiJoinErrorView: View {
 
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 36, weight: .semibold))
-                .foregroundColor(Color.Theme.destructive)
+                .foregroundColor(Color.red)
 
             VStack(spacing: 10) {
                 Text(title)
                     .font(.headline)
-                    .foregroundColor(Color.Theme.foreground)
+                    .foregroundColor(Color.primary)
 
                 Text(subtitle)
                     .font(.subheadline)
-                    .foregroundColor(Color.Theme.mutedForeground)
+                    .foregroundColor(Color.secondary)
                     .multilineTextAlignment(.center)
             }
             .padding(.horizontal, 32)
@@ -63,13 +63,13 @@ struct WiFiJoinErrorView: View {
                 Button("Try Again") {
                     onRetry()
                 }
-                .buttonStyle(.compact)
+                .buttonStyle(.bordered)
 
                 if let secondaryActionTitle, let onSecondaryAction {
                     Button(secondaryActionTitle) {
                         onSecondaryAction()
                     }
-                    .buttonStyle(.compact)
+                    .buttonStyle(.bordered)
                 }
             }
             .padding(.horizontal, 32)
@@ -91,12 +91,12 @@ typealias SonyWiFiJoinErrorView = WiFiJoinErrorView
 
 #Preview("WiFi Joining with SSID") {
     WiFiJoiningView(title: "Joining camera WiFi...", ssid: "DIRECT-cWE1:ILCE-7RM4")
-        .background(Color.Theme.background)
+        .background(Color(UIColor.systemBackground))
 }
 
 #Preview("WiFi Joining without SSID") {
     WiFiJoiningView(title: "Joining camera WiFi...", ssid: nil)
-        .background(Color.Theme.background)
+        .background(Color(UIColor.systemBackground))
 }
 
 #Preview("WiFi Join Error") {
@@ -105,7 +105,7 @@ typealias SonyWiFiJoinErrorView = WiFiJoinErrorView
         subtitle: "Check your camera Wi‑Fi connection.",
         onRetry: {}
     )
-    .background(Color.Theme.background)
+    .background(Color(UIColor.systemBackground))
 }
 
 #Preview("WiFi Join Error with Secondary") {
@@ -116,7 +116,7 @@ typealias SonyWiFiJoinErrorView = WiFiJoinErrorView
         secondaryActionTitle: "Enter IP Manually",
         onSecondaryAction: {}
     )
-    .background(Color.Theme.background)
+    .background(Color(UIColor.systemBackground))
 }
 
 #endif

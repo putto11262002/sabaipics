@@ -26,7 +26,7 @@ struct CameraDiscoveryTimedOutView: View {
 
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 48))
-                .foregroundColor(Color.Theme.mutedForeground.opacity(0.6))
+                .foregroundColor(Color.secondary.opacity(0.6))
                 .frame(maxWidth: .infinity, alignment: .center)
 
             Spacer()
@@ -47,9 +47,9 @@ struct CameraDiscoveryTimedOutView: View {
     private func bulletRow(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text("•")
-                .foregroundColor(Color.Theme.mutedForeground)
+                .foregroundColor(Color.secondary)
             Text(text)
-                .foregroundColor(Color.Theme.mutedForeground)
+                .foregroundColor(Color.secondary)
         }
         .font(.subheadline)
     }
@@ -57,9 +57,9 @@ struct CameraDiscoveryTimedOutView: View {
     private func bulletRow(_ text: AttributedString) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text("•")
-                .foregroundColor(Color.Theme.mutedForeground)
+                .foregroundColor(Color.secondary)
             Text(text)
-                .foregroundColor(Color.Theme.mutedForeground)
+                .foregroundColor(Color.secondary)
         }
         .font(.subheadline)
     }

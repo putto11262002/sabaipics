@@ -76,11 +76,11 @@ struct EventPickerSheetView: View {
                         HStack(spacing: 12) {
                             Text(event.name)
                                 .font(.body)
-                                .foregroundStyle(Color.Theme.foreground)
+                                .foregroundStyle(Color.primary)
                             Spacer(minLength: 8)
                             if selectedEventId == event.id {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(Color.Theme.primary)
+                                    .foregroundStyle(Color.accentColor)
                             }
                         }
                     }
@@ -88,7 +88,7 @@ struct EventPickerSheetView: View {
                                     }
             } header: {
                 Text("Events")
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
             }
         }
         .refreshable {
@@ -104,7 +104,7 @@ struct EventPickerSheetView: View {
                 }
             } header: {
                 Text("Events")
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
             }
         }
         .redacted(reason: .placeholder)
@@ -115,15 +115,15 @@ struct EventPickerSheetView: View {
         VStack(spacing: 16) {
             Image(systemName: "calendar")
                 .font(.system(size: 60))
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
 
             Text("No events yet")
                 .font(.headline)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
 
             Text("Your events will appear here once created")
                 .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
         }
         .padding()
@@ -139,15 +139,15 @@ struct EventPickerSheetView: View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.Theme.destructive)
+                .foregroundStyle(Color.red)
 
             Text("Error Loading Events")
                 .font(.headline)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
 
             Text(error.localizedDescription)
                 .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
@@ -158,7 +158,8 @@ struct EventPickerSheetView: View {
             } label: {
                 Text("Retry")
             }
-            .buttonStyle(.primary)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -172,7 +173,7 @@ private struct EventPickerSkeletonEventRow: View {
         HStack {
             Text(title)
                 .font(.body)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
 
             Spacer(minLength: 0)
         }
@@ -184,15 +185,15 @@ private struct EventPickerOfflineEventsPlaceholderView: View {
         VStack(spacing: 14) {
             Image(systemName: "wifi.slash")
                 .font(.system(size: 52))
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
 
             Text("Offline")
                 .font(.headline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
 
             Text("Events can’t be loaded right now. Uploads will resume when you’re back online.")
                 .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
         }
