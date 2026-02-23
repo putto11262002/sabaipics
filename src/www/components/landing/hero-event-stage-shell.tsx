@@ -115,13 +115,13 @@ export function HeroEventStageShell({ className }: { className?: string }) {
                     className="relative h-full w-full overflow-hidden"
                     style={{ borderRadius: 'calc(var(--radius) + 0.4rem)' }}
                   >
-                    {/* Static first frame - LCP image */}
+                    {/* Static first frame - LCP image with high priority */}
                     <div className="absolute inset-0">
                       <Image
                         src={event1}
                         alt="Event photo example 1"
                         fill
-                        preload
+                        fetchPriority="high"
                         sizes="(max-width: 1024px) 100vw, 720px"
                         className="object-contain"
                       />
