@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { Webhook } from 'svix';
-import { photographers, consentRecords } from '@/db/schema';
+import { photographers, consentRecords, appSettings } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import type { Database } from '@/db';
 import type { Env } from '../../types';
 import { apiError } from '../../lib/error';
+import { grantCredits } from '../../lib/credits/grant';
 
 // Use shared types from ../../types
 
@@ -113,27 +113,60 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
 
         if (!existing) {
           // Insert new photographer with consent status
-          await db.insert(photographers).values({
-            clerkId: user.id,
-            email,
-            name: displayName,
-            pdpaConsentAt,
-          });
+          const [newPhotographer] = await db
+            .insert(photographers)
+            .values({
+              clerkId: user.id,
+              email,
+              name: displayName,
+              pdpaConsentAt,
+            })
+            .returning({ id: photographers.id });
 
           // Create consent record if user accepted consent
-          if (pdpaConsentAt) {
-            const [newPhotographer] = await db
-              .select({ id: photographers.id })
-              .from(photographers)
-              .where(eq(photographers.clerkId, user.id))
-              .limit(1);
+          if (pdpaConsentAt && newPhotographer) {
+            await db.insert(consentRecords).values({
+              photographerId: newPhotographer.id,
+              consentType: 'pdpa',
+              ipAddress: c.req.header('CF-Connecting-IP') || null,
+            });
+          }
 
-            if (newPhotographer) {
-              await db.insert(consentRecords).values({
-                photographerId: newPhotographer.id,
-                consentType: 'pdpa',
-                ipAddress: c.req.header('CF-Connecting-IP') || null,
-              });
+          // Grant signup bonus if enabled
+          if (newPhotographer) {
+            try {
+              const [settings] = await db
+                .select()
+                .from(appSettings)
+                .where(eq(appSettings.id, 'global'))
+                .limit(1);
+
+              if (settings?.signupBonusEnabled && settings.signupBonusCredits > 0) {
+                const dbTx = c.var.dbTx();
+                const expiresAt = new Date(
+                  Date.now() + settings.signupBonusCreditExpiresInDays * 86_400_000,
+                ).toISOString();
+
+                await dbTx.transaction(async (tx) => {
+                  await grantCredits(tx, {
+                    photographerId: newPhotographer.id,
+                    amount: settings.signupBonusCredits,
+                    source: 'signup_bonus',
+                    expiresAt,
+                  }).match(
+                    () =>
+                      console.log('[Clerk Webhook] Signup bonus granted', {
+                        photographerId: newPhotographer.id,
+                        credits: settings.signupBonusCredits,
+                      }),
+                    (err) =>
+                      console.error('[Clerk Webhook] Failed to grant signup bonus:', err),
+                  );
+                });
+              }
+            } catch (bonusError) {
+              // Don't fail the webhook if signup bonus fails
+              console.error('[Clerk Webhook] Signup bonus error:', bonusError);
             }
           }
         }
