@@ -48,7 +48,9 @@ jobs:
       - run: pnpm install
 
       - name: Create Admin Env
-        run: echo "VITE_API_URL=https://api-staging.framefast.io" > src/admin/.env.staging
+        run: |
+          echo "VITE_API_URL=https://api-staging.framefast.io" > src/admin/.env.staging
+          echo "VITE_DASHBOARD_URL=https://app-staging.framefast.io" >> src/admin/.env.staging
 
       - name: Build Admin
         run: pnpm build:admin --mode staging

@@ -17,6 +17,14 @@ export const router = createBrowserRouter([
         path: '/users/:id',
         lazy: () => import('./routes/users/[id]'),
       },
+      {
+        path: '/gift-codes',
+        lazy: () => import('./routes/gift-codes'),
+      },
+      {
+        path: '/gift-codes/:id',
+        lazy: () => import('./routes/gift-codes/[id]'),
+      },
     ],
   },
 

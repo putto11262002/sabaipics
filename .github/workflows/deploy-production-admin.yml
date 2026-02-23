@@ -48,7 +48,9 @@ jobs:
       - run: pnpm install
 
       - name: Create Admin Env
-        run: echo "VITE_API_URL=https://api.framefast.io" > src/admin/.env.production
+        run: |
+          echo "VITE_API_URL=https://api.framefast.io" > src/admin/.env.production
+          echo "VITE_DASHBOARD_URL=https://app.framefast.io" >> src/admin/.env.production
 
       - name: Build Admin
         run: pnpm build:admin --mode production
