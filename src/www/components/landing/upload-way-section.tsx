@@ -573,14 +573,7 @@ export function UploadWaySection() {
         </p>
         </div>
 
-        <div
-          ref={showcaseRef}
-          className={[
-            'mt-8',
-            prefersReducedMotion ? '' : 'transition-all duration-500 ease-out',
-            prefersReducedMotion || showcaseVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0',
-          ].join(' ')}
-        >
+        <div ref={showcaseRef} className="mt-8">
           <div className="hidden md:block">
             {/* <div ref={cameraRef} className="mx-auto w-full max-w-[160px] lg:max-w-[200px]">
               <UploadCameraStage />
