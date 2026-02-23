@@ -41,6 +41,9 @@ importers:
       '@fontsource-variable/inter':
         specifier: ^5.2.8
         version: 5.2.8
+      '@fontsource-variable/noto-sans-thai':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@hono/node-server':
         specifier: ^1.8.0
         version: 1.19.9(hono@4.11.9)
@@ -1826,6 +1829,9 @@ packages:
 
   '@fontsource-variable/inter@5.2.8':
     resolution: {integrity: sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ==}
+
+  '@fontsource-variable/noto-sans-thai@5.2.8':
+    resolution: {integrity: sha512-btwMwVkcyGHc7UuC4+JJqiIrXxdswIA6RPzqiJ35dkD9ECfMM+1qECenQkaFPCiMWXfQvk0lV/N1BgBIq9ztdA==}
 
   '@formatjs/ecma402-abstract@3.1.1':
     resolution: {integrity: sha512-jhZbTwda+2tcNrs4kKvxrPLPjx8QsBCLCUgrrJ/S+G9YrGHWLhAyFMMBHJBnBoOwuLHd7L14FgYudviKaxkO2Q==}
@@ -10162,6 +10168,8 @@ snapshots:
   '@floating-ui/utils@0.2.10': {}
 
   '@fontsource-variable/inter@5.2.8': {}
+
+  '@fontsource-variable/noto-sans-thai@5.2.8': {}
 
   '@formatjs/ecma402-abstract@3.1.1':
     dependencies:

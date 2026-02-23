@@ -3,12 +3,14 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
+@import "@fontsource-variable/noto-sans-thai";
 
 /* @source directives moved to app-specific CSS files for tree-shaking */
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
+    --font-thai: 'Noto Sans Thai Variable';
     --background: oklch(0.993 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
