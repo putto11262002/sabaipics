@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Outlet, NavLink } from 'react-router';
+import { useState, useEffect } from 'react';
+import { Outlet, NavLink, useSearchParams } from 'react-router';
 import { Button } from '@/shared/components/ui/button';
 import {
   Card,
@@ -9,10 +9,11 @@ import {
   CardDescription,
 } from '@/shared/components/ui/card';
 import { Skeleton } from '@/shared/components/ui/skeleton';
-import { CreditCard, Wallet, Clock, TrendingDown } from 'lucide-react';
+import { CreditCard, Gift, Wallet, Clock, TrendingDown } from 'lucide-react';
 import { cn } from '@/shared/utils/ui';
 import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { CreditTopUpDialog } from '../../components/credits/CreditTopUpDialog';
+import { GiftCodeDialog } from '../../components/credits/GiftCodeDialog';
 import { useCreditHistory } from '../../hooks/credits/useCreditHistory';
 
 const tabs = [
@@ -22,9 +23,22 @@ const tabs = [
 
 export default function CreditsLayout() {
   const [topUpOpen, setTopUpOpen] = useState(false);
+  const [giftOpen, setGiftOpen] = useState(false);
+  const [giftCode, setGiftCode] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
   // Fetch just for summary stats (page 0, limit 1 to minimize data)
   const { data, isLoading } = useCreditHistory(0, 1);
   const summary = data?.data?.summary;
+
+  // Handle ?code=GIFT-XXX from URL
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (code) {
+      setGiftCode(code.toUpperCase());
+      setGiftOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   return (
     <div className="flex h-full flex-col">
@@ -34,6 +48,10 @@ export default function CreditsLayout() {
           { label: 'Credits' },
         ]}
       >
+        <Button size="sm" variant="outline" onClick={() => setGiftOpen(true)}>
+          <Gift className="mr-1 size-4" />
+          Redeem Gift Code
+        </Button>
         <Button size="sm" onClick={() => setTopUpOpen(true)}>
           <CreditCard className="mr-1 size-4" />
           Buy Credits
@@ -122,6 +140,7 @@ export default function CreditsLayout() {
       </div>
 
       <CreditTopUpDialog open={topUpOpen} onOpenChange={setTopUpOpen} />
+      <GiftCodeDialog open={giftOpen} onOpenChange={setGiftOpen} initialCode={giftCode} />
     </div>
   );
 }
