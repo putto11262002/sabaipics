@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 132" width="320" height="132" fill="none">
+  <defs>
+    <linearGradient id="logo-gradient" x1="0" y1="0" x2="96" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#EF4444"/>
+    </linearGradient>
+  </defs>
+
+  <!-- White background -->
+  <rect width="320" height="132" fill="#FFFFFF"/>
+
+  <!-- Mark: centered vertically, positioned at x=16 -->
+  <g transform="translate(16, 11) scale(0.95)">
+    <line x1="48" y1="5" x2="70.71" y2="41.5" stroke="url(#logo-gradient)" stroke-width="10" stroke-linecap="round"/>
+    <line x1="91.3" y1="30" x2="70.71" y2="68.5" stroke="url(#logo-gradient)" stroke-width="10" stroke-linecap="round"/>
+    <line x1="91.3" y1="80" x2="48" y2="80" stroke="url(#logo-gradient)" stroke-width="10" stroke-linecap="round"/>
+    <line x1="48" y1="105" x2="25.29" y2="68.5" stroke="url(#logo-gradient)" stroke-width="10" stroke-linecap="round"/>
+    <line x1="4.7" y1="80" x2="25.29" y2="41.5" stroke="url(#logo-gradient)" stroke-width="10" stroke-linecap="round"/>
+    <line x1="4.7" y1="30" x2="48" y2="30" stroke="url(#logo-gradient)" stroke-width="10" stroke-linecap="round"/>
+  </g>
+
+  <!-- FrameFast text -->
+  <text x="125" y="78" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="36" font-weight="600" fill="#1f2937">
+    FrameFast
+  </text>
+</svg>
