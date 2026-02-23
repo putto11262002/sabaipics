@@ -1,6 +1,7 @@
 import { relations } from 'drizzle-orm';
 import { photographers } from './photographers';
 import { creditLedger } from './credit-ledger';
+import { creditAllocations } from './credit-allocations';
 import { events } from './events';
 import { photos } from './photos';
 import { faces } from './faces';
@@ -17,10 +18,26 @@ export const photographersRelations = relations(photographers, ({ many }) => ({
 }));
 
 // Credit ledger relations
-export const creditLedgerRelations = relations(creditLedger, ({ one }) => ({
+export const creditLedgerRelations = relations(creditLedger, ({ one, many }) => ({
   photographer: one(photographers, {
     fields: [creditLedger.photographerId],
     references: [photographers.id],
+  }),
+  debitAllocations: many(creditAllocations, { relationName: 'debitEntry' }),
+  creditAllocations: many(creditAllocations, { relationName: 'creditEntry' }),
+}));
+
+// Credit allocation relations
+export const creditAllocationsRelations = relations(creditAllocations, ({ one }) => ({
+  debitLedgerEntry: one(creditLedger, {
+    fields: [creditAllocations.debitLedgerEntryId],
+    references: [creditLedger.id],
+    relationName: 'debitEntry',
+  }),
+  creditLedgerEntry: one(creditLedger, {
+    fields: [creditAllocations.creditLedgerEntryId],
+    references: [creditLedger.id],
+    relationName: 'creditEntry',
   }),
 }));
 
