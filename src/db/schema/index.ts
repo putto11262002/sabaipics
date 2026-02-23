@@ -2,6 +2,7 @@
 export * from './common';
 
 // Tables
+export * from './app-settings';
 export * from './test';
 export * from './photographers';
 export * from './credit-ledger';
