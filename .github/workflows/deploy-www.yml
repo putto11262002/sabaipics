@@ -54,9 +54,9 @@ jobs:
 
       - name: Purge Cloudflare Edge Cache
         run: |
-          curl -X POST "https://api.cloudflare.com/client/v4/zones/cad9739a62904eeef1eaf4a2c0ab13ce/purge_cache" \
+          curl -f -X POST "https://api.cloudflare.com/client/v4/zones/cad9739a62904eeef1eaf4a2c0ab13ce/purge_cache" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json" \
-            --data '{"files":["https://framefast.io/","https://framefast.io/en","https://framefast.io/th","https://www.framefast.io/","https://www.framefast.io/en","https://www.framefast.io/th"]}'
+            --data '{"files":["https://framefast.io/","https://framefast.io/en","https://framefast.io/en/","https://framefast.io/th","https://framefast.io/th/","https://www.framefast.io/","https://www.framefast.io/en","https://www.framefast.io/en/","https://www.framefast.io/th","https://www.framefast.io/th/"]}'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
