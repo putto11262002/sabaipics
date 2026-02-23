@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 
 import { Footer } from '@/components/landing/footer';
@@ -5,9 +6,36 @@ import { SiteNav } from '@/components/site-nav';
 import { Link } from '@/i18n/navigation';
 import { Separator } from '@/shared/components/ui/separator';
 
+const PAGE_METADATA = {
+  en: {
+    title: 'Canon EOS Utility Setup Guide | FrameFast',
+    description:
+      'Learn how to set up Canon EOS Utility for wireless tethering and automatic photo transfer to FrameFast during events.',
+  },
+  th: {
+    title: 'คู่มือตั้งค่า Canon EOS Utility | FrameFast',
+    description:
+      'เรียนรู้วิธีตั้งค่า Canon EOS Utility สำหรับการถ่ายภาพแบบไร้สายและถ่ายโอนภาพอัตโนมัติไปยัง FrameFast ระหว่างงานอีเวนต์',
+  },
+} as const;
+
 type Props = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const meta = PAGE_METADATA[locale as keyof typeof PAGE_METADATA] ?? PAGE_METADATA.en;
+
+  return {
+    title: meta.title,
+    description: meta.description,
+    openGraph: {
+      title: meta.title,
+      description: meta.description,
+    },
+  };
+}
 
 function InlineCode({ children }: { children: string }) {
   return (
@@ -60,7 +88,7 @@ export default async function CanonEosUtilityGuidePage({ params }: Props) {
           <p className="text-sm text-muted-foreground">
             ถ้าในเมนูกล้องเห็นคำว่า <InlineCode>Remote control (EOS Utility)</InlineCode> ให้ใช้{' '}
             <Link
-              href="/guides/canon-remote-control-eos-utility"
+              href="/guides/canon/remote-control-eos-utility"
               className="text-foreground underline underline-offset-4 decoration-border hover:decoration-foreground"
             >
               คู่มือ Group 2
@@ -179,7 +207,7 @@ export default async function CanonEosUtilityGuidePage({ params }: Props) {
             </ol>
             <GuideImage
               alt="Canon menu: Connect to EOS Utility (illustration)"
-              src="/guides/canon-eos-utility/camera-menu-connect-to-eos-utility.svg"
+              src="/guides/canon/eos-utility/camera-menu-connect-to-eos-utility.svg"
             />
             <ol start={3} className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>
@@ -191,7 +219,7 @@ export default async function CanonEosUtilityGuidePage({ params }: Props) {
             </ol>
             <GuideImage
               alt="Canon Wi-Fi: SSID + Password (illustration)"
-              src="/guides/canon-eos-utility/camera-ssid-password.svg"
+              src="/guides/canon/eos-utility/camera-ssid-password.svg"
             />
             <p className="text-xs text-muted-foreground">
               Canon manual source:{' '}
@@ -218,7 +246,7 @@ export default async function CanonEosUtilityGuidePage({ params }: Props) {
             </ol>
             <GuideImage
               alt="iOS Wi-Fi join camera SSID (illustration)"
-              src="/guides/canon-eos-utility/ios-wifi-join.svg"
+              src="/guides/canon/eos-utility/ios-wifi-join.svg"
             />
           </div>
 

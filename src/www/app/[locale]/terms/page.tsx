@@ -1,10 +1,38 @@
+import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 import { SiteNav } from '@/components/site-nav';
 import { Footer } from '@/components/landing/footer';
 
+const PAGE_METADATA = {
+  en: {
+    title: 'Terms of Service | FrameFast',
+    description:
+      'FrameFast terms of service for event photo distribution platform. Read our usage terms and conditions.',
+  },
+  th: {
+    title: 'ข้อกำหนดการใช้งาน | FrameFast',
+    description:
+      'ข้อกำหนดการใช้งานของ FrameFast สำหรับแพลตฟอร์มแจกจ่ายภาพงานอีเวนต์ อ่านเงื่อนไขการใช้งานของเรา',
+  },
+} as const;
+
 type Props = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const meta = PAGE_METADATA[locale as keyof typeof PAGE_METADATA] ?? PAGE_METADATA.en;
+
+  return {
+    title: meta.title,
+    description: meta.description,
+    openGraph: {
+      title: meta.title,
+      description: meta.description,
+    },
+  };
+}
 
 function TermsEn() {
   return (

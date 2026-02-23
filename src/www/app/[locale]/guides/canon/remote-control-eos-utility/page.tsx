@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 
 import { Footer } from '@/components/landing/footer';
@@ -5,9 +6,36 @@ import { SiteNav } from '@/components/site-nav';
 import { Link } from '@/i18n/navigation';
 import { Separator } from '@/shared/components/ui/separator';
 
+const PAGE_METADATA = {
+  en: {
+    title: 'Canon Remote Control with EOS Utility | FrameFast',
+    description:
+      'Control your Canon camera remotely with EOS Utility. Adjust settings, trigger shutter, and transfer photos wirelessly.',
+  },
+  th: {
+    title: 'ควบคุมกล้อง Canon ระยะไกลด้วย EOS Utility | FrameFast',
+    description:
+      'ควบคุมกล้อง Canon ของคุณระยะไกลด้วย EOS Utility ปรับการตั้งค่า กดชัตเตอร์ และถ่ายโอนภาพไร้สาย',
+  },
+} as const;
+
 type Props = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const meta = PAGE_METADATA[locale as keyof typeof PAGE_METADATA] ?? PAGE_METADATA.en;
+
+  return {
+    title: meta.title,
+    description: meta.description,
+    openGraph: {
+      title: meta.title,
+      description: meta.description,
+    },
+  };
+}
 
 function InlineCode({ children }: { children: string }) {
   return (
@@ -50,7 +78,7 @@ export default async function CanonRemoteControlEosUtilityGuidePage({ params }: 
           <p className="text-sm text-muted-foreground">
             ถ้าเมนูกล้องเป็น <InlineCode>Connect to EOS Utility</InlineCode> ให้ใช้{' '}
             <Link
-              href="/guides/canon-eos-utility"
+              href="/guides/canon/eos-utility"
               className="text-foreground underline underline-offset-4 decoration-border hover:decoration-foreground"
             >
               คู่มือ Group 1
@@ -175,7 +203,7 @@ export default async function CanonRemoteControlEosUtilityGuidePage({ params }: 
             </ol>
             <GuideImage
               alt="Placeholder: Wi-Fi/Bluetooth connection menu"
-              src="/guides/canon-remote-control-eos-utility/camera-menu-wifi-bluetooth-connection.svg"
+              src="/guides/canon/remote-control-eos-utility/camera-menu-wifi-bluetooth-connection.svg"
             />
             <ol start={2} className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>
@@ -184,7 +212,7 @@ export default async function CanonRemoteControlEosUtilityGuidePage({ params }: 
             </ol>
             <GuideImage
               alt="Placeholder: Remote control (EOS Utility) selection"
-              src="/guides/canon-remote-control-eos-utility/camera-menu-remote-control-eos-utility.svg"
+              src="/guides/canon/remote-control-eos-utility/camera-menu-remote-control-eos-utility.svg"
             />
             <ol start={3} className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>
@@ -196,7 +224,7 @@ export default async function CanonRemoteControlEosUtilityGuidePage({ params }: 
             </ol>
             <GuideImage
               alt="Placeholder: SSID (network name) and Password"
-              src="/guides/canon-remote-control-eos-utility/camera-ssid-password.svg"
+              src="/guides/canon/remote-control-eos-utility/camera-ssid-password.svg"
             />
             <p className="text-xs text-muted-foreground">
               Canon manual source:{' '}
@@ -223,7 +251,7 @@ export default async function CanonRemoteControlEosUtilityGuidePage({ params }: 
             </ol>
             <GuideImage
               alt="Placeholder: iOS Wi-Fi join camera SSID"
-              src="/guides/canon-remote-control-eos-utility/ios-wifi-join.svg"
+              src="/guides/canon/remote-control-eos-utility/ios-wifi-join.svg"
             />
           </div>
 

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 
 import { Footer } from '@/components/landing/footer';
@@ -5,9 +6,36 @@ import { SiteNav } from '@/components/site-nav';
 import { Link } from '@/i18n/navigation';
 import { Separator } from '@/shared/components/ui/separator';
 
+const PAGE_METADATA = {
+  en: {
+    title: 'Sony WiFi Direct Connection Guide | FrameFast',
+    description:
+      'Connect your Sony camera directly to your device via WiFi Direct for fast photo transfer without a router.',
+  },
+  th: {
+    title: 'คู่มือเชื่อมต่อ Sony WiFi Direct | FrameFast',
+    description:
+      'เชื่อมต่อกล้อง Sony ของคุณโดยตรงกับอุปกรณ์ผ่าน WiFi Direct เพื่อถ่ายโอนภาพเร็วโดยไม่ต้องใช้เราเตอร์',
+  },
+} as const;
+
 type Props = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const meta = PAGE_METADATA[locale as keyof typeof PAGE_METADATA] ?? PAGE_METADATA.en;
+
+  return {
+    title: meta.title,
+    description: meta.description,
+    openGraph: {
+      title: meta.title,
+      description: meta.description,
+    },
+  };
+}
 
 function InlineCode({ children }: { children: string }) {
   return (
@@ -132,7 +160,7 @@ export default async function SonyWifiDirectSsidGuidePage({ params }: Props) {
             </ol>
             <GuideImage
               alt="Placeholder: Sony smartphone control connection screen"
-              src="/guides/sony-wifi-direct-ssid/camera-smartphone-control-connection.svg"
+              src="/guides/sony/wifi-direct-ssid/camera-smartphone-control-connection.svg"
             />
             <p className="text-xs text-muted-foreground">
               Sony manual source:{' '}
@@ -164,7 +192,7 @@ export default async function SonyWifiDirectSsidGuidePage({ params }: Props) {
             </ol>
             <GuideImage
               alt="Placeholder: iOS join DIRECT- SSID"
-              src="/guides/sony-wifi-direct-ssid/ios-wifi-join-direct.svg"
+              src="/guides/sony/wifi-direct-ssid/ios-wifi-join-direct.svg"
             />
           </div>
 
