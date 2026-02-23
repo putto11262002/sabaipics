@@ -22,6 +22,7 @@ export function requireAdmin(): MiddlewareHandler<
   return async (c, next) => {
     // Dev bypass — no CF Access tunnel locally
     if (c.env.NODE_ENV === "development") {
+      c.set("adminEmail", "dev@admin.local");
       return next();
     }
 
@@ -35,11 +36,12 @@ export function requireAdmin(): MiddlewareHandler<
     }
 
     try {
-      await verifyCfAccessToken(
+      const payload = await verifyCfAccessToken(
         token,
         c.env.CF_ACCESS_TEAM_DOMAIN,
         c.env.CF_ACCESS_AUD,
       );
+      c.set("adminEmail", payload.email);
     } catch {
       return c.json(
         createAuthError("UNAUTHENTICATED", "Invalid CF Access token"),

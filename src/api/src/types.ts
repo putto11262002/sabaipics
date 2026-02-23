@@ -16,6 +16,7 @@ export type Bindings = Cloudflare.Env & {
 export type Variables = AuthVariables & {
   db: () => Database; // HTTP adapter - fast, no transactions
   dbTx: () => DatabaseTx; // WebSocket adapter - with transaction support
+  adminEmail?: string; // Admin email from CF Access JWT
 };
 
 export type Env = { Bindings: Bindings; Variables: Variables };
