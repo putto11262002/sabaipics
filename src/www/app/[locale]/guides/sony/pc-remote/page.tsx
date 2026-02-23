@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 
 import { Footer } from '@/components/landing/footer';
@@ -5,9 +6,36 @@ import { SiteNav } from '@/components/site-nav';
 import { Link } from '@/i18n/navigation';
 import { Separator } from '@/shared/components/ui/separator';
 
+const PAGE_METADATA = {
+  en: {
+    title: 'Sony PC Remote (Imaging Edge) Setup | FrameFast',
+    description:
+      'Configure Sony PC Remote in Imaging Edge Desktop for tethered shooting and wireless photo transfer to FrameFast.',
+  },
+  th: {
+    title: 'ตั้งค่า Sony PC Remote (Imaging Edge) | FrameFast',
+    description:
+      'กำหนดค่า Sony PC Remote ใน Imaging Edge Desktop สำหรับการถ่ายภาพแบบ tethered และถ่ายโอนภาพไร้สายไปยัง FrameFast',
+  },
+} as const;
+
 type Props = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const meta = PAGE_METADATA[locale as keyof typeof PAGE_METADATA] ?? PAGE_METADATA.en;
+
+  return {
+    title: meta.title,
+    description: meta.description,
+    openGraph: {
+      title: meta.title,
+      description: meta.description,
+    },
+  };
+}
 
 function InlineCode({ children }: { children: string }) {
   return (
@@ -118,7 +146,7 @@ export default async function SonyPcRemoteGuidePage({ params }: Props) {
             </ol>
             <GuideImage
               alt="Placeholder: Sony access authentication settings"
-              src="/guides/sony-pc-remote/access-auth-off.svg"
+              src="/guides/sony/pc-remote/access-auth-off.svg"
             />
             <p className="text-xs text-muted-foreground">
               Sony manual source:{' '}
@@ -151,7 +179,7 @@ export default async function SonyPcRemoteGuidePage({ params }: Props) {
             </ol>
             <GuideImage
               alt="Placeholder: Sony PC Remote enable + Wi-Fi Direct info"
-              src="/guides/sony-pc-remote/pc-remote-wifi-direct.svg"
+              src="/guides/sony/pc-remote/pc-remote-wifi-direct.svg"
             />
             <p className="text-xs text-muted-foreground">
               Sony manual source:{' '}
@@ -178,7 +206,7 @@ export default async function SonyPcRemoteGuidePage({ params }: Props) {
             </ol>
             <GuideImage
               alt="Placeholder: iOS join Sony Wi-Fi Direct SSID"
-              src="/guides/sony-pc-remote/ios-wifi-join.svg"
+              src="/guides/sony/pc-remote/ios-wifi-join.svg"
             />
           </div>
 

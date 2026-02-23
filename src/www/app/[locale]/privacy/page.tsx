@@ -1,10 +1,38 @@
+import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 import { SiteNav } from '@/components/site-nav';
 import { Footer } from '@/components/landing/footer';
 
+const PAGE_METADATA = {
+  en: {
+    title: 'Privacy Policy | FrameFast',
+    description:
+      'FrameFast privacy policy. Learn how we protect your data and comply with PDPA for event photo distribution.',
+  },
+  th: {
+    title: 'นโยบายความเป็นส่วนตัว | FrameFast',
+    description:
+      'นโยบายความเป็นส่วนตัวของ FrameFast เรียนรู้ว่าเราปกป้องข้อมูลของคุณอย่างไรและปฏิบัติตาม PDPA',
+  },
+} as const;
+
 type Props = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const meta = PAGE_METADATA[locale as keyof typeof PAGE_METADATA] ?? PAGE_METADATA.en;
+
+  return {
+    title: meta.title,
+    description: meta.description,
+    openGraph: {
+      title: meta.title,
+      description: meta.description,
+    },
+  };
+}
 
 function PrivacyPolicyEn() {
   return (

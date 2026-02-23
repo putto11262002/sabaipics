@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 
 import { SiteNav } from '@/components/site-nav';
@@ -5,9 +6,36 @@ import { Footer } from '@/components/landing/footer';
 import { Link } from '@/i18n/navigation';
 import { Separator } from '@/shared/components/ui/separator';
 
+const PAGE_METADATA = {
+  en: {
+    title: 'Sony Camera Setup for FrameFast | FrameFast',
+    description:
+      'Complete guide to setting up Sony cameras for wireless photo transfer. Covers WiFi, PC Remote, and smartphone connection.',
+  },
+  th: {
+    title: 'ตั้งค่ากล้อง Sony สำหรับ FrameFast | FrameFast',
+    description:
+      'คู่มือฉบับสมบูรณ์สำหรับตั้งค่ากล้อง Sony เพื่อถ่ายโอนภาพไร้สาย ครอบคลุม WiFi, PC Remote และการเชื่อมต่อสมาร์ทโฟน',
+  },
+} as const;
+
 type Props = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const meta = PAGE_METADATA[locale as keyof typeof PAGE_METADATA] ?? PAGE_METADATA.en;
+
+  return {
+    title: meta.title,
+    description: meta.description,
+    openGraph: {
+      title: meta.title,
+      description: meta.description,
+    },
+  };
+}
 
 function GuideLink({
   title,
@@ -48,12 +76,12 @@ export default async function SonyGuidesPage({ params }: Props) {
 
         <section className="space-y-3">
           <GuideLink
-            href="/guides/sony-wifi-direct-ssid"
+            href="/guides/sony/wifi-direct-ssid"
             title="Sony Wi‑Fi Direct (SSID + password)"
             description="For models that show DIRECT-xxxx SSID and a Wi‑Fi password on camera."
           />
           <GuideLink
-            href="/guides/sony-pc-remote"
+            href="/guides/sony/pc-remote"
             title="Sony PC Remote (Access authentication OFF)"
             description="Recommended for models that support remote control + can disable access authentication."
           />

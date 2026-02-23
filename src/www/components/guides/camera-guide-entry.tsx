@@ -115,7 +115,7 @@ export function CameraGuideEntry() {
   const canContinue = brand === 'canon' ? Boolean(canonModel) : Boolean(brand);
   const nextHref =
     brand === 'canon'
-      ? '/guides/canon-eos-utility'
+      ? '/guides/canon/eos-utility'
       : brand === 'nikon'
         ? '/guides/nikon'
         : brand === 'sony'
