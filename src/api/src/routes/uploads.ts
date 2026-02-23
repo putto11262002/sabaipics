@@ -10,12 +10,13 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, and, gt, lt, sql, inArray, desc } from 'drizzle-orm';
-import { activeEvents, creditLedger, uploadIntents, photos } from '@/db';
+import { activeEvents, uploadIntents, photos } from '@/db';
 import { requirePhotographer, type PhotographerVariables } from '../middleware';
 import type { Env, Bindings } from '../types';
 import { apiError, type HandlerError } from '../lib/error';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { generatePresignedPutUrl } from '../lib/r2/presign';
+import { getBalance } from '../lib/credits';
 import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 
@@ -115,20 +116,10 @@ export const uploadsRouter = new Hono<Env>()
       }
 
       // 2. Quick credit check (fail fast, no lock)
-      const [balanceCheck] = yield* ResultAsync.fromPromise(
-        db
-          .select({ balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int` })
-          .from(creditLedger)
-          .where(
-            and(
-              eq(creditLedger.photographerId, photographer.id),
-              gt(creditLedger.expiresAt, sql`NOW()`),
-            ),
-          ),
-        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
-      );
+      const balance = yield* getBalance(db, photographer.id)
+        .mapErr((e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }));
 
-      if ((balanceCheck?.balance ?? 0) < 1) {
+      if (balance < 1) {
         return err<never, HandlerError>({
           code: 'PAYMENT_REQUIRED',
           message: 'Insufficient credits. Purchase more to continue.',

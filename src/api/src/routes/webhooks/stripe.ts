@@ -18,8 +18,9 @@
 import { Hono } from "hono";
 import type Stripe from "stripe";
 import { addMonths } from "date-fns";
-import { creditLedger, photographers, promoCodeUsage, type Database, type DatabaseTx } from "@/db";
-import { eq, sql } from "drizzle-orm";
+import { creditLedger, promoCodeUsage, type Database, type DatabaseTx } from "@/db";
+import { eq } from "drizzle-orm";
+import { grantCredits } from "../../lib/credits";
 import { ResultAsync, ok, err } from "neverthrow";
 import {
   createStripeClient,
@@ -126,23 +127,19 @@ export async function fulfillCheckout(
       // Extract promo code from metadata
       const promoCodeApplied = metadata.promo_code_applied;
 
-      // Insert credit ledger entry with remainingCredits for FIFO allocation
-      await tx.insert(creditLedger).values({
+      // Grant credits via centralized module (ledger insert + balance increment)
+      const grantResult = await grantCredits(tx, {
         photographerId,
         amount: credits,
-        type: "credit",
-        source: "purchase",
-        remainingCredits: credits,
-        promoCode: promoCodeApplied && typeof promoCodeApplied === 'string' ? promoCodeApplied : null,
-        stripeSessionId: session.id,
+        source: 'purchase',
         expiresAt: addMonths(new Date(), 6).toISOString(),
+        stripeSessionId: session.id,
+        promoCode: promoCodeApplied && typeof promoCodeApplied === 'string' ? promoCodeApplied : null,
       });
 
-      // Increment denormalized balance on photographer
-      await tx
-        .update(photographers)
-        .set({ balance: sql`${photographers.balance} + ${credits}` })
-        .where(eq(photographers.id, photographerId));
+      if (grantResult.isErr()) {
+        throw grantResult.error.cause ?? new Error(`Grant failed: ${grantResult.error.type}`);
+      }
 
       console.log(
         `[Stripe Fulfillment] Added ${credits} credits for photographer ${photographerId} (session: ${session.id})`

@@ -13,6 +13,7 @@ import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../lib/error';
 import { calculateTieredDiscount, getDiscountTiers } from '../lib/pricing/discounts';
 import { topUpSchema } from '../lib/pricing/validation';
+import { getCreditHistory } from '../lib/credits';
 
 /**
  * Credits API
@@ -538,71 +539,11 @@ export const creditsRouter = new Hono<Env>()
       const page = Math.max(0, parseInt(c.req.query('page') || '0', 10));
       const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10)));
       const typeFilter = c.req.query('type') as 'credit' | 'debit' | undefined;
-      const offset = page * limit;
 
-      // Build where conditions
-      const conditions = [eq(creditLedger.photographerId, photographer.id)];
-      if (typeFilter === 'credit' || typeFilter === 'debit') {
-        conditions.push(eq(creditLedger.type, typeFilter));
-      }
+      const result = yield* getCreditHistory(db, { photographerId: photographer.id, page, limit, typeFilter })
+        .mapErr((e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }));
 
-      // Paginated entries
-      const entries = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            id: creditLedger.id,
-            amount: creditLedger.amount,
-            type: creditLedger.type,
-            source: creditLedger.source,
-            promoCode: creditLedger.promoCode,
-            stripeReceiptUrl: creditLedger.stripeReceiptUrl,
-            expiresAt: creditLedger.expiresAt,
-            createdAt: creditLedger.createdAt,
-          })
-          .from(creditLedger)
-          .where(and(...conditions))
-          .orderBy(desc(creditLedger.createdAt))
-          .limit(limit)
-          .offset(offset),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-      );
-
-      // Total count for pagination
-      const [countResult] = yield* ResultAsync.fromPromise(
-        db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(creditLedger)
-          .where(and(...conditions)),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-      );
-      const totalCount = countResult?.count ?? 0;
-
-      // Summary stats (always for all types)
-      const [summary] = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            balance: sql<number>`coalesce(sum(case when ${creditLedger.expiresAt} > now() then ${creditLedger.amount} else 0 end), 0)::int`,
-            expiringSoon: sql<number>`coalesce(sum(case when ${creditLedger.expiresAt} > now() and ${creditLedger.expiresAt} <= now() + interval '30 days' then ${creditLedger.amount} else 0 end), 0)::int`,
-            usedThisMonth: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'debit' and ${creditLedger.createdAt} >= date_trunc('month', now()) then abs(${creditLedger.amount}) else 0 end), 0)::int`,
-          })
-          .from(creditLedger)
-          .where(eq(creditLedger.photographerId, photographer.id)),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-      );
-
-      const totalPages = Math.ceil(totalCount / limit);
-
-      return ok({
-        entries,
-        summary: summary ?? { balance: 0, expiringSoon: 0, usedThisMonth: 0 },
-        pagination: {
-          page,
-          limit,
-          totalCount,
-          totalPages,
-          hasNextPage: page < totalPages - 1,
-        },
-      });
+      return ok(result);
     })
       .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
       .match(
