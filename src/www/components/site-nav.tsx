@@ -6,7 +6,7 @@ import { Menu, X } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 
 import { LogoMark } from '@/shared/components/icons/logo-mark';
-import { SiteNavAuthCta } from '@/components/site-nav-auth-cta';
+import { SiteNavAuthCtaLazy } from '@/components/site-nav-auth-cta-lazy';
 
 const navItems = [
   { href: '#features', label: 'Features' },
@@ -69,7 +69,7 @@ export function SiteNav() {
             </nav>
 
             <div className="ml-auto flex items-center gap-2 md:gap-3">
-              <SiteNavAuthCta />
+              <SiteNavAuthCtaLazy />
 
               <button
                 type="button"
