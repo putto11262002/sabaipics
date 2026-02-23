@@ -38,6 +38,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Spinner } from '@/shared/components/ui/spinner';
 import { CreditTopUpDialog } from '../../components/credits/CreditTopUpDialog';
 import { useValidatePromoCode } from '../../hooks/credits/useValidatePromoCode';
+import { LatestAnnouncementBanner } from '../../components/announcements/latest-announcement-card';
 
 export function DashboardPage() {
   const [creditDialogOpen, setCreditDialogOpen] = useState(false);
@@ -144,6 +145,9 @@ export function DashboardPage() {
       </SidebarPageHeader>
 
       <div className="flex flex-1 flex-col gap-4 p-4">
+        {/* Latest Announcement */}
+        <LatestAnnouncementBanner />
+
         {/* Loading State */}
         {isLoading && (
           <>
