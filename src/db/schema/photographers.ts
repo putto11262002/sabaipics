@@ -14,12 +14,14 @@ export const photographers = pgTable(
     stripeCustomerId: text("stripe_customer_id").unique(),
     pdpaConsentAt: timestamptz("pdpa_consent_at"),
     balance: integer("balance").notNull().default(0), // Denormalized running balance
+    bannedAt: timestamptz("banned_at"), // null = not banned, set = account suspended
     deletedAt: timestamptz("deleted_at"), // null = active, set = soft deleted
     createdAt: createdAtCol(),
   },
   (table) => [
     index("photographers_clerk_id_idx").on(table.clerkId),
     index("photographers_stripe_customer_id_idx").on(table.stripeCustomerId),
+    index("photographers_banned_at_idx").on(table.bannedAt),
     index("photographers_deleted_at_idx").on(table.deletedAt),
   ]
 );

@@ -695,7 +695,7 @@ describe('upload-consumer', () => {
 
   describe('credit / transaction', () => {
     it('9.1 — insufficient credits → retryable failed', async () => {
-      mockTxTransaction.mockRejectedValue(new Error('INSUFFICIENT_CREDITS'));
+      mockTxTransaction.mockRejectedValue({ type: 'insufficient_credits' });
       const msg = createMockMessage(makeR2Event());
       const batch = createMockBatch([msg]);
 

@@ -43,6 +43,14 @@ export function toRequestError(e: unknown): RequestError {
 
 
 /**
+ * Check if the error indicates the account has been suspended/locked.
+ * Used by API wrappers to force sign-out when the server rejects the session.
+ */
+export function isAccountSuspended(error: RequestError): boolean {
+  return error.type === 'API_ERROR' && error.error.code === 'ACCOUNT_SUSPENDED';
+}
+
+/**
  * Status codes that are worth retrying — transient server/infra issues.
  *
  * 429 — rate limited (back off and retry)

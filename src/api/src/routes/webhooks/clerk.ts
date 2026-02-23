@@ -21,6 +21,7 @@ interface ClerkWebhookEvent {
     primary_email_address_id?: string | null;
     first_name?: string | null;
     last_name?: string | null;
+    locked?: boolean;
     legal_accepted_at?: string | null;
   };
 }
@@ -150,7 +151,7 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
 
         // Find existing photographer
         const [existing] = await db
-          .select({ id: photographers.id })
+          .select({ id: photographers.id, bannedAt: photographers.bannedAt })
           .from(photographers)
           .where(eq(photographers.clerkId, user.id))
           .limit(1);
@@ -163,20 +164,30 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
           break;
         }
 
-        // Update photographer (idempotent - safe to run multiple times)
+        // Build update set
+        const set: Record<string, unknown> = {};
+
         if (email) {
+          set.email = email;
+          set.name = displayName;
+        }
+
+        // Sync lock status (Clerk sends locked: true when account is locked)
+        if (user.locked && !existing.bannedAt) {
+          set.bannedAt = new Date().toISOString();
+        } else if (!user.locked && existing.bannedAt) {
+          set.bannedAt = null;
+        }
+
+        if (Object.keys(set).length > 0) {
           await db
             .update(photographers)
-            .set({
-              email,
-              name: displayName,
-            })
+            .set(set)
             .where(eq(photographers.clerkId, user.id));
 
           console.log('[Clerk Webhook] user.updated: photographer updated', {
             clerkId: user.id,
-            email,
-            name: displayName,
+            ...set,
           });
         }
 
