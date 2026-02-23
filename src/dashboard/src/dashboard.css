@@ -1,0 +1,3 @@
+/* Dashboard-specific Tailwind sources */
+@source "./**/*.{js,ts,jsx,tsx}";
+@source "../../shared/**/*.{js,ts,jsx,tsx}";
