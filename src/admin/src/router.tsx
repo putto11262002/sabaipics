@@ -38,6 +38,14 @@ export const router = createBrowserRouter([
         lazy: () => import('./routes/announcements/[id]'),
       },
       {
+        path: '/feedback',
+        lazy: () => import('./routes/feedback'),
+      },
+      {
+        path: '/feedback/:id',
+        lazy: () => import('./routes/feedback/[id]'),
+      },
+      {
         path: '/settings',
         lazy: () => import('./routes/settings'),
       },

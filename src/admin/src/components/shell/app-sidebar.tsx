@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Calendar, Gift, Megaphone, Settings, Users } from 'lucide-react';
+import { Calendar, Gift, Megaphone, MessageSquare, Settings, Users } from 'lucide-react';
 
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { NavMain } from './nav-main';
@@ -31,6 +31,11 @@ const data = {
       title: 'Announcements',
       url: '/announcements',
       icon: Megaphone,
+    },
+    {
+      title: 'Feedback',
+      url: '/feedback',
+      icon: MessageSquare,
     },
     {
       title: 'Settings',
