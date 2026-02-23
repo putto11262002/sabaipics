@@ -4,7 +4,6 @@ export * from './common';
 // Tables
 export * from './test';
 export * from './photographers';
-export * from './credit-packages';
 export * from './credit-ledger';
 export * from './credit-allocations';
 export * from './promo-code-usage';

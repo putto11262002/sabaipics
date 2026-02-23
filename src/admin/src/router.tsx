@@ -6,10 +6,6 @@ export const router = createBrowserRouter([
     element: <SidebarLayout />,
     children: [
       {
-        path: '/credit-packages',
-        lazy: () => import('./routes/credit-packages'),
-      },
-      {
         path: '/users',
         lazy: () => import('./routes/users'),
       },
@@ -31,7 +27,7 @@ export const router = createBrowserRouter([
   // Root redirect
   {
     path: '/',
-    element: <Navigate to="/credit-packages" replace />,
+    element: <Navigate to="/gift-codes" replace />,
   },
 
   // 404 catch-all

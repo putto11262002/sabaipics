@@ -5,7 +5,7 @@ import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { useAdminMutation } from '../use-admin-mutation';
 
 type CreateGiftCodeResponse = InferResponseType<
-  (typeof api.admin)['gift-codes-v2']['$post'],
+  (typeof api.admin)['gift-codes']['$post'],
   SuccessStatusCode
 >;
 
@@ -24,7 +24,7 @@ export function useCreateGiftCode() {
 
   return useAdminMutation<CreateGiftCodeResponse, CreateGiftCodeInput>({
     apiFn: (input, opts) =>
-      api.admin['gift-codes-v2'].$post({ json: input }, opts),
+      api.admin['gift-codes'].$post({ json: input }, opts),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'gift-codes', 'list'] });
     },
