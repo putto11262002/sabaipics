@@ -48,9 +48,6 @@ jobs:
 
       - name: Build and Deploy
         run: pnpm deploy:www
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Purge Cloudflare Edge Cache
         run: |
@@ -58,5 +55,3 @@ jobs:
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json" \
             --data '{"files":["https://framefast.io/","https://framefast.io/en","https://framefast.io/en/","https://framefast.io/th","https://framefast.io/th/","https://www.framefast.io/","https://www.framefast.io/en","https://www.framefast.io/en/","https://www.framefast.io/th","https://www.framefast.io/th/"]}'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
