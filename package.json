@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "check-types": "tsc --noEmit -p tsconfig.browser.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.node.json",
-
     "dev:api": "trap 'kill 0' EXIT; . .dev.vars; wrangler dev -c wrangler.api.jsonc & ngrok http --domain=$NGROK_DOMAIN --log=stdout --log-format=logfmt 8081 & wait",
     "dev:api:local": "wrangler dev -c wrangler.api.jsonc",
     "dev:dashboard": "vite --config vite.dashboard.config.ts",
@@ -13,13 +12,11 @@
     "dev:www": "cd src/www && next dev",
     "dev:admin": "vite --config vite.admin.config.ts",
     "dev:sabaiface": "cd src/sabaiface && tsx watch src/server.ts",
-
     "build:api": "wrangler deploy --dry-run --outdir=src/api/dist -c wrangler.api.jsonc",
     "build:admin": "vite build --config vite.admin.config.ts",
     "build:dashboard": "vite build --config vite.dashboard.config.ts",
     "build:event": "vite build --config vite.event.config.ts",
     "build:www": "cd src/www && next build",
-
     "deploy:api:staging": "wrangler deploy --env staging --minify -c wrangler.api.jsonc",
     "deploy:api:prod": "wrangler deploy --env production --minify -c wrangler.api.jsonc",
     "deploy:dashboard:staging": "pnpm build:dashboard --mode staging && wrangler deploy --env staging -c wrangler.dashboard.jsonc",
@@ -29,16 +26,13 @@
     "deploy:www": "cd src/www && opennextjs-cloudflare build && opennextjs-cloudflare deploy --env production",
     "deploy:admin:prod": "pnpm build:admin --mode production && wrangler deploy --env production -c wrangler.admin.jsonc",
     "deploy:sabaiface": "fly deploy . -c src/sabaiface/fly.toml",
-
     "db:generate": "drizzle-kit generate --config src/db/drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config src/db/drizzle.config.ts",
     "db:push": "drizzle-kit push --config src/db/drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config src/db/drizzle.config.ts",
     "db:seed:credit-packages": "tsx src/db/scripts/seed-credit-packages.ts",
-
     "test:api": "vitest run --config vitest.api.node.config.ts && vitest run --config vitest.api.workers.config.ts",
     "test:sabaiface": "vitest run --config src/sabaiface/vitest.config.ts",
-
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "dependencies": {
@@ -53,6 +47,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@fabianlars/tauri-plugin-oauth": "^2.0.0",
     "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/noto-sans-thai": "^5.2.8",
     "@hono/node-server": "^1.8.0",
     "@hono/zod-validator": "^0.7.6",
     "@hookform/resolvers": "^5.2.2",
