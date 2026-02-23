@@ -78,6 +78,7 @@ export const events = pgTable(
   (table) => [
     index('events_photographer_id_idx').on(table.photographerId),
     index('events_deleted_at_idx').on(table.deletedAt),
+    index('events_deleted_at_expires_at_idx').on(table.deletedAt, table.expiresAt),
   ],
 );
 

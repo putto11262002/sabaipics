@@ -64,6 +64,7 @@ export const photos = pgTable(
     index('photos_event_id_idx').on(table.eventId),
     index('photos_status_idx').on(table.status),
     index('photos_deleted_at_idx').on(table.deletedAt),
+    index('photos_event_id_deleted_at_idx').on(table.eventId, table.deletedAt),
   ],
 );
 
