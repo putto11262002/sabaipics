@@ -4,7 +4,6 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
-import { WwwAuthProvider } from '@/components/providers/www-auth-provider';
 import '@/shared/styles/globals.css';
 import '../www.css';
 
@@ -46,7 +45,7 @@ export default async function LocaleLayout({ children, params }: Props) {
     <html lang={locale} className={`${notoSansThai.variable}`}>
       <body className="antialiased">
         <NextIntlClientProvider messages={messages}>
-          <WwwAuthProvider>{children}</WwwAuthProvider>
+          {children}
         </NextIntlClientProvider>
       </body>
     </html>
