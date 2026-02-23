@@ -14,7 +14,7 @@ import type { CreditError } from './error';
 export interface GrantCreditsParams {
   photographerId: string;
   amount: number;
-  source: 'purchase' | 'gift' | 'discount' | 'refund' | 'admin_adjustment' | 'apple_purchase';
+  source: 'purchase' | 'gift' | 'discount' | 'refund' | 'admin_adjustment' | 'apple_purchase' | 'signup_bonus';
   expiresAt: string;
   stripeSessionId?: string | null;
   appleTransactionId?: string | null;
