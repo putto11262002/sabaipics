@@ -21,7 +21,7 @@ class EventsViewModel: ObservableObject {
     @Published var isFirstLoad = true
     @Published var error: Error?
     @Published var isRefreshing = false
-    @Published var eventsSource: EventsRepository.Source? = nil
+    @Published var eventsSource: SWRSource? = nil
     @Published var eventsFetchedAt: Date? = nil
 
     private let repository: EventsRepository
@@ -35,18 +35,35 @@ class EventsViewModel: ObservableObject {
         isFirstLoad = events.isEmpty
         error = nil
 
-        // Concurrent operations: fetch + minimum display time
-        async let eventsData = repository.fetchEvents(page: 0, limit: 10)
-        async let minimumDelay: () = Task.sleep(nanoseconds: 300_000_000)  // 300ms
-
         do {
-            let result = try await eventsData
-            try await minimumDelay  // Prevent skeleton flicker
+            let result = try await repository.fetchEvents(
+                page: 0,
+                limit: 10,
+                onRevalidate: { [weak self] result in
+                    guard let self else { return }
+                    self.events = result.value.data
+                    self.eventsSource = result.source
+                    self.eventsFetchedAt = result.fetchedAt
+                },
+                onAuthError: { [weak self] error in
+                    guard let self else { return }
+                    self.events = []
+                    self.error = error
+                }
+            )
+
+            // Only add minimum delay on genuine cold start (skeleton visible)
+            if isFirstLoad && result.source == .network {
+                try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
+            }
+
             events = result.value.data
             eventsSource = result.source
             eventsFetchedAt = result.fetchedAt
         } catch {
-            try? await minimumDelay
+            if isFirstLoad {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+            }
             self.error = error
         }
 
@@ -57,7 +74,7 @@ class EventsViewModel: ObservableObject {
         isRefreshing = true
 
         do {
-            let result = try await repository.fetchEvents(page: 0, limit: 10)
+            let result = try await repository.refreshEvents(page: 0, limit: 10)
             events = result.value.data
             eventsSource = result.source
             eventsFetchedAt = result.fetchedAt
