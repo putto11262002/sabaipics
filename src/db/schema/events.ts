@@ -33,6 +33,8 @@ export interface SlideshowConfig {
 export interface EventSettings {
   colorGrade?: {
     enabled: boolean;
+    autoEdit: boolean;
+    style: string | null;
     lutId: string | null;
     intensity: number; // 0-100
     includeLuminance: boolean;
