@@ -51,3 +51,6 @@ export const createDb = createDbHttp;
 // Type exports
 export type Database = ReturnType<typeof createDbHttp>;
 export type DatabaseTx = ReturnType<typeof createDbTx>;
+
+/** The `tx` parameter type inside a `.transaction()` callback. */
+export type Transaction = Parameters<Parameters<DatabaseTx['transaction']>[0]>[0];

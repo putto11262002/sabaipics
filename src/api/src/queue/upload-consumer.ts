@@ -21,12 +21,10 @@ import {
   photoLuts,
   uploadIntents,
   photos,
-  creditLedger,
-  creditAllocations,
-  photographers,
   type EventSettings,
 } from '@/db';
-import { eq, and, gt, asc, sql, or, isNull } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
+import { debitCredits } from '../lib/credits';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
 import {
   applyCubeLutToRgba,
@@ -676,68 +674,17 @@ async function processUpload(
     const photo = yield* ResultAsync.fromPromise(
       Sentry.startSpan({ name: 'upload.transaction', op: 'db.transaction' }, () =>
         dbTx.transaction(async (tx) => {
-          // Step 10a: Atomic balance decrement — replaces SELECT FOR UPDATE + SUM
-          const decrementResult = await tx
-            .update(photographers)
-            .set({ balance: sql`${photographers.balance} - 1` })
-            .where(
-              and(
-                eq(photographers.id, intent.photographerId),
-                sql`${photographers.balance} >= 1`,
-              ),
-            )
-            .returning({ id: photographers.id });
-
-          if (decrementResult.length === 0) {
-            throw new Error('INSUFFICIENT_CREDITS');
-          }
-
-          // Step 10b: Find oldest non-expired credit entry with remainingCredits > 0 (FIFO)
-          const [creditEntry] = await tx
-            .select({ id: creditLedger.id, expiresAt: creditLedger.expiresAt })
-            .from(creditLedger)
-            .where(
-              and(
-                eq(creditLedger.photographerId, intent.photographerId),
-                eq(creditLedger.type, 'credit'),
-                gt(creditLedger.remainingCredits, 0),
-                or(
-                  isNull(creditLedger.expiresAt),
-                  gt(creditLedger.expiresAt, sql`NOW()`),
-                ),
-              ),
-            )
-            .orderBy(asc(creditLedger.expiresAt), sql`${creditLedger.expiresAt} IS NULL`)
-            .limit(1);
-
-          if (!creditEntry) {
-            throw new Error('INSUFFICIENT_CREDITS');
-          }
-
-          // Step 10c: Decrement remainingCredits on the credit entry
-          await tx
-            .update(creditLedger)
-            .set({ remainingCredits: sql`${creditLedger.remainingCredits} - 1` })
-            .where(eq(creditLedger.id, creditEntry.id));
-
-          // Step 10d: Insert credit_ledger debit row with audit fields
-          const [debitEntry] = await tx.insert(creditLedger).values({
+          // Steps 10a-10e: Debit credit via FIFO allocation
+          const debitResult = await debitCredits(tx, {
             photographerId: intent.photographerId,
-            amount: -1,
-            type: 'debit',
-            source: 'upload',
+            amount: 1,
             operationType: 'image_upload',
             operationId: photoId,
-            expiresAt: creditEntry.expiresAt,
-            stripeSessionId: null,
-          }).returning({ id: creditLedger.id });
-
-          // Step 10e: Insert credit_allocations row (attribution)
-          await tx.insert(creditAllocations).values({
-            debitLedgerEntryId: debitEntry.id,
-            creditLedgerEntryId: creditEntry.id,
-            amount: 1,
           });
+
+          if (debitResult.isErr()) {
+            throw debitResult.error;
+          }
 
           // Create photo record
           const [newPhoto] = await tx
@@ -771,10 +718,13 @@ async function processUpload(
         }),
       ),
       (cause): UploadProcessingError => {
-        const msg = cause instanceof Error ? cause.message : '';
-        if (msg === 'INSUFFICIENT_CREDITS') {
-          captureUploadError('insufficient_credits', intentCtx);
-          return { type: 'insufficient_credits', key, intentId: intent.id };
+        // CreditError discriminated union from debitCredits
+        if (cause && typeof cause === 'object' && 'type' in cause) {
+          const creditErr = cause as { type: string; cause?: unknown };
+          if (creditErr.type === 'insufficient_credits') {
+            captureUploadError('insufficient_credits', intentCtx);
+            return { type: 'insufficient_credits', key, intentId: intent.id };
+          }
         }
         captureUploadError('database', {
           ...intentCtx,

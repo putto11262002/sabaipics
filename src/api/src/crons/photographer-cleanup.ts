@@ -1,9 +1,10 @@
-import { createDbTx, photographers, events, creditLedger, consentRecords, uploadIntents } from '@/db';
+import { createDbTx, photographers, events, consentRecords, uploadIntents } from '@/db';
 import { and, lt, isNotNull, eq } from 'drizzle-orm';
 import type { Bindings } from '../types';
 import { hardDeleteEvents } from '../lib/services/events/hard-delete';
 import { createFaceProvider } from '../lib/rekognition';
 import { createStripeClient } from '../lib/stripe/client';
+import { deleteAllCredits } from '../lib/credits';
 
 interface PhotographerCleanupResult {
 	photographersHardDeleted: number;
@@ -153,11 +154,12 @@ export async function photographerCleanup(env: Bindings): Promise<PhotographerCl
 
 			// Step 3: Delete photographer dependencies and record (in transaction)
 			await db.transaction(async (tx) => {
-				// Delete in FK order
-				const creditDeleted = await tx
-					.delete(creditLedger)
-					.where(eq(creditLedger.photographerId, photographer.id))
-					.returning({ id: creditLedger.id });
+				// Delete in FK order (credit_allocations → credit_ledger)
+				const creditDeletedCount = await deleteAllCredits(tx, photographer.id)
+					.match(
+						(count) => count,
+						(e) => { throw e.cause ?? new Error(`Credit cleanup failed: ${e.type}`); },
+					);
 
 				const consentDeleted = await tx
 					.delete(consentRecords)
@@ -173,7 +175,7 @@ export async function photographerCleanup(env: Bindings): Promise<PhotographerCl
 
 				console.log('[PhotographerCleanup] Photographer dependencies deleted', {
 					photographerId: photographer.id,
-					creditLedger: creditDeleted.length,
+					creditLedger: creditDeletedCount,
 					consentRecords: consentDeleted.length,
 					uploadIntents: uploadsDeleted.length,
 				});
