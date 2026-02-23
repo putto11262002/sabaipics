@@ -1,4 +1,4 @@
-import { pgTable, text, index, uuid, pgView } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, index, uuid, pgView } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { timestamptz, createdAtCol } from "./common";
 
@@ -13,6 +13,7 @@ export const photographers = pgTable(
     name: text("name"),
     stripeCustomerId: text("stripe_customer_id").unique(),
     pdpaConsentAt: timestamptz("pdpa_consent_at"),
+    balance: integer("balance").notNull().default(0), // Denormalized running balance
     deletedAt: timestamptz("deleted_at"), // null = active, set = soft deleted
     createdAt: createdAtCol(),
   },

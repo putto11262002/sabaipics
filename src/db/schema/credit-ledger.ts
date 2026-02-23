@@ -42,6 +42,9 @@ export const creditLedger = pgTable(
     stripeSessionId: text("stripe_session_id"), // Nullable, only for Stripe purchases
     appleTransactionId: text("apple_transaction_id"), // Nullable, only for Apple IAP purchases
     stripeReceiptUrl: text("stripe_receipt_url"), // Nullable, Stripe receipt URL for purchases
+    operationType: text("operation_type"), // Nullable. e.g. 'photo_processing', 'face_search'
+    operationId: text("operation_id"), // Nullable. e.g. photo UUID that caused the deduction
+    remainingCredits: integer("remaining_credits"), // Nullable. Only on credit (positive) entries. Starts equal to amount, decremented on each allocation
     expiresAt: timestamptz("expires_at").notNull(),
     createdAt: createdAtCol(),
   },
