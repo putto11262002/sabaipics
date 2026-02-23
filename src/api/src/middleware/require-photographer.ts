@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { eq } from "drizzle-orm";
-import { activePhotographers, type Photographer, type Database } from "@/db";
+import { photographers, type Photographer, type Database } from "@/db";
 import { createAuthError } from "@/auth/errors";
 import type { AuthVariables } from "@/auth/types";
 
@@ -48,11 +48,13 @@ export function requirePhotographer(): MiddlewareHandler<Env> {
     const db = c.var.db();
     const [row] = await db
       .select({
-        id: activePhotographers.id,
-        pdpaConsentAt: activePhotographers.pdpaConsentAt,
+        id: photographers.id,
+        pdpaConsentAt: photographers.pdpaConsentAt,
+        bannedAt: photographers.bannedAt,
+        deletedAt: photographers.deletedAt,
       })
-      .from(activePhotographers)
-      .where(eq(activePhotographers.clerkId, auth.userId))
+      .from(photographers)
+      .where(eq(photographers.clerkId, auth.userId))
       .limit(1);
 
     if (!row) {
@@ -62,7 +64,21 @@ export function requirePhotographer(): MiddlewareHandler<Env> {
       );
     }
 
-    c.set("photographer", row);
+    if (row.bannedAt) {
+      return c.json(
+        createAuthError("ACCOUNT_SUSPENDED", "Account suspended"),
+        403
+      );
+    }
+
+    if (row.deletedAt) {
+      return c.json(
+        createAuthError("FORBIDDEN", "Photographer account not found"),
+        403
+      );
+    }
+
+    c.set("photographer", { id: row.id, pdpaConsentAt: row.pdpaConsentAt });
     return next();
   };
 }

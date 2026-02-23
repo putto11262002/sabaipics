@@ -5,7 +5,7 @@ import {
 } from '@tanstack/react-query';
 import { parseResponse, type ClientResponse } from 'hono/client';
 import { useAuth } from '@/auth/react';
-import { toRequestError, type RequestError } from '@/shared/lib/api-error';
+import { toRequestError, isAccountSuspended, type RequestError } from '@/shared/lib/api-error';
 
 type ClientOpts = { headers: Record<string, string> };
 
@@ -37,7 +37,7 @@ export function useApiInfiniteQuery<TPageData, TPageParam = unknown>(
   options: UseApiInfiniteQueryOptions<TPageData, TPageParam>,
 ) {
   const { apiFn, withAuth: needsAuth = true, ...rest } = options;
-  const { getToken } = useAuth();
+  const { getToken, signOut } = useAuth();
 
   return useInfiniteQuery({
     ...rest,
@@ -51,7 +51,9 @@ export function useApiInfiniteQuery<TPageData, TPageParam = unknown>(
       try {
         return (await parseResponse(apiFn(pageParam, { headers }))) as TPageData;
       } catch (e) {
-        throw toRequestError(e);
+        const error = toRequestError(e);
+        if (isAccountSuspended(error)) signOut();
+        throw error;
       }
     },
   });

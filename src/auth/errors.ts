@@ -3,6 +3,7 @@ export const AUTH_ERRORS = {
   INVALID_TOKEN: "INVALID_TOKEN",
   TOKEN_EXPIRED: "TOKEN_EXPIRED",
   FORBIDDEN: "FORBIDDEN",
+  ACCOUNT_SUSPENDED: "ACCOUNT_SUSPENDED",
 } as const;
 
 export type AuthErrorResponse = {
