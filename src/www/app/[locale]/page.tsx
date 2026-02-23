@@ -1,12 +1,38 @@
 import { setRequestLocale } from 'next-intl/server';
-import { FaqSection } from '@/components/landing/faq-section';
-import { Footer } from '@/components/landing/footer';
+import dynamic from 'next/dynamic';
+
 import { LandingHero } from '@/components/landing/hero';
-import { IosAppSection } from '@/components/landing/ios-app-section';
-import { PricingSection } from '@/components/landing/pricing-section';
 import { SiteNav } from '@/components/site-nav';
-import { FeatureStory } from '@/components/landing/feature-story';
-import { UploadWaySection } from '@/components/landing/upload-way-section';
+
+// Lazy load below-fold sections to reduce initial JS bundle
+const FeatureStory = dynamic(
+  () => import('@/components/landing/feature-story').then((mod) => mod.FeatureStory),
+  { ssr: true, loading: () => <SectionSkeleton /> }
+);
+const UploadWaySection = dynamic(
+  () => import('@/components/landing/upload-way-section').then((mod) => mod.UploadWaySection),
+  { ssr: true, loading: () => <SectionSkeleton /> }
+);
+const PricingSection = dynamic(
+  () => import('@/components/landing/pricing-section').then((mod) => mod.PricingSection),
+  { ssr: true, loading: () => <SectionSkeleton /> }
+);
+const IosAppSection = dynamic(
+  () => import('@/components/landing/ios-app-section').then((mod) => mod.IosAppSection),
+  { ssr: true, loading: () => <SectionSkeleton /> }
+);
+const FaqSection = dynamic(
+  () => import('@/components/landing/faq-section').then((mod) => mod.FaqSection),
+  { ssr: true, loading: () => <SectionSkeleton /> }
+);
+const Footer = dynamic(
+  () => import('@/components/landing/footer').then((mod) => mod.Footer),
+  { ssr: true, loading: () => <SectionSkeleton /> }
+);
+
+function SectionSkeleton() {
+  return <div className="h-96" />;
+}
 
 type Props = {
   params: Promise<{ locale: string }>;
