@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { LayoutDashboard, CalendarDays, Sparkles, Wallet } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Sparkles, Wallet, MessageCircle } from 'lucide-react';
 
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { NavMain } from './nav-main';
@@ -33,6 +33,11 @@ const data = {
       title: 'Credits',
       url: '/credits',
       icon: Wallet,
+    },
+    {
+      title: 'LINE Delivery',
+      url: '/line-delivery',
+      icon: MessageCircle,
     },
     // {
     // 	title: "Galleries",
