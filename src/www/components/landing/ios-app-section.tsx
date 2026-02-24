@@ -47,7 +47,7 @@ export async function IosAppSection() {
               </div>
             </div>
 
-            <div className="order-1 lg:order-2">
+            <div className="order-1 lg:order-2" aria-hidden="true">
               <div className="mx-auto w-full max-w-[360px] rounded-[2.4rem] border border-border/60 bg-[linear-gradient(165deg,color-mix(in_oklab,var(--primary)_12%,transparent)_0%,color-mix(in_oklab,var(--primary)_4%,transparent)_58%,color-mix(in_oklab,var(--primary)_8%,transparent)_100%)] p-3 shadow-[0_26px_64px_-46px_color-mix(in_oklab,var(--foreground)_22%,transparent)] lg:ml-auto">
                 <div className="relative aspect-[9/19] overflow-hidden rounded-[1.8rem] border border-border/50 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--primary)_8%,var(--card))_0%,color-mix(in_oklab,var(--primary)_4%,var(--card))_100%)]">
                   <div className="absolute inset-x-[30%] top-2 h-1 rounded-full bg-border/60" />

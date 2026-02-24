@@ -4,7 +4,7 @@ import { HeroEventStageShell } from './hero-event-stage-shell';
 
 export function HeroEventStage({ className }: { className?: string }) {
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" aria-hidden="true">
       {/* Static shell - renders immediately in SSR HTML (instant LCP) */}
       <div className="absolute inset-0">
         <HeroEventStageShell className={className} />
