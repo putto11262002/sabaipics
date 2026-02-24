@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
 import { Button } from '@/shared/components/ui/button';
-import { ButtonGroup } from '@/shared/components/ui/button-group';
 import { Badge } from '@/shared/components/ui/badge';
 import {
   DropdownMenu,
@@ -41,7 +40,7 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from '@/shared/components/ui/empty';
-import { AlertCircle, FileUp, Image, MoreHorizontal, Palette, RefreshCw } from 'lucide-react';
+import { AlertCircle, FileUp, MoreHorizontal, Palette, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { createColumnHelper, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { DataTable } from '../../../components/events-table/data-table';
@@ -51,8 +50,6 @@ import { useDeleteStudioLut } from '../../../hooks/studio/useDeleteStudioLut';
 import { useDownloadStudioLut } from '../../../hooks/studio/useDownloadStudioLut';
 import { useRenameStudioLut } from '../../../hooks/studio/useRenameStudioLut';
 import { CreateLutDialog } from '../../../components/studio/CreateLutDialog';
-
-type CreateKind = 'cube' | 'reference';
 
 const columnHelper = createColumnHelper<StudioLut>();
 
@@ -64,7 +61,6 @@ export default function StudioLutsPage() {
   const rename = useRenameStudioLut();
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [createKind, setCreateKind] = useState<CreateKind>('cube');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [renameState, setRenameState] = useState<{ id: string; name: string } | null>(null);
 
@@ -119,18 +115,12 @@ export default function StudioLutsPage() {
                   >
                     Preview
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setRenameState({ id: lut.id, name: lut.name })}
-                  >
+                  <DropdownMenuItem onClick={() => setRenameState({ id: lut.id, name: lut.name })}>
                     Rename
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={async () => {
-                      const newTab = window.open(
-                        'about:blank',
-                        '_blank',
-                        'noopener,noreferrer',
-                      );
+                      const newTab = window.open('about:blank', '_blank', 'noopener,noreferrer');
                       try {
                         const res = await download.mutateAsync(lut.id);
                         const url = res.data.getUrl;
@@ -143,7 +133,9 @@ export default function StudioLutsPage() {
                         }
                       } catch (e) {
                         newTab?.close();
-                        toast.error('Download failed', { description: e instanceof Error ? e.message : 'Something went wrong' });
+                        toast.error('Download failed', {
+                          description: e instanceof Error ? e.message : 'Something went wrong',
+                        });
                       }
                     }}
                   >
@@ -182,28 +174,15 @@ export default function StudioLutsPage() {
           { label: 'LUTs' },
         ]}
       >
-        <ButtonGroup>
-          <Button
-            size="sm"
-            onClick={() => {
-              setCreateKind('cube');
-              setCreateOpen(true);
-            }}
-          >
-            <FileUp className="mr-1 size-4" />
-            Upload .cube
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              setCreateKind('reference');
-              setCreateOpen(true);
-            }}
-          >
-            <Image className="mr-1 size-4" />
-            Reference image
-          </Button>
-        </ButtonGroup>
+        <Button
+          size="sm"
+          onClick={() => {
+            setCreateOpen(true);
+          }}
+        >
+          <FileUp className="mr-1 size-4" />
+          Upload .cube
+        </Button>
       </SidebarPageHeader>
 
       <div className="flex flex-1 flex-col gap-4 p-4">
@@ -224,8 +203,15 @@ export default function StudioLutsPage() {
             <AlertCircle className="size-4" />
             <AlertTitle>Failed to load LUTs</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
-              <span>{luts.error instanceof Error ? luts.error.message : 'Something went wrong'}</span>
-              <Button variant="destructive" size="sm" onClick={() => luts.refetch()} disabled={luts.isRefetching}>
+              <span>
+                {luts.error instanceof Error ? luts.error.message : 'Something went wrong'}
+              </span>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => luts.refetch()}
+                disabled={luts.isRefetching}
+              >
                 {luts.isRefetching ? (
                   <Spinner className="mr-1 size-3" />
                 ) : (
@@ -240,9 +226,13 @@ export default function StudioLutsPage() {
         {!luts.isLoading && !luts.isError && lutRows.length === 0 && (
           <Empty>
             <EmptyHeader>
-              <EmptyMedia variant="icon"><Palette /></EmptyMedia>
+              <EmptyMedia variant="icon">
+                <Palette />
+              </EmptyMedia>
               <EmptyTitle>No LUTs yet</EmptyTitle>
-              <EmptyDescription>Create a LUT to start color grading your event photos.</EmptyDescription>
+              <EmptyDescription>
+                Create a LUT to start color grading your event photos.
+              </EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
@@ -259,7 +249,7 @@ export default function StudioLutsPage() {
         )}
       </div>
 
-      <CreateLutDialog open={createOpen} onOpenChange={setCreateOpen} kind={createKind} />
+      <CreateLutDialog open={createOpen} onOpenChange={setCreateOpen} />
 
       <AlertDialog
         open={confirmDeleteId != null}
@@ -284,7 +274,9 @@ export default function StudioLutsPage() {
                   await del.mutateAsync(id);
                   toast.success('LUT deleted');
                 } catch (e) {
-                  toast.error('Delete failed', { description: e instanceof Error ? e.message : 'Something went wrong' });
+                  toast.error('Delete failed', {
+                    description: e instanceof Error ? e.message : 'Something went wrong',
+                  });
                 } finally {
                   setConfirmDeleteId(null);
                 }
@@ -303,10 +295,7 @@ export default function StudioLutsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog
-        open={renameState != null}
-        onOpenChange={(open) => !open && setRenameState(null)}
-      >
+      <Dialog open={renameState != null} onOpenChange={(open) => !open && setRenameState(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Rename LUT</DialogTitle>
@@ -319,7 +308,9 @@ export default function StudioLutsPage() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameState(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setRenameState(null)}>
+              Cancel
+            </Button>
             <Button
               disabled={rename.isPending}
               onClick={async () => {
@@ -328,7 +319,9 @@ export default function StudioLutsPage() {
                   await rename.mutateAsync({ id: renameState.id, name: renameState.name.trim() });
                   toast.success('Renamed');
                 } catch (e) {
-                  toast.error('Rename failed', { description: e instanceof Error ? e.message : 'Something went wrong' });
+                  toast.error('Rename failed', {
+                    description: e instanceof Error ? e.message : 'Something went wrong',
+                  });
                 } finally {
                   setRenameState(null);
                 }

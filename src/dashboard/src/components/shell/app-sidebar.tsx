@@ -26,8 +26,18 @@ const data = {
     },
     {
       title: 'Studio',
-      url: '/studio/luts',
+      url: '/studio',
       icon: Sparkles,
+      items: [
+        {
+          title: 'LUTs',
+          url: '/studio/luts',
+        },
+        {
+          title: 'Auto Edit',
+          url: '/studio/auto-edit',
+        },
+      ],
     },
     {
       title: 'Credits',

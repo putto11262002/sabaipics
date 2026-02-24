@@ -5,15 +5,14 @@ import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
 
 type UpdateColorGradeResponse = InferResponseType<
-  typeof api.events[':id']['color-grade']['$put'],
+  (typeof api.events)[':id']['color-grade']['$put'],
   SuccessStatusCode
 >;
 
 export type UpdateColorGradeInput = {
   eventId: string;
-  enabled: boolean;
   lutId: string | null;
-  intensity: number;
+  lutIntensity: number;
   includeLuminance: boolean;
 };
 
@@ -26,9 +25,8 @@ export function useUpdateEventColorGrade() {
         {
           param: { id: input.eventId },
           json: {
-            enabled: input.enabled,
             lutId: input.lutId,
-            intensity: input.intensity,
+            lutIntensity: input.lutIntensity,
             includeLuminance: input.includeLuminance,
           },
         },

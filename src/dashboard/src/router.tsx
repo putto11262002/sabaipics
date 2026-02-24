@@ -23,6 +23,7 @@ import SlideshowPreviewPage from './routes/events/[id]/slideshow/preview';
 import StudioLutsPage from './routes/studio/luts';
 import StudioLutPreviewPage from './routes/studio/luts/preview';
 import LineDeliveryPage from './routes/line-delivery';
+import StudioAutoEditPage from './routes/studio/auto-edit';
 import { SidebarLayout } from './components/shell/sidebar-layout';
 export const router = createBrowserRouter([
   // Public routes
@@ -101,6 +102,10 @@ export const router = createBrowserRouter([
       {
         path: '/line-delivery',
         element: <LineDeliveryPage />,
+      },
+      {
+        path: '/studio/auto-edit',
+        element: <StudioAutoEditPage />,
       },
       {
         path: '/credits',
