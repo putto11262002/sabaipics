@@ -680,7 +680,7 @@ async function processUpload(
     let processedSize: number | null = null;
 
     const modalConfigured = isModalConfigured(env);
-    const shouldUseModal = modalConfigured;
+    const shouldUseModal = modalConfigured && (colorGrade.autoEdit || !!colorGrade.lutId);
 
     console.log('[upload-consumer] Modal decision', {
       intentId: intent.id,
