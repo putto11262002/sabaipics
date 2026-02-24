@@ -18,6 +18,7 @@ function CreditCoin() {
     <div
       className="relative h-[52px] w-[52px] shrink-0"
       style={{ perspective: '240px' }}
+      aria-hidden="true"
     >
       {/* Coin edge (thickness) - positioned behind */}
       <div
@@ -77,6 +78,7 @@ function CreditStack() {
     <div
       className="relative h-[52px] w-full max-w-[130px] shrink-0"
       style={{ perspective: '240px' }}
+      aria-hidden="true"
     >
       {/* Coin 1 */}
       <div
@@ -151,6 +153,7 @@ function PhotoPrint() {
     <div
       className="relative h-[52px] w-[52px] shrink-0"
       style={{ perspective: '240px' }}
+      aria-hidden="true"
     >
       {/* Photo back/thickness */}
       <div
