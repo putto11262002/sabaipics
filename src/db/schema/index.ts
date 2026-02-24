@@ -20,6 +20,7 @@ export * from './participant-searches';
 export * from './ftp-credentials';
 export * from './desktop-auth';
 export * from './announcements';
+export * from './feedback';
 
 // Relations
 export * from './relations';
