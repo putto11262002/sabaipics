@@ -69,6 +69,14 @@ DESKTOP_REFRESH_TOKEN_PEPPER=desktop-refresh-token-pepper-change-me
 LINE_CHANNEL_SECRET=xxxxx
 LINE_CHANNEL_ACCESS_TOKEN=xxxxx
 
+# LINE Login Channel Credentials (separate channel from Messaging API)
+# Get from: LINE Developers Console → LINE Login Channel → Basic settings
+# Channel ID: Basic settings → Channel ID
+# Channel Secret: Basic settings → Channel secret
+# Note: Must link the LINE Login channel to the same LINE Official Account as the Messaging API channel
+LINE_LOGIN_CHANNEL_ID=xxxxx
+LINE_LOGIN_CHANNEL_SECRET=xxxxx
+
 # Legacy notes (kept for reference)
 # - CF_DOMAIN / R2_BASE_URL were older names; runtime code now uses CF_ZONE + PHOTO_R2_BASE_URL.
 

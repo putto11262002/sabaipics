@@ -11,6 +11,8 @@ export type Bindings = Cloudflare.Env & {
   DESKTOP_REFRESH_TOKEN_PEPPER: string;
   CF_ACCESS_TEAM_DOMAIN: string;
   CF_ACCESS_AUD: string;
+  LINE_LOGIN_CHANNEL_ID: string;
+  LINE_LOGIN_CHANNEL_SECRET: string;
 };
 
 export type Variables = AuthVariables & {
