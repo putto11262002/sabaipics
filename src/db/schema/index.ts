@@ -21,6 +21,7 @@ export * from './ftp-credentials';
 export * from './desktop-auth';
 export * from './announcements';
 export * from './feedback';
+export * from './line-deliveries';
 
 // Relations
 export * from './relations';

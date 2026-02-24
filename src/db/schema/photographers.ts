@@ -1,6 +1,15 @@
-import { pgTable, text, integer, index, uuid, pgView } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, index, uuid, pgView, jsonb } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { timestamptz, createdAtCol } from "./common";
+
+export interface LineSettings {
+  photoCap: 5 | 10 | 15 | 20 | null; // null = send all
+  overageEnabled: boolean;
+}
+
+export interface PhotographerSettings {
+  lineSettings?: LineSettings;
+}
 
 export const photographers = pgTable(
   "photographers",
@@ -14,6 +23,7 @@ export const photographers = pgTable(
     stripeCustomerId: text("stripe_customer_id").unique(),
     pdpaConsentAt: timestamptz("pdpa_consent_at"),
     balance: integer("balance").notNull().default(0), // Denormalized running balance
+    settings: jsonb("settings").$type<PhotographerSettings>(),
     bannedAt: timestamptz("banned_at"), // null = not banned, set = account suspended
     deletedAt: timestamptz("deleted_at"), // null = active, set = soft deleted
     createdAt: createdAtCol(),

@@ -9,6 +9,7 @@ import { consentRecords } from './consent-records';
 import { participantSearches } from './participant-searches';
 import { giftCodes, giftCodeRedemptions } from './gift-codes';
 import { photoLuts } from './photo-luts';
+import { lineDeliveries } from './line-deliveries';
 
 // Photographer relations
 export const photographersRelations = relations(photographers, ({ many }) => ({
@@ -16,6 +17,7 @@ export const photographersRelations = relations(photographers, ({ many }) => ({
   events: many(events),
   consentRecords: many(consentRecords),
   photoLuts: many(photoLuts),
+  lineDeliveries: many(lineDeliveries),
 }));
 
 // Credit ledger relations
@@ -50,6 +52,7 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   }),
   photos: many(photos),
   participantSearches: many(participantSearches),
+  lineDeliveries: many(lineDeliveries),
 }));
 
 // Photo LUT relations
@@ -86,11 +89,12 @@ export const consentRecordsRelations = relations(consentRecords, ({ one }) => ({
 }));
 
 // Participant searches relations
-export const participantSearchesRelations = relations(participantSearches, ({ one }) => ({
+export const participantSearchesRelations = relations(participantSearches, ({ one, many }) => ({
   event: one(events, {
     fields: [participantSearches.eventId],
     references: [events.id],
   }),
+  lineDeliveries: many(lineDeliveries),
 }));
 
 // Gift code relations
@@ -110,6 +114,26 @@ export const giftCodeRedemptionsRelations = relations(giftCodeRedemptions, ({ on
   }),
   creditLedgerEntry: one(creditLedger, {
     fields: [giftCodeRedemptions.creditLedgerEntryId],
+    references: [creditLedger.id],
+  }),
+}));
+
+// LINE delivery relations
+export const lineDeliveriesRelations = relations(lineDeliveries, ({ one }) => ({
+  photographer: one(photographers, {
+    fields: [lineDeliveries.photographerId],
+    references: [photographers.id],
+  }),
+  event: one(events, {
+    fields: [lineDeliveries.eventId],
+    references: [events.id],
+  }),
+  search: one(participantSearches, {
+    fields: [lineDeliveries.searchId],
+    references: [participantSearches.id],
+  }),
+  creditLedgerEntry: one(creditLedger, {
+    fields: [lineDeliveries.creditLedgerEntryId],
     references: [creditLedger.id],
   }),
 }));
