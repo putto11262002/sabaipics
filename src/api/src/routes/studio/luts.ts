@@ -23,12 +23,13 @@ import {
 // Constants
 // =============================================================================
 
-const PRESIGN_TTL_SECONDS = 300; // 5 minutes
+const PRESIGN_TTL_SECONDS = 300;
 const PREVIEW_MAX_WIDTH = 1200;
 const PREVIEW_MAX_HEIGHT = 1200;
 const PREVIEW_JPEG_QUALITY = 85;
-const PREVIEW_MAX_PIXELS = 20_000_000; // guard against huge images (e.g. > ~20MP)
-const ALLOWED_REFERENCE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+const PREVIEW_MAX_PIXELS = 20_000_000;
+
+const ALLOWED_PREVIEW_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 // =============================================================================
 // Schemas
@@ -55,16 +56,6 @@ const cubePresignSchema = z.object({
     .max(10 * 1024 * 1024),
 });
 
-const referencePresignSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  contentType: z.enum(ALLOWED_REFERENCE_MIME_TYPES),
-  contentLength: z
-    .number()
-    .int()
-    .positive()
-    .max(25 * 1024 * 1024),
-});
-
 const renameSchema = z.object({
   name: z.string().trim().min(1).max(120),
 });
@@ -76,10 +67,8 @@ const previewFormSchema = z.object({
     .refine((f) => f.size <= 15 * 1024 * 1024, 'File too large')
     .refine(
       (f) =>
-        ALLOWED_REFERENCE_MIME_TYPES.includes(
-          f.type as (typeof ALLOWED_REFERENCE_MIME_TYPES)[number],
-        ),
-      `File type must be one of: ${ALLOWED_REFERENCE_MIME_TYPES.join(', ')}`,
+        ALLOWED_PREVIEW_MIME_TYPES.includes(f.type as (typeof ALLOWED_PREVIEW_MIME_TYPES)[number]),
+      `File type must be one of: ${ALLOWED_PREVIEW_MIME_TYPES.join(', ')}`,
     ),
   intensity: z.coerce.number().int().min(0).max(100).default(75),
   includeLuminance: z
@@ -365,79 +354,6 @@ export const studioLutsRouter = new Hono<Env>()
         });
       })
         .orTee((e) => e.cause && console.error('[studio/luts/cube/presign] error:', e.cause))
-        .match(
-          (data) => c.json({ data }, 201),
-          (e) => apiError(c, e),
-        );
-    },
-  )
-
-  // POST /studio/luts/reference/presign
-  .post(
-    '/reference/presign',
-    requirePhotographer(),
-    zValidator('json', referencePresignSchema),
-    async (c) => {
-      return safeTry(async function* () {
-        const photographer = c.var.photographer;
-        const db = c.var.db();
-        const { name, contentType, contentLength } = c.req.valid('json');
-
-        const lutId = crypto.randomUUID();
-        const ts = Date.now();
-        const uploadR2Key = `lut-uploads/${lutId}-${ts}`;
-
-        const presign = yield* ResultAsync.fromPromise(
-          generatePresignedPutUrl(
-            c.env.CF_ACCOUNT_ID,
-            c.env.R2_ACCESS_KEY_ID,
-            c.env.R2_SECRET_ACCESS_KEY,
-            {
-              bucket: c.env.PHOTO_BUCKET_NAME,
-              key: uploadR2Key,
-              contentType,
-              contentLength,
-              expiresIn: PRESIGN_TTL_SECONDS,
-            },
-          ),
-          (cause): HandlerError => ({
-            code: 'INTERNAL_ERROR',
-            message: 'Failed to generate upload URL',
-            cause,
-          }),
-        );
-
-        yield* ResultAsync.fromPromise(
-          db
-            .insert(photoLuts)
-            .values({
-              id: lutId,
-              photographerId: photographer.id,
-              name,
-              sourceType: 'reference_image',
-              status: 'pending',
-              uploadR2Key,
-              contentType,
-              contentLength,
-              expiresAt: presign.expiresAt.toISOString(),
-            })
-            .returning({ id: photoLuts.id }),
-          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-        );
-
-        return ok({
-          lutId,
-          putUrl: presign.url,
-          objectKey: uploadR2Key,
-          expiresAt: presign.expiresAt.toISOString(),
-          requiredHeaders: {
-            'Content-Type': contentType,
-            'Content-Length': contentLength.toString(),
-            'If-None-Match': '*',
-          },
-        });
-      })
-        .orTee((e) => e.cause && console.error('[studio/luts/reference/presign] error:', e.cause))
         .match(
           (data) => c.json({ data }, 201),
           (e) => apiError(c, e),

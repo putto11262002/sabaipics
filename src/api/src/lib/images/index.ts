@@ -8,14 +8,7 @@ export { extractPngDimensions } from './png';
 export { extractWebpDimensions } from './webp';
 
 // Color grading (LUT)
-export {
-  parseCubeLut,
-  applyCubeLutToRgba,
-  generateCubeLutFromReferenceRgba,
-  rgbToLab,
-  labToRgb,
-  computeLabStatsFromRgba,
-} from './color-grade';
+export { parseCubeLut, applyCubeLutToRgba } from './color-grade';
 
 // =============================================================================
 // Magic Byte Validation

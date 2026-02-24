@@ -15,19 +15,11 @@ import type { R2EventMessage } from '../types/r2-event';
 import type { Bindings } from '../types';
 import type { PhotoJob } from '../types/photo-job';
 import { createDb, createDbTx } from '@/db';
-import {
-  activeEvents,
-  events,
-  photoLuts,
-  uploadIntents,
-  photos,
-  type EventSettings,
-} from '@/db';
+import { activeEvents, events, photoLuts, uploadIntents, photos, type EventSettings } from '@/db';
 import { eq, and, sql } from 'drizzle-orm';
 import { debitCredits } from '../lib/credits';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
 import {
-  applyCubeLutToRgba,
   parseCubeLut,
   validateImageMagicBytes,
   extractJpegDimensions,
@@ -35,9 +27,10 @@ import {
   extractWebpDimensions,
 } from '../lib/images';
 import type { ParsedCubeLut } from '../lib/images/color-grade';
-import { normalizeWithCfImages, applyPostProcessPhoton, type PhotonPostProcessHook } from '../lib/images/normalize';
+import { normalizeWithCfImages } from '../lib/images/normalize';
 import { extractExif } from '../lib/images/exif';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
+import { processWithModal, isModalConfigured, type ModalProcessOptions } from '../lib/modal-client';
 
 // wrangler.api.jsonc sets max_retries: 1 as a crash safety net.
 // The consumer itself never calls message.retry() — the idempotency guard
@@ -47,6 +40,23 @@ import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 // CF Images handles the heavy decode externally, so this no longer
 // needs to fit in the 128 MB Workers heap.
 const MAX_PIXELS = 25_000_000;
+
+/**
+ * Generate R2 keys for original and processed photos.
+ * New structure: events/{eventId}/{photoId}/original.jpeg and processed.jpeg
+ */
+function generateR2Keys(
+  eventId: string,
+  photoId: string,
+): {
+  original: string;
+  processed: string;
+} {
+  return {
+    original: `events/${eventId}/${photoId}/original.jpeg`,
+    processed: `events/${eventId}/${photoId}/processed.jpeg`,
+  };
+}
 
 // =============================================================================
 // Types
@@ -63,7 +73,7 @@ type UploadProcessingError =
   | { type: 'intent_update'; intentId: string; cause: unknown };
 
 type ParsedLutCacheEntry =
-  | { kind: 'ok'; lut: ParsedCubeLut }
+  | { kind: 'ok'; lut: ParsedCubeLut; lutR2Key: string }
   | { kind: 'skip'; reason: string; extra?: Record<string, unknown> };
 
 type UploadBatchCaches = {
@@ -75,29 +85,40 @@ type UploadBatchCaches = {
 };
 
 const DEFAULT_COLOR_GRADE_SETTINGS = {
-  enabled: false,
+  autoEdit: false,
+  autoEditPresetId: null as string | null,
+  autoEditIntensity: 75,
   lutId: null as string | null,
-  intensity: 75,
+  lutIntensity: 75,
   includeLuminance: false,
 };
-
 function resolveColorGradeSettings(settings: EventSettings | null): {
-  enabled: boolean;
+  autoEdit: boolean;
+  autoEditPresetId: string | null;
+  autoEditIntensity: number;
   lutId: string | null;
-  intensity: number;
+  lutIntensity: number;
   includeLuminance: boolean;
 } {
   const cg = settings?.colorGrade;
-  const intensityRaw = cg?.intensity;
-  const intensity =
-    typeof intensityRaw === 'number' && Number.isFinite(intensityRaw)
-      ? intensityRaw
-      : DEFAULT_COLOR_GRADE_SETTINGS.intensity;
+  const lutIntensityRaw = cg?.lutIntensity;
+  const lutIntensity =
+    typeof lutIntensityRaw === 'number' && Number.isFinite(lutIntensityRaw)
+      ? lutIntensityRaw
+      : DEFAULT_COLOR_GRADE_SETTINGS.lutIntensity;
+
+  const autoEditIntensityRaw = cg?.autoEditIntensity;
+  const autoEditIntensity =
+    typeof autoEditIntensityRaw === 'number' && Number.isFinite(autoEditIntensityRaw)
+      ? autoEditIntensityRaw
+      : DEFAULT_COLOR_GRADE_SETTINGS.autoEditIntensity;
 
   return {
-    enabled: cg?.enabled ?? DEFAULT_COLOR_GRADE_SETTINGS.enabled,
+    autoEdit: cg?.autoEdit ?? DEFAULT_COLOR_GRADE_SETTINGS.autoEdit,
+    autoEditPresetId: cg?.autoEditPresetId ?? DEFAULT_COLOR_GRADE_SETTINGS.autoEditPresetId,
+    autoEditIntensity: Math.max(0, Math.min(100, Math.round(autoEditIntensity))),
     lutId: cg?.lutId ?? DEFAULT_COLOR_GRADE_SETTINGS.lutId,
-    intensity: Math.max(0, Math.min(100, Math.round(intensity))),
+    lutIntensity: Math.max(0, Math.min(100, Math.round(lutIntensity))),
     includeLuminance: cg?.includeLuminance ?? DEFAULT_COLOR_GRADE_SETTINGS.includeLuminance,
   };
 }
@@ -204,7 +225,11 @@ async function processUpload(
     }
 
     // Idempotency guard: skip if already terminal (handles crash redelivery + duplicate R2 events)
-    if (intent.status === 'completed' || intent.status === 'failed' || intent.status === 'expired') {
+    if (
+      intent.status === 'completed' ||
+      intent.status === 'failed' ||
+      intent.status === 'expired'
+    ) {
       console.log(`[upload-consumer] Skipping already-${intent.status} intent: ${intent.id}`);
       return ok(undefined);
     }
@@ -360,9 +385,8 @@ async function processUpload(
     );
 
     // Step 6c: Load event color grade settings + LUT (best-effort; never fail upload)
-    let postProcess: PhotonPostProcessHook | undefined;
-    let colorGradeApplied = false;
     let colorGradeSkip: { reason: string; extra?: Record<string, unknown> } | null = null;
+    let lutR2Key: string | null = null; // For Modal API (to look up LUT text from cache)
 
     const hasEventSettings = caches.eventSettingsByEventId.has(intent.eventId);
     const eventSettings = hasEventSettings
@@ -406,7 +430,7 @@ async function processUpload(
         );
 
     const colorGrade = resolveColorGradeSettings(eventSettings);
-    if (colorGrade.enabled && colorGrade.lutId) {
+    if (colorGrade.lutId) {
       const lutId = colorGrade.lutId;
       const cacheKey = `${intent.photographerId}:${lutId}`;
 
@@ -421,12 +445,7 @@ async function processUpload(
       const cached = caches.parsedLutByPhotographerAndLutId.get(cacheKey);
       if (cached) {
         if (cached.kind === 'ok') {
-          postProcess = (pixels: Uint8Array) =>
-            applyCubeLutToRgba(pixels, cached.lut, {
-              intensity: colorGrade.intensity,
-              includeLuminance: colorGrade.includeLuminance,
-            });
-          colorGradeApplied = true;
+          lutR2Key = cached.lutR2Key;
         } else {
           colorGradeSkip = { reason: cached.reason, extra: cached.extra };
         }
@@ -483,19 +502,19 @@ async function processUpload(
             hasLutR2Key: Boolean(lutRow.lutR2Key),
           });
         } else {
-          const lutR2Key = lutRow.lutR2Key;
+          lutR2Key = lutRow.lutR2Key;
           let lutText = caches.lutTextByR2Key.get(lutR2Key);
 
           if (lutText === undefined) {
             const r2Object = await ResultAsync.fromPromise(
               Sentry.startSpan({ name: 'upload.color_grade.r2_get_lut', op: 'r2.get' }, () =>
-                env.PHOTOS_BUCKET.get(lutR2Key),
+                env.PHOTOS_BUCKET.get(lutR2Key!),
               ),
               (cause) => cause,
             ).match(
               (obj) => obj,
               (cause) => {
-                caches.lutTextByR2Key.set(lutR2Key, null);
+                caches.lutTextByR2Key.set(lutR2Key!, null);
                 warnSkip('lut_r2_get_failed', { cause: unknownToString(cause), lutR2Key });
                 return null;
               },
@@ -541,13 +560,8 @@ async function processUpload(
               caches.parsedLutByPhotographerAndLutId.set(cacheKey, {
                 kind: 'ok',
                 lut: parsed.value,
+                lutR2Key,
               });
-              postProcess = (pixels: Uint8Array) =>
-                applyCubeLutToRgba(pixels, parsed.value, {
-                  intensity: colorGrade.intensity,
-                  includeLuminance: colorGrade.includeLuminance,
-                });
-              colorGradeApplied = true;
             }
           }
         }
@@ -562,9 +576,14 @@ async function processUpload(
       async (span) => {
         span.setAttribute('upload.original_size', imageBytes.byteLength);
         span.setAttribute('upload.normalization_method', 'cf_images');
-        span.setAttribute('upload.color_grade.enabled', colorGrade.enabled);
-        span.setAttribute('upload.color_grade.will_apply', Boolean(postProcess));
-        if (colorGradeSkip) span.setAttribute('upload.color_grade.skip_reason', colorGradeSkip.reason);
+        span.setAttribute('upload.color_grade.auto_edit', colorGrade.autoEdit);
+        span.setAttribute('upload.color_grade.has_lut', !!colorGrade.lutId);
+        span.setAttribute(
+          'upload.color_grade.will_apply',
+          (colorGrade.autoEdit || !!colorGrade.lutId) && isModalConfigured(env),
+        );
+        if (colorGradeSkip)
+          span.setAttribute('upload.color_grade.skip_reason', colorGradeSkip.reason);
 
         const result = await normalizeWithCfImages(imageBytes, env.IMAGES);
         result.match(
@@ -585,86 +604,145 @@ async function processUpload(
         extra: {
           normalization_method: 'cf_images',
           stage: cfNormalizeResult.error.stage,
-          cause: cfNormalizeResult.error.cause instanceof Error
-            ? cfNormalizeResult.error.cause.message
-            : String(cfNormalizeResult.error.cause),
+          cause:
+            cfNormalizeResult.error.cause instanceof Error
+              ? cfNormalizeResult.error.cause.message
+              : String(cfNormalizeResult.error.cause),
           detectedType: magicValidation.detectedType,
           originalSize: imageBytes.byteLength,
         },
       });
       return err<never, UploadProcessingError>({
-        type: 'normalization', key, intentId: intent.id, cause: cfNormalizeResult.error.cause,
+        type: 'normalization',
+        key,
+        intentId: intent.id,
+        cause: cfNormalizeResult.error.cause,
       });
     }
 
     let { bytes: normalizedBytes, width, height } = cfNormalizeResult.value;
 
-    // Step 7b: Apply LUT color grading via Photon (only when postProcess is defined).
-    // CF Images output is ≤2500px JPEG (~3-5 MB). applyPostProcessPhoton decodes this
-    // to ~14 MB RGBA — completely safe within the 128 MB Workers limit.
-    if (postProcess) {
-      const lutResult = Sentry.startSpan(
-        { name: 'upload.color_grade.apply', op: 'image.process' },
-        (span) => {
-          span.setAttribute('upload.color_grade.input_size', normalizedBytes.byteLength);
-          span.setAttribute('upload.color_grade.intensity', colorGrade.intensity);
-          if (colorGrade.lutId) span.setAttribute('upload.color_grade.lut_id', colorGrade.lutId);
+    // Step 7b: Apply image pipeline via Modal (auto-edit + LUT)
+    // CF Images output is ≤2500px JPEG (~3-5 MB).
+    // Modal processes and returns processed JPEG.
+    let pipelineApplied: {
+      autoEdit: boolean;
+      autoEditPresetId: string | null;
+      lutId: string | null;
+      lutIntensity: number;
+    } | null = null;
+    let processedBytes: ArrayBuffer | null = null;
 
-          const result = applyPostProcessPhoton(normalizedBytes, postProcess);
+    const shouldUseModal = (colorGrade.autoEdit || colorGrade.lutId) && isModalConfigured(env);
+
+    if (shouldUseModal) {
+      const modalOptions: ModalProcessOptions = {
+        autoEdit: colorGrade.autoEdit,
+        style: null,
+        lutIntensity: colorGrade.lutIntensity,
+        preserveLuminance: !colorGrade.includeLuminance,
+      };
+
+      // Get LUT base64 if needed (from cache using lutR2Key)
+      if (colorGrade.lutId && lutR2Key) {
+        const lutText = caches.lutTextByR2Key.get(lutR2Key);
+        if (lutText) {
+          modalOptions.lutBase64 = btoa(lutText);
+        }
+      }
+
+      const modalResult = await Sentry.startSpan(
+        { name: 'upload.modal_process', op: 'image.process' },
+        async (span) => {
+          span.setAttribute('upload.modal.auto_edit', colorGrade.autoEdit);
+          span.setAttribute('upload.modal.preset_id', colorGrade.autoEditPresetId ?? 'null');
+          span.setAttribute('upload.modal.lut_enabled', !!colorGrade.lutId);
+          span.setAttribute('upload.modal.lut_intensity', colorGrade.lutIntensity);
+          span.setAttribute('upload.modal.input_size', normalizedBytes.byteLength);
+
+          const result = await processWithModal(normalizedBytes, modalOptions, {
+            MODAL_KEY: env.MODAL_KEY!,
+            MODAL_SECRET: env.MODAL_SECRET!,
+          });
           result.match(
             (val) => {
-              span.setAttribute('upload.color_grade.output_size', val.bytes.byteLength);
-              colorGradeApplied = true;
+              span.setAttribute('upload.modal.output_size', val.imageBytes.byteLength);
+              span.setAttribute('upload.modal.width', val.width);
+              span.setAttribute('upload.modal.height', val.height);
+              span.setAttribute('upload.modal.operations', val.operationsApplied.join(','));
             },
-            (error) => span.setAttribute('upload.color_grade.error_stage', error.stage),
+            (error) => span.setAttribute('upload.modal.error', error.message),
           );
           return result;
         },
       );
 
-      if (lutResult.isErr()) {
-        // LUT failure is non-fatal — use un-graded CF Images output + warn.
-        colorGradeApplied = false;
-        captureUploadWarning('color_grade_apply_failed', {
+      if (modalResult.isErr()) {
+        // Modal failure is non-fatal — use un-graded CF Images output + warn.
+        captureUploadWarning('modal_process_failed', {
           ...intentCtx,
           extra: {
-            stage: lutResult.error.stage,
-            cause: lutResult.error.cause instanceof Error
-              ? lutResult.error.cause.message : String(lutResult.error.cause),
+            error: modalResult.error.message,
+            type: modalResult.error.type,
+            auto_edit: colorGrade.autoEdit,
             lut_id: colorGrade.lutId,
           },
         });
       } else {
-        ({ bytes: normalizedBytes, width, height } = lutResult.value);
+        processedBytes = modalResult.value.imageBytes;
+        width = modalResult.value.width;
+        height = modalResult.value.height;
+        pipelineApplied = {
+          autoEdit: colorGrade.autoEdit,
+          autoEditPresetId: colorGrade.autoEditPresetId,
+          lutId: colorGrade.lutId,
+          lutIntensity: colorGrade.lutIntensity,
+        };
       }
     }
 
-    const fileSize = normalizedBytes.byteLength;
+    const finalBytes = processedBytes ?? normalizedBytes;
+    const fileSize = finalBytes.byteLength;
 
-    // Step 8: Generate final photo ID and key
+    // Step 8: Generate final photo ID and keys
     const photoId = crypto.randomUUID();
-    const finalR2Key = `${intent.eventId}/${photoId}.jpg`;
+    const r2Keys = generateR2Keys(intent.eventId, photoId);
+    // For backward compatibility, r2Key points to processed if available, else original
+    const finalR2Key = processedBytes ? r2Keys.processed : r2Keys.original;
 
     // Step 8b: Write photoId to intent BEFORE R2 PUT so crons can clean
     // orphaned normalized JPEGs if the transaction at step 10 fails.
     yield* ResultAsync.fromPromise(
-      db.update(uploadIntents)
-        .set({ photoId })
-        .where(eq(uploadIntents.id, intent.id)),
+      db.update(uploadIntents).set({ photoId }).where(eq(uploadIntents.id, intent.id)),
       (cause): UploadProcessingError => ({
-        type: 'intent_update', intentId: intent.id, cause,
+        type: 'intent_update',
+        intentId: intent.id,
+        cause,
       }),
     );
 
-    // Step 9: Upload normalized image to final location
+    // Step 9: Upload images to final locations
+    // Always save original (normalized but unprocessed)
     yield* ResultAsync.fromPromise(
-      Sentry.startSpan({ name: 'upload.r2_put', op: 'r2.put' }, () =>
-        env.PHOTOS_BUCKET.put(finalR2Key, normalizedBytes, {
+      Sentry.startSpan({ name: 'upload.r2_put_original', op: 'r2.put' }, () =>
+        env.PHOTOS_BUCKET.put(r2Keys.original, normalizedBytes, {
           httpMetadata: { contentType: 'image/jpeg' },
         }),
       ),
-      (cause): UploadProcessingError => ({ type: 'r2', operation: 'put_normalized', cause }),
+      (cause): UploadProcessingError => ({ type: 'r2', operation: 'put_original', cause }),
     );
+
+    // If processed, also save processed version
+    if (processedBytes) {
+      yield* ResultAsync.fromPromise(
+        Sentry.startSpan({ name: 'upload.r2_put_processed', op: 'r2.put' }, () =>
+          env.PHOTOS_BUCKET.put(r2Keys.processed, processedBytes!, {
+            httpMetadata: { contentType: 'image/jpeg' },
+          }),
+        ),
+        (cause): UploadProcessingError => ({ type: 'r2', operation: 'put_processed', cause }),
+      );
+    }
 
     // Step 10: Credit deduction + photo creation (transactional)
     // Uses atomic balance decrement: UPDATE balance = balance - 1 WHERE balance >= 1
@@ -701,6 +779,7 @@ async function processUpload(
               height,
               fileSize,
               exif: exifData,
+              pipelineApplied,
             })
             .returning();
 
@@ -839,7 +918,12 @@ export async function queue(
           case 'invalid_file':
             await db
               .update(uploadIntents)
-              .set({ status: 'failed', errorCode: error.reason, errorMessage: error.message, retryable: false })
+              .set({
+                status: 'failed',
+                errorCode: error.reason,
+                errorMessage: error.message,
+                retryable: false,
+              })
               .where(eq(uploadIntents.id, error.intentId))
               .catch(() => {});
             break;
@@ -906,10 +990,12 @@ export async function queue(
 
             // Best-effort: find intent and mark as failed. If DB is down,
             // this fails silently — cron catches stuck-pending after 7 days.
-            const failedIntent = await db.query.uploadIntents.findFirst({
-              where: eq(uploadIntents.r2Key, event.object.key),
-              columns: { id: true },
-            }).catch(() => null);
+            const failedIntent = await db.query.uploadIntents
+              .findFirst({
+                where: eq(uploadIntents.r2Key, event.object.key),
+                columns: { id: true },
+              })
+              .catch(() => null);
 
             if (failedIntent) {
               await db

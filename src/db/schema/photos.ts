@@ -24,7 +24,7 @@ export type PhotoExifData = {
 /** Pipeline processing applied to photo */
 export type PipelineApplied = {
   autoEdit: boolean;
-  style: string | null;
+  autoEditPresetId: string | null;
   lutId: string | null;
   lutIntensity: number;
 };
