@@ -24,6 +24,7 @@ export const creditLedgerSources = [
   "admin_adjustment",
   "apple_purchase",
   "signup_bonus",
+  "line_delivery",
 ] as const;
 export type CreditLedgerSource = (typeof creditLedgerSources)[number];
 

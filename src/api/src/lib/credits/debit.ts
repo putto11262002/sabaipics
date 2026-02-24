@@ -11,6 +11,7 @@ import {
   creditLedger,
   creditAllocations,
   photographers,
+  type CreditLedgerSource,
 } from '@/db';
 import { eq, and, gt, asc, sql, or, isNull } from 'drizzle-orm';
 import { ResultAsync, ok, err } from 'neverthrow';
@@ -21,6 +22,7 @@ export interface DebitCreditsParams {
   amount: number;
   operationType: string;
   operationId: string;
+  source?: CreditLedgerSource;
 }
 
 export interface DebitAllocation {
@@ -49,7 +51,7 @@ export function debitCredits(
   tx: Transaction,
   params: DebitCreditsParams,
 ): ResultAsync<DebitResult, CreditError> {
-  const { photographerId, amount, operationType, operationId } = params;
+  const { photographerId, amount, operationType, operationId, source = 'upload' } = params;
 
   return ResultAsync.fromPromise(
     (async () => {
@@ -74,7 +76,7 @@ export function debitCredits(
         photographerId,
         amount: -amount,
         type: 'debit',
-        source: 'upload',
+        source,
         operationType,
         operationId,
         expiresAt: sql`NOW()`, // debit rows don't expire; placeholder
