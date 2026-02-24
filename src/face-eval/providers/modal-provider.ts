@@ -77,10 +77,17 @@ function httpError(status: number, body: unknown): FaceServiceError {
 
 export interface ModalProviderConfig {
   endpoint: string;
+  modalKey?: string;
+  modalSecret?: string;
 }
 
 export function createModalProvider(config: ModalProviderConfig): FaceRecognitionProvider {
   const endpoint = config.endpoint.replace(/\/$/, '');
+
+  // Build auth headers for Modal proxy auth (requires_proxy_auth=True)
+  const authHeaders: Record<string, string> = {};
+  if (config.modalKey) authHeaders['Modal-Key'] = config.modalKey;
+  if (config.modalSecret) authHeaders['Modal-Secret'] = config.modalSecret;
 
   // In-memory embedding store, keyed by collection ID
   const collections = new Map<string, StoredFace[]>();
@@ -92,7 +99,7 @@ export function createModalProvider(config: ModalProviderConfig): FaceRecognitio
       const response = yield* ResultAsync.fromPromise(
         fetch(`${endpoint}/extract`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify({ image: base64Image, max_faces: 100, min_confidence: 0.3 }),
         }),
         networkError,

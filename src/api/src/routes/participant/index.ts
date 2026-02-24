@@ -268,7 +268,11 @@ export const participantRouter = new Hono<Env>()
         }
 
         // Step 6: Extract face embedding from selfie
-        const extractor = createExtractor({ endpoint: c.env.RECOGNITION_ENDPOINT });
+        const extractor = createExtractor({
+          endpoint: c.env.RECOGNITION_ENDPOINT,
+          modalKey: c.env.MODAL_KEY!,
+          modalSecret: c.env.MODAL_SECRET!,
+        });
         const extractResult = yield* extractor
           .extractFaces(transformedBytes)
           .mapErr(mapRecognitionError);

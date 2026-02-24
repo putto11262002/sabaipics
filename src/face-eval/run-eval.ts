@@ -68,9 +68,11 @@ function getProvider(cmd: RunCommand): { provider: FaceRecognitionProvider; prov
     if (!endpoint) {
       throw new Error('Missing --endpoint (or env RECOGNITION_ENDPOINT) for modal provider');
     }
+    const modalKey = process.env.MODAL_KEY;
+    const modalSecret = process.env.MODAL_SECRET;
     return {
-      provider: createModalProvider({ endpoint }),
-      providerConfig: { endpoint },
+      provider: createModalProvider({ endpoint, modalKey, modalSecret }),
+      providerConfig: { endpoint, hasModalKey: !!modalKey, hasModalSecret: !!modalSecret },
     };
   }
 

@@ -170,7 +170,11 @@ function processPhoto(
   message: Message<PhotoJob>,
 ): ResultAsync<ExtractionResult, PhotoProcessingError> {
   const job = message.body;
-  const extractor = createExtractor({ endpoint: env.RECOGNITION_ENDPOINT });
+  const extractor = createExtractor({
+    endpoint: env.RECOGNITION_ENDPOINT,
+    modalKey: env.MODAL_KEY!,
+    modalSecret: env.MODAL_SECRET!,
+  });
   const imageUrl = `${env.PHOTO_R2_BASE_URL}/${job.r2_key}`;
 
   return extractor

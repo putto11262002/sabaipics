@@ -290,6 +290,6 @@ def create_web_app():
     max_containers=5,
 )
 @modal.concurrent(max_inputs=4, target_inputs=2)
-@modal.asgi_app()
+@modal.asgi_app(requires_proxy_auth=True)
 def serve():
     return create_web_app()
