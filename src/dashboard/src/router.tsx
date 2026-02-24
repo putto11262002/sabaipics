@@ -22,6 +22,7 @@ import EventSlideshowTab from './routes/events/[id]/slideshow';
 import SlideshowPreviewPage from './routes/events/[id]/slideshow/preview';
 import StudioLutsPage from './routes/studio/luts';
 import StudioLutPreviewPage from './routes/studio/luts/preview';
+import LineDeliveryPage from './routes/line-delivery';
 import { SidebarLayout } from './components/shell/sidebar-layout';
 export const router = createBrowserRouter([
   // Public routes
@@ -96,6 +97,10 @@ export const router = createBrowserRouter([
       {
         path: '/studio/luts/:id/preview',
         element: <StudioLutPreviewPage />,
+      },
+      {
+        path: '/line-delivery',
+        element: <LineDeliveryPage />,
       },
       {
         path: '/credits',
