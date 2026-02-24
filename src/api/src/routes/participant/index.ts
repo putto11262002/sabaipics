@@ -11,13 +11,14 @@
  * - POST /participant/events/:eventId/search                   - Face search (rate limited)
  * - GET  /participant/events/:eventId/photos/:photoId/download - Single photo download
  * - POST /participant/events/:eventId/photos/download          - Bulk download as zip
+ * - POST /participant/feedback                                 - Submit anonymous feedback
  */
 
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, and, inArray, isNull, desc, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { activeEvents, photos, participantSearches, DEFAULT_SLIDESHOW_CONFIG, events } from '@/db';
+import { activeEvents, photos, participantSearches, DEFAULT_SLIDESHOW_CONFIG, events, feedback, feedbackCategories } from '@/db';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
 import { createFaceProvider } from '../../lib/rekognition/provider';
@@ -757,6 +758,52 @@ export const participantRouter = new Hono<Env>()
         .orTee((e) => e.cause && console.error(`[${c.req.url}] ${e.code}:`, e.cause))
         .match(
           (result) => c.json(result),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // =========================================================================
+  // POST /participant/feedback - Submit anonymous feedback
+  // =========================================================================
+  .post(
+    '/feedback',
+    zValidator(
+      'json',
+      z.object({
+        content: z.string().min(1).max(2000),
+        category: z.enum(feedbackCategories).optional().default('general'),
+        eventId: z.string().uuid().optional(),
+      }),
+    ),
+    async (c) => {
+      const input = c.req.valid('json');
+      const db = c.var.db();
+
+      return safeTry(async function* () {
+        const [created] = yield* ResultAsync.fromPromise(
+          db
+            .insert(feedback)
+            .values({
+              content: input.content,
+              category: input.category,
+              source: 'event_app',
+              eventId: input.eventId,
+              photographerId: null,
+            })
+            .returning(),
+          (cause): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Failed to submit feedback',
+            cause,
+          }),
+        );
+
+        return ok(created);
+      })
+        .orTee((e) => e.cause && console.error('[Participant/Feedback]', e.code, e.cause))
+        .match(
+          (data) => c.json({ data }, 201),
           (e) => apiError(c, e),
         );
     },
