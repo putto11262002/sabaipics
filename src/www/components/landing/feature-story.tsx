@@ -780,13 +780,13 @@ export function FeatureStory() {
           <article
             key={step.id}
             id={`feature-step-${step.id}`}
-            className="relative isolate scroll-mt-24 overflow-visible sticky top-0 flex h-svh items-center py-0"
+            className="relative isolate scroll-mt-24 overflow-visible sticky top-14 md:top-20 flex h-[calc(100svh-3.5rem)] md:h-[calc(100svh-5rem)] items-center py-0"
             style={{ zIndex: index + 1 }}
           >
-            <div className="mx-auto h-[min(680px,calc(100svh-8rem))] w-full">
+            <div className="mx-auto h-[80svh] w-full">
               <div className="relative z-10 h-full overflow-hidden rounded-3xl border border-border/90 bg-card shadow-[0_24px_62px_-42px_color-mix(in_oklab,var(--foreground)_36%,transparent)]">
                 <div className="relative flex h-full flex-col lg:flex-row">
-                  <div className="flex min-h-0 min-w-0 flex-1 flex-col p-5 sm:p-7 lg:h-full lg:flex-1 lg:p-9">
+                  <div className="flex min-h-0 min-w-0 shrink-0 flex-col p-5 sm:p-7 lg:h-full lg:flex-1 lg:p-9">
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <span className="rounded-full border border-border bg-background px-2 py-1 text-xs">
                         {step.id} / 04
@@ -835,7 +835,7 @@ export function FeatureStory() {
                     </a>
                   </div>
 
-                  <div className="relative h-[50svh] min-h-[15rem] max-h-[22rem] overflow-hidden sm:h-[50svh] sm:min-h-[17rem] sm:max-h-[25rem] lg:h-full lg:min-h-0 lg:max-h-none lg:min-w-0 lg:flex-1">
+                  <div className="relative min-h-0 flex-1 overflow-hidden lg:min-w-0">
                     <div
                       className="absolute inset-0"
                       style={{
