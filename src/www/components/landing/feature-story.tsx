@@ -463,7 +463,7 @@ function ColorVariant() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden px-[4.8%] pb-[4.8%] pt-[5.2%]">
       {/* Decorative controls - not interactive, just illustration */}
-      <div className="z-20 flex shrink-0 flex-col gap-2.5" aria-hidden="true" style={{ pointerEvents: 'none' }}>
+      <div className="z-20 flex shrink-0 flex-col gap-2.5" aria-hidden="true" inert>
         <div className="flex flex-row items-center justify-between gap-3 rounded-xl border border-border/65 bg-card px-4 py-3 shadow-[0_18px_38px_-28px_color-mix(in_oklab,var(--foreground)_45%,transparent),inset_0_1px_0_color-mix(in_oklab,white_58%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_10%,transparent)]">
           <span className="text-xs font-medium text-foreground">LUT strength</span>
           <div className="w-[52%] min-w-[8rem]">
