@@ -147,12 +147,7 @@ describe('PostgresVectorStore', () => {
       (db.execute as any).mockResolvedValue(mockResults);
 
       const queryDescriptor = new Float32Array([0.1, 0.2, 0.3]);
-      const results = await vectorStore.searchFaces(
-        'event-123',
-        queryDescriptor,
-        10,
-        0.6
-      );
+      const results = await vectorStore.searchFaces('event-123', queryDescriptor, 10, 0.6);
 
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({
@@ -186,12 +181,7 @@ describe('PostgresVectorStore', () => {
       (db.execute as any).mockResolvedValue(mockResults);
 
       const queryDescriptor = new Float32Array([0.1, 0.2, 0.3]);
-      const results = await vectorStore.searchFaces(
-        'event-123',
-        queryDescriptor,
-        10,
-        1.0
-      );
+      const results = await vectorStore.searchFaces('event-123', queryDescriptor, 10, 1.0);
 
       // Distance of 0.6 should map to similarity around 60%
       expect(results[0].similarity).toBeGreaterThan(50);
@@ -203,12 +193,7 @@ describe('PostgresVectorStore', () => {
       (db.execute as any).mockResolvedValue(mockResults);
 
       const queryDescriptor = new Float32Array([0.1, 0.2, 0.3]);
-      const results = await vectorStore.searchFaces(
-        'event-123',
-        queryDescriptor,
-        10,
-        0.6
-      );
+      const results = await vectorStore.searchFaces('event-123', queryDescriptor, 10, 0.6);
 
       expect(results).toEqual([]);
     });
@@ -247,10 +232,7 @@ describe('PostgresVectorStore', () => {
   describe('listCollections', () => {
     it('should return distinct event IDs with indexed faces', async () => {
       const mockResults = {
-        rows: [
-          { event_id: 'event-123' },
-          { event_id: 'event-456' },
-        ],
+        rows: [{ event_id: 'event-123' }, { event_id: 'event-456' }],
       };
 
       (db.execute as any).mockResolvedValue(mockResults);

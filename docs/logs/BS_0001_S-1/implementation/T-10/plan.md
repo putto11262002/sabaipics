@@ -6,6 +6,7 @@ Date: `2026-01-10`
 Owner: `Claude`
 
 ## Inputs
+
 - Task: `docs/logs/BS_0001_S-1/tasks.md` (section: `T-10`)
 - Upstream plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Context reports:
@@ -16,6 +17,7 @@ Owner: `Claude`
   - `docs/logs/BS_0001_S-1/implementation/T-10/context/risk-scout.md`
 
 ## Goal / non-goals
+
 - **Goal:** Handle `checkout.session.completed` webhook to add credits to photographer's ledger with FIFO expiry and idempotency.
 - **Non-goals:** PromptPay async payment handling (follow-up), alerting/monitoring integration, payments table.
 
@@ -24,6 +26,7 @@ Owner: `Claude`
 Implement fulfillment logic directly in the webhook route (`apps/api/src/routes/webhooks/stripe.ts`) where we have db access via `c.var.db`. Skip the event bus abstraction for DB operations.
 
 **Key decisions:**
+
 1. **Direct route implementation** - No event bus for fulfillment, just call db directly in the webhook route
 2. **Idempotency via unique constraint** - Add `UNIQUE` constraint on `stripe_session_id` to prevent race conditions at DB level
 3. **6 calendar months expiry** - Use `date-fns` `addMonths()` for user-friendly expiry
@@ -31,15 +34,16 @@ Implement fulfillment logic directly in the webhook route (`apps/api/src/routes/
 
 **Files to modify:**
 
-| File | Change |
-|------|--------|
-| `packages/db/src/schema/credit-ledger.ts` | Add unique constraint on `stripe_session_id` |
-| `apps/api/src/routes/webhooks/stripe.ts` | Add fulfillment logic in `checkout.session.completed` case |
-| `apps/api/tests/stripe.test.ts` | Add tests for credit insertion and idempotency |
+| File                                      | Change                                                     |
+| ----------------------------------------- | ---------------------------------------------------------- |
+| `packages/db/src/schema/credit-ledger.ts` | Add unique constraint on `stripe_session_id`               |
+| `apps/api/src/routes/webhooks/stripe.ts`  | Add fulfillment logic in `checkout.session.completed` case |
+| `apps/api/tests/stripe.test.ts`           | Add tests for credit insertion and idempotency             |
 
 ## Contracts (only if touched)
 
 ### DB: credit_ledger insert
+
 ```typescript
 {
   photographerId: string,      // from metadata.photographer_id
@@ -51,6 +55,7 @@ Implement fulfillment logic directly in the webhook route (`apps/api/src/routes/
 ```
 
 ### API: Webhook response
+
 - Always return `200 { received: true }` after signature verification (prevent Stripe retries)
 - Log errors for manual reconciliation but don't fail the response
 
@@ -67,13 +72,13 @@ Implement fulfillment logic directly in the webhook route (`apps/api/src/routes/
 
 ## Failure modes / edge cases (major only)
 
-| Scenario | Handling |
-|----------|----------|
-| Duplicate webhook (same session.id) | Unique constraint rejects insert, catch error, log, return 200 |
-| Missing metadata (photographer_id/credits) | Log error, return 200 (no retry), manual reconciliation |
-| Invalid photographer_id (not UUID) | Log error, return 200 |
-| Photographer not in DB | FK constraint fails, log error, return 200 |
-| `payment_status !== 'paid'` | Skip fulfillment, log info, return 200 |
+| Scenario                                   | Handling                                                       |
+| ------------------------------------------ | -------------------------------------------------------------- |
+| Duplicate webhook (same session.id)        | Unique constraint rejects insert, catch error, log, return 200 |
+| Missing metadata (photographer_id/credits) | Log error, return 200 (no retry), manual reconciliation        |
+| Invalid photographer_id (not UUID)         | Log error, return 200                                          |
+| Photographer not in DB                     | FK constraint fails, log error, return 200                     |
+| `payment_status !== 'paid'`                | Skip fulfillment, log info, return 200                         |
 
 ## Validation plan
 
@@ -96,7 +101,8 @@ Implement fulfillment logic directly in the webhook route (`apps/api/src/routes/
 
 ## Open questions
 
-*None - all questions resolved:*
+_None - all questions resolved:_
+
 - ~~Credit expiry~~ → 6 calendar months using `addMonths()`
 - ~~PromptPay~~ → Out of scope, follow-up task
 - ~~Unique constraint~~ → Will add migration

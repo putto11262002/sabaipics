@@ -4,22 +4,21 @@ about: Support a new camera
 title: ''
 labels: ''
 assignees: ''
-
 ---
 
 Fill in fields below. If you don't know how, leave it free.
 
-**Name of the camera*
+\*_Name of the camera_
 
 Use the Marketing name.
 
 **USB IDs**
-e.g. by running:   lsusb 
+e.g. by running: lsusb
 
 **camera summary output**
 run
 
-  gphoto2 --summary > summary.txt
+gphoto2 --summary > summary.txt
 
 attach summary.txt here
 
@@ -33,6 +32,6 @@ and attach list-all-config.txt here
 
 test if capture perhaps already works:
 
-  gphoto2 --capture-image-and-download
- 
-  gphoto2 --capture-preview
+gphoto2 --capture-image-and-download
+
+gphoto2 --capture-preview

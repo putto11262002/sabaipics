@@ -1,6 +1,6 @@
 ---
-url: "https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate"
-title: "ICScannerDeviceDelegate | Apple Developer Documentation"
+url: 'https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate'
+title: 'ICScannerDeviceDelegate | Apple Developer Documentation'
 ---
 
 [Skip Navigation](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#app-main)
@@ -40,12 +40,12 @@ Only search within “Documentation”
 
 [Open Menu](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#)
 
-- SwiftLanguage:  Swift  Objective-C
+- SwiftLanguage: Swift Objective-C
 
 Language:
 
-  - Swift
-  - [Objective-C](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#)
+- Swift
+- [Objective-C](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#)
 
 All Technologies
 
@@ -300,48 +300,48 @@ macOS 10.4+
 protocol ICScannerDeviceDelegate : ICDeviceDelegate
 ```
 
-## [Topics](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate\#topics)
+## [Topics](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#topics)
 
-### [Determining Scanner Availability](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate\#Determining-Scanner-Availability)
+### [Determining Scanner Availability](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#Determining-Scanner-Availability)
 
-[`func scannerDeviceDidBecomeAvailable(ICScannerDevice)`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevicedidbecomeavailable(_:))
+[`func scannerDeviceDidBecomeAvailable(ICScannerDevice)`](<https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevicedidbecomeavailable(_:)>)
 
 Tells the client when another client closes the current open session on the scanner.
 
-### [Selecting a Functional Unit](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate\#Selecting-a-Functional-Unit)
+### [Selecting a Functional Unit](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#Selecting-a-Functional-Unit)
 
-[`func scannerDevice(ICScannerDevice, didSelect: ICScannerFunctionalUnit, error: (any Error)?)`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevice(_:didselect:error:))
+[`func scannerDevice(ICScannerDevice, didSelect: ICScannerFunctionalUnit, error: (any Error)?)`](<https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevice(_:didselect:error:)>)
 
 Tells the client when a functional unit is selected on the scanner.
 
-### [Performing a Scan](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate\#Performing-a-Scan)
+### [Performing a Scan](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#Performing-a-Scan)
 
-[`func scannerDevice(ICScannerDevice, didCompleteOverviewScanWithError: (any Error)?)`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevice(_:didcompleteoverviewscanwitherror:))
+[`func scannerDevice(ICScannerDevice, didCompleteOverviewScanWithError: (any Error)?)`](<https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevice(_:didcompleteoverviewscanwitherror:)>)
 
 Tells the client when the scanner completes an overview scan.
 
-[`func scannerDevice(ICScannerDevice, didCompleteScanWithError: (any Error)?)`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevice(_:didcompletescanwitherror:))
+[`func scannerDevice(ICScannerDevice, didCompleteScanWithError: (any Error)?)`](<https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevice(_:didcompletescanwitherror:)>)
 
 Tells the client when the scanner completes a scan.
 
-[`func scannerDevice(ICScannerDevice, didScanTo: ICScannerBandData)`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevice(_:didscanto:)-6tht3)
+[`func scannerDevice(ICScannerDevice, didScanTo: ICScannerBandData)`](<https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevice(_:didscanto:)-6tht3>)
 
 Tells the client when the scanner receives the requested scan progress notification and a band of data is sent for each notification received.
 
-[`func scannerDevice(ICScannerDevice, didScanTo: URL)`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevice(_:didscanto:)-10whl)
+[`func scannerDevice(ICScannerDevice, didScanTo: URL)`](<https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate/scannerdevice(_:didscanto:)-10whl>)
 
 Tells the client when the scanner receives the requested scan.
 
-## [Relationships](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate\#relationships)
+## [Relationships](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#relationships)
 
-### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate\#inherits-from)
+### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#inherits-from)
 
 - [`ICDeviceDelegate`](https://developer.apple.com/documentation/imagecapturecore/icdevicedelegate)
 - [`NSObjectProtocol`](https://developer.apple.com/documentation/ObjectiveC/NSObjectProtocol)
 
-## [See Also](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate\#see-also)
+## [See Also](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#see-also)
 
-### [Scanners](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate\#Scanners)
+### [Scanners](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate#Scanners)
 
 [`class ICScannerDevice`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice)
 

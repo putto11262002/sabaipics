@@ -24,6 +24,7 @@ import StudioLutsPage from './routes/studio/luts';
 import StudioLutPreviewPage from './routes/studio/luts/preview';
 import LineDeliveryPage from './routes/line-delivery';
 import StudioAutoEditPage from './routes/studio/auto-edit';
+import StudioAutoEditNewPage from './routes/studio/auto-edit/new';
 import { SidebarLayout } from './components/shell/sidebar-layout';
 export const router = createBrowserRouter([
   // Public routes
@@ -106,6 +107,14 @@ export const router = createBrowserRouter([
       {
         path: '/studio/auto-edit',
         element: <StudioAutoEditPage />,
+      },
+      {
+        path: '/studio/auto-edit/new',
+        element: <StudioAutoEditNewPage />,
+      },
+      {
+        path: '/studio/auto-edit/:id/edit',
+        element: <StudioAutoEditNewPage />,
       },
       {
         path: '/credits',

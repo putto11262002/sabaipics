@@ -52,11 +52,7 @@ export const GalleryRenderer = memo(function GalleryRenderer({
       return (
         <AspectRatio key={photo?.id ?? `slot-${i}`} ratio={1}>
           {photo ? (
-            <img
-              src={photo.previewUrl}
-              alt=""
-              className="h-full w-full rounded-lg object-cover"
-            />
+            <img src={photo.previewUrl} alt="" className="h-full w-full rounded-lg object-cover" />
           ) : (
             <Skeleton className="h-full w-full rounded-lg" />
           )}

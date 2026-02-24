@@ -10,7 +10,7 @@ From the start my development style has been to rely on as few 3rd party framewo
 
 That being said, you will notice there are a few bits of Open Source code included in the project (And I hope I haven't forgotten to include any licenses - Please PR or create an issue if I have as this is entirely unintentional!) where I felt it necessary. For this reason, I won't accept PRs that rely heavily on large 3rd party Frameworks; I want this framework to remain a single codebase as much as possible (With a few exceptions) as package management can be a PITA, and well; it's just the way I like it!
 
-My main aim with this framework is for it to become **the** swift framework for interfacing with cameras from all manufacturers. If you have some knowledge of the APIs running on certain manufacturers, or just have a camera lying around and know something about Swift (Or coding in another language) please don't hesitate to have a play around; it could be the case that you only need to make small changes to the existing codebase to get things up and running! 
+My main aim with this framework is for it to become **the** swift framework for interfacing with cameras from all manufacturers. If you have some knowledge of the APIs running on certain manufacturers, or just have a camera lying around and know something about Swift (Or coding in another language) please don't hesitate to have a play around; it could be the case that you only need to make small changes to the existing codebase to get things up and running!
 
 ## How can I contribute
 

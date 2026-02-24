@@ -313,7 +313,7 @@ describe('SabaiFace Adapter Integration', () => {
           eventId: testEventId,
           photoId: 'invalid-photo',
           imageData: invalidBuffer.buffer,
-        })
+        }),
       ).rejects.toThrow();
     });
   });

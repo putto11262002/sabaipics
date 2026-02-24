@@ -2,7 +2,11 @@ import { useMemo } from 'react';
 import type { SlideshowBlock, SlideshowContext, StatsPanelProps } from '../../types';
 import { getBlockDef, blockRegistry } from '../registry';
 
-function createInternalBlock(type: string, props: any, children?: SlideshowBlock[]): SlideshowBlock {
+function createInternalBlock(
+  type: string,
+  props: any,
+  children?: SlideshowBlock[],
+): SlideshowBlock {
   const def = blockRegistry.get(type);
   if (!def) throw new Error(`Unknown block type: ${type}`);
 

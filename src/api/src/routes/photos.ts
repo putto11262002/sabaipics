@@ -129,6 +129,7 @@ export const photosRouter = new Hono<Env>()
               width: photos.width,
               height: photos.height,
               exif: photos.exif,
+              pipelineApplied: photos.pipelineApplied,
             })
             .from(photos)
             .where(
@@ -169,6 +170,7 @@ export const photosRouter = new Hono<Env>()
           width: photo.width ?? 1,
           height: photo.height ?? 1,
           exif: photo.exif ?? null,
+          pipelineApplied: photo.pipelineApplied ?? null,
         }));
 
         return ok({

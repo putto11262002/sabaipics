@@ -1,14 +1,14 @@
-import type { MiddlewareHandler } from "hono";
-import { eq } from "drizzle-orm";
-import { photographers, type Photographer, type Database } from "@/db";
-import { createAuthError } from "@/auth/errors";
-import type { AuthVariables } from "@/auth/types";
+import type { MiddlewareHandler } from 'hono';
+import { eq } from 'drizzle-orm';
+import { photographers, type Photographer, type Database } from '@/db';
+import { createAuthError } from '@/auth/errors';
+import type { AuthVariables } from '@/auth/types';
 
 /**
  * Minimal photographer context stored in request
  * Contains only fields needed by most routes
  */
-export type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
+export type PhotographerContext = Pick<Photographer, 'id' | 'pdpaConsentAt'>;
 
 /**
  * Extended variables including photographer context
@@ -37,12 +37,9 @@ type Env = {
  */
 export function requirePhotographer(): MiddlewareHandler<Env> {
   return async (c, next) => {
-    const auth = c.get("auth");
+    const auth = c.get('auth');
     if (!auth) {
-      return c.json(
-        createAuthError("UNAUTHENTICATED", "Authentication required"),
-        401
-      );
+      return c.json(createAuthError('UNAUTHENTICATED', 'Authentication required'), 401);
     }
 
     const db = c.var.db();
@@ -58,27 +55,18 @@ export function requirePhotographer(): MiddlewareHandler<Env> {
       .limit(1);
 
     if (!row) {
-      return c.json(
-        createAuthError("FORBIDDEN", "Photographer account not found"),
-        403
-      );
+      return c.json(createAuthError('FORBIDDEN', 'Photographer account not found'), 403);
     }
 
     if (row.bannedAt) {
-      return c.json(
-        createAuthError("ACCOUNT_SUSPENDED", "Account suspended"),
-        403
-      );
+      return c.json(createAuthError('ACCOUNT_SUSPENDED', 'Account suspended'), 403);
     }
 
     if (row.deletedAt) {
-      return c.json(
-        createAuthError("FORBIDDEN", "Photographer account not found"),
-        403
-      );
+      return c.json(createAuthError('FORBIDDEN', 'Photographer account not found'), 403);
     }
 
-    c.set("photographer", { id: row.id, pdpaConsentAt: row.pdpaConsentAt });
+    c.set('photographer', { id: row.id, pdpaConsentAt: row.pdpaConsentAt });
     return next();
   };
 }

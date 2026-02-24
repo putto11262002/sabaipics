@@ -1,7 +1,6 @@
 ---
 name: Bug Report
 about: Create a report to help us improve Rocc
-
 ---
 
 ### Steps to reproduce:
@@ -21,6 +20,7 @@ about: Create a report to help us improve Rocc
 #### Other information about your system(s):
 
 ### Other questions
+
 #### Does the issue still occur after updating your Camera's Firmware?
 
 #### Have you tried any other versions of ROCC?

@@ -1,8 +1,8 @@
 import {
-	useAuth as useClerkAuth,
-	useUser as useClerkUser,
-	useClerk as useClerkInstance,
-} from "@clerk/clerk-react";
+  useAuth as useClerkAuth,
+  useUser as useClerkUser,
+  useClerk as useClerkInstance,
+} from '@clerk/clerk-react';
 
 /**
  * Custom types - Our own interface, not Clerk's
@@ -10,22 +10,22 @@ import {
  */
 
 export interface User {
-	id: string;
-	email: string;
-	firstName: string | null;
-	lastName: string | null;
-	fullName: string | null;
-	imageUrl: string;
-	emailAddresses: Array<{ emailAddress: string }>;
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  fullName: string | null;
+  imageUrl: string;
+  emailAddresses: Array<{ emailAddress: string }>;
 }
 
 export interface AuthState {
-	userId: string | null;
-	sessionId: string | null;
-	isLoaded: boolean;
-	isSignedIn: boolean;
-	signOut: () => Promise<void>;
-	getToken: (options?: { template?: string }) => Promise<string | null>;
+  userId: string | null;
+  sessionId: string | null;
+  isLoaded: boolean;
+  isSignedIn: boolean;
+  signOut: () => Promise<void>;
+  getToken: (options?: { template?: string }) => Promise<string | null>;
 }
 
 /**
@@ -35,16 +35,16 @@ export interface AuthState {
  * This makes it easier to swap auth providers in the future.
  */
 export function useAuth(): AuthState {
-	const clerk = useClerkAuth();
+  const clerk = useClerkAuth();
 
-	return {
-		userId: clerk.userId ?? null,
-		sessionId: clerk.sessionId ?? null,
-		isLoaded: clerk.isLoaded ?? false,
-		isSignedIn: clerk.isSignedIn ?? false,
-		signOut: () => clerk.signOut(),
-		getToken: (options) => clerk.getToken(options),
-	};
+  return {
+    userId: clerk.userId ?? null,
+    sessionId: clerk.sessionId ?? null,
+    isLoaded: clerk.isLoaded ?? false,
+    isSignedIn: clerk.isSignedIn ?? false,
+    signOut: () => clerk.signOut(),
+    getToken: (options) => clerk.getToken(options),
+  };
 }
 
 /**
@@ -54,26 +54,26 @@ export function useAuth(): AuthState {
  * Adapts Clerk's user object to our simpler interface.
  */
 export function useUser() {
-	const { user: clerkUser, isLoaded } = useClerkUser();
+  const { user: clerkUser, isLoaded } = useClerkUser();
 
-	if (!clerkUser) {
-		return { user: null, isLoaded };
-	}
+  if (!clerkUser) {
+    return { user: null, isLoaded };
+  }
 
-	return {
-		user: {
-			id: clerkUser.id,
-			email: clerkUser.primaryEmailAddress?.emailAddress ?? "",
-			firstName: clerkUser.firstName,
-			lastName: clerkUser.lastName,
-			fullName: clerkUser.fullName,
-			imageUrl: clerkUser.imageUrl,
-			emailAddresses: clerkUser.emailAddresses.map((e) => ({
-				emailAddress: e.emailAddress,
-			})),
-		} as User,
-		isLoaded,
-	};
+  return {
+    user: {
+      id: clerkUser.id,
+      email: clerkUser.primaryEmailAddress?.emailAddress ?? '',
+      firstName: clerkUser.firstName,
+      lastName: clerkUser.lastName,
+      fullName: clerkUser.fullName,
+      imageUrl: clerkUser.imageUrl,
+      emailAddresses: clerkUser.emailAddresses.map((e) => ({
+        emailAddress: e.emailAddress,
+      })),
+    } as User,
+    isLoaded,
+  };
 }
 
 /**
@@ -82,12 +82,12 @@ export function useUser() {
  * Provides access to Clerk methods like openUserProfile(), signOut(), etc.
  */
 export function useClerk() {
-	const clerk = useClerkInstance();
+  const clerk = useClerkInstance();
 
-	return {
-		openUserProfile: () => clerk.openUserProfile(),
-		openSignIn: () => clerk.openSignIn(),
-		openSignUp: () => clerk.openSignUp(),
-		signOut: () => clerk.signOut(),
-	};
+  return {
+    openUserProfile: () => clerk.openUserProfile(),
+    openSignIn: () => clerk.openSignIn(),
+    openSignUp: () => clerk.openSignUp(),
+    signOut: () => clerk.signOut(),
+  };
 }

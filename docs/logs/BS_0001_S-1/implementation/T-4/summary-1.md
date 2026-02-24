@@ -15,9 +15,9 @@ Implemented the `handleUserCreated` function in the Clerk webhook handler to cre
 
 ## Files Modified
 
-| File | Change |
-|------|--------|
-| `apps/api/src/index.ts` | Added DB injection middleware before webhook routes |
+| File                                    | Change                                                                    |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| `apps/api/src/index.ts`                 | Added DB injection middleware before webhook routes                       |
 | `apps/api/src/routes/webhooks/clerk.ts` | Implemented `handleUserCreated` with DB insertion, cleaned up unused code |
 
 ---
@@ -33,24 +33,26 @@ Implemented the `handleUserCreated` function in the Clerk webhook handler to cre
 ```typescript
 const app = new Hono()
   // DB injection for webhooks (no auth, no CORS - verified by signature)
-  .use("/webhooks/*", (c, next) => {
-    c.set("db", () => createDb(c.env.DATABASE_URL));
+  .use('/webhooks/*', (c, next) => {
+    c.set('db', () => createDb(c.env.DATABASE_URL));
     return next();
   })
   // Webhooks route (uses c.var.db from above)
-  .route("/webhooks", webhookRouter)
+  .route('/webhooks', webhookRouter);
 ```
 
 ### 2. Updated Clerk Webhook Handler (`apps/api/src/routes/webhooks/clerk.ts`)
 
 **Added imports:**
+
 ```typescript
-import { photographers } from "@sabaipics/db/schema";
-import { eq } from "drizzle-orm";
-import type { Database } from "@sabaipics/db";
+import { photographers } from '@sabaipics/db/schema';
+import { eq } from 'drizzle-orm';
+import type { Database } from '@sabaipics/db';
 ```
 
 **Added types:**
+
 ```typescript
 type WebhookVariables = {
   db: () => Database;
@@ -63,6 +65,7 @@ export const clerkWebhookRouter = new Hono<{
 ```
 
 **Implemented `handleUserCreated`:**
+
 1. Extracts email from `user.email_addresses[0].email_address`
 2. Builds display name from `first_name + last_name`
 3. **Idempotency check:** Queries for existing photographer by `clerkId` before insert
@@ -70,6 +73,7 @@ export const clerkWebhookRouter = new Hono<{
 5. Returns early on duplicate (logs "already exists, skipping (idempotent)")
 
 **Removed code (per plan decisions):**
+
 - `user_type` metadata extraction (decision #4: only photographers sign up)
 - `participant`-related logic (not needed)
 - `line_user_id` extraction (can add later if needed)
@@ -89,7 +93,7 @@ const [existing] = await db
   .limit(1);
 
 if (existing) {
-  console.log("  → Photographer already exists, skipping (idempotent)");
+  console.log('  → Photographer already exists, skipping (idempotent)');
   return;
 }
 ```
@@ -105,7 +109,7 @@ Per task requirements: "Logs errors but returns 200 (prevent Svix retries on bad
 ```typescript
 try {
   switch (event.type) {
-    case "user.created":
+    case 'user.created':
       await handleUserCreated(event, c.var.db);
       break;
     // ...
@@ -134,6 +138,7 @@ return c.json({ success: true }, 200);
 **Testing with ngrok + Clerk Dashboard:**
 
 1. Start dev server with ngrok tunnel:
+
    ```bash
    pnpm --filter @sabaipics/api dev:local
    # In another terminal:
@@ -147,6 +152,7 @@ return c.json({ success: true }, 200);
 3. Trigger signup via Clerk to test `user.created` event
 
 4. Check database for photographer record:
+
    ```sql
    SELECT * FROM photographers;
    ```

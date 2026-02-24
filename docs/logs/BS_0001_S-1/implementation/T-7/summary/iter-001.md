@@ -7,16 +7,19 @@ PR: `https://github.com/putto11262002/sabaipics/pull/12`
 Date: `2026-01-10`
 
 ## Outcome
+
 - Implemented `GET /dashboard` endpoint returning credit balance, events list, and stats
 - All 7 tests passing (3 auth + 4 functional)
 - Type checking passes
 
 ## Key code changes
+
 - `apps/api/src/routes/dashboard.ts` — Dashboard router with three aggregation queries
 - `apps/api/src/routes/dashboard.test.ts` — Unit tests with mock DB
 - `apps/api/src/index.ts` — Route registration after Clerk middleware
 
 ## Behavioral notes
+
 - Success path: Auth → photographer lookup → consent check → 3 queries → aggregation → response
 - Key failure modes handled:
   - 401 for unauthenticated requests
@@ -26,10 +29,12 @@ Date: `2026-01-10`
 - `[KNOWN_LIMITATION]` nearestExpiry uses simple MIN of purchase expires_at (not FIFO-aware)
 
 ## Ops / rollout
+
 - Flags/env: None required
 - Migrations/run order: None required
 
 ## How to validate
+
 - Commands run:
   - `pnpm check-types` — passed
   - `pnpm --filter=@sabaipics/api test` — 47 tests passed
@@ -40,4 +45,5 @@ Date: `2026-01-10`
   - Stats computed from events data
 
 ## Follow-ups
+
 - None identified

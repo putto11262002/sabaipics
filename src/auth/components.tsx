@@ -9,10 +9,4 @@
  * - Accessibility improvements
  */
 
-export {
-	SignIn,
-	SignUp,
-	UserButton,
-	SignedIn,
-	SignedOut,
-} from "@clerk/clerk-react";
+export { SignIn, SignUp, UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';

@@ -22,9 +22,7 @@ export function LandingHero() {
   return (
     <section className="pb-14 pt-8 sm:pb-20 sm:pt-10 bg-muted/30">
       <div className="mx-auto w-[min(100vw-2rem,1700px)] sm:w-[min(100vw-2.75rem,1700px)] lg:w-[min(100vw-3.25rem,1700px)]">
-        <div
-          className="relative overflow-hidden rounded-b-[2rem] bg-muted/30"
-        >
+        <div className="relative overflow-hidden rounded-b-[2rem] bg-muted/30">
           <div
             className="pointer-events-none absolute inset-0"
             style={{
@@ -42,19 +40,19 @@ export function LandingHero() {
             <h1 className="mt-4 text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
               {t.rich('title', {
                 highlight: (chunks) => (
-                    <span className="relative inline-block">
-                      {chunks}
-                      {!isThai && (
-                        <span
-                          className="absolute -bottom-1 left-0 h-2 w-full -rotate-1 rounded-sm"
-                          style={{
-                            background:
-                              'linear-gradient(90deg, var(--primary-end) 0%, var(--primary) 100%)',
-                          }}
-                          aria-hidden="true"
-                        />
-                      )}
-                    </span>
+                  <span className="relative inline-block">
+                    {chunks}
+                    {!isThai && (
+                      <span
+                        className="absolute -bottom-1 left-0 h-2 w-full -rotate-1 rounded-sm"
+                        style={{
+                          background:
+                            'linear-gradient(90deg, var(--primary-end) 0%, var(--primary) 100%)',
+                        }}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </span>
                 ),
               })}
             </h1>

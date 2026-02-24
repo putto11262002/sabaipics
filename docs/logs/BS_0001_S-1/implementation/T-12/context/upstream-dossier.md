@@ -7,6 +7,7 @@ Date: 2026-01-10
 ## Task definition (from tasks.md)
 
 ### T-12 — Credit packages page UI
+
 - [ ] Done
 - **Type:** `feature`
 - **StoryRefs:** US-4
@@ -32,24 +33,24 @@ Date: 2026-01-10
 
 **Flow:**
 
-| Step | Surface | Action |
-|------|---------|--------|
-| 1 | UI | Click "Buy Credits" → navigate to `/credits/packages` |
-| 2 | API | `GET /credit-packages` |
-| 3 | UI | Select package |
-| 4 | API | `POST /credits/checkout` |
-| 5 | External | Stripe Checkout (PromptPay enabled) |
-| 6 | Webhook | `checkout.session.completed` → insert credit_ledger |
-| 7 | UI | Success → dashboard with updated balance |
+| Step | Surface  | Action                                                |
+| ---- | -------- | ----------------------------------------------------- |
+| 1    | UI       | Click "Buy Credits" → navigate to `/credits/packages` |
+| 2    | API      | `GET /credit-packages`                                |
+| 3    | UI       | Select package                                        |
+| 4    | API      | `POST /credits/checkout`                              |
+| 5    | External | Stripe Checkout (PromptPay enabled)                   |
+| 6    | Webhook  | `checkout.session.completed` → insert credit_ledger   |
+| 7    | UI       | Success → dashboard with updated balance              |
 
 **Credit expiry:** `expires_at = NOW() + 6 months`
 
 ### API Summary (relevant endpoints)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /credit-packages | List packages |
-| POST | /credits/checkout | Create Stripe session |
+| Method | Endpoint          | Description           |
+| ------ | ----------------- | --------------------- |
+| GET    | /credit-packages  | List packages         |
+| POST   | /credits/checkout | Create Stripe session |
 
 ### Decision: Credit packages UI (Decision #11)
 
@@ -77,6 +78,7 @@ Upload Request
 ```
 
 **Key points:**
+
 - Credits are deducted AFTER validation (user commits when selecting package)
 - No refund on failures after deduction
 - 6-month expiration from purchase date
@@ -87,6 +89,7 @@ Upload Request
 **Model:** Append-only ledger with FIFO expiry inheritance.
 
 **Table structure:**
+
 ```
 | amount | type     | expires_at | created_at |
 |--------|----------|------------|------------|
@@ -95,6 +98,7 @@ Upload Request
 ```
 
 **Balance calculation:**
+
 ```sql
 SELECT SUM(amount)
 FROM credit_ledger
@@ -110,16 +114,17 @@ WHERE photographer_id = ?
 
 ### Database Schema (relevant tables)
 
-| Table | Key Columns | Notes |
-|-------|-------------|-------|
-| `credit_packages` | id, name, credits, price_thb, active, sort_order | Admin-editable |
-| `credit_ledger` | id, photographer_id, amount, type, stripe_session_id, expires_at, created_at | 6-month expiry |
+| Table             | Key Columns                                                                  | Notes          |
+| ----------------- | ---------------------------------------------------------------------------- | -------------- |
+| `credit_packages` | id, name, credits, price_thb, active, sort_order                             | Admin-editable |
+| `credit_ledger`   | id, photographer_id, amount, type, stripe_session_id, expires_at, created_at | 6-month expiry |
 
 ### Phase 2: Dashboard (US-3, US-4)
 
 **US-3: Dashboard display**
 
 API:
+
 ```
 GET /dashboard
 Response: {
@@ -140,6 +145,7 @@ See flow above. The `/credits/packages` page is the main UI for this user story.
 **Primary Recommendation:** Option A (Checkout Sessions, Stripe-Hosted)
 
 **Flow:**
+
 ```
 1. Photographer selects credit package in dashboard
 2. API creates Checkout Session with metadata (photographer_id, credits, package_name)
@@ -151,6 +157,7 @@ See flow above. The `/credits/packages` page is the main UI for this user story.
 ```
 
 **Pros:**
+
 - Already implemented in codebase (`checkout.ts`)
 - PCI compliance handled by Stripe
 - Supports Thai payment methods (PromptPay) automatically
@@ -159,6 +166,7 @@ See flow above. The `/credits/packages` page is the main UI for this user story.
 - Built-in error handling and retries
 
 **Cons:**
+
 - Redirect away from app (UX friction)
 - Less branding control (can customize colors/logo)
 - Depends on webhook reliability
@@ -192,12 +200,14 @@ export const CREDIT_PACKAGES = [
    - Do NOT fulfill here (already done by webhook)
 
 **Thai Market Considerations:**
+
 - PromptPay is highly popular for local payments (zero fees for consumers)
 - Credit card penetration is lower than Western markets
 - Mobile banking apps are ubiquitous
 - Consider enabling PromptPay for launch to maximize conversion
 
 **THB Currency Support:**
+
 - THB is a supported settlement currency with minimum charge of 10 THB (~$0.30 USD)
 - THB is NOT a zero-decimal currency (use satang: 1 THB = 100 satang)
 - Existing `checkout.ts` already defaults to `currency: 'thb'`

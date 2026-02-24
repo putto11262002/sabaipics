@@ -167,7 +167,12 @@ export function DashboardPage() {
             <AlertTitle>Error loading dashboard</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
               <span>{error.message}</span>
-              <Button variant="destructive" size="sm" onClick={() => refetch()} disabled={isRefetching}>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isRefetching}
+              >
                 {isRefetching ? (
                   <Spinner className="mr-1 size-3" />
                 ) : (

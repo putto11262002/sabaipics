@@ -7,7 +7,12 @@
 
 export interface R2EventMessage {
   account: string;
-  action: 'PutObject' | 'CopyObject' | 'CompleteMultipartUpload' | 'DeleteObject' | 'LifecycleDeletion';
+  action:
+    | 'PutObject'
+    | 'CopyObject'
+    | 'CompleteMultipartUpload'
+    | 'DeleteObject'
+    | 'LifecycleDeletion';
   bucket: string;
   object: {
     key: string;

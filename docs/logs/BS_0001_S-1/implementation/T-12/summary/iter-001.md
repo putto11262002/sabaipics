@@ -9,10 +9,12 @@ Date: `2026-01-10`
 ## Outcome
 
 Successfully implemented credit packages page UI with Stripe checkout integration. Created two new routes:
+
 - `/credits/packages` - Public page for browsing and purchasing credit packages
 - `/credits/success` - Protected page for post-purchase confirmation
 
 All acceptance criteria met:
+
 - ✓ Displays all active packages with price and credit amount
 - ✓ Select package → calls checkout API → redirects to Stripe
 - ✓ Success page after return from Stripe
@@ -58,6 +60,7 @@ All acceptance criteria met:
 ## Behavioral notes
 
 **Success path:**
+
 1. User navigates to `/credits/packages` (no auth required for browsing)
 2. Packages load from `GET /credit-packages` API
 3. User clicks "Purchase" on a package
@@ -70,6 +73,7 @@ All acceptance criteria met:
 10. User returns to dashboard, balance auto-refreshes via `refetchOnWindowFocus`
 
 **Key failure modes handled:**
+
 - Network error during package fetch → error alert with retry button
 - Network error during checkout creation → error alert below packages, user can retry
 - User not authenticated → Clerk handles redirect to sign-in automatically
@@ -80,6 +84,7 @@ All acceptance criteria met:
 - Empty packages list → empty state component with appropriate messaging
 
 **`[KNOWN_LIMITATION]` Webhook timing:**
+
 - After successful payment, webhook may take 1-5 seconds to arrive
 - Credit balance won't update immediately on success page
 - Dashboard query invalidation + `refetchOnWindowFocus` ensures balance updates when user returns to dashboard
@@ -92,6 +97,7 @@ All acceptance criteria met:
 **Migrations/run order:** None required (no database changes)
 
 **Prerequisites verified:**
+
 - T-8 (Credit packages API) deployed ✓
 - T-9 (Stripe checkout API) deployed ✓
 - T-10 (Webhook handler) deployed ✓
@@ -100,6 +106,7 @@ All acceptance criteria met:
 ## How to validate
 
 **Commands run:**
+
 ```bash
 # Type check (dashboard only, API has unrelated error)
 pnpm --filter=@sabaipics/dashboard build
@@ -138,6 +145,7 @@ pnpm --filter=@sabaipics/dashboard build
    - ✓ Button states (disabled, loading) work correctly
 
 **Manual testing scope:**
+
 - Desktop browsers: Chrome, Safari, Firefox
 - Mobile browsers: iOS Safari, Android Chrome
 - Stripe test mode: Card `4242 4242 4242 4242`
@@ -147,29 +155,34 @@ pnpm --filter=@sabaipics/dashboard build
 ## Follow-ups
 
 **`[ENG_DEBT]` No UI tests:**
+
 - Dashboard has no test infrastructure (Vitest not configured)
 - Component tests for package cards would be valuable
 - E2E test for purchase flow would catch regressions
 - Requires setting up test framework as separate task
 
 **`[ENG_DEBT]` Bundle size warning:**
+
 - Build output shows 555 kB bundle (>500 kB threshold)
 - Consider code splitting with dynamic imports
 - Consider manual chunking for vendor libraries
 - Not blocking for MVP, but should be addressed for performance
 
 **`[PM_FOLLOWUP]` Enhanced package display:**
+
 - Consider adding "Most Popular" badge to recommended package
 - Consider package comparison table view
 - Consider showing price per credit calculation
 - Consider showing total savings for larger packages
 
 **`[PM_FOLLOWUP]` Purchase history:**
+
 - Users may want to view past purchases
 - Requires new API endpoint + UI page
 - Could show: date, package, amount paid, credits received
 
 **`[PM_FOLLOWUP]` PromptPay async payments:**
+
 - Current implementation only handles `checkout.session.completed` webhook
 - PromptPay uses `checkout.session.async_payment_succeeded` (not implemented in T-10)
 - Success page may show "processing" for PromptPay payments

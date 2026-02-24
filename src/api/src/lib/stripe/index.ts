@@ -15,7 +15,7 @@
  */
 
 // Client
-export { createStripeClient, webCrypto, type StripeEnv } from "./client";
+export { createStripeClient, webCrypto, type StripeEnv } from './client';
 
 // Checkout
 export {
@@ -25,7 +25,7 @@ export {
   type CheckoutLineItem,
   type CreateCheckoutParams,
   type CheckoutSessionResult,
-} from "./checkout";
+} from './checkout';
 
 // Customer
 export {
@@ -37,7 +37,7 @@ export {
   type GetOrCreateCustomerParams,
   type CreateCustomerParams,
   type UpdateCustomerParams,
-} from "./customer";
+} from './customer';
 
 // Webhook
 export {
@@ -47,7 +47,7 @@ export {
   extractCustomerId,
   type WebhookHandlers,
   type WebhookResult,
-} from "./webhook";
+} from './webhook';
 
 // Errors
 export {
@@ -60,10 +60,10 @@ export {
   formatStripeError,
   getCardErrorMessage,
   type FormattedStripeError,
-} from "./errors";
+} from './errors';
 
 // Events
-export type { StripeEvents, StripeEventPayload } from "./events";
+export type { StripeEvents, StripeEventPayload } from './events';
 
 // Re-export Stripe types for convenience
-export type { default as Stripe } from "stripe";
+export type { default as Stripe } from 'stripe';

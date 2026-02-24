@@ -43,6 +43,7 @@ sudo chown -R $USER:$USER /opt/sabaipics-ftp
 ```
 
 Place your files in:
+
 - Compose file: `/opt/sabaipics-ftp/docker-compose.yml`
 - Environment file: `/opt/sabaipics-ftp/.env`
 
@@ -67,6 +68,7 @@ sudo ufw delete allow 80/tcp
 ```
 
 Certificates will be in:
+
 - `/etc/letsencrypt/live/ftp.yourdomain.com/fullchain.pem`
 - `/etc/letsencrypt/live/ftp.yourdomain.com/privkey.pem`
 
@@ -94,6 +96,7 @@ sudo dpkg-reconfigure -plow unattended-upgrades
 ```
 
 Notes:
+
 - Ensure your FTP container is configured for passive ports `60000-60100` and
   uses the cert paths above.
 - Re-login if `docker` permissions are not applied after `usermod`.

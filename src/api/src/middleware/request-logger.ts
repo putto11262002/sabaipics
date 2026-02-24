@@ -23,8 +23,6 @@ export function requestLogger(): MiddlewareHandler<Env> {
       // auth variable not registered for this route
     }
 
-    console.log(
-      JSON.stringify({ msg: 'request', method, path, status, duration, userId }),
-    );
+    console.log(JSON.stringify({ msg: 'request', method, path, status, duration, userId }));
   };
 }

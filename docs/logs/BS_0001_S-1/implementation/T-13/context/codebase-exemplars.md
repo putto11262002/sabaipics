@@ -20,13 +20,13 @@ Inferred from upstream context: T-13 requires implementing Events CRUD endpoints
 ### Pattern to copy
 
 ```typescript
-import { Hono } from "hono";
-import { z } from "zod";
-import { zValidator } from "@hono/zod-validator";
-import { eq, asc } from "drizzle-orm";
-import { creditPackages } from "@sabaipics/db";
-import { requireAdmin } from "../../middleware";
-import type { Env } from "../../types";
+import { Hono } from 'hono';
+import { z } from 'zod';
+import { zValidator } from '@hono/zod-validator';
+import { eq, asc } from 'drizzle-orm';
+import { creditPackages } from '@sabaipics/db';
+import { requireAdmin } from '../../middleware';
+import type { Env } from '../../types';
 
 // =============================================================================
 // Validation Schemas
@@ -55,7 +55,7 @@ const updatePackageSchema = z.object({
 function validationError(message: string, details?: z.ZodIssue[]) {
   return {
     error: {
-      code: "VALIDATION_ERROR",
+      code: 'VALIDATION_ERROR',
       message,
       ...(details && { details }),
     },
@@ -65,7 +65,7 @@ function validationError(message: string, details?: z.ZodIssue[]) {
 function notFoundError(message: string) {
   return {
     error: {
-      code: "NOT_FOUND",
+      code: 'NOT_FOUND',
       message,
     },
   };
@@ -77,33 +77,27 @@ function notFoundError(message: string) {
 
 export const adminCreditPackagesRouter = new Hono<Env>()
   // GET / - List all
-  .get("/", requireAdmin(), async (c) => {
+  .get('/', requireAdmin(), async (c) => {
     const db = c.var.db();
-    const packages = await db
-      .select()
-      .from(creditPackages)
-      .orderBy(asc(creditPackages.sortOrder));
+    const packages = await db.select().from(creditPackages).orderBy(asc(creditPackages.sortOrder));
     return c.json({ data: packages });
   })
   // POST / - Create
-  .post("/", requireAdmin(), zValidator("json", createPackageSchema), async (c) => {
-    const data = c.req.valid("json");
+  .post('/', requireAdmin(), zValidator('json', createPackageSchema), async (c) => {
+    const data = c.req.valid('json');
     const db = c.var.db();
-    const [created] = await db
-      .insert(creditPackages)
-      .values(data)
-      .returning();
+    const [created] = await db.insert(creditPackages).values(data).returning();
     return c.json({ data: created }, 201);
   })
   // PATCH /:id - Update
   .patch(
-    "/:id",
+    '/:id',
     requireAdmin(),
-    zValidator("json", updatePackageSchema),
-    zValidator("param", z.object({ id: z.string().uuid() })),
+    zValidator('json', updatePackageSchema),
+    zValidator('param', z.object({ id: z.string().uuid() })),
     async (c) => {
-      const { id } = c.req.valid("param");
-      const data = c.req.valid("json");
+      const { id } = c.req.valid('param');
+      const data = c.req.valid('json');
       const db = c.var.db();
 
       const [existing] = await db
@@ -113,7 +107,7 @@ export const adminCreditPackagesRouter = new Hono<Env>()
         .limit(1);
 
       if (!existing) {
-        return c.json(notFoundError("Credit package not found"), 404);
+        return c.json(notFoundError('Credit package not found'), 404);
       }
 
       const [updated] = await db
@@ -123,7 +117,7 @@ export const adminCreditPackagesRouter = new Hono<Env>()
         .returning();
 
       return c.json({ data: updated });
-    }
+    },
   );
 ```
 
@@ -148,11 +142,11 @@ export const adminCreditPackagesRouter = new Hono<Env>()
 ### Pattern to copy
 
 ```typescript
-import { Hono } from "hono";
-import { eq } from "drizzle-orm";
-import { consentRecords, photographers } from "@sabaipics/db";
-import { requirePhotographer, type PhotographerVariables } from "../middleware";
-import type { Bindings } from "../types";
+import { Hono } from 'hono';
+import { eq } from 'drizzle-orm';
+import { consentRecords, photographers } from '@sabaipics/db';
+import { requirePhotographer, type PhotographerVariables } from '../middleware';
+import type { Bindings } from '../types';
 
 type Env = {
   Bindings: Bindings;
@@ -166,8 +160,8 @@ type Env = {
 function alreadyConsentedError() {
   return {
     error: {
-      code: "ALREADY_CONSENTED",
-      message: "PDPA consent already recorded",
+      code: 'ALREADY_CONSENTED',
+      message: 'PDPA consent already recorded',
     },
   };
 }
@@ -178,7 +172,7 @@ function alreadyConsentedError() {
 
 export const consentRouter = new Hono<Env>()
   // GET / - Check status
-  .get("/", requirePhotographer(), (c) => {
+  .get('/', requirePhotographer(), (c) => {
     const photographer = c.var.photographer;
     return c.json({
       data: {
@@ -188,7 +182,7 @@ export const consentRouter = new Hono<Env>()
     });
   })
   // POST / - Record consent
-  .post("/", requirePhotographer(), async (c) => {
+  .post('/', requirePhotographer(), async (c) => {
     const photographer = c.var.photographer;
 
     // Business logic: check if already consented
@@ -197,7 +191,7 @@ export const consentRouter = new Hono<Env>()
     }
 
     const db = c.var.db();
-    const ipAddress = c.req.header("CF-Connecting-IP") ?? null;
+    const ipAddress = c.req.header('CF-Connecting-IP') ?? null;
     const now = new Date().toISOString();
 
     // Insert consent record
@@ -205,7 +199,7 @@ export const consentRouter = new Hono<Env>()
       .insert(consentRecords)
       .values({
         photographerId: photographer.id,
-        consentType: "pdpa",
+        consentType: 'pdpa',
         ipAddress,
       })
       .returning({
@@ -362,7 +356,7 @@ describe("POST /credit-packages", () => {
     const newPackage = { id: "pkg-new", name: "New Package", ... };
     const mockDb = createMockDb();
     mockDb.returning = vi.fn().mockResolvedValue([newPackage]);
-    
+
     const app = createTestApp(mockDb);
     const client = testClient(app, { ADMIN_API_KEY: TEST_API_KEY });
 
@@ -397,20 +391,21 @@ From `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent1/packag
 
 ```typescript
 export const AUTH_ERRORS = {
-  UNAUTHENTICATED: "UNAUTHENTICATED",
-  FORBIDDEN: "FORBIDDEN",
+  UNAUTHENTICATED: 'UNAUTHENTICATED',
+  FORBIDDEN: 'FORBIDDEN',
   // ...
 } as const;
 
 export function createAuthError(
   code: keyof typeof AUTH_ERRORS,
-  message: string
+  message: string,
 ): AuthErrorResponse {
   return { error: { code: AUTH_ERRORS[code], message } };
 }
 ```
 
 **Standard error shape:**
+
 ```typescript
 {
   error: {
@@ -421,6 +416,7 @@ export function createAuthError(
 ```
 
 **Common error codes:**
+
 - `UNAUTHENTICATED` - 401, missing/invalid auth
 - `FORBIDDEN` - 403, auth but not allowed
 - `NOT_FOUND` - 404, resource doesn't exist
@@ -435,12 +431,9 @@ export function createAuthError(
 From `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent1/apps/api/src/lib/qr/generate.ts`:
 
 ```typescript
-import { generatePngQrCode } from "@juit/qrcode";
+import { generatePngQrCode } from '@juit/qrcode';
 
-export async function generateEventQR(
-  accessCode: string,
-  baseUrl: string
-): Promise<Uint8Array> {
+export async function generateEventQR(accessCode: string, baseUrl: string): Promise<Uint8Array> {
   // Validate access code format
   if (!/^[A-Z0-9]{6}$/.test(accessCode)) {
     throw new Error(`Invalid access code format: "${accessCode}"`);
@@ -449,8 +442,8 @@ export async function generateEventQR(
   const searchUrl = `${baseUrl}/search/${accessCode}`;
 
   const pngBytes = await generatePngQrCode(searchUrl, {
-    ecLevel: "M",  // Medium error correction
-    margin: 4,     // Standard quiet zone
+    ecLevel: 'M', // Medium error correction
+    margin: 4, // Standard quiet zone
   });
 
   return pngBytes;
@@ -475,9 +468,9 @@ await c.env.PHOTOS_BUCKET.put(r2Key, qrPng);
 ```typescript
 export function requirePhotographer(): MiddlewareHandler<Env> {
   return async (c, next) => {
-    const auth = c.get("auth");
+    const auth = c.get('auth');
     if (!auth) {
-      return c.json(createAuthError("UNAUTHENTICATED", "..."), 401);
+      return c.json(createAuthError('UNAUTHENTICATED', '...'), 401);
     }
 
     const db = c.var.db();
@@ -488,10 +481,10 @@ export function requirePhotographer(): MiddlewareHandler<Env> {
       .limit(1);
 
     if (!row) {
-      return c.json(createAuthError("FORBIDDEN", "..."), 403);
+      return c.json(createAuthError('FORBIDDEN', '...'), 403);
     }
 
-    c.set("photographer", row);
+    c.set('photographer', row);
     return next();
   };
 }
@@ -502,7 +495,7 @@ export function requirePhotographer(): MiddlewareHandler<Env> {
 ```typescript
 type Env = {
   Bindings: Bindings;
-  Variables: PhotographerVariables;  // extends AuthVariables
+  Variables: PhotographerVariables; // extends AuthVariables
 };
 ```
 
@@ -513,18 +506,20 @@ type Env = {
 From `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent1/packages/db/src/schema/events.ts`:
 
 ```typescript
-export const events = pgTable("events", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  photographerId: uuid("photographer_id")
+export const events = pgTable('events', {
+  id: uuid('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  photographerId: uuid('photographer_id')
     .notNull()
-    .references(() => photographers.id, { onDelete: "restrict" }),
-  name: text("name").notNull(),
-  startDate: timestamptz("start_date"),
-  endDate: timestamptz("end_date"),
-  accessCode: text("access_code").notNull().unique(), // 6-char code
-  qrCodeR2Key: text("qr_code_r2_key"), // R2 key for QR PNG
-  rekognitionCollectionId: text("rekognition_collection_id"),
-  expiresAt: timestamptz("expires_at").notNull(),
+    .references(() => photographers.id, { onDelete: 'restrict' }),
+  name: text('name').notNull(),
+  startDate: timestamptz('start_date'),
+  endDate: timestamptz('end_date'),
+  accessCode: text('access_code').notNull().unique(), // 6-char code
+  qrCodeR2Key: text('qr_code_r2_key'), // R2 key for QR PNG
+  rekognitionCollectionId: text('rekognition_collection_id'),
+  expiresAt: timestamptz('expires_at').notNull(),
   createdAt: createdAtCol(),
 });
 
@@ -533,6 +528,7 @@ export type NewEvent = typeof events.$inferInsert;
 ```
 
 **For T-13:** Events API will need to:
+
 - Generate 6-character uppercase access codes (A-Z0-9)
 - Call `generateEventQR()` and upload to R2
 - Store R2 key in `qrCodeR2Key` column
@@ -546,7 +542,7 @@ export type Bindings = CloudflareBindings & {
   ADMIN_API_KEY: string;
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
-  APP_BASE_URL: string;  // For QR code URLs
+  APP_BASE_URL: string; // For QR code URLs
 };
 ```
 

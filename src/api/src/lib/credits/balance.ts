@@ -46,7 +46,10 @@ export function getBalance(db: Db, photographerId: string): ResultAsync<number, 
  * Returns the earliest expiresAt from unexpired credit rows (type = 'credit', amount > 0).
  * Returns null if no expiring credits exist.
  */
-export function getNextExpiry(db: Db, photographerId: string): ResultAsync<string | null, CreditError> {
+export function getNextExpiry(
+  db: Db,
+  photographerId: string,
+): ResultAsync<string | null, CreditError> {
   return ResultAsync.fromPromise(
     (async () => {
       const [row] = await db

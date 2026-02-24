@@ -7,12 +7,7 @@ const VARIANT_CLASSES = {
   caption: 'text-sm text-muted-foreground text-center',
 };
 
-export function TextBlockRenderer({
-  block,
-}: {
-  block: SlideshowBlock;
-  context: SlideshowContext;
-}) {
+export function TextBlockRenderer({ block }: { block: SlideshowBlock; context: SlideshowContext }) {
   const props = block.props as TextBlockProps;
 
   return (

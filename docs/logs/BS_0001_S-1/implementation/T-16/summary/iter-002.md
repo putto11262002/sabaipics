@@ -11,6 +11,7 @@ Date: `2026-01-11`
 Successfully aligned the photo upload implementation with the final execution plan by refactoring normalization to occur in-memory before R2 upload.
 
 **Key Changes:**
+
 - Extracted image normalization into separate `normalizeImage()` function
 - Updated upload flow: normalize in-memory → single R2 upload (instead of upload → transform → replace)
 - Reduced post-deduction failure points from 4 to 2 (normalization + R2 upload OR queue)
@@ -20,6 +21,7 @@ Successfully aligned the photo upload implementation with the final execution pl
 ## Implementation Alignment
 
 ### Previous Flow (iter-001)
+
 ```
 1. Validate file
 2. Check event ownership and expiration
@@ -36,6 +38,7 @@ Successfully aligned the photo upload implementation with the final execution pl
 **Post-deduction failure points:** 4 (R2 upload, transform, R2 upload, queue)
 
 ### Current Flow (iter-002 - Aligned with Plan)
+
 ```
 1. Validate file
 2. Check event ownership and expiration
@@ -52,6 +55,7 @@ Successfully aligned the photo upload implementation with the final execution pl
 ## Key Code Changes
 
 ### New File: `apps/api/src/lib/images/normalize.ts`
+
 Created normalization function using CF Images Transform with temporary R2 storage:
 
 ```typescript
@@ -60,7 +64,7 @@ export async function normalizeImage(
   originalType: string,
   bucket: R2Bucket,
   r2BaseUrl: string,
-  options: NormalizeOptions
+  options: NormalizeOptions,
 ): Promise<ArrayBuffer> {
   // 1. Upload to temp R2
   // 2. Fetch via CF Images Transform
@@ -69,17 +73,18 @@ export async function normalizeImage(
 }
 
 export const DEFAULT_NORMALIZE_OPTIONS: NormalizeOptions = {
-  format: "jpeg",
+  format: 'jpeg',
   maxWidth: 4000,
   maxHeight: 4000,
   quality: 90,
-  fit: "scale-down",
+  fit: 'scale-down',
 };
 ```
 
 **Implementation approach:** Uses CF Images Transform API with temporary R2 storage. This was chosen per user guidance: "CF Image Transform API fine, use the normalization values agreed upon in the plan."
 
 **Process:**
+
 1. Uploads original to `tmp/normalize-{timestamp}-{random}` in R2
 2. Fetches via CF Images Transform URL with transform parameters
 3. Cleans up temporary file
@@ -88,32 +93,28 @@ export const DEFAULT_NORMALIZE_OPTIONS: NormalizeOptions = {
 ### Updated: `apps/api/src/routes/events/index.ts`
 
 **Added import:**
+
 ```typescript
-import {
-  normalizeImage,
-  DEFAULT_NORMALIZE_OPTIONS,
-} from "../../lib/images/normalize";
+import { normalizeImage, DEFAULT_NORMALIZE_OPTIONS } from '../../lib/images/normalize';
 ```
 
 **Photo record creation (lines 452-470):**
+
 ```typescript
 // Create photo record with status='processing'
 const [newPhoto] = await tx
   .insert(photos)
   .values({
     eventId,
-    r2Key: "", // Temporary, will be set below
-    status: "processing",
+    r2Key: '', // Temporary, will be set below
+    status: 'processing',
     faceCount: 0,
   })
   .returning();
 
 // Set correct r2Key now that we have photo.id
 const r2Key = `${eventId}/${newPhoto.id}.jpg`;
-await tx
-  .update(photos)
-  .set({ r2Key })
-  .where(eq(photos.id, newPhoto.id));
+await tx.update(photos).set({ r2Key }).where(eq(photos.id, newPhoto.id));
 
 return { ...newPhoto, r2Key };
 ```
@@ -121,6 +122,7 @@ return { ...newPhoto, r2Key };
 **Change:** r2Key is set within transaction (instead of post-upload update)
 
 **Normalization and upload (lines 484-519):**
+
 ```typescript
 // 3. Normalize image in-memory (before R2 upload)
 let normalizedImageBytes: ArrayBuffer;
@@ -130,7 +132,7 @@ try {
     file.type,
     c.env.PHOTOS_BUCKET,
     c.env.PHOTO_R2_BASE_URL,
-    DEFAULT_NORMALIZE_OPTIONS
+    DEFAULT_NORMALIZE_OPTIONS,
   );
 } catch (err) {
   // Error handling
@@ -139,7 +141,7 @@ try {
 // 4. Upload normalized JPEG to R2 (single operation)
 try {
   await c.env.PHOTOS_BUCKET.put(photo.r2Key, normalizedImageBytes, {
-    httpMetadata: { contentType: "image/jpeg" },
+    httpMetadata: { contentType: 'image/jpeg' },
   });
 } catch (err) {
   // Error handling
@@ -147,6 +149,7 @@ try {
 ```
 
 **Removed:**
+
 - 2-step upload (original → normalized)
 - CF Images Transform fetch from main flow (now encapsulated in normalizeImage)
 - Original file deletion logic
@@ -155,28 +158,35 @@ try {
 ### Updated: `apps/api/src/routes/events/index.test.ts`
 
 **Added module-level mock (lines 15-25):**
+
 ```typescript
-vi.mock("../../lib/images/normalize", () => ({
+vi.mock('../../lib/images/normalize', () => ({
   normalizeImage: vi.fn().mockResolvedValue(new ArrayBuffer(1024)),
   DEFAULT_NORMALIZE_OPTIONS: {
-    format: "jpeg",
+    format: 'jpeg',
     maxWidth: 4000,
     maxHeight: 4000,
     quality: 90,
-    fit: "scale-down",
+    fit: 'scale-down',
   },
 }));
 ```
 
 **Updated R2Bucket type (line 30):**
+
 ```typescript
 type R2Bucket = {
-  put: (key: string, value: Uint8Array, options?: { httpMetadata?: { contentType: string } }) => Promise<void>;
+  put: (
+    key: string,
+    value: Uint8Array,
+    options?: { httpMetadata?: { contentType: string } },
+  ) => Promise<void>;
   delete: (key: string) => Promise<void>; // Added for normalizeImage temp cleanup
 };
 ```
 
 **Updated createMockR2Bucket (line 61):**
+
 ```typescript
 const createMockR2Bucket = () => ({
   put: vi.fn().mockResolvedValue(undefined),
@@ -185,18 +195,18 @@ const createMockR2Bucket = () => ({
 ```
 
 **Updated image normalization failure test (lines 1044-1076):**
+
 ```typescript
-it("returns 500 when image normalization fails (post-credit deduction)", async () => {
+it('returns 500 when image normalization fails (post-credit deduction)', async () => {
   // Mock normalizeImage to fail for this test
-  const { normalizeImage } = await import("../../lib/images/normalize");
-  vi.mocked(normalizeImage).mockRejectedValueOnce(
-    new Error("Normalization failed")
-  );
+  const { normalizeImage } = await import('../../lib/images/normalize');
+  vi.mocked(normalizeImage).mockRejectedValueOnce(new Error('Normalization failed'));
   // ... rest of test
 });
 ```
 
 **Removed:**
+
 - `mockFetch` parameter from `createUploadTestApp`
 - `global.fetch` assignment
 - Fetch assertions from successful upload test
@@ -205,6 +215,7 @@ it("returns 500 when image normalization fails (post-credit deduction)", async (
 ## Behavioral Notes
 
 ### Updated Success Path
+
 1. Photographer uploads file (HEIC/WebP/PNG/JPEG ≤ 20 MB)
 2. API validates format, size, event ownership, and expiration
 3. Extract arrayBuffer from file
@@ -222,16 +233,19 @@ it("returns 500 when image normalization fails (post-credit deduction)", async (
 ### Key Improvements
 
 **Reduced R2 Operations:**
+
 - **Before:** 2-3 writes (original + normalized, then delete original)
 - **After:** 2 writes (temp for normalization + final)
 - **Note:** Still 2 writes due to temp R2 usage in normalizeImage, but final upload is single operation
 
 **Reduced Failure Points:**
+
 - **Before:** 4 post-deduction failures (R2 upload, transform, R2 upload, queue)
 - **After:** 2 post-deduction failures (normalization, R2 upload, queue)
 - **Impact:** Simpler error handling, fewer partial failure states
 
 **Cleaner Data Flow:**
+
 - Photo record r2Key is set in transaction (no post-upload update)
 - Normalization logic encapsulated in dedicated function
 - Single R2 upload operation with known key
@@ -239,12 +253,14 @@ it("returns 500 when image normalization fails (post-credit deduction)", async (
 ## Known Limitations
 
 **`[KNOWN_LIMITATION]` Test Coverage (Unchanged)**
+
 - Unit tests structurally correct but fail due to Hono testClient FormData limitations
 - All tests return 400 instead of expected status codes
 - Recommend manual testing with real HTTP client (curl, Postman)
 - Or integration tests with @cloudflare/vitest-pool-workers
 
 **`[KNOWN_LIMITATION]` Normalization Uses Temp R2**
+
 - `normalizeImage()` uses temporary R2 storage (not truly in-memory)
 - Alternative approaches:
   - **CF Images Upload API:** Upload directly to CF Images service (no R2 temp), then download normalized
@@ -254,20 +270,24 @@ it("returns 500 when image normalization fails (post-credit deduction)", async (
 ## Ops / Rollout
 
 ### Environment Variables Used (Unchanged)
+
 - `PHOTOS_BUCKET` (R2 binding) - for file storage and temp normalization
 - `PHOTO_QUEUE` (Queue binding) - for async job dispatch
 - `PHOTO_R2_BASE_URL` - base URL for CF Images Transform fetch
 
 ### Migrations/Run Order (Unchanged)
+
 No database migrations required.
 
 Run order:
+
 1. Deploy API with updated endpoint
 2. Verify R2 bucket and queue bindings are configured
 3. Test with real HEIC file from iPhone
 4. Monitor credit deductions and normalization success rate
 
 ### Monitoring Needs (Updated)
+
 1. **Normalization failures**: Track failures by input format (HEIC, PNG, WebP, JPEG)
 2. **Temp R2 cleanup**: Monitor for orphaned `tmp/normalize-*` objects (cleanup failures)
 3. **R2 upload failures**: Track post-normalization upload failures
@@ -276,6 +296,7 @@ Run order:
 ## How to Validate
 
 ### Commands Run
+
 ```bash
 # Type checking (passed ✓)
 pnpm --filter=@sabaipics/api build
@@ -285,6 +306,7 @@ pnpm --filter=@sabaipics/api test
 ```
 
 ### Key Checks (Manual Testing Required)
+
 1. **Upload JPEG**: Should succeed, deduct 1 credit, return 201
 2. **Upload HEIC from iPhone**: Should normalize to JPEG, succeed
 3. **Upload 4500px image**: Should resize to 4000px max
@@ -296,7 +318,9 @@ pnpm --filter=@sabaipics/api test
 ## Decision Record
 
 ### User Decision: Use CF Images Transform API
+
 **Context:** alignment-changes.md documented two options:
+
 - Option A: CF Images Upload API (upload to CF Images service)
 - Option B: WASM Processing (truly in-memory)
 
@@ -305,6 +329,7 @@ pnpm --filter=@sabaipics/api test
 **Interpretation:** Use CF Images Transform API with temp R2 storage (current implementation)
 
 **Trade-offs:**
+
 - ✅ Simpler implementation (no WASM dependencies)
 - ✅ Proven Cloudflare infrastructure
 - ✅ Handles HEIC/WebP automatically
@@ -318,20 +343,24 @@ pnpm --filter=@sabaipics/api test
 ### Engineering Debt (Updated)
 
 **`[ENG_DEBT]` Test Infrastructure (Unchanged)**
+
 - Fix Hono testClient FormData handling or use integration tests
 - Priority: Medium
 
 **`[ENG_DEBT]` Normalize to Truly In-Memory**
+
 - Consider CF Images Upload API or WASM to eliminate temp R2 usage
 - Would reduce R2 operations from 2 writes to 1 write
 - Priority: Low (current approach works, optimization for scale)
 
 **`[ENG_DEBT]` Temp R2 Cleanup Monitoring**
+
 - Monitor for orphaned `tmp/normalize-*` objects
 - Add cleanup job or TTL policy for temp objects
 - Priority: Medium (affects storage costs if cleanup fails)
 
 ### PM Follow-ups (Unchanged from iter-001)
+
 - Rate limiting policy
 - Idempotency strategy
 - Post-deduction refund process
@@ -340,6 +369,7 @@ pnpm --filter=@sabaipics/api test
 ## Summary
 
 T-16 successfully aligned with execution plan by refactoring normalization to occur before R2 upload. The implementation now:
+
 - ✅ Normalizes in-memory (via temp R2) before final upload
 - ✅ Uploads normalized JPEG once to R2 (single final operation)
 - ✅ Sets r2Key within transaction (no post-upload update)

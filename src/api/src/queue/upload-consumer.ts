@@ -15,8 +15,17 @@ import type { R2EventMessage } from '../types/r2-event';
 import type { Bindings } from '../types';
 import type { PhotoJob } from '../types/photo-job';
 import { createDb, createDbTx } from '@/db';
-import { activeEvents, events, photoLuts, uploadIntents, photos, type EventSettings } from '@/db';
-import { eq, and, sql } from 'drizzle-orm';
+import {
+  activeEvents,
+  events,
+  photoLuts,
+  uploadIntents,
+  photos,
+  autoEditPresets,
+  type PhotoExifData,
+  type EventSettings,
+} from '@/db';
+import { eq, and, or, sql } from 'drizzle-orm';
 import { debitCredits } from '../lib/credits';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
 import {
@@ -31,6 +40,7 @@ import { normalizeWithCfImages } from '../lib/images/normalize';
 import { extractExif } from '../lib/images/exif';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 import { processWithModal, isModalConfigured, type ModalProcessOptions } from '../lib/modal-client';
+import { generatePresignedGetUrl, generatePresignedPutUrl } from '../lib/r2/presign';
 
 // wrangler.api.jsonc sets max_retries: 1 as a crash safety net.
 // The consumer itself never calls message.retry() — the idempotency guard
@@ -40,6 +50,8 @@ import { processWithModal, isModalConfigured, type ModalProcessOptions } from '.
 // CF Images handles the heavy decode externally, so this no longer
 // needs to fit in the 128 MB Workers heap.
 const MAX_PIXELS = 25_000_000;
+// R2 presign TTL for Modal processing.
+const MODAL_R2_PRESIGN_TTL_SECONDS = 300;
 
 /**
  * Generate R2 keys for original and processed photos.
@@ -79,6 +91,16 @@ type ParsedLutCacheEntry =
 type UploadBatchCaches = {
   eventSettingsByEventId: Map<string, EventSettings | null>;
   eventSettingsLoadFailedByEventId: Set<string>;
+  autoEditPresetByPhotographerAndPresetId: Map<
+    string,
+    {
+      contrast: number;
+      brightness: number;
+      saturation: number;
+      sharpness: number;
+      autoContrast: boolean;
+    } | null
+  >;
   parsedLutByPhotographerAndLutId: Map<string, ParsedLutCacheEntry>;
   lutLookupFailedByCacheKey: Set<string>;
   lutTextByR2Key: Map<string, string | null>;
@@ -283,6 +305,9 @@ async function processUpload(
       });
     }
 
+    const originalMimeType = headResult.httpMetadata?.contentType ?? null;
+    const originalFileSize = headResult.size;
+
     // Step 5: Now safe to GET the full object
     const r2Object = yield* ResultAsync.fromPromise(
       env.PHOTOS_BUCKET.get(key),
@@ -371,7 +396,7 @@ async function processUpload(
 
     // Step 6c: Extract EXIF metadata from original bytes (non-blocking)
     const exifResult = await extractExif(imageBytes);
-    const exifData = exifResult.match(
+    let exifData = exifResult.match(
       (data) => data,
       (error) => {
         captureUploadWarning('exif_extraction', {
@@ -382,6 +407,78 @@ async function processUpload(
         });
         return null;
       },
+    );
+
+    // Step 7: Normalize image to JPEG via CF Images (external — zero Worker memory for decode)
+    console.log(`[upload-consumer] Normalizing with CF Images: ${key}`);
+
+    const cfNormalizeResult = await Sentry.startSpan(
+      { name: 'upload.normalize', op: 'image.process' },
+      async (span) => {
+        span.setAttribute('upload.original_size', imageBytes.byteLength);
+        span.setAttribute('upload.normalization_method', 'cf_images');
+
+        const result = await normalizeWithCfImages(imageBytes, env.IMAGES);
+        result.match(
+          (val) => {
+            span.setAttribute('upload.width', val.width);
+            span.setAttribute('upload.height', val.height);
+            span.setAttribute('upload.file_size', val.bytes.byteLength);
+          },
+          (error) => span.setAttribute('upload.error_stage', error.stage),
+        );
+        return result;
+      },
+    );
+
+    if (cfNormalizeResult.isErr()) {
+      captureUploadError('normalization', {
+        ...intentCtx,
+        extra: {
+          normalization_method: 'cf_images',
+          stage: cfNormalizeResult.error.stage,
+          cause:
+            cfNormalizeResult.error.cause instanceof Error
+              ? cfNormalizeResult.error.cause.message
+              : String(cfNormalizeResult.error.cause),
+          detectedType: magicValidation.detectedType,
+          originalSize: imageBytes.byteLength,
+        },
+      });
+      return err<never, UploadProcessingError>({
+        type: 'normalization',
+        key,
+        intentId: intent.id,
+        cause: cfNormalizeResult.error.cause,
+      });
+    }
+
+    let { bytes: normalizedBytes, width, height } = cfNormalizeResult.value;
+    let fileSizeOriginal = normalizedBytes.byteLength;
+
+    // Step 8: Generate final photo ID and keys
+    const photoId = crypto.randomUUID();
+    const r2Keys = generateR2Keys(intent.eventId, photoId);
+
+    // Step 8b: Write photoId to intent BEFORE R2 PUT so crons can clean
+    // orphaned normalized JPEGs if the transaction at step 10 fails.
+    yield* ResultAsync.fromPromise(
+      db.update(uploadIntents).set({ photoId }).where(eq(uploadIntents.id, intent.id)),
+      (cause): UploadProcessingError => ({
+        type: 'intent_update',
+        intentId: intent.id,
+        cause,
+      }),
+    );
+
+    // Step 9: Upload original (normalized) image to final location
+    yield* ResultAsync.fromPromise(
+      Sentry.startSpan({ name: 'upload.r2_put_original', op: 'r2.put' }, () =>
+        env.PHOTOS_BUCKET.put(r2Keys.original, normalizedBytes, {
+          httpMetadata: { contentType: 'image/jpeg' },
+        }),
+      ),
+      (cause): UploadProcessingError => ({ type: 'r2', operation: 'put_original', cause }),
     );
 
     // Step 6c: Load event color grade settings + LUT (best-effort; never fail upload)
@@ -568,59 +665,7 @@ async function processUpload(
       }
     }
 
-    // Step 7: Normalize image to JPEG via CF Images (external — zero Worker memory for decode)
-    console.log(`[upload-consumer] Normalizing with CF Images: ${key}`);
-
-    const cfNormalizeResult = await Sentry.startSpan(
-      { name: 'upload.normalize', op: 'image.process' },
-      async (span) => {
-        span.setAttribute('upload.original_size', imageBytes.byteLength);
-        span.setAttribute('upload.normalization_method', 'cf_images');
-        span.setAttribute('upload.color_grade.auto_edit', colorGrade.autoEdit);
-        span.setAttribute('upload.color_grade.has_lut', !!colorGrade.lutId);
-        span.setAttribute(
-          'upload.color_grade.will_apply',
-          (colorGrade.autoEdit || !!colorGrade.lutId) && isModalConfigured(env),
-        );
-        if (colorGradeSkip)
-          span.setAttribute('upload.color_grade.skip_reason', colorGradeSkip.reason);
-
-        const result = await normalizeWithCfImages(imageBytes, env.IMAGES);
-        result.match(
-          (val) => {
-            span.setAttribute('upload.width', val.width);
-            span.setAttribute('upload.height', val.height);
-            span.setAttribute('upload.file_size', val.bytes.byteLength);
-          },
-          (error) => span.setAttribute('upload.error_stage', error.stage),
-        );
-        return result;
-      },
-    );
-
-    if (cfNormalizeResult.isErr()) {
-      captureUploadError('normalization', {
-        ...intentCtx,
-        extra: {
-          normalization_method: 'cf_images',
-          stage: cfNormalizeResult.error.stage,
-          cause:
-            cfNormalizeResult.error.cause instanceof Error
-              ? cfNormalizeResult.error.cause.message
-              : String(cfNormalizeResult.error.cause),
-          detectedType: magicValidation.detectedType,
-          originalSize: imageBytes.byteLength,
-        },
-      });
-      return err<never, UploadProcessingError>({
-        type: 'normalization',
-        key,
-        intentId: intent.id,
-        cause: cfNormalizeResult.error.cause,
-      });
-    }
-
-    let { bytes: normalizedBytes, width, height } = cfNormalizeResult.value;
+    // normalized output metadata already available from CF Images
 
     // Step 7b: Apply image pipeline via Modal (auto-edit + LUT)
     // CF Images output is ≤2500px JPEG (~3-5 MB).
@@ -631,17 +676,113 @@ async function processUpload(
       lutId: string | null;
       lutIntensity: number;
     } | null = null;
-    let processedBytes: ArrayBuffer | null = null;
+    let processedR2Key: string | null = null;
+    let processedSize: number | null = null;
 
-    const shouldUseModal = (colorGrade.autoEdit || colorGrade.lutId) && isModalConfigured(env);
+    const modalConfigured = isModalConfigured(env);
+    const shouldUseModal = modalConfigured;
+
+    console.log('[upload-consumer] Modal decision', {
+      intentId: intent.id,
+      eventId: intent.eventId,
+      autoEdit: colorGrade.autoEdit,
+      autoEditPresetId: colorGrade.autoEditPresetId,
+      autoEditIntensity: colorGrade.autoEditIntensity,
+      lutId: colorGrade.lutId,
+      lutIntensity: colorGrade.lutIntensity,
+      includeLuminance: colorGrade.includeLuminance,
+      modalConfigured,
+      shouldUseModal,
+    });
+
+    if ((colorGrade.autoEdit || colorGrade.lutId) && !modalConfigured) {
+      console.warn('[upload-consumer] Modal disabled due to missing credentials', {
+        intentId: intent.id,
+        eventId: intent.eventId,
+        hasModalKey: Boolean(env.MODAL_KEY),
+        hasModalSecret: Boolean(env.MODAL_SECRET),
+      });
+    }
 
     if (shouldUseModal) {
       const modalOptions: ModalProcessOptions = {
         autoEdit: colorGrade.autoEdit,
-        style: null,
+        autoEditIntensity: colorGrade.autoEditIntensity,
+        normalizeMaxPx: 2500,
         lutIntensity: colorGrade.lutIntensity,
         preserveLuminance: !colorGrade.includeLuminance,
       };
+
+      if (colorGrade.autoEdit && colorGrade.autoEditPresetId) {
+        const presetCacheKey = `${intent.photographerId}:${colorGrade.autoEditPresetId}`;
+        let preset = caches.autoEditPresetByPhotographerAndPresetId.get(presetCacheKey);
+
+        if (preset === undefined) {
+          const row = await ResultAsync.fromPromise(
+            Sentry.startSpan({ name: 'upload.auto_edit.find_preset', op: 'db.query' }, () =>
+              db
+                .select({
+                  contrast: autoEditPresets.contrast,
+                  brightness: autoEditPresets.brightness,
+                  saturation: autoEditPresets.saturation,
+                  sharpness: autoEditPresets.sharpness,
+                  autoContrast: autoEditPresets.autoContrast,
+                })
+                .from(autoEditPresets)
+                .where(
+                  and(
+                    eq(autoEditPresets.id, colorGrade.autoEditPresetId!),
+                    or(
+                      eq(autoEditPresets.photographerId, intent.photographerId),
+                      eq(autoEditPresets.isBuiltin, true),
+                    ),
+                  ),
+                )
+                .limit(1),
+            ),
+            (cause) => cause,
+          ).match(
+            (rows) => rows[0] ?? null,
+            (cause) => {
+              captureUploadWarning('auto_edit_preset_lookup_failed', {
+                ...intentCtx,
+                extra: {
+                  presetId: colorGrade.autoEditPresetId,
+                  cause: unknownToString(cause),
+                },
+              });
+              return null;
+            },
+          );
+
+          preset = row
+            ? {
+                contrast: row.contrast,
+                brightness: row.brightness,
+                saturation: row.saturation,
+                sharpness: row.sharpness,
+                autoContrast: row.autoContrast,
+              }
+            : null;
+
+          caches.autoEditPresetByPhotographerAndPresetId.set(presetCacheKey, preset);
+        }
+
+        if (preset) {
+          modalOptions.contrast = preset.contrast;
+          modalOptions.brightness = preset.brightness;
+          modalOptions.saturation = preset.saturation;
+          modalOptions.sharpness = preset.sharpness;
+          modalOptions.autoContrast = preset.autoContrast;
+        } else {
+          captureUploadWarning('auto_edit_preset_not_found', {
+            ...intentCtx,
+            extra: {
+              presetId: colorGrade.autoEditPresetId,
+            },
+          });
+        }
+      }
 
       // Get LUT base64 if needed (from cache using lutR2Key)
       if (colorGrade.lutId && lutR2Key) {
@@ -651,33 +792,92 @@ async function processUpload(
         }
       }
 
-      const modalResult = await Sentry.startSpan(
-        { name: 'upload.modal_process', op: 'image.process' },
-        async (span) => {
-          span.setAttribute('upload.modal.auto_edit', colorGrade.autoEdit);
-          span.setAttribute('upload.modal.preset_id', colorGrade.autoEditPresetId ?? 'null');
-          span.setAttribute('upload.modal.lut_enabled', !!colorGrade.lutId);
-          span.setAttribute('upload.modal.lut_intensity', colorGrade.lutIntensity);
-          span.setAttribute('upload.modal.input_size', normalizedBytes.byteLength);
+      let inputUrl: string | null = null;
+      let outputUrl: string | null = null;
+      let outputHeaders: Record<string, string> | null = null;
 
-          const result = await processWithModal(normalizedBytes, modalOptions, {
-            MODAL_KEY: env.MODAL_KEY!,
-            MODAL_SECRET: env.MODAL_SECRET!,
-          });
-          result.match(
-            (val) => {
-              span.setAttribute('upload.modal.output_size', val.imageBytes.byteLength);
-              span.setAttribute('upload.modal.width', val.width);
-              span.setAttribute('upload.modal.height', val.height);
-              span.setAttribute('upload.modal.operations', val.operationsApplied.join(','));
-            },
-            (error) => span.setAttribute('upload.modal.error', error.message),
-          );
-          return result;
-        },
-      );
+      try {
+        const presignedGet = await generatePresignedGetUrl(
+          env.CF_ACCOUNT_ID,
+          env.R2_ACCESS_KEY_ID,
+          env.R2_SECRET_ACCESS_KEY,
+          {
+            bucket: env.PHOTO_BUCKET_NAME,
+            key: r2Keys.original,
+            expiresIn: MODAL_R2_PRESIGN_TTL_SECONDS,
+          },
+        );
+
+        const presignedPut = await generatePresignedPutUrl(
+          env.CF_ACCOUNT_ID,
+          env.R2_ACCESS_KEY_ID,
+          env.R2_SECRET_ACCESS_KEY,
+          {
+            bucket: env.PHOTO_BUCKET_NAME,
+            key: r2Keys.processed,
+            contentType: 'image/jpeg',
+            expiresIn: MODAL_R2_PRESIGN_TTL_SECONDS,
+          },
+        );
+
+        inputUrl = presignedGet.url;
+        outputUrl = presignedPut.url;
+        outputHeaders = {
+          'Content-Type': 'image/jpeg',
+          'If-None-Match': '*',
+        };
+      } catch (cause) {
+        captureUploadWarning('modal_presign_failed', {
+          ...intentCtx,
+          extra: { cause: unknownToString(cause) },
+        });
+      }
+
+      const modalResult =
+        inputUrl && outputUrl && outputHeaders
+          ? await Sentry.startSpan(
+              { name: 'upload.modal_process', op: 'image.process' },
+              async (span) => {
+                span.setAttribute('upload.modal.auto_edit', colorGrade.autoEdit);
+                span.setAttribute('upload.modal.preset_id', colorGrade.autoEditPresetId ?? 'null');
+                span.setAttribute('upload.modal.auto_edit_intensity', colorGrade.autoEditIntensity);
+                span.setAttribute('upload.modal.lut_enabled', !!colorGrade.lutId);
+                span.setAttribute('upload.modal.lut_intensity', colorGrade.lutIntensity);
+                span.setAttribute('upload.modal.input_size', fileSizeOriginal);
+
+                const result = await processWithModal(
+                  inputUrl,
+                  { url: outputUrl, headers: outputHeaders },
+                  modalOptions,
+                  {
+                    MODAL_KEY: env.MODAL_KEY!,
+                    MODAL_SECRET: env.MODAL_SECRET!,
+                  },
+                );
+                result.match(
+                  (val) => {
+                    span.setAttribute('upload.modal.output_size', val.outputSize);
+                    span.setAttribute('upload.modal.width', val.width);
+                    span.setAttribute('upload.modal.height', val.height);
+                    span.setAttribute('upload.modal.operations', val.operationsApplied.join(','));
+                  },
+                  (error) => span.setAttribute('upload.modal.error', error.message),
+                );
+                return result;
+              },
+            )
+          : err({
+              type: 'modal_response' as const,
+              message: 'Modal presign failed',
+            });
 
       if (modalResult.isErr()) {
+        console.warn('[upload-consumer] Modal processing failed, fallback to normalized image', {
+          intentId: intent.id,
+          eventId: intent.eventId,
+          errorType: modalResult.error.type,
+          errorMessage: modalResult.error.message,
+        });
         // Modal failure is non-fatal — use un-graded CF Images output + warn.
         captureUploadWarning('modal_process_failed', {
           ...intentCtx,
@@ -689,7 +889,17 @@ async function processUpload(
           },
         });
       } else {
-        processedBytes = modalResult.value.imageBytes;
+        console.log('[upload-consumer] Modal processing succeeded', {
+          intentId: intent.id,
+          eventId: intent.eventId,
+          operationsApplied: modalResult.value.operationsApplied,
+          outputBytes: modalResult.value.outputSize,
+          width: modalResult.value.width,
+          height: modalResult.value.height,
+        });
+        processedR2Key = r2Keys.processed;
+        processedSize = modalResult.value.outputSize;
+        exifData = modalResult.value.exif ?? null;
         width = modalResult.value.width;
         height = modalResult.value.height;
         pipelineApplied = {
@@ -701,48 +911,9 @@ async function processUpload(
       }
     }
 
-    const finalBytes = processedBytes ?? normalizedBytes;
-    const fileSize = finalBytes.byteLength;
-
-    // Step 8: Generate final photo ID and keys
-    const photoId = crypto.randomUUID();
-    const r2Keys = generateR2Keys(intent.eventId, photoId);
+    const fileSize = processedSize ?? fileSizeOriginal;
     // For backward compatibility, r2Key points to processed if available, else original
-    const finalR2Key = processedBytes ? r2Keys.processed : r2Keys.original;
-
-    // Step 8b: Write photoId to intent BEFORE R2 PUT so crons can clean
-    // orphaned normalized JPEGs if the transaction at step 10 fails.
-    yield* ResultAsync.fromPromise(
-      db.update(uploadIntents).set({ photoId }).where(eq(uploadIntents.id, intent.id)),
-      (cause): UploadProcessingError => ({
-        type: 'intent_update',
-        intentId: intent.id,
-        cause,
-      }),
-    );
-
-    // Step 9: Upload images to final locations
-    // Always save original (normalized but unprocessed)
-    yield* ResultAsync.fromPromise(
-      Sentry.startSpan({ name: 'upload.r2_put_original', op: 'r2.put' }, () =>
-        env.PHOTOS_BUCKET.put(r2Keys.original, normalizedBytes, {
-          httpMetadata: { contentType: 'image/jpeg' },
-        }),
-      ),
-      (cause): UploadProcessingError => ({ type: 'r2', operation: 'put_original', cause }),
-    );
-
-    // If processed, also save processed version
-    if (processedBytes) {
-      yield* ResultAsync.fromPromise(
-        Sentry.startSpan({ name: 'upload.r2_put_processed', op: 'r2.put' }, () =>
-          env.PHOTOS_BUCKET.put(r2Keys.processed, processedBytes!, {
-            httpMetadata: { contentType: 'image/jpeg' },
-          }),
-        ),
-        (cause): UploadProcessingError => ({ type: 'r2', operation: 'put_processed', cause }),
-      );
-    }
+    const finalR2Key = processedR2Key ?? r2Keys.original;
 
     // Step 10: Credit deduction + photo creation (transactional)
     // Uses atomic balance decrement: UPDATE balance = balance - 1 WHERE balance >= 1
@@ -773,8 +944,8 @@ async function processUpload(
               r2Key: finalR2Key,
               status: 'uploading',
               faceCount: 0,
-              originalMimeType: intent.contentType,
-              originalFileSize: intent.contentLength,
+              originalMimeType,
+              originalFileSize,
               width,
               height,
               fileSize,
@@ -860,6 +1031,7 @@ export async function queue(
   const caches: UploadBatchCaches = {
     eventSettingsByEventId: new Map(),
     eventSettingsLoadFailedByEventId: new Set(),
+    autoEditPresetByPhotographerAndPresetId: new Map(),
     parsedLutByPhotographerAndLutId: new Map(),
     lutLookupFailedByCacheKey: new Set(),
     lutTextByR2Key: new Map(),

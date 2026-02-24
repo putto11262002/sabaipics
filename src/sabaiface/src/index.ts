@@ -38,41 +38,21 @@ export type {
 // Factory Functions
 // =============================================================================
 
-export {
-  createFaceService,
-  createSabaiFaceService,
-} from './factory/face-service-factory';
+export { createFaceService, createSabaiFaceService } from './factory/face-service-factory';
 
-export type {
-  SabaiFaceProviderConfig,
-} from './factory/face-service-factory';
+export type { SabaiFaceProviderConfig } from './factory/face-service-factory';
 
 // =============================================================================
 // Core Abstractions (for advanced use cases)
 // =============================================================================
 
-export type {
-  VectorStore,
-  FaceMetadata,
-  FaceMatch,
-  FaceData,
-} from './core/vector-store';
+export type { VectorStore, FaceMetadata, FaceMatch, FaceData } from './core/vector-store';
 
-export {
-  distanceToSimilarity,
-  similarityToDistance,
-} from './core/vector-store';
+export { distanceToSimilarity, similarityToDistance } from './core/vector-store';
 
-export type {
-  FaceDetector,
-  DetectedFace,
-  FaceDetectorConfig,
-} from './core/face-detector';
+export type { FaceDetector, DetectedFace, FaceDetectorConfig } from './core/face-detector';
 
-export {
-  pixelBoxToRatio,
-  ratioBoxToPixel,
-} from './core/face-detector';
+export { pixelBoxToRatio, ratioBoxToPixel } from './core/face-detector';
 
 // =============================================================================
 // Adapters (for direct instantiation if needed)

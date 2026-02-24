@@ -10,6 +10,7 @@
 This document describes the step-by-step flows for key operations. Each flow shows the sequence of actions across system components.
 
 **Components:**
+
 - **Client**: Web app, Desktop app, Lightroom plugin
 - **API**: Hono on Cloudflare Workers
 - **DB**: Postgres on Neon
@@ -82,11 +83,13 @@ This document describes the step-by-step flows for key operations. Each flow sho
 ```
 
 **PDPA Compliance:**
+
 - Photographer must consent before accessing dashboard
 - Consent stored with timestamp, IP address, privacy policy version
 - Privacy Policy explains photographer's obligation to obtain consent from event participants
 
 **Notes:**
+
 - Clerk handles all OAuth/OTP complexity
 - We sync profile data (name, avatar) from Clerk on each login
 - Signup bonus credits added on first login (if configured)
@@ -132,6 +135,7 @@ This document describes the step-by-step flows for key operations. Each flow sho
 ```
 
 **Notes:**
+
 - Credits only added after Stripe webhook confirms payment
 - Webhook handler is idempotent (checks for existing payment)
 - `expires_at` set to 6 months from purchase
@@ -175,6 +179,7 @@ This document describes the step-by-step flows for key operations. Each flow sho
 ```
 
 **Notes:**
+
 - Rekognition collection created on publish, not on create
 - Collection naming: `facelink-{event_uuid}`
 - Draft events have no collection (saves cost)
@@ -246,6 +251,7 @@ This document describes the step-by-step flows for key operations. Each flow sho
 ```
 
 **Key validation order:**
+
 1. **Rate limit check** (Durable Object) → `RATE_LIMITED` (429)
 2. Event published? → `EVENT_NOT_PUBLISHED`
 3. Upload window open? → `EVENT_NOT_STARTED` or `EVENT_UPLOAD_CLOSED`
@@ -253,6 +259,7 @@ This document describes the step-by-step flows for key operations. Each flow sho
 5. Valid file? → `INVALID_FILE_TYPE` or `FILE_TOO_LARGE`
 
 **Important sequencing:**
+
 - **Rate limit checked FIRST** - fast check (<1ms), prevents wasted work
 - **Credit deduction happens BEFORE R2 upload** - ensures atomicity
 - **Audit log written AFTER upload** - permanent business record (Neon Postgres)
@@ -288,6 +295,7 @@ This document describes the step-by-step flows for key operations. Each flow sho
 ```
 
 **FTP credentials format:**
+
 - Username: `{photographer_id}_{event_id}`
 - Password: Generated token per event
 
@@ -367,6 +375,7 @@ This document describes the step-by-step flows for key operations. Each flow sho
 ```
 
 **Key validation order:**
+
 1. **Rate limit check** (Cloudflare WAF) → `RATE_LIMITED` (429)
    - 600 requests/min per IP
    - 1800 requests/min global
@@ -375,12 +384,14 @@ This document describes the step-by-step flows for key operations. Each flow sho
 4. **Consent given?** → Show consent dialog if not
 
 **PDPA Compliance:**
+
 - Anonymous users: Always show consent (can't track between sessions)
 - Logged-in users: Check if consent already given for this event, only ask once
 - Consent stored with search_session_id (for anonymous) or participant_id (for logged-in)
 - Privacy Policy explains: facial recognition, cross-border transfer (USA), 1-month retention
 
 **Notes:**
+
 - No login required for web search
 - Rate limiting via Cloudflare WAF (per-IP + global)
 - Cache key: hash of (event_id + selfie_face_embedding)
@@ -421,6 +432,7 @@ This document describes the step-by-step flows for key operations. Each flow sho
 ```
 
 **Notes:**
+
 - No login required
 - Photos served via Cloudflare CDN
 - For multiple photos: return individual URLs or generate ZIP
@@ -434,6 +446,7 @@ This document describes the step-by-step flows for key operations. Each flow sho
 **VERIFIED:** Based on competitor (Pixid) implementation - this is the standard Thai market flow.
 
 **Two requirements for sending photos via LINE:**
+
 1. User must sign in with LINE (we get `userId`)
 2. User must be friend of our OA (otherwise message silently fails)
 
@@ -574,6 +587,7 @@ This document describes the step-by-step flows for key operations. Each flow sho
 ```
 
 **Key validation order:**
+
 1. **User authentication check** - must be logged in with LINE
 2. **Friendship check** - must be friend of OA (`line_linked=true`)
 3. **Rate limit check** (Durable Object, per-user) → `RATE_LIMITED` (429)
@@ -613,12 +627,14 @@ This document describes the step-by-step flows for key operations. Each flow sho
 ```
 
 **Key points:**
+
 - LINE Login uses `bot_prompt=aggressive` to show separate "Add friend" screen after consent
 - If user doesn't add friend, we store `line_linked=false` and prompt again next time
 - Silent failure if we try to send to non-friend (API returns 200 but no delivery)
 - Always check `line_linked=true` before attempting push message
 
 **LINE Login URL parameters:**
+
 ```
 https://access.line.me/oauth2/v2.1/authorize?
   response_type=code
@@ -676,6 +692,7 @@ https://access.line.me/oauth2/v2.1/authorize?
 ```
 
 **Notes:**
+
 - Run via Cloudflare Workers Cron Trigger
 - Process in batches to avoid timeout
 - Event record preserved (for history/accounting)
@@ -716,6 +733,7 @@ https://access.line.me/oauth2/v2.1/authorize?
 ```
 
 **FIFO tracking:**
+
 - Each credit batch has ID and `expires_at`
 - When consuming, track which batch credits came from
 - On expiry, only expire unused portion of that batch
@@ -724,17 +742,17 @@ https://access.line.me/oauth2/v2.1/authorize?
 
 ## Flow Summary
 
-| # | Flow | Trigger | Key Components |
-|---|------|---------|----------------|
-| 1 | Photographer Signup | User action | Clerk → API → DB |
-| 2 | Credit Purchase | User action | Stripe → Webhook → DB |
-| 3 | Create & Publish Event | User action | API → DB → Rekognition |
-| 4 | Photo Upload (Web) | User action | API → DB → R2 → Rekognition |
-| 5 | Photo Upload (FTP) | Camera upload | FTP → API → ... |
-| 6 | Face Search (Web) | User action | API → Rekognition → DB |
-| 7 | Photo Download | User action | API → CDN |
-| 8 | LINE Notification | User action | Clerk LINE Login → API → LINE Messaging |
-| 9 | Event Expiry | Cron (daily) | Cron → DB → R2 → Rekognition |
-| 10 | Credit Expiry | Cron (daily) | Cron → DB |
+| #   | Flow                   | Trigger       | Key Components                          |
+| --- | ---------------------- | ------------- | --------------------------------------- |
+| 1   | Photographer Signup    | User action   | Clerk → API → DB                        |
+| 2   | Credit Purchase        | User action   | Stripe → Webhook → DB                   |
+| 3   | Create & Publish Event | User action   | API → DB → Rekognition                  |
+| 4   | Photo Upload (Web)     | User action   | API → DB → R2 → Rekognition             |
+| 5   | Photo Upload (FTP)     | Camera upload | FTP → API → ...                         |
+| 6   | Face Search (Web)      | User action   | API → Rekognition → DB                  |
+| 7   | Photo Download         | User action   | API → CDN                               |
+| 8   | LINE Notification      | User action   | Clerk LINE Login → API → LINE Messaging |
+| 9   | Event Expiry           | Cron (daily)  | Cron → DB → R2 → Rekognition            |
+| 10  | Credit Expiry          | Cron (daily)  | Cron → DB                               |
 
 **Note:** LIFF flow removed from MVP to reduce complexity. All participant auth goes through Clerk.

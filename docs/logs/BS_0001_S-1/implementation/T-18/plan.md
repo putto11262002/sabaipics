@@ -6,6 +6,7 @@ Date: `2026-01-10`
 Owner: `Claude`
 
 ## Inputs
+
 - Task: `docs/logs/BS_0001_S-1/tasks.md` (section: T-18)
 - Upstream plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Context reports:
@@ -16,6 +17,7 @@ Owner: `Claude`
   - `docs/logs/BS_0001_S-1/implementation/T-18/context/risk-scout.md`
 
 ## Goal / non-goals
+
 - **Goal:** Create `GET /events/:id/photos` endpoint returning paginated photos with CF Images thumbnail/preview URLs and presigned R2 download URLs
 - **Non-goals:**
   - Photo upload (T-16)
@@ -28,6 +30,7 @@ Owner: `Claude`
 Based on codebase exemplars (`apps/api/src/routes/dashboard/route.ts`):
 
 1. **Add `aws4fetch` dependency:**
+
    ```bash
    pnpm --filter=@sabaipics/api add aws4fetch
    ```
@@ -52,6 +55,7 @@ Based on codebase exemplars (`apps/api/src/routes/dashboard/route.ts`):
    - `downloadUrl`: Presigned R2 URL (15-minute expiry) - prevents hotlinking
 
 6. **Response shape:**
+
 ```typescript
 {
   data: [{
@@ -130,22 +134,22 @@ Based on codebase exemplars (`apps/api/src/routes/dashboard/route.ts`):
 
 ## Open questions
 
-| Item | Status | Resolution |
-|------|--------|------------|
-| R2 presigned URL method | ✅ Resolved | Use `aws4fetch` library with S3 API domain |
-| Pagination response format | ✅ Resolved | Use `{ data, pagination: {...} }` format |
-| Expired events handling | ✅ Resolved | Show photos for expired events (no filter) |
-| R2 custom domain configured | `[OPS]` | Verify `photos.sabaipics.com` is set up before deployment |
-| R2 API credentials | `[OPS]` | Set via `wrangler secret put` (R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, CLOUDFLARE_ACCOUNT_ID) |
+| Item                        | Status      | Resolution                                                                                    |
+| --------------------------- | ----------- | --------------------------------------------------------------------------------------------- |
+| R2 presigned URL method     | ✅ Resolved | Use `aws4fetch` library with S3 API domain                                                    |
+| Pagination response format  | ✅ Resolved | Use `{ data, pagination: {...} }` format                                                      |
+| Expired events handling     | ✅ Resolved | Show photos for expired events (no filter)                                                    |
+| R2 custom domain configured | `[OPS]`     | Verify `photos.sabaipics.com` is set up before deployment                                     |
+| R2 API credentials          | `[OPS]`     | Set via `wrangler secret put` (R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, CLOUDFLARE_ACCOUNT_ID) |
 
 ## Files to create/modify
 
-| File | Action |
-|------|--------|
-| `apps/api/package.json` | Modify (add aws4fetch dependency) |
-| `apps/api/src/routes/photos.ts` | Create |
-| `apps/api/src/routes/photos.test.ts` | Create |
-| `apps/api/src/index.ts` | Modify (add route) |
+| File                                 | Action                            |
+| ------------------------------------ | --------------------------------- |
+| `apps/api/package.json`              | Modify (add aws4fetch dependency) |
+| `apps/api/src/routes/photos.ts`      | Create                            |
+| `apps/api/src/routes/photos.test.ts` | Create                            |
+| `apps/api/src/index.ts`              | Modify (add route)                |
 
 **Note:** `wrangler.jsonc` and `types.ts` already updated with CF_DOMAIN, R2_BASE_URL, and secret bindings.
 

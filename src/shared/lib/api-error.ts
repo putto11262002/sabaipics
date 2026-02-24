@@ -41,7 +41,6 @@ export function toRequestError(e: unknown): RequestError {
   return { type: 'UNKNOWN_ERROR', message, error: e };
 }
 
-
 /**
  * Check if the error indicates the account has been suspended/locked.
  * Used by API wrappers to force sign-out when the server rejects the session.

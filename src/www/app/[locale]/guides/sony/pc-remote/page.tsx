@@ -71,8 +71,9 @@ export default async function SonyPcRemoteGuidePage({ params }: Props) {
             เชื่อมต่อกล้อง Sony กับ FrameFast iOS ผ่าน PC Remote
           </h1>
           <p className="text-pretty text-sm leading-6 text-muted-foreground">
-            โฟลว์นี้อิงจากคู่มือ Sony “การสั่งงานกล้องจากคอมพิวเตอร์ (ฟังก์ชั่นถ่ายแบบรีโมท)” และตั้งค่า{' '}
-            <InlineCode>ตรวจสอบสิทธิ์เข้าถึง</InlineCode> เป็น <InlineCode>ปิด</InlineCode> เพื่อให้แอปเชื่อมต่อได้ง่ายขึ้น
+            โฟลว์นี้อิงจากคู่มือ Sony “การสั่งงานกล้องจากคอมพิวเตอร์ (ฟังก์ชั่นถ่ายแบบรีโมท)”
+            และตั้งค่า <InlineCode>ตรวจสอบสิทธิ์เข้าถึง</InlineCode> เป็น{' '}
+            <InlineCode>ปิด</InlineCode> เพื่อให้แอปเชื่อมต่อได้ง่ายขึ้น
             (ไม่มีการเข้ารหัส/ตรวจสอบสิทธิ์ SSH).
           </p>
           <p className="text-sm text-muted-foreground">
@@ -125,7 +126,10 @@ export default async function SonyPcRemoteGuidePage({ params }: Props) {
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
             <li>ติดตั้งแอป FrameFast iOS บน iPhone/iPad</li>
             <li>ชาร์จแบตเตอรี่กล้องให้พอ</li>
-            <li>ให้กล้อง “ไม่เชื่อมต่อ” กับสมาร์ทโฟนอยู่ก่อน (Sony ระบุว่าถ้าเชื่อมต่ออยู่ จะสั่งงานจากคอมพิวเตอร์ไม่ได้)</li>
+            <li>
+              ให้กล้อง “ไม่เชื่อมต่อ” กับสมาร์ทโฟนอยู่ก่อน (Sony ระบุว่าถ้าเชื่อมต่ออยู่
+              จะสั่งงานจากคอมพิวเตอร์ไม่ได้)
+            </li>
           </ul>
         </section>
 
@@ -138,7 +142,10 @@ export default async function SonyPcRemoteGuidePage({ params }: Props) {
             <h3 className="text-base font-semibold">1) ปิด “ตรวจสอบสิทธิ์เข้าถึง” บนกล้อง</h3>
             <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>
-                ไปที่ <InlineCode>MENU → (เครือข่าย) → [ตัวเลือกเครือข่าย] → [ตั้งค่าตรวจสอบเข้าถึง]</InlineCode>
+                ไปที่{' '}
+                <InlineCode>
+                  MENU → (เครือข่าย) → [ตัวเลือกเครือข่าย] → [ตั้งค่าตรวจสอบเข้าถึง]
+                </InlineCode>
               </li>
               <li>
                 ตั้ง <InlineCode>ตรวจสอบสิทธิ์เข้าถึง</InlineCode> เป็น <InlineCode>ปิด</InlineCode>
@@ -167,14 +174,23 @@ export default async function SonyPcRemoteGuidePage({ params }: Props) {
             <h3 className="text-base font-semibold">2) เปิด “ถ่ายภาพแบบรีโมท” (PC Remote)</h3>
             <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>
-                ตั้ง Wi‑Fi ให้พร้อมใช้งาน: <InlineCode>MENU →(เครือข่าย) → [Wi-Fi] → [เชื่อมต่อ Wi-Fi] → [เปิด]</InlineCode>
+                ตั้ง Wi‑Fi ให้พร้อมใช้งาน:{' '}
+                <InlineCode>MENU →(เครือข่าย) → [Wi-Fi] → [เชื่อมต่อ Wi-Fi] → [เปิด]</InlineCode>
               </li>
               <li>
-                เปิดโหมดรีโมท: <InlineCode>MENU →(เครือข่าย) → [ต่อ/ถ่ายรีโมท] → [ฟังก์ชั่นถ่ายแบบรีโมท] → [ถ่ายภาพแบบรีโมท] → [เปิด]</InlineCode>
+                เปิดโหมดรีโมท:{' '}
+                <InlineCode>
+                  MENU →(เครือข่าย) → [ต่อ/ถ่ายรีโมท] → [ฟังก์ชั่นถ่ายแบบรีโมท] → [ถ่ายภาพแบบรีโมท]
+                  → [เปิด]
+                </InlineCode>
               </li>
               <li>
-                เปิดข้อมูล Wi‑Fi Direct เพื่อดู <InlineCode>SSID</InlineCode> และ <InlineCode>รหัสผ่าน</InlineCode>:{' '}
-                <InlineCode>MENU → (เครือข่าย) → [ต่อ/ถ่ายรีโมท] → [ฟังก์ชั่นถ่ายแบบรีโมท] → [ข้อมูล Wi-Fi Direct]</InlineCode>
+                เปิดข้อมูล Wi‑Fi Direct เพื่อดู <InlineCode>SSID</InlineCode> และ{' '}
+                <InlineCode>รหัสผ่าน</InlineCode>:{' '}
+                <InlineCode>
+                  MENU → (เครือข่าย) → [ต่อ/ถ่ายรีโมท] → [ฟังก์ชั่นถ่ายแบบรีโมท] → [ข้อมูล Wi-Fi
+                  Direct]
+                </InlineCode>
               </li>
             </ol>
             <GuideImage
@@ -198,7 +214,9 @@ export default async function SonyPcRemoteGuidePage({ params }: Props) {
 
           <div className="space-y-3">
             <h3 className="text-base font-semibold">3) ทำบน iPhone/iPad</h3>
-            <p className="text-sm text-muted-foreground">เชื่อม Wi‑Fi เข้ากับ SSID ที่กล้องแสดง (Wi‑Fi Direct)</p>
+            <p className="text-sm text-muted-foreground">
+              เชื่อม Wi‑Fi เข้ากับ SSID ที่กล้องแสดง (Wi‑Fi Direct)
+            </p>
             <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>เปิด Settings ของ iOS → Wi‑Fi</li>
               <li>เลือก Wi‑Fi ตาม SSID ที่กล้องแสดง</li>
@@ -226,9 +244,11 @@ export default async function SonyPcRemoteGuidePage({ params }: Props) {
         <section className="space-y-4">
           <h2 className="text-xl font-semibold">ข้อควรระวังเรื่องความปลอดภัย</h2>
           <p className="text-sm text-muted-foreground">
-            การตั้งค่า <InlineCode>ตรวจสอบสิทธิ์เข้าถึง</InlineCode> เป็น <InlineCode>ปิด</InlineCode> หมายถึงการสื่อสารจะไม่ทำ
-            access authentication / SSH encryption (Sony ระบุว่าอาจเสี่ยงถูกดักข้อมูลหรือเข้าถึงโดยบุคคลอื่นได้) ให้ใช้ในสถานที่ที่ควบคุมได้
-            และเปลี่ยนกลับเป็น <InlineCode>เปิด</InlineCode> เมื่อไม่ใช้งาน
+            การตั้งค่า <InlineCode>ตรวจสอบสิทธิ์เข้าถึง</InlineCode> เป็น{' '}
+            <InlineCode>ปิด</InlineCode> หมายถึงการสื่อสารจะไม่ทำ access authentication / SSH
+            encryption (Sony ระบุว่าอาจเสี่ยงถูกดักข้อมูลหรือเข้าถึงโดยบุคคลอื่นได้)
+            ให้ใช้ในสถานที่ที่ควบคุมได้ และเปลี่ยนกลับเป็น <InlineCode>เปิด</InlineCode>{' '}
+            เมื่อไม่ใช้งาน
           </p>
         </section>
 
@@ -240,14 +260,20 @@ export default async function SonyPcRemoteGuidePage({ params }: Props) {
             <div>
               <p className="font-medium text-foreground">แอปขึ้น auth error</p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
-                <li>เช็คว่า <InlineCode>ตรวจสอบสิทธิ์เข้าถึง</InlineCode> ตั้งเป็น <InlineCode>ปิด</InlineCode> แล้ว</li>
+                <li>
+                  เช็คว่า <InlineCode>ตรวจสอบสิทธิ์เข้าถึง</InlineCode> ตั้งเป็น{' '}
+                  <InlineCode>ปิด</InlineCode> แล้ว
+                </li>
                 <li>ลองปิด/เปิด “ถ่ายภาพแบบรีโมท” ใหม่ แล้วเชื่อม Wi‑Fi ใหม่</li>
               </ul>
             </div>
             <div>
               <p className="font-medium text-foreground">หา SSID ไม่เจอ</p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
-                <li>เปิดหน้า <InlineCode>ข้อมูล Wi‑Fi Direct</InlineCode> บนกล้องค้างไว้ แล้วสแกน Wi‑Fi บน iOS ใหม่</li>
+                <li>
+                  เปิดหน้า <InlineCode>ข้อมูล Wi‑Fi Direct</InlineCode> บนกล้องค้างไว้ แล้วสแกน
+                  Wi‑Fi บน iOS ใหม่
+                </li>
               </ul>
             </div>
           </div>

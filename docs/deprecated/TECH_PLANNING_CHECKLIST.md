@@ -8,13 +8,13 @@ Breadth-first technical planning. Decide high-level patterns for each area befor
 
 ## What We Have (From Phase 3)
 
-| Doc | Content | Status |
-|-----|---------|--------|
-| `docs/tech/01_design_drivers.md` | Goals, constraints, optimization targets | ✅ Complete |
-| `docs/tech/02_component_breakdown.md` | System slices, two subsystems model | ✅ Complete |
-| `docs/tech/03_tech_decisions.md` | 18 component technology choices | ✅ Complete |
-| `docs/tech/04_assumptions.md` | Event parameters, sizing, cost formula | ✅ Complete |
-| `docs/2_feature_positioning.md` | MVP features, what to build/skip | ✅ Complete |
+| Doc                                   | Content                                  | Status      |
+| ------------------------------------- | ---------------------------------------- | ----------- |
+| `docs/tech/01_design_drivers.md`      | Goals, constraints, optimization targets | ✅ Complete |
+| `docs/tech/02_component_breakdown.md` | System slices, two subsystems model      | ✅ Complete |
+| `docs/tech/03_tech_decisions.md`      | 18 component technology choices          | ✅ Complete |
+| `docs/tech/04_assumptions.md`         | Event parameters, sizing, cost formula   | ✅ Complete |
+| `docs/2_feature_positioning.md`       | MVP features, what to build/skip         | ✅ Complete |
 
 ---
 
@@ -134,7 +134,6 @@ Breadth-first technical planning. Decide high-level patterns for each area befor
 
 Set up a monorepo with pnpm, turbo, and pnpm workspaces.
 set up critial infrastructure (Cloudflare, Clerk, Hono, Postgres, Rekognition, Stripe, etc.)
-
 
 ### CONTEXT Files
 

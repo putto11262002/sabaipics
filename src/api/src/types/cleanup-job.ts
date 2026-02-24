@@ -6,6 +6,6 @@
  */
 
 export interface CleanupJob {
-	event_id: string;
-	collection_id: string | null;
+  event_id: string;
+  collection_id: string | null;
 }

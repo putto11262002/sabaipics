@@ -70,7 +70,9 @@ export function createFaceProvider(env: FaceProviderEnv): FaceRecognitionProvide
 
   // Default to AWS
   if (!env.AWS_ACCESS_KEY_ID || !env.AWS_SECRET_ACCESS_KEY || !env.AWS_REGION) {
-    throw new Error('AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION) are required');
+    throw new Error(
+      'AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION) are required',
+    );
   }
 
   return createAWSProvider({

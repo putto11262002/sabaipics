@@ -14,11 +14,13 @@ LINE Login implements standard OAuth 2.0 authorization code flow for web applica
 Redirect users to LINE's authorization endpoint with required parameters.
 
 **Endpoint:**
+
 ```
 https://access.line.me/oauth2/v2.1/authorize
 ```
 
 **Required Parameters:**
+
 - `response_type`: Must be `code` (authorization code flow)
 - `client_id`: Your LINE Login Channel ID from LINE Developers Console
 - `redirect_uri`: URL-encoded callback URL (must match registered URL)
@@ -26,6 +28,7 @@ https://access.line.me/oauth2/v2.1/authorize
 - `scope`: Space-separated permissions (e.g., `profile openid email`)
 
 **Optional Parameters:**
+
 - `bot_prompt`: `normal` or `aggressive` - Shows option to add Official Account as friend
 - `prompt`: `consent` - Forces consent screen display
 - `nonce`: Random value included in ID token (recommended for security)
@@ -34,6 +37,7 @@ https://access.line.me/oauth2/v2.1/authorize
 - `initial_amr_display`: Login method preference
 
 **Example Authorization URL:**
+
 ```
 https://access.line.me/oauth2/v2.1/authorize
   ?response_type=code
@@ -56,6 +60,7 @@ https://access.line.me/oauth2/v2.1/authorize
 LINE redirects back to your `redirect_uri` with:
 
 **Success Response:**
+
 ```
 https://yourapp.com/callback
   ?code=AUTHORIZATION_CODE
@@ -64,6 +69,7 @@ https://yourapp.com/callback
 ```
 
 **Error Response:**
+
 ```
 https://yourapp.com/callback
   ?error=access_denied
@@ -78,16 +84,19 @@ https://yourapp.com/callback
 Exchange authorization code for access tokens via server-side request.
 
 **Endpoint:**
+
 ```
 POST https://api.line.me/oauth2/v2.1/token
 ```
 
 **Request Headers:**
+
 ```
 Content-Type: application/x-www-form-urlencoded
 ```
 
 **Request Body Parameters:**
+
 - `grant_type`: Must be `authorization_code`
 - `code`: Authorization code from callback
 - `redirect_uri`: Same URI used in authorization request
@@ -95,6 +104,7 @@ Content-Type: application/x-www-form-urlencoded
 - `client_secret`: Your Channel Secret
 
 **Example Request:**
+
 ```bash
 curl -X POST https://api.line.me/oauth2/v2.1/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
@@ -106,6 +116,7 @@ curl -X POST https://api.line.me/oauth2/v2.1/token \
 ```
 
 **Success Response (200 OK):**
+
 ```json
 {
   "access_token": "eyJhbGci...",
@@ -118,6 +129,7 @@ curl -X POST https://api.line.me/oauth2/v2.1/token \
 ```
 
 **Token Validity:**
+
 - Access Token: 30 days (2,592,000 seconds)
 - Refresh Token: 90 days
 - ID Token: JWT format, no expiration for profile data
@@ -127,11 +139,13 @@ curl -X POST https://api.line.me/oauth2/v2.1/token \
 When access token expires, use refresh token to get new tokens without re-authentication.
 
 **Endpoint:**
+
 ```
 POST https://api.line.me/oauth2/v2.1/token
 ```
 
 **Request Body:**
+
 - `grant_type`: Must be `refresh_token`
 - `refresh_token`: Refresh token from previous response
 - `client_id`: Your Channel ID
@@ -142,16 +156,19 @@ POST https://api.line.me/oauth2/v2.1/token
 ### Get User Profile
 
 **Endpoint:**
+
 ```
 GET https://api.line.me/v2/profile
 ```
 
 **Request Headers:**
+
 ```
 Authorization: Bearer ACCESS_TOKEN
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "userId": "U1234567890abcdef1234567890abcdef",
@@ -162,6 +179,7 @@ Authorization: Bearer ACCESS_TOKEN
 ```
 
 **Profile Data Fields:**
+
 - `userId` (string): Unique user identifier (33 characters, format: `U` + 32 hex chars)
 - `displayName` (string): User's display name in LINE
 - `pictureUrl` (string): HTTPS URL to profile picture
@@ -174,16 +192,19 @@ Authorization: Bearer ACCESS_TOKEN
 Alternative endpoint using OpenID Connect standard.
 
 **Endpoint:**
+
 ```
 GET https://api.line.me/oauth2/v2.1/userinfo
 ```
 
 **Request Headers:**
+
 ```
 Authorization: Bearer ACCESS_TOKEN
 ```
 
 **Response:**
+
 ```json
 {
   "sub": "U1234567890abcdef1234567890abcdef",
@@ -194,6 +215,7 @@ Authorization: Bearer ACCESS_TOKEN
 ```
 
 **Fields:**
+
 - `sub`: User ID (same as `userId`)
 - `name`: Display name
 - `picture`: Profile picture URL
@@ -204,6 +226,7 @@ Authorization: Bearer ACCESS_TOKEN
 The `id_token` returned during token exchange contains user claims in JWT format.
 
 **Decode ID Token to get:**
+
 ```json
 {
   "iss": "https://access.line.me",
@@ -218,6 +241,7 @@ The `id_token` returned during token exchange contains user claims in JWT format
 ```
 
 **Important:** Always verify ID token signature before using claims. Use LINE's public keys from:
+
 ```
 https://api.line.me/oauth2/v2.1/certs
 ```
@@ -229,6 +253,7 @@ https://api.line.me/oauth2/v2.1/certs
 **Example:** `U1234567890abcdef1234567890abcdef`
 
 **Characteristics:**
+
 - Unique per user per channel
 - Persistent (doesn't change)
 - Different across different channels (same user has different IDs in different apps)
@@ -241,23 +266,24 @@ LINE Login supports granular permission control through scopes.
 
 ### Available Scopes
 
-| Scope | Description | Provides |
-|-------|-------------|----------|
+| Scope     | Description       | Provides                               |
+| --------- | ----------------- | -------------------------------------- |
 | `profile` | User profile info | displayName, pictureUrl, statusMessage |
-| `openid` | OpenID Connect | userId (sub) |
-| `email` | Email address | email (requires approval) |
+| `openid`  | OpenID Connect    | userId (sub)                           |
+| `email`   | Email address     | email (requires approval)              |
 
 ### Scope Combinations & Data Access
 
-| Scopes Requested | User ID | Display Name | Picture | Email |
-|------------------|---------|--------------|---------|-------|
-| `profile` | ✗ | ✓ | ✓ | ✗ |
-| `openid` | ✓ | ✗ | ✗ | ✗ |
-| `profile openid` | ✓ | ✓ | ✓ | ✗ |
-| `openid email` | ✓ | ✗ | ✗ | ✓ |
-| `profile openid email` | ✓ | ✓ | ✓ | ✓ |
+| Scopes Requested       | User ID | Display Name | Picture | Email |
+| ---------------------- | ------- | ------------ | ------- | ----- |
+| `profile`              | ✗       | ✓            | ✓       | ✗     |
+| `openid`               | ✓       | ✗            | ✗       | ✗     |
+| `profile openid`       | ✓       | ✓            | ✓       | ✗     |
+| `openid email`         | ✓       | ✗            | ✗       | ✓     |
+| `profile openid email` | ✓       | ✓            | ✓       | ✓     |
 
 **Notes:**
+
 - `openid` scope is required to receive `id_token` and access userinfo endpoint
 - `profile` scope is required for display name and picture
 - `email` scope requires separate application to LINE for approval
@@ -281,10 +307,12 @@ LINE Login and LINE Messaging API (Official Accounts) are separate but can be li
 Use `bot_prompt` parameter in authorization request:
 
 **Options:**
+
 - `bot_prompt=normal`: Shows option to add Official Account (default behavior)
 - `bot_prompt=aggressive`: Highlights the option more prominently
 
 **Authorization URL with bot_prompt:**
+
 ```
 https://access.line.me/oauth2/v2.1/authorize
   ?response_type=code
@@ -296,6 +324,7 @@ https://access.line.me/oauth2/v2.1/authorize
 ```
 
 **Callback Response:**
+
 ```
 https://yourapp.com/callback
   ?code=CODE
@@ -310,16 +339,19 @@ The `friendship_status_changed=true` parameter indicates user's friend status ch
 After authentication, check if user is friend with your Official Account.
 
 **Endpoint:**
+
 ```
 GET https://api.line.me/friendship/v1/status
 ```
 
 **Request Headers:**
+
 ```
 Authorization: Bearer ACCESS_TOKEN
 ```
 
 **Response:**
+
 ```json
 {
   "friendFlag": true
@@ -332,26 +364,31 @@ Authorization: Bearer ACCESS_TOKEN
 ### Method 3: Link User ID for Messaging
 
 **Important Concepts:**
+
 1. **LINE Login userId**: User identifier from LINE Login (starts with `U`)
 2. **Messaging API userId**: Same format, but obtained from webhook events
 
 **Key Point:** The LINE Login userId and Messaging API userId are **THE SAME** if:
+
 - Your LINE Login channel and Messaging API channel are linked in LINE Developers Console
 - User has both logged in AND added your Official Account as friend
 
 **Linking Channels in Console:**
+
 1. Go to LINE Developers Console
 2. Open your LINE Login channel
 3. Navigate to "Linked OA" tab
 4. Link your LINE Official Account (Messaging API channel)
 
 **After Linking:**
+
 - When user logs in via LINE Login and adds your Official Account, their `userId` will be consistent across both
 - You can store the `userId` from LINE Login in your database
 - When user sends message to Official Account, webhook event contains same `userId`
 - You can then match the user and send personalized messages
 
 **Workflow:**
+
 ```
 1. User logs in via LINE Login
    → You get userId: U1234567890abcdef...
@@ -371,18 +408,22 @@ Authorization: Bearer ACCESS_TOKEN
 Once you have the userId and user is friends with your Official Account:
 
 **Endpoint:**
+
 ```
 POST https://api.line.me/v2/bot/message/push
 ```
 
 **Request Headers:**
+
 ```
 Content-Type: application/json
 Authorization: Bearer CHANNEL_ACCESS_TOKEN
 ```
+
 (Note: This is your Messaging API channel access token, NOT the user's LINE Login access token)
 
 **Request Body:**
+
 ```json
 {
   "to": "U1234567890abcdef1234567890abcdef",
@@ -396,6 +437,7 @@ Authorization: Bearer CHANNEL_ACCESS_TOKEN
 ```
 
 **Important:**
+
 - Must use Messaging API channel access token (not user's access token)
 - User must have your Official Account as friend
 - Subject to Messaging API rate limits and pricing
@@ -403,25 +445,31 @@ Authorization: Bearer CHANNEL_ACCESS_TOKEN
 ## Security Best Practices
 
 ### 1. State Parameter
+
 - Generate cryptographically secure random string for each authorization request
 - Store in session
 - Verify matches on callback
 - Prevents CSRF attacks
 
 ### 2. PKCE (Proof Key for Code Exchange)
+
 LINE Login supports PKCE for enhanced security (recommended for public clients):
+
 - Generate `code_verifier`: Random 43-128 character string
 - Calculate `code_challenge`: Base64URL(SHA256(code_verifier))
 - Include `code_challenge` and `code_challenge_method=S256` in authorization request
 - Include `code_verifier` in token exchange request
 
 ### 3. Nonce Parameter
+
 - Include random `nonce` in authorization request
 - Verify same nonce appears in ID token
 - Prevents replay attacks
 
 ### 4. ID Token Verification
+
 Always verify ID token before trusting claims:
+
 1. Verify signature using LINE's public keys
 2. Verify `iss` claim equals `https://access.line.me`
 3. Verify `aud` claim equals your Channel ID
@@ -429,15 +477,18 @@ Always verify ID token before trusting claims:
 5. Verify `nonce` if you sent one
 
 ### 5. HTTPS Only
+
 - All redirect URIs must use HTTPS (except localhost for development)
 - Never send tokens over unencrypted connections
 
 ### 6. Token Storage
+
 - Store access tokens and refresh tokens securely server-side
 - Never expose tokens in client-side code
 - Use secure session management
 
 ### 7. Channel Secret Protection
+
 - Never expose Channel Secret in client-side code
 - Keep it in environment variables or secure configuration
 - Rotate if compromised
@@ -445,6 +496,7 @@ Always verify ID token before trusting claims:
 ## Rate Limiting
 
 LINE implements rate limiting but doesn't publish specific thresholds. Best practices:
+
 - Cache user profile data when possible
 - Implement exponential backoff for retries
 - Monitor for 429 (Too Many Requests) responses
@@ -454,34 +506,34 @@ LINE implements rate limiting but doesn't publish specific thresholds. Best prac
 
 ### Authorization Errors (Callback)
 
-| Error Code | Description | Action |
-|------------|-------------|--------|
-| `access_denied` | User declined authorization | Show friendly message, allow retry |
-| `invalid_request` | Malformed request | Check parameters |
-| `unauthorized_client` | Invalid client_id | Verify Channel ID |
-| `unsupported_response_type` | Invalid response_type | Must be `code` |
-| `invalid_scope` | Invalid scope value | Check scope format |
-| `server_error` | LINE server error | Retry later |
+| Error Code                  | Description                 | Action                             |
+| --------------------------- | --------------------------- | ---------------------------------- |
+| `access_denied`             | User declined authorization | Show friendly message, allow retry |
+| `invalid_request`           | Malformed request           | Check parameters                   |
+| `unauthorized_client`       | Invalid client_id           | Verify Channel ID                  |
+| `unsupported_response_type` | Invalid response_type       | Must be `code`                     |
+| `invalid_scope`             | Invalid scope value         | Check scope format                 |
+| `server_error`              | LINE server error           | Retry later                        |
 
 ### Token Exchange Errors
 
-| HTTP Status | Error | Description |
-|-------------|-------|-------------|
-| 400 | `invalid_request` | Missing required parameter |
-| 400 | `invalid_grant` | Invalid/expired authorization code |
-| 400 | `invalid_client` | Invalid client credentials |
-| 401 | `unauthorized` | Authentication failed |
-| 500 | `server_error` | LINE server error |
+| HTTP Status | Error             | Description                        |
+| ----------- | ----------------- | ---------------------------------- |
+| 400         | `invalid_request` | Missing required parameter         |
+| 400         | `invalid_grant`   | Invalid/expired authorization code |
+| 400         | `invalid_client`  | Invalid client credentials         |
+| 401         | `unauthorized`    | Authentication failed              |
+| 500         | `server_error`    | LINE server error                  |
 
 ### API Request Errors
 
-| HTTP Status | Description |
-|-------------|-------------|
-| 400 | Bad Request - Check parameters |
-| 401 | Unauthorized - Invalid/expired access token |
-| 403 | Forbidden - Insufficient permissions |
-| 429 | Too Many Requests - Rate limit exceeded |
-| 500 | Internal Server Error - Retry later |
+| HTTP Status | Description                                 |
+| ----------- | ------------------------------------------- |
+| 400         | Bad Request - Check parameters              |
+| 401         | Unauthorized - Invalid/expired access token |
+| 403         | Forbidden - Insufficient permissions        |
+| 429         | Too Many Requests - Rate limit exceeded     |
+| 500         | Internal Server Error - Retry later         |
 
 ## Complete Implementation Example
 
@@ -501,7 +553,7 @@ function generateAuthUrl(channelId, redirectUri, scope = 'profile openid') {
     redirect_uri: redirectUri,
     state: state,
     scope: scope,
-    bot_prompt: 'normal'
+    bot_prompt: 'normal',
   });
 
   return `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
@@ -520,15 +572,15 @@ async function handleCallback(req) {
   const tokenResponse = await fetch('https://api.line.me/oauth2/v2.1/token', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code: code,
       redirect_uri: process.env.REDIRECT_URI,
       client_id: process.env.CHANNEL_ID,
-      client_secret: process.env.CHANNEL_SECRET
-    })
+      client_secret: process.env.CHANNEL_SECRET,
+    }),
   });
 
   const tokens = await tokenResponse.json();
@@ -541,8 +593,8 @@ async function handleCallback(req) {
 async function getUserProfile(accessToken) {
   const response = await fetch('https://api.line.me/v2/profile', {
     headers: {
-      'Authorization': `Bearer ${accessToken}`
-    }
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
 
   const profile = await response.json();
@@ -555,8 +607,8 @@ async function getUserProfile(accessToken) {
 async function checkFriendship(accessToken) {
   const response = await fetch('https://api.line.me/friendship/v1/status', {
     headers: {
-      'Authorization': `Bearer ${accessToken}`
-    }
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
 
   const { friendFlag } = await response.json();
@@ -569,12 +621,12 @@ async function sendMessage(userId, text) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.MESSAGING_API_TOKEN}`
+      Authorization: `Bearer ${process.env.MESSAGING_API_TOKEN}`,
     },
     body: JSON.stringify({
       to: userId,
-      messages: [{ type: 'text', text: text }]
-    })
+      messages: [{ type: 'text', text: text }],
+    }),
   });
 
   return response.ok;
@@ -584,12 +636,14 @@ async function sendMessage(userId, text) {
 ## Key Takeaways for FaceLink Implementation
 
 ### What We Can Get After Authentication
+
 1. **User Identification**: Unique `userId` (33 chars, format: `U` + 32 hex)
 2. **User Profile**: Display name, profile picture URL
 3. **Email**: If approved and user consents (requires separate approval)
 4. **Friend Status**: Check if user has Official Account as friend
 
 ### Messaging Capability
+
 - LINE Login alone CANNOT send messages to users
 - Must link to LINE Official Account (Messaging API)
 - User must actively add Official Account as friend
@@ -597,6 +651,7 @@ async function sendMessage(userId, text) {
 - Once linked, can use same `userId` for push messages
 
 ### Recommended Flow for FaceLink
+
 1. User logs in via LINE Login (`profile openid` scope)
 2. Store `userId`, display name, picture URL in database
 3. Show option to add Official Account for photo notifications
@@ -604,6 +659,7 @@ async function sendMessage(userId, text) {
 5. Can now send photo notifications via Messaging API
 
 ### Limitations
+
 - Cannot send messages without Official Account friendship
 - Cannot force users to add Official Account
 - Messaging API has rate limits and costs

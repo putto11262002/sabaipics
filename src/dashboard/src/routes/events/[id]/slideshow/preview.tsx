@@ -22,7 +22,13 @@ import { Spinner } from '@/shared/components/ui/spinner';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { cn } from '@/shared/utils/ui';
-import type { SlideshowConfig, SlideshowContext, SlideshowBlock, FlexProps, SlideshowLayout } from './types';
+import type {
+  SlideshowConfig,
+  SlideshowContext,
+  SlideshowBlock,
+  FlexProps,
+  SlideshowLayout,
+} from './types';
 import { DEFAULT_CONFIG } from './lib/templates';
 import { buildThemeCssVars } from './lib/color-utils';
 import { getBlockDef } from './blocks/registry';
@@ -130,9 +136,7 @@ function SortableBlock({
       {...listeners}
     >
       {/* Drop indicator line */}
-      {isOver && !isLayout && (
-        <div className="absolute -top-1 left-0 right-0 h-0.5 bg-blue-500" />
-      )}
+      {isOver && !isLayout && <div className="absolute -top-1 left-0 right-0 h-0.5 bg-blue-500" />}
 
       {/* Block type label */}
       <div
@@ -215,7 +219,9 @@ function LayoutBlockContent({
       )}
       <SortableContext
         items={enabledChildren.map((c) => c.id)}
-        strategy={props.direction === 'row' ? horizontalListSortingStrategy : verticalListSortingStrategy}
+        strategy={
+          props.direction === 'row' ? horizontalListSortingStrategy : verticalListSortingStrategy
+        }
       >
         {enabledChildren.map((child) => (
           <SortableChildBlock
@@ -296,9 +302,7 @@ function SortableChildBlock({
         <div
           className={cn(
             'absolute bg-blue-500',
-            direction === 'row'
-              ? '-left-1 top-0 bottom-0 w-0.5'
-              : '-top-1 left-0 right-0 h-0.5',
+            direction === 'row' ? '-left-1 top-0 bottom-0 w-0.5' : '-top-1 left-0 right-0 h-0.5',
           )}
         />
       )}
@@ -358,9 +362,7 @@ function EditorModePreview() {
   const [overId, setOverId] = useState<string | null>(null);
   const [overContainerId, setOverContainerId] = useState<string | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   // Listen for config from parent editor
   useEffect(() => {
@@ -381,12 +383,18 @@ function EditorModePreview() {
 
   // Notify parent when a block is clicked
   const handleSelectBlock = useCallback((blockId: string) => {
-    window.parent.postMessage({ type: 'block-selected', blockId } satisfies BlockSelectedMessage, '*');
+    window.parent.postMessage(
+      { type: 'block-selected', blockId } satisfies BlockSelectedMessage,
+      '*',
+    );
   }, []);
 
   // Deselect when clicking canvas background
   const handleCanvasClick = useCallback(() => {
-    window.parent.postMessage({ type: 'block-selected', blockId: '' } satisfies BlockSelectedMessage, '*');
+    window.parent.postMessage(
+      { type: 'block-selected', blockId: '' } satisfies BlockSelectedMessage,
+      '*',
+    );
   }, []);
 
   // Track drag start
@@ -408,93 +416,100 @@ function EditorModePreview() {
   }, []);
 
   // Unified drag end handler for all block moves
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    // Reset drag state
-    setActiveId(null);
-    setOverId(null);
-    setOverContainerId(null);
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      // Reset drag state
+      setActiveId(null);
+      setOverId(null);
+      setOverContainerId(null);
 
-    const { active, over } = event;
-    if (!over || !config) return;
+      const { active, over } = event;
+      if (!over || !config) return;
 
-    const activeId = active.id as string;
-    const overId = over.id as string;
+      const activeId = active.id as string;
+      const overId = over.id as string;
 
-    if (activeId === overId) return;
+      if (activeId === overId) return;
 
-    const activeData = active.data.current as { containerId: string; block: SlideshowBlock } | undefined;
-    const overData = over.data.current as { containerId: string; block?: SlideshowBlock } | undefined;
+      const activeData = active.data.current as
+        | { containerId: string; block: SlideshowBlock }
+        | undefined;
+      const overData = over.data.current as
+        | { containerId: string; block?: SlideshowBlock }
+        | undefined;
 
-    if (!activeData) return;
+      if (!activeData) return;
 
-    const sourceContainerId = activeData.containerId;
-    const targetContainerId = overData?.containerId ?? 'root';
+      const sourceContainerId = activeData.containerId;
+      const targetContainerId = overData?.containerId ?? 'root';
 
-    // Get the block being dragged
-    const draggedBlock = activeData.block;
-    if (!draggedBlock) return;
+      // Get the block being dragged
+      const draggedBlock = activeData.block;
+      if (!draggedBlock) return;
 
-    let newBlocks = config.blocks;
+      let newBlocks = config.blocks;
 
-    // Same container - reorder
-    if (sourceContainerId === targetContainerId) {
-      if (sourceContainerId === 'root') {
-        // Reorder root blocks
-        const oldIndex = newBlocks.findIndex((b) => b.id === activeId);
-        const newIndex = newBlocks.findIndex((b) => b.id === overId);
-        if (oldIndex !== -1 && newIndex !== -1) {
-          newBlocks = arrayMove(newBlocks, oldIndex, newIndex);
-        }
-      } else {
-        // Reorder within same layout
-        newBlocks = newBlocks.map((b) => {
-          if (b.id === sourceContainerId && b.children) {
-            const oldIndex = b.children.findIndex((c) => c.id === activeId);
-            const newIndex = b.children.findIndex((c) => c.id === overId);
-            if (oldIndex !== -1 && newIndex !== -1) {
-              return { ...b, children: arrayMove(b.children, oldIndex, newIndex) };
-            }
+      // Same container - reorder
+      if (sourceContainerId === targetContainerId) {
+        if (sourceContainerId === 'root') {
+          // Reorder root blocks
+          const oldIndex = newBlocks.findIndex((b) => b.id === activeId);
+          const newIndex = newBlocks.findIndex((b) => b.id === overId);
+          if (oldIndex !== -1 && newIndex !== -1) {
+            newBlocks = arrayMove(newBlocks, oldIndex, newIndex);
           }
-          return b;
-        });
-      }
-    } else {
-      // Cross-container move
-      // 1. Validate target exists first
-      let targetIndex = 0;
-      if (targetContainerId === 'root') {
-        // Root always exists
-        targetIndex = newBlocks.findIndex((b) => b.id === overId);
-        if (targetIndex === -1) targetIndex = newBlocks.length;
+        } else {
+          // Reorder within same layout
+          newBlocks = newBlocks.map((b) => {
+            if (b.id === sourceContainerId && b.children) {
+              const oldIndex = b.children.findIndex((c) => c.id === activeId);
+              const newIndex = b.children.findIndex((c) => c.id === overId);
+              if (oldIndex !== -1 && newIndex !== -1) {
+                return { ...b, children: arrayMove(b.children, oldIndex, newIndex) };
+              }
+            }
+            return b;
+          });
+        }
       } else {
-        // Validate target parent exists
-        const targetParent = newBlocks.find((b) => b.id === targetContainerId);
-        if (!targetParent) {
-          console.warn(`Target container ${targetContainerId} not found, aborting move`);
-          return; // Abort - don't remove the block
+        // Cross-container move
+        // 1. Validate target exists first
+        let targetIndex = 0;
+        if (targetContainerId === 'root') {
+          // Root always exists
+          targetIndex = newBlocks.findIndex((b) => b.id === overId);
+          if (targetIndex === -1) targetIndex = newBlocks.length;
+        } else {
+          // Validate target parent exists
+          const targetParent = newBlocks.find((b) => b.id === targetContainerId);
+          if (!targetParent) {
+            console.warn(`Target container ${targetContainerId} not found, aborting move`);
+            return; // Abort - don't remove the block
+          }
+          if (targetParent.children) {
+            targetIndex = targetParent.children.findIndex((c) => c.id === overId);
+            if (targetIndex === -1) targetIndex = targetParent.children.length;
+          }
         }
-        if (targetParent.children) {
-          targetIndex = targetParent.children.findIndex((c) => c.id === overId);
-          if (targetIndex === -1) targetIndex = targetParent.children.length;
-        }
+
+        // 2. Remove from source (only after validation passes)
+        newBlocks = removeBlockFromTree(newBlocks, activeId);
+
+        // 3. Add to target
+        newBlocks = addBlockToContainer(newBlocks, draggedBlock, targetContainerId, targetIndex);
       }
 
-      // 2. Remove from source (only after validation passes)
-      newBlocks = removeBlockFromTree(newBlocks, activeId);
+      const newConfig = { ...config, blocks: newBlocks };
+      setConfig(newConfig);
 
-      // 3. Add to target
-      newBlocks = addBlockToContainer(newBlocks, draggedBlock, targetContainerId, targetIndex);
-    }
-
-    const newConfig = { ...config, blocks: newBlocks };
-    setConfig(newConfig);
-
-    // Send updated config to parent
-    window.parent.postMessage(
-      { type: 'config-updated', config: newConfig } satisfies ConfigUpdatedMessage,
-      '*',
-    );
-  }, [config]);
+      // Send updated config to parent
+      window.parent.postMessage(
+        { type: 'config-updated', config: newConfig } satisfies ConfigUpdatedMessage,
+        '*',
+      );
+    },
+    [config],
+  );
 
   if (!config || !context) {
     return (
@@ -644,7 +659,9 @@ function LiveModePreview() {
             <p className="text-sm text-muted-foreground">No blocks configured.</p>
           </div>
         ) : (
-          enabledBlocks.map((block) => <BlockRenderer key={block.id} block={block} context={context} />)
+          enabledBlocks.map((block) => (
+            <BlockRenderer key={block.id} block={block} context={context} />
+          ))
         )}
       </div>
     </div>
@@ -653,13 +670,7 @@ function LiveModePreview() {
 
 // ─── Block Renderer (for live mode - no drag) ──────────────────────────────────
 
-function BlockRenderer({
-  block,
-  context,
-}: {
-  block: SlideshowBlock;
-  context: SlideshowContext;
-}) {
+function BlockRenderer({ block, context }: { block: SlideshowBlock; context: SlideshowContext }) {
   const def = getBlockDef(block.type);
   if (!def) return null;
   return (

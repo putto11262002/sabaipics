@@ -1,7 +1,7 @@
-import { pgTable, text, jsonb, index, uuid } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
-import { timestamptz } from "./common";
-import { photos } from "./photos";
+import { pgTable, text, jsonb, index, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { timestamptz } from './common';
+import { photos } from './photos';
 
 // =============================================================================
 // Rekognition Response Types (for JSONB typing per DBSCHEMA-002)
@@ -90,20 +90,20 @@ export interface RekognitionFaceRecord {
 // =============================================================================
 
 export const faces = pgTable(
-  "faces",
+  'faces',
   {
-    id: uuid("id")
+    id: uuid('id')
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    photoId: uuid("photo_id")
+    photoId: uuid('photo_id')
       .notNull()
-      .references(() => photos.id, { onDelete: "restrict" }),
-    rekognitionFaceId: text("rekognition_face_id"), // Face ID from Rekognition (nullable until indexed)
-    boundingBox: jsonb("bounding_box").$type<BoundingBox>(), // Quick access to face location
-    rekognitionResponse: jsonb("rekognition_response").$type<RekognitionFaceRecord>(), // Full response for model training
-    indexedAt: timestamptz("indexed_at").defaultNow().notNull(),
+      .references(() => photos.id, { onDelete: 'restrict' }),
+    rekognitionFaceId: text('rekognition_face_id'), // Face ID from Rekognition (nullable until indexed)
+    boundingBox: jsonb('bounding_box').$type<BoundingBox>(), // Quick access to face location
+    rekognitionResponse: jsonb('rekognition_response').$type<RekognitionFaceRecord>(), // Full response for model training
+    indexedAt: timestamptz('indexed_at').defaultNow().notNull(),
   },
-  (table) => [index("faces_photo_id_idx").on(table.photoId)]
+  (table) => [index('faces_photo_id_idx').on(table.photoId)],
 );
 
 export type Face = typeof faces.$inferSelect;

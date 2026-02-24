@@ -1,6 +1,6 @@
 ---
-url: "https://developer.apple.com/documentation/imagecapturecore/scanner-configuration"
-title: "Scanner Configuration | Apple Developer Documentation"
+url: 'https://developer.apple.com/documentation/imagecapturecore/scanner-configuration'
+title: 'Scanner Configuration | Apple Developer Documentation'
 ---
 
 [Skip Navigation](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#app-main)
@@ -40,12 +40,12 @@ Only search within “Documentation”
 
 [Open Menu](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#)
 
-- SwiftLanguage:  Swift  Objective-C
+- SwiftLanguage: Swift Objective-C
 
 Language:
 
-  - Swift
-  - [Objective-C](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#)
+- Swift
+- [Objective-C](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#)
 
 All Technologies
 
@@ -242,27 +242,27 @@ API Collection
 
 Examine a scanner’s functional units and features.
 
-## [Topics](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#topics)
+## [Topics](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#topics)
 
-### [Band Data](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#Band-Data)
+### [Band Data](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#Band-Data)
 
 [`class ICScannerBandData`](https://developer.apple.com/documentation/imagecapturecore/icscannerbanddata)
 
 The options for each band of data that the scanner reads.
 
-### [Bit Depth](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#Bit-Depth)
+### [Bit Depth](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#Bit-Depth)
 
 [`enum ICScannerBitDepth`](https://developer.apple.com/documentation/imagecapturecore/icscannerbitdepth)
 
 The number of bits per channel in the scanned image.
 
-### [Color Formats](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#Color-Formats)
+### [Color Formats](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#Color-Formats)
 
 [`enum ICScannerColorDataFormatType`](https://developer.apple.com/documentation/imagecapturecore/icscannercolordataformattype)
 
 The color data formats relevant to multichannel data.
 
-### [Document Sizes](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#Document-Sizes)
+### [Document Sizes](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#Document-Sizes)
 
 [`enum ICScannerDocumentType`](https://developer.apple.com/documentation/imagecapturecore/icscannerdocumenttype)
 
@@ -272,7 +272,7 @@ The supported document size types.
 
 The unit of measurement used by the scanner.
 
-### [Features](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#Features)
+### [Features](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#Features)
 
 [`class ICScannerFeature`](https://developer.apple.com/documentation/imagecapturecore/icscannerfeature)
 
@@ -298,7 +298,7 @@ A group of one or more rectangular scan areas that can be used with a scanner fu
 
 The types of scanner features.
 
-### [Functional Units](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#Functional-Units)
+### [Functional Units](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#Functional-Units)
 
 [`class ICScannerFunctionalUnit`](https://developer.apple.com/documentation/imagecapturecore/icscannerfunctionalunit)
 
@@ -324,13 +324,13 @@ An object that represents the transparency unit for scanning positives on the sc
 
 The modes for transferring scan data from the scanner functional unit.
 
-### [Pixel Data Types](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#Pixel-Data-Types)
+### [Pixel Data Types](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#Pixel-Data-Types)
 
 [`enum ICScannerPixelDataType`](https://developer.apple.com/documentation/imagecapturecore/icscannerpixeldatatype)
 
 The pixel data types.
 
-### [Scanner States](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#Scanner-States)
+### [Scanner States](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#Scanner-States)
 
 [`let ICScannerStatusRequestsOverviewScan: String`](https://developer.apple.com/documentation/imagecapturecore/icscannerstatusrequestsoverviewscan)
 
@@ -344,7 +344,7 @@ A nonlocalized notification string to indicate that the scanner is warming up.
 
 A nonlocalized notification string to indicate that the scanner has warmed up.
 
-### [Buttons](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#Buttons)
+### [Buttons](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#Buttons)
 
 [`let ICButtonTypeCopy: String`](https://developer.apple.com/documentation/imagecapturecore/icbuttontypecopy)
 
@@ -370,9 +370,9 @@ A nonlocalized notification string to indicate that the Transfer button on the d
 
 A nonlocalized notification string to indicate that the Web button on the device was pressed.
 
-## [See Also](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#see-also)
+## [See Also](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#see-also)
 
-### [Scanners](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration\#Scanners)
+### [Scanners](https://developer.apple.com/documentation/imagecapturecore/scanner-configuration#Scanners)
 
 [`class ICScannerDevice`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice)
 

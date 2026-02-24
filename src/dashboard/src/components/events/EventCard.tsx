@@ -5,9 +5,9 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "@/shared/components/ui/card";
-import { formatDistanceToNow, parseISO } from "date-fns";
-import type { Event } from "../../hooks/events/useEvents";
+} from '@/shared/components/ui/card';
+import { formatDistanceToNow, parseISO } from 'date-fns';
+import type { Event } from '../../hooks/events/useEvents';
 
 interface EventCardProps {
   event: Event;
@@ -16,10 +16,7 @@ interface EventCardProps {
 
 export function EventCard({ event, onClick }: EventCardProps) {
   return (
-    <Card
-      className="cursor-pointer transition-colors hover:bg-muted/50"
-      onClick={onClick}
-    >
+    <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={onClick}>
       <CardHeader>
         <CardDescription className="text-xs">
           Created {formatDistanceToNow(parseISO(event.createdAt))} ago
@@ -35,7 +32,7 @@ export function EventCard({ event, onClick }: EventCardProps) {
             className="size-20 object-contain"
             onError={(e) => {
               // Fallback if logo image fails to load
-              e.currentTarget.style.display = "none";
+              e.currentTarget.style.display = 'none';
             }}
           />
         </CardContent>

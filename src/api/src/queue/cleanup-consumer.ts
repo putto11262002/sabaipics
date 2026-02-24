@@ -81,7 +81,8 @@ export async function queue(batch: MessageBatch<CleanupJob>, env: Bindings): Pro
 
       // 3. Delete collection + clear DB reference
       if (state.collectionId) {
-        collectionDeleted = yield* provider.deleteCollection(event_id)
+        collectionDeleted = yield* provider
+          .deleteCollection(event_id)
           .map(() => true)
           .orElse((faceErr) => {
             // Handle ResourceNotFoundException (already deleted) - treat as success

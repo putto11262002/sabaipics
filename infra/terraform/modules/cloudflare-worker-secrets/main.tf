@@ -54,6 +54,8 @@ locals {
     AWS_SECRET_ACCESS_KEY        = local.infisical["AWS_SECRET_ACCESS_KEY"].value
     STRIPE_SECRET_KEY            = local.infisical["STRIPE_SECRET_KEY"].value
     STRIPE_WEBHOOK_SECRET        = local.infisical["STRIPE_WEBHOOK_SECRET"].value
+    MODAL_KEY                    = local.infisical["MODAL_KEY"].value
+    MODAL_SECRET                 = local.infisical["MODAL_SECRET"].value
     FTP_PASSWORD_ENCRYPTION_KEY  = local.infisical["FTP_PASSWORD_ENCRYPTION_KEY"].value
     FTP_JWT_SECRET               = local.infisical["FTP_JWT_SECRET"].value
     DESKTOP_ACCESS_JWT_SECRET    = local.infisical["DESKTOP_ACCESS_JWT_SECRET"].value

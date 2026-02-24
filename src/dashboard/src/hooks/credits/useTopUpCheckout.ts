@@ -26,8 +26,7 @@ export interface TopUpCheckoutResult {
 
 export function useTopUpCheckout() {
   return useApiMutation<TopUpCheckoutResponse, TopUpCheckoutInput>({
-    apiFn: (input, opts) =>
-      postCheckout({ json: input }, opts),
+    apiFn: (input, opts) => postCheckout({ json: input }, opts),
     retry: false,
   });
 }

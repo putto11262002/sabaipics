@@ -41,7 +41,10 @@ const presignRequestSchema = z.object({
     .number()
     .int('Content length must be an integer')
     .positive('Content length must be positive')
-    .max(PHOTO_MAX_FILE_SIZE, `File size must be less than ${PHOTO_MAX_FILE_SIZE / 1024 / 1024} MB`),
+    .max(
+      PHOTO_MAX_FILE_SIZE,
+      `File size must be less than ${PHOTO_MAX_FILE_SIZE / 1024 / 1024} MB`,
+    ),
   filename: z.string().optional(),
   source: z.enum(['web', 'ios']).optional(),
 });
@@ -116,8 +119,13 @@ export const uploadsRouter = new Hono<Env>()
       }
 
       // 2. Quick credit check (fail fast, no lock)
-      const balance = yield* getBalance(db, photographer.id)
-        .mapErr((e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }));
+      const balance = yield* getBalance(db, photographer.id).mapErr(
+        (e): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Database error',
+          cause: e.cause,
+        }),
+      );
 
       if (balance < 1) {
         return err<never, HandlerError>({

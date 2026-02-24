@@ -86,9 +86,7 @@ vi.mock('@/db', () => {
 
 vi.mock('@sentry/cloudflare', () => ({
   startSpan: vi.fn((_opts: any, cb: any) => cb({ setAttribute: vi.fn() })),
-  withScope: vi.fn((cb: any) =>
-    cb({ setTag: vi.fn(), setExtra: vi.fn(), setLevel: vi.fn() }),
-  ),
+  withScope: vi.fn((cb: any) => cb({ setTag: vi.fn(), setExtra: vi.fn(), setLevel: vi.fn() })),
   captureMessage: vi.fn(),
 }));
 
@@ -111,24 +109,68 @@ import * as Sentry from '@sentry/cloudflare';
 
 // Minimal JPEG: valid magic bytes + SOF0 with 100×100 dimensions (18 bytes)
 const VALID_JPEG_100x100 = new Uint8Array([
-  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, // SOI + minimal APP0 (length=2)
-  0xff, 0xc0, 0x00, 0x0b, 0x08, // SOF0 marker
-  0x00, 0x64, 0x00, 0x64, // height=100, width=100
-  0x01, 0x01, 0x11, 0x00, // 1 component
+  0xff,
+  0xd8,
+  0xff,
+  0xe0,
+  0x00,
+  0x02, // SOI + minimal APP0 (length=2)
+  0xff,
+  0xc0,
+  0x00,
+  0x0b,
+  0x08, // SOF0 marker
+  0x00,
+  0x64,
+  0x00,
+  0x64, // height=100, width=100
+  0x01,
+  0x01,
+  0x11,
+  0x00, // 1 component
 ]);
 
 // JPEG with dimensions exceeding 25 MP (5001×5001 = 25,010,001)
 const OVERSIZED_DIM_JPEG = new Uint8Array([
-  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02,
-  0xff, 0xc0, 0x00, 0x0b, 0x08,
-  0x13, 0x89, 0x13, 0x89, // height=5001, width=5001
-  0x01, 0x01, 0x11, 0x00,
+  0xff,
+  0xd8,
+  0xff,
+  0xe0,
+  0x00,
+  0x02,
+  0xff,
+  0xc0,
+  0x00,
+  0x0b,
+  0x08,
+  0x13,
+  0x89,
+  0x13,
+  0x89, // height=5001, width=5001
+  0x01,
+  0x01,
+  0x11,
+  0x00,
 ]);
 
 // Valid JPEG magic bytes but no SOF marker → dimension parse fails
 const NO_SOF_JPEG = new Uint8Array([
-  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, // SOI + minimal APP0
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // padding (no SOF)
+  0xff,
+  0xd8,
+  0xff,
+  0xe0,
+  0x00,
+  0x02, // SOI + minimal APP0
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00, // padding (no SOF)
 ]);
 
 // Invalid magic bytes
@@ -177,10 +219,7 @@ type MockMessage<T> = {
   retry: ReturnType<typeof vi.fn>;
 };
 
-function createMockMessage(
-  body: R2EventMessage,
-  id?: string,
-): MockMessage<R2EventMessage> {
+function createMockMessage(body: R2EventMessage, id?: string): MockMessage<R2EventMessage> {
   return {
     id: id ?? crypto.randomUUID(),
     timestamp: new Date(),
@@ -191,9 +230,7 @@ function createMockMessage(
   };
 }
 
-function createMockBatch(
-  messages: MockMessage<R2EventMessage>[],
-): MessageBatch<R2EventMessage> {
+function createMockBatch(messages: MockMessage<R2EventMessage>[]): MessageBatch<R2EventMessage> {
   return {
     queue: 'upload-processing-dev',
     messages: messages as unknown as Message<R2EventMessage>[],
@@ -277,9 +314,7 @@ describe('upload-consumer', () => {
     });
 
     it('1.4 — processes CompleteMultipartUpload', async () => {
-      const msg = createMockMessage(
-        makeR2Event({ action: 'CompleteMultipartUpload' }),
-      );
+      const msg = createMockMessage(makeR2Event({ action: 'CompleteMultipartUpload' }));
       const batch = createMockBatch([msg]);
 
       await queue(batch, env as any, {} as ExecutionContext);
@@ -389,9 +424,7 @@ describe('upload-consumer', () => {
     it('5.1 — R2 HEAD returns null → r2 error', async () => {
       // Don't seed R2 — use a key that doesn't exist
       const uniqueKey = `uploads/${TEST_EVENT_ID}/nonexistent.jpg`;
-      mockFindFirstIntent.mockResolvedValue(
-        makePendingIntent({ r2Key: uniqueKey }),
-      );
+      mockFindFirstIntent.mockResolvedValue(makePendingIntent({ r2Key: uniqueKey }));
       const msg = createMockMessage(
         makeR2Event({ object: { key: uniqueKey, size: 1000, eTag: 'x' } }),
       );
@@ -409,9 +442,7 @@ describe('upload-consumer', () => {
       const largeFile = new ArrayBuffer(PHOTO_MAX_FILE_SIZE + 1);
       await env.PHOTOS_BUCKET.put(largeKey, largeFile);
 
-      mockFindFirstIntent.mockResolvedValue(
-        makePendingIntent({ r2Key: largeKey }),
-      );
+      mockFindFirstIntent.mockResolvedValue(makePendingIntent({ r2Key: largeKey }));
       const msg = createMockMessage(
         makeR2Event({ object: { key: largeKey, size: largeFile.byteLength, eTag: 'x' } }),
       );
@@ -433,9 +464,7 @@ describe('upload-consumer', () => {
       const badKey = `uploads/${TEST_EVENT_ID}/bad-magic.dat`;
       await env.PHOTOS_BUCKET.put(badKey, INVALID_MAGIC);
 
-      mockFindFirstIntent.mockResolvedValue(
-        makePendingIntent({ r2Key: badKey }),
-      );
+      mockFindFirstIntent.mockResolvedValue(makePendingIntent({ r2Key: badKey }));
       const msg = createMockMessage(
         makeR2Event({ object: { key: badKey, size: INVALID_MAGIC.length, eTag: 'x' } }),
       );
@@ -457,9 +486,7 @@ describe('upload-consumer', () => {
       const bigDimKey = `uploads/${TEST_EVENT_ID}/big-dim.jpg`;
       await env.PHOTOS_BUCKET.put(bigDimKey, OVERSIZED_DIM_JPEG);
 
-      mockFindFirstIntent.mockResolvedValue(
-        makePendingIntent({ r2Key: bigDimKey }),
-      );
+      mockFindFirstIntent.mockResolvedValue(makePendingIntent({ r2Key: bigDimKey }));
       const msg = createMockMessage(
         makeR2Event({
           object: { key: bigDimKey, size: OVERSIZED_DIM_JPEG.length, eTag: 'x' },
@@ -483,9 +510,7 @@ describe('upload-consumer', () => {
       const noSofKey = `uploads/${TEST_EVENT_ID}/no-sof.jpg`;
       await env.PHOTOS_BUCKET.put(noSofKey, NO_SOF_JPEG);
 
-      mockFindFirstIntent.mockResolvedValue(
-        makePendingIntent({ r2Key: noSofKey }),
-      );
+      mockFindFirstIntent.mockResolvedValue(makePendingIntent({ r2Key: noSofKey }));
       const msg = createMockMessage(
         makeR2Event({
           object: { key: noSofKey, size: NO_SOF_JPEG.length, eTag: 'x' },
@@ -535,10 +560,10 @@ describe('upload-consumer', () => {
 
     it('6.2 — no retry on normalization failure', async () => {
       mockNormalizeCfImages.mockReturnValue(
-        ResultAsync.fromPromise(
-          Promise.reject(new Error('fail')),
-          (cause) => ({ stage: 'cf_images_transform', cause }),
-        ),
+        ResultAsync.fromPromise(Promise.reject(new Error('fail')), (cause) => ({
+          stage: 'cf_images_transform',
+          cause,
+        })),
       );
       const msg = createMockMessage(makeR2Event());
       const batch = createMockBatch([msg]);
@@ -571,9 +596,18 @@ describe('upload-consumer', () => {
       const dbSelectMock = vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([{
-              settings: { colorGrade: { enabled: true, lutId: 'lut-1', intensity: 75, includeLuminance: false } },
-            }]),
+            limit: vi.fn().mockResolvedValue([
+              {
+                settings: {
+                  colorGrade: {
+                    enabled: true,
+                    lutId: 'lut-1',
+                    intensity: 75,
+                    includeLuminance: false,
+                  },
+                },
+              },
+            ]),
           }),
         }),
       });
@@ -628,13 +662,13 @@ describe('upload-consumer', () => {
 
       // Track R2 PUT for normalized image
       const originalPut = env.PHOTOS_BUCKET.put.bind(env.PHOTOS_BUCKET);
-      const putSpy = vi.spyOn(env.PHOTOS_BUCKET, 'put').mockImplementation(
-        async (key: string, ...args: any[]) => {
+      const putSpy = vi
+        .spyOn(env.PHOTOS_BUCKET, 'put')
+        .mockImplementation(async (key: string, ...args: any[]) => {
           // Only track puts to the normalized key (eventId/photoId.jpg), not uploads/
           if (!key.startsWith('uploads/')) callOrder.push('r2_put_normalized');
           return originalPut(key, ...args);
-        },
-      );
+        });
 
       const msg = createMockMessage(makeR2Event());
       const batch = createMockBatch([msg]);
@@ -773,9 +807,7 @@ describe('upload-consumer', () => {
       expect(msg.retry).not.toHaveBeenCalled();
 
       // Sentry captures the enqueue failure
-      expect(Sentry.captureMessage).toHaveBeenCalledWith(
-        expect.stringContaining('enqueue_failed'),
-      );
+      expect(Sentry.captureMessage).toHaveBeenCalledWith(expect.stringContaining('enqueue_failed'));
 
       queueSpy.mockRestore();
     });
@@ -794,13 +826,9 @@ describe('upload-consumer', () => {
 
       const messages = [
         // 1. Orphan (no intent)
-        createMockMessage(
-          makeR2Event({ object: { key: orphanKey, size: 100, eTag: 'a' } }),
-        ),
+        createMockMessage(makeR2Event({ object: { key: orphanKey, size: 100, eTag: 'a' } })),
         // 2. Invalid magic bytes
-        createMockMessage(
-          makeR2Event({ object: { key: invalidKey, size: 8, eTag: 'b' } }),
-        ),
+        createMockMessage(makeR2Event({ object: { key: invalidKey, size: 8, eTag: 'b' } })),
       ];
 
       // First findFirst → null (orphan), second → intent for invalid file
@@ -839,10 +867,10 @@ describe('upload-consumer', () => {
     it('12.1 — DB update in error handler fails → still ack, no throw', async () => {
       // Make normalization fail (triggers error handler)
       mockNormalizeCfImages.mockReturnValue(
-        ResultAsync.fromPromise(
-          Promise.reject(new Error('fail')),
-          (cause) => ({ stage: 'cf_images_transform', cause }),
-        ),
+        ResultAsync.fromPromise(Promise.reject(new Error('fail')), (cause) => ({
+          stage: 'cf_images_transform',
+          cause,
+        })),
       );
       // Make the error handler's DB update reject
       mockUpdateWhere.mockRejectedValue(new Error('DB is down'));

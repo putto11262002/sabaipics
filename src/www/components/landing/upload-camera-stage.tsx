@@ -35,7 +35,6 @@ export function UploadCameraStage({ className }: { className?: string }) {
   return (
     <div className={cn('w-full', className)} style={{ containerType: 'inline-size' }}>
       <div className="relative">
-
         {/* Contact shadow */}
         <div
           className="pointer-events-none absolute left-1/2 top-[calc(100%-0.25rem)] -z-10 h-10 w-[92%] -translate-x-1/2 rounded-[999px]"
@@ -64,7 +63,10 @@ export function UploadCameraStage({ className }: { className?: string }) {
           {/* Erase top border behind viewfinder */}
           <div
             className="pointer-events-none absolute left-1/2 top-0 z-10 h-[2px] -translate-x-1/2"
-            style={{ width: metrics.eraserW, background: 'color-mix(in oklab, var(--primary) 8%, transparent)' }}
+            style={{
+              width: metrics.eraserW,
+              background: 'color-mix(in oklab, var(--primary) 8%, transparent)',
+            }}
             aria-hidden="true"
           />
 
@@ -136,7 +138,8 @@ export function UploadCameraStage({ className }: { className?: string }) {
                   className="relative h-full w-full overflow-hidden shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--primary)_32%,transparent),0_10px_24px_-24px_color-mix(in_oklab,var(--foreground)_16%,transparent)]"
                   style={{
                     borderRadius: metrics.screenRadius,
-                    background: 'linear-gradient(135deg, color-mix(in oklab, var(--primary) 8%, var(--card)) 0%, color-mix(in oklab, var(--primary-end) 12%, var(--card)) 100%)',
+                    background:
+                      'linear-gradient(135deg, color-mix(in oklab, var(--primary) 8%, var(--card)) 0%, color-mix(in oklab, var(--primary-end) 12%, var(--card)) 100%)',
                   }}
                 />
               </div>
@@ -187,10 +190,7 @@ function UploadHardwareButton() {
       }}
       aria-hidden="true"
     >
-      <div
-        className="absolute rounded-full border border-primary/36"
-        style={{ inset: '18%' }}
-      />
+      <div className="absolute rounded-full border border-primary/36" style={{ inset: '18%' }} />
     </div>
   );
 }
@@ -207,10 +207,7 @@ function UploadHardwareDial() {
       }}
       aria-hidden="true"
     >
-      <div
-        className="absolute rounded-full border border-primary/36"
-        style={{ inset: '12%' }}
-      />
+      <div className="absolute rounded-full border border-primary/36" style={{ inset: '12%' }} />
       <div
         className="absolute rounded-full border border-primary/32"
         style={{ inset: '32%', background: 'color-mix(in oklab, var(--primary) 26%, transparent)' }}

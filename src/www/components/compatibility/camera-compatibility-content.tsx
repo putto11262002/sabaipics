@@ -101,12 +101,19 @@ export function CameraCompatibilityContent() {
   return (
     <main className="mx-auto max-w-7xl px-4 py-14 sm:py-16">
       <section className="space-y-3">
-        <h1 className="text-3xl font-semibold tracking-tight">FrameFast iOS Mobile Compatibility List</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          FrameFast iOS Mobile Compatibility List
+        </h1>
         <p className="max-w-3xl text-muted-foreground">
           Canon, Sony, and Nikon camera compatibility for Studio WiFi/remote capture workflows.
         </p>
 
-        <Tabs value={activeBrandId} onValueChange={(value) => setActiveBrandId(value)} className="mt-6" aria-label="Camera brand filter">
+        <Tabs
+          value={activeBrandId}
+          onValueChange={(value) => setActiveBrandId(value)}
+          className="mt-6"
+          aria-label="Camera brand filter"
+        >
           <TabsList variant="line" className="flex flex-wrap gap-2">
             {BRAND_TABS.map((brand) => (
               <TabsTrigger key={brand.id} value={brand.id}>
@@ -148,11 +155,20 @@ export function CameraCompatibilityContent() {
                               </thead>
                               <tbody>
                                 {category.rows.map((row) => (
-                                  <tr key={`${section.title}-${category.title}-${row.model}`} className="border-t border-border/80">
+                                  <tr
+                                    key={`${section.title}-${category.title}-${row.model}`}
+                                    className="border-t border-border/80"
+                                  >
                                     <td className="px-4 py-3 align-top font-medium">{row.model}</td>
-                                    <td className="px-4 py-3 align-top text-muted-foreground">{row.year}</td>
-                                    <td className="px-4 py-3 align-top text-muted-foreground">{row.processor}</td>
-                                    <td className="px-4 py-3 align-top text-muted-foreground">{row.wifi}</td>
+                                    <td className="px-4 py-3 align-top text-muted-foreground">
+                                      {row.year}
+                                    </td>
+                                    <td className="px-4 py-3 align-top text-muted-foreground">
+                                      {row.processor}
+                                    </td>
+                                    <td className="px-4 py-3 align-top text-muted-foreground">
+                                      {row.wifi}
+                                    </td>
                                     <td className="px-4 py-3 align-top">
                                       <span
                                         className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${
@@ -179,7 +195,6 @@ export function CameraCompatibilityContent() {
             </TabsContent>
           ))}
         </Tabs>
-
       </section>
     </main>
   );

@@ -17,6 +17,7 @@ T-6 involves integrating Clerk authentication UI with a blocking PDPA consent mo
 **Risk:** Race condition between Clerk webhook (`user.created`) and UI consent modal display.
 
 **Analysis:** The current flow is:
+
 1. User completes Clerk signup
 2. `user.created` webhook creates photographer row in DB (T-4)
 3. UI redirects to dashboard
@@ -25,11 +26,13 @@ T-6 involves integrating Clerk authentication UI with a blocking PDPA consent mo
 If the UI redirects before webhook completes, `requirePhotographer()` middleware will fail with 403 because photographer row does not exist yet.
 
 **Evidence from codebase:**
+
 - `apps/dashboard/src/routes/sign-up.tsx:10` uses `afterSignUpUrl="/dashboard"` for immediate redirect
 - `apps/api/src/middleware/require-photographer.ts` expects photographer row to exist
 - No polling/retry logic exists in dashboard
 
 **Mitigation options:**
+
 - A) Add polling in ProtectedRoute to retry photographer lookup with exponential backoff
 - B) Have consent modal page use a separate "waiting" state while webhook processes
 - C) Create photographer row synchronously during signup (not via webhook)
@@ -43,11 +46,13 @@ If the UI redirects before webhook completes, `requirePhotographer()` middleware
 **Risk:** Modal must block all dashboard access until consent given, but current `ProtectedRoute` only checks auth, not consent.
 
 **Analysis:** Current flow allows authenticated users to reach `/dashboard` immediately:
+
 - `apps/dashboard/src/components/auth/ProtectedRoute.tsx` only checks `isSignedIn`
 - `apps/api/src/middleware/require-consent.ts` exists but is API-level, not UI-level
 - No UI-level consent gate exists
 
 **Implementation approach needed:**
+
 ```
 ProtectedRoute
   |-- Check Clerk auth (exists)
@@ -68,15 +73,18 @@ ProtectedRoute
 **Risk:** Thai users primarily access via mobile, using LINE browser, Safari, Chrome. Clerk components and modals must work across all.
 
 **Specific concerns:**
+
 - LINE in-app browser has known quirks with OAuth redirects and popups
 - iOS Safari viewport issues with fixed/sticky modals
 - Older Android WebView versions (Samsung Internet, Oppo browser)
 
 **Evidence:**
+
 - Research doc `docs/logs/BS_0001_S-1/research/clerk-line-email.md` mentions LINE OAuth flow complexity
 - No mobile-specific CSS or viewport handling in current codebase
 
 **Testing requirements:**
+
 - LINE in-app browser (iOS + Android)
 - Safari iOS (15+)
 - Chrome Android
@@ -91,16 +99,19 @@ ProtectedRoute
 **Risk:** LINE OAuth may not provide email; Clerk shows "missing requirements" flow that could confuse users or break the consent modal timing.
 
 **Analysis from research:**
+
 - `docs/logs/BS_0001_S-1/research/clerk-line-email.md` details that LINE does not provide email by default
 - Clerk prebuilt `<SignUp />` component handles this automatically
 - But the flow is: OAuth complete -> missing requirements -> email collection -> verification -> actual signup complete
 
 **Impact on T-6:**
+
 - `afterSignUpUrl="/dashboard"` may trigger before email is verified
 - Webhook may fire without email if user abandons mid-flow
 - Consent modal should only appear after full signup (including email verification)
 
 **Mitigation:**
+
 - Use Clerk's `status` checks to ensure signup is truly complete
 - Consider `afterSignUpUrl` pointing to a dedicated `/onboarding` route that handles edge cases
 
@@ -113,11 +124,13 @@ ProtectedRoute
 **Risk:** Plan specifies 24h session persistence, but this is a Clerk configuration, not code.
 
 **Analysis:**
+
 - Decision #1 in plan: "Session timeout: 24 hours"
 - Clerk default session lifetime may differ
 - Mobile browsers aggressively clear localStorage/cookies
 
 **Configuration checklist:**
+
 - [ ] Clerk Dashboard > Sessions > Session lifetime = 24 hours
 - [ ] Test session survival across browser restarts
 - [ ] Test in LINE in-app browser (may not persist sessions)
@@ -131,6 +144,7 @@ ProtectedRoute
 **Risk:** UI must correctly call consent API and handle all response codes.
 
 **Evidence from T-5 implementation:**
+
 - `apps/api/src/routes/consent.ts` returns:
   - 201 on success
   - 409 if already consented (idempotent)
@@ -138,12 +152,14 @@ ProtectedRoute
   - 403 if photographer not found
 
 **UI handling requirements:**
+
 - Success (201): Close modal, allow dashboard access
 - Already consented (409): Treat as success (idempotent)
 - Auth error (401): Should not happen if modal is behind auth
 - Not found (403): Could happen due to webhook race condition
 
 **Code pattern from exemplar:**
+
 ```typescript
 // From apps/dashboard/src/lib/api.ts
 const { createAuthClient } = useApiClient();
@@ -158,11 +174,13 @@ const res = await client.consent.$post();
 **Risk:** After consent is given, how does the app "remember" this state without re-fetching on every navigation?
 
 **Options:**
+
 - A) Fetch consent status on app mount, store in React context
 - B) Include consent status in Clerk user metadata (requires API sync)
 - C) Use React Query to cache `/dashboard` response which includes consent state
 
 **Current state:**
+
 - `packages/auth/src/hooks.ts:useAuth()` does not expose consent status
 - No global state management (Redux, Zustand) in codebase
 - React Query is configured in `apps/dashboard/src/main.tsx`
@@ -178,6 +196,7 @@ const res = await client.consent.$post();
 **Context:** Clerk webhook may not complete before UI redirects after signup.
 
 **Options:**
+
 - A) Polling with backoff in UI (adds complexity, ~500ms-2s delay)
 - B) Dedicated `/onboarding` route with loading state
 - C) Synchronous photographer creation in custom signup flow (breaks prebuilt components)
@@ -191,6 +210,7 @@ const res = await client.consent.$post();
 **Context:** Where does the blocking PDPA modal appear?
 
 **Options:**
+
 - A) On `/dashboard` route (blocks dashboard content)
 - B) On dedicated `/onboarding` route (cleaner separation)
 - C) As a wrapper around `ProtectedRoute` (affects all protected routes)
@@ -204,6 +224,7 @@ const res = await client.consent.$post();
 **Context:** How to persist consent status client-side after it is given?
 
 **Options:**
+
 - A) React Context with initial fetch
 - B) React Query cache (invalidate on consent success)
 - C) Refetch on every navigation
@@ -215,11 +236,13 @@ const res = await client.consent.$post();
 ### [NEED_DECISION] Consent Decline Behavior
 
 **Context:** Task spec says "Decline shows explanation with retry option" but does not specify:
+
 - Can user sign out and try different account?
 - Is there a "Contact support" option?
 - How many times can user retry?
 
 **Options:**
+
 - A) Simple: Show explanation, "Try Again" button only
 - B) Medium: Add "Use Different Account" (sign out) option
 - C) Full: Add explanation, retry, sign out, and support contact
@@ -243,6 +266,7 @@ const res = await client.consent.$post();
 **Issue:** `ProtectedRoute` only checks Clerk auth, not database consent status.
 
 **Resolution:** Add consent status check that:
+
 1. Fetches photographer consent status
 2. Shows blocking modal if not consented
 3. Allows route access if consented
@@ -354,6 +378,7 @@ const res = await client.consent.$post();
 ## Provenance
 
 **Files examined:**
+
 - `apps/dashboard/src/App.tsx` - routing structure
 - `apps/dashboard/src/routes/sign-up.tsx` - current signup flow
 - `apps/dashboard/src/routes/sign-in.tsx` - current signin flow

@@ -38,7 +38,10 @@ export const creditsRouter = new Hono<Env>()
       const code = c.req.query('code');
 
       if (!code) {
-        return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'code parameter is required' });
+        return err<never, HandlerError>({
+          code: 'BAD_REQUEST',
+          message: 'code parameter is required',
+        });
       }
 
       const stripe = createStripeClient(c.env);
@@ -510,8 +513,18 @@ export const creditsRouter = new Hono<Env>()
       const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10)));
       const typeFilter = c.req.query('type') as 'credit' | 'debit' | undefined;
 
-      const result = yield* getCreditHistory(db, { photographerId: photographer.id, page, limit, typeFilter })
-        .mapErr((e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }));
+      const result = yield* getCreditHistory(db, {
+        photographerId: photographer.id,
+        page,
+        limit,
+        typeFilter,
+      }).mapErr(
+        (e): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Database error',
+          cause: e.cause,
+        }),
+      );
 
       return ok(result);
     })
@@ -591,7 +604,10 @@ export const creditsRouter = new Hono<Env>()
         );
 
         if (!giftCode) {
-          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Invalid or inactive gift code' });
+          return err<never, HandlerError>({
+            code: 'NOT_FOUND',
+            message: 'Invalid or inactive gift code',
+          });
         }
 
         // 2. Not expired
@@ -605,7 +621,10 @@ export const creditsRouter = new Hono<Env>()
           giftCode.targetPhotographerIds.length > 0 &&
           !giftCode.targetPhotographerIds.includes(photographer.id)
         ) {
-          return err<never, HandlerError>({ code: 'FORBIDDEN', message: 'This gift code is not available for your account' });
+          return err<never, HandlerError>({
+            code: 'FORBIDDEN',
+            message: 'This gift code is not available for your account',
+          });
         }
 
         // Transaction: check limits + grant credits + record redemption (atomic)
@@ -626,7 +645,9 @@ export const creditsRouter = new Hono<Env>()
               );
 
             if (userRedemptions.count >= giftCode.maxRedemptionsPerUser) {
-              throw Object.assign(new Error('You have already redeemed this gift code'), { handlerCode: 'CONFLICT' as const });
+              throw Object.assign(new Error('You have already redeemed this gift code'), {
+                handlerCode: 'CONFLICT' as const,
+              });
             }
 
             // 5. Global limit (inside transaction for atomicity)
@@ -637,7 +658,10 @@ export const creditsRouter = new Hono<Env>()
                 .where(eq(giftCodeRedemptions.giftCodeId, giftCode.id));
 
               if (totalRedemptions.count >= giftCode.maxRedemptions) {
-                throw Object.assign(new Error('This gift code has reached its maximum redemptions'), { handlerCode: 'CONFLICT' as const });
+                throw Object.assign(
+                  new Error('This gift code has reached its maximum redemptions'),
+                  { handlerCode: 'CONFLICT' as const },
+                );
               }
             }
 
@@ -650,7 +674,9 @@ export const creditsRouter = new Hono<Env>()
               promoCode: giftCode.code,
             }).match(
               (r) => r,
-              (e) => { throw new Error(`Grant failed: ${e.type}`); },
+              (e) => {
+                throw new Error(`Grant failed: ${e.type}`);
+              },
             );
 
             // Record redemption

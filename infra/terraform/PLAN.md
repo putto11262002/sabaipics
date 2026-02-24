@@ -8,13 +8,13 @@ Migrate `scripts/infra/cloudflare-provision.sh` to Terraform for declarative, ve
 
 ## Resources to Migrate
 
-| Resource | Current Method | Terraform Resource | Status |
-|----------|---------------|-------------------|--------|
-| R2 Buckets | `wrangler r2 bucket create` | `cloudflare_r2_bucket` | ✅ Supported |
-| Queues | `wrangler queues create` | `cloudflare_queue` | ✅ Supported |
-| R2 CORS | `wrangler r2 bucket cors set` | `cloudflare_r2_bucket_cors` | ✅ Supported |
+| Resource               | Current Method                           | Terraform Resource                        | Status                |
+| ---------------------- | ---------------------------------------- | ----------------------------------------- | --------------------- |
+| R2 Buckets             | `wrangler r2 bucket create`              | `cloudflare_r2_bucket`                    | ✅ Supported          |
+| Queues                 | `wrangler queues create`                 | `cloudflare_queue`                        | ✅ Supported          |
+| R2 CORS                | `wrangler r2 bucket cors set`            | `cloudflare_r2_bucket_cors`               | ✅ Supported          |
 | R2 Event Notifications | `wrangler r2 bucket notification create` | `cloudflare_r2_bucket_event_notification` | ✅ Supported (v5.13+) |
-| R2 Custom Domains | `wrangler r2 bucket domain add` | `cloudflare_r2_custom_domain` | ✅ Supported |
+| R2 Custom Domains      | `wrangler r2 bucket domain add`          | `cloudflare_r2_custom_domain`             | ✅ Supported          |
 
 All features are natively supported by the Cloudflare Terraform provider v5.13+.
 
@@ -59,6 +59,7 @@ curl -X GET "https://api.cloudflare.com/client/v4/zones?name=sabaipics.com" \
 ```
 
 Then update `environments/staging/terraform.tfvars`:
+
 ```hcl
 zone_id = "YOUR_ZONE_ID_HERE"
 ```
@@ -152,12 +153,14 @@ terraform plan
 ```
 
 Expected output:
+
 - Imported resources should show "no changes"
 - CORS, notifications, domains may show "will be created" (that's OK)
 
 ### Step 5: Review the Plan
 
 If `terraform plan` shows:
+
 - **No changes** for buckets/queues → Import worked perfectly
 - **Create** for CORS/notifications/domains → Expected (will recreate these)
 - **Destroy** anything → STOP and investigate
@@ -173,6 +176,7 @@ terraform apply
 ```
 
 This will:
+
 1. Create CORS rules (replacing wrangler-managed ones)
 2. Create event notifications
 3. Set up custom domain binding
@@ -195,11 +199,11 @@ bash scripts/infra/cloudflare-provision.sh staging --with-domains
 
 ## Known Issues
 
-| Resource | Issue | Workaround |
-|----------|-------|------------|
-| R2 Bucket | Location hint may force replacement | Set `photos_bucket_location = "APAC"` explicitly |
-| Custom Domain | May need double-apply | Run `terraform apply` twice if domain not enabled |
-| Event Notifications | Queue ID required | Must import queues before creating notifications |
+| Resource            | Issue                               | Workaround                                        |
+| ------------------- | ----------------------------------- | ------------------------------------------------- |
+| R2 Bucket           | Location hint may force replacement | Set `photos_bucket_location = "APAC"` explicitly  |
+| Custom Domain       | May need double-apply               | Run `terraform apply` twice if domain not enabled |
+| Event Notifications | Queue ID required                   | Must import queues before creating notifications  |
 
 ---
 

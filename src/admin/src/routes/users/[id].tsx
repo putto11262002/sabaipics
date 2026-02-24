@@ -104,8 +104,11 @@ const creditColumns = [
     cell: (info) => {
       const amount = info.getValue();
       return (
-        <span className={`font-medium tabular-nums ${amount > 0 ? 'text-success' : 'text-destructive'}`}>
-          {amount > 0 ? '+' : ''}{amount.toLocaleString()}
+        <span
+          className={`font-medium tabular-nums ${amount > 0 ? 'text-success' : 'text-destructive'}`}
+        >
+          {amount > 0 ? '+' : ''}
+          {amount.toLocaleString()}
         </span>
       );
     },
@@ -118,9 +121,7 @@ const creditColumns = [
   }),
   columnHelper.accessor('operationType', {
     header: 'Operation',
-    cell: (info) => (
-      <span className="text-muted-foreground">{info.getValue() || '-'}</span>
-    ),
+    cell: (info) => <span className="text-muted-foreground">{info.getValue() || '-'}</span>,
   }),
 ];
 
@@ -167,9 +168,7 @@ function CreditHistoryTable({ entries }: { entries: CreditLedgerEntry[] }) {
   return (
     <div className="space-y-4">
       <DataTable table={table} emptyMessage="No credit history" />
-      {table.getPageCount() > 1 && (
-        <DataTablePagination table={table} showSelectedCount={false} />
-      )}
+      {table.getPageCount() > 1 && <DataTablePagination table={table} showSelectedCount={false} />}
     </div>
   );
 }
@@ -278,8 +277,12 @@ function UserDetailPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Card key={i}>
-                  <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
-                  <CardContent><Skeleton className="h-7 w-16" /></CardContent>
+                  <CardHeader className="pb-2">
+                    <Skeleton className="h-4 w-24" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-7 w-16" />
+                  </CardContent>
                 </Card>
               ))}
             </div>
@@ -292,12 +295,7 @@ function UserDetailPage() {
             <AlertCircle className="size-4" />
             <AlertTitle>Failed to load user</AlertTitle>
             <AlertDescription>{error.message}</AlertDescription>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="mt-2"
-              onClick={() => refetch()}
-            >
+            <Button variant="destructive" size="sm" className="mt-2" onClick={() => refetch()}>
               <RefreshCw className="mr-1 size-4" />
               Retry
             </Button>
@@ -342,7 +340,11 @@ function UserDetailPage() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <StatCard title="Credit Balance" value={user.balance} icon={CreditCard} />
                 <StatCard title="Total Purchased" value={stats.totalCredits} icon={TrendingUp} />
-                <StatCard title="Total Used" value={Math.abs(stats.totalDebits)} icon={TrendingDown} />
+                <StatCard
+                  title="Total Used"
+                  value={Math.abs(stats.totalDebits)}
+                  icon={TrendingDown}
+                />
                 <StatCard title="Total Events" value={stats.totalEvents} icon={Calendar} />
                 <StatCard title="Total Photos" value={stats.totalPhotos} icon={Image} />
               </div>

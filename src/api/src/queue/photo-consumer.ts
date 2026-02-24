@@ -576,9 +576,7 @@ export async function queue(
         extra.attempt = message.attempts;
         extra.isLastAttempt = isLastAttempt;
 
-        const captureFn = !isRetryable || isLastAttempt
-          ? capturePhotoError
-          : capturePhotoWarning;
+        const captureFn = !isRetryable || isLastAttempt ? capturePhotoError : capturePhotoWarning;
         captureFn(error.type, { ...sentryCtx, extra });
       })
       .match(
@@ -589,9 +587,7 @@ export async function queue(
               console.error(`[Queue] Persist error`, {
                 photoId: job.photo_id,
                 type: persistErr.type,
-                ...(persistErr.type === 'database'
-                  ? { operation: persistErr.operation }
-                  : {}),
+                ...(persistErr.type === 'database' ? { operation: persistErr.operation } : {}),
                 ...(persistErr.type === 'face_service'
                   ? { faceErrorType: persistErr.cause.type }
                   : {}),
@@ -600,9 +596,7 @@ export async function queue(
                 ...sentryCtx,
                 extra: {
                   persistErrorType: persistErr.type,
-                  ...(persistErr.type === 'database'
-                    ? { operation: persistErr.operation }
-                    : {}),
+                  ...(persistErr.type === 'database' ? { operation: persistErr.operation } : {}),
                 },
               });
             })
@@ -619,9 +613,11 @@ export async function queue(
                 const writeResult = await ResultAsync.fromPromise(
                   db
                     .update(photos)
-                    .set(isLastAttempt
-                      ? { status: 'failed' as const, retryable: false, errorName }
-                      : { retryable: true, errorName })
+                    .set(
+                      isLastAttempt
+                        ? { status: 'failed' as const, retryable: false, errorName }
+                        : { retryable: true, errorName },
+                    )
                     .where(eq(photos.id, job.photo_id)),
                   (e) => e,
                 );
@@ -658,9 +654,11 @@ export async function queue(
             const throttleWrite = await ResultAsync.fromPromise(
               db
                 .update(photos)
-                .set(isLastAttempt
-                  ? { status: 'failed' as const, retryable: false, errorName }
-                  : { retryable: true, errorName })
+                .set(
+                  isLastAttempt
+                    ? { status: 'failed' as const, retryable: false, errorName }
+                    : { retryable: true, errorName },
+                )
                 .where(eq(photos.id, job.photo_id)),
               (e) => e,
             );
@@ -699,9 +697,11 @@ export async function queue(
           const retryWrite = await ResultAsync.fromPromise(
             db
               .update(photos)
-              .set(isLastAttempt
-                ? { status: 'failed' as const, retryable: false, errorName }
-                : { retryable: true, errorName })
+              .set(
+                isLastAttempt
+                  ? { status: 'failed' as const, retryable: false, errorName }
+                  : { retryable: true, errorName },
+              )
               .where(eq(photos.id, job.photo_id)),
             (e) => e,
           );

@@ -60,16 +60,11 @@
  * @module
  */
 
-import { createEventBus, type EventBus as EventBusInterface } from "./event-bus";
+import { createEventBus, type EventBus as EventBusInterface } from './event-bus';
 
 export const eventBus = createEventBus();
 
 // Re-export types for convenience
-export { createEventBus } from "./event-bus";
-export type {
-  AnyEvent,
-  EventHandlers,
-  EventProducer,
-  FilterFn,
-} from "./event-bus";
+export { createEventBus } from './event-bus';
+export type { AnyEvent, EventHandlers, EventProducer, FilterFn } from './event-bus';
 export type { EventBusInterface as EventBusType };

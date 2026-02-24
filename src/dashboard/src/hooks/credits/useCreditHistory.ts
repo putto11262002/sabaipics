@@ -37,18 +37,10 @@ export interface CreditHistoryResponse {
   };
 }
 
-export function useCreditHistory(
-  page: number = 0,
-  limit: number = 20,
-  type?: 'credit' | 'debit',
-) {
+export function useCreditHistory(page: number = 0, limit: number = 20, type?: 'credit' | 'debit') {
   return useApiQuery<CreditHistoryApiResponse>({
     queryKey: ['credit-history', page, limit, type],
-    apiFn: (opts) =>
-      getCreditHistory(
-        { query: { page, limit, ...(type ? { type } : {}) } },
-        opts,
-      ),
+    apiFn: (opts) => getCreditHistory({ query: { page, limit, ...(type ? { type } : {}) } }, opts),
     staleTime: 1000 * 30,
   });
 }

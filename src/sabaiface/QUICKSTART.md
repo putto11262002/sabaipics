@@ -57,6 +57,7 @@ cp .env.example .env
 ```
 
 Key settings:
+
 - `DATABASE_URL` - Your PostgreSQL connection string
 - `MODELS_PATH` - Path to face-api.js models (default: `./models`)
 - `FACE_PROVIDER` - `sabaiface` (self-hosted) or `aws` (AWS Rekognition)
@@ -101,6 +102,7 @@ curl http://localhost:3000/health
 ```
 
 Expected response:
+
 ```json
 {
   "status": "ok",
@@ -120,6 +122,7 @@ curl -X POST http://localhost:3000/collections \
 ```
 
 Expected response:
+
 ```json
 {
   "StatusCode": 200,
@@ -226,6 +229,7 @@ testSabaiFace().catch(console.error);
 Error: `Failed to load face-api.js models`
 
 **Solution:** Make sure all model files are in the `MODELS_PATH` directory. Required files:
+
 - `ssd_mobilenetv1_model-weights_manifest.json` + shards
 - `face_landmark_68_model-weights_manifest.json` + shards
 - `face_recognition_model-weights_manifest.json` + shards
@@ -236,6 +240,7 @@ Error: `Failed to load face-api.js models`
 Error: `Failed to connect to database`
 
 **Solution:**
+
 1. Check `DATABASE_URL` is correct
 2. Ensure PostgreSQL is running
 3. Ensure database exists
@@ -246,6 +251,7 @@ Error: `Failed to connect to database`
 Response: `FaceRecords: []`
 
 **Solution:**
+
 1. Check image quality (min 80x80 pixels for faces)
 2. Lower `FACE_CONFIDENCE_THRESHOLD` in `.env`
 3. Ensure image is properly encoded as base64
@@ -254,6 +260,7 @@ Response: `FaceRecords: []`
 ### Slow performance
 
 **Solutions:**
+
 1. Enable GPU: Set `USE_GPU=true` and install `@tensorflow/tfjs-node-gpu`
 2. Reduce `MAX_FACES_PER_IMAGE`
 3. Increase `FACE_CONFIDENCE_THRESHOLD`
@@ -270,6 +277,7 @@ Response: `FaceRecords: []`
 ## Support
 
 For issues or questions, check:
+
 1. TypeScript compilation: `pnpm build`
 2. Server logs: Look for `[FaceDetector]` and `[Server]` prefixes
 3. Database migrations: Ensure schema is up to date

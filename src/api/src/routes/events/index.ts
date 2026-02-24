@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { eq, desc, sql, and, isNull } from 'drizzle-orm';
+import { eq, desc, sql, and, or, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   events,
   activeEvents,
   photoLuts,
+  autoEditPresets,
   DEFAULT_SLIDESHOW_CONFIG,
   logoUploadIntents,
   ftpCredentials,
@@ -197,6 +198,33 @@ export const eventsRouter = new Hono<Env>()
 
         if (!event) {
           return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const presetId = (body as { autoEditPresetId?: string }).autoEditPresetId;
+        if (presetId) {
+          const [preset] = yield* ResultAsync.fromPromise(
+            db
+              .select({ id: autoEditPresets.id })
+              .from(autoEditPresets)
+              .where(
+                and(
+                  eq(autoEditPresets.id, presetId),
+                  or(
+                    eq(autoEditPresets.photographerId, photographer.id),
+                    eq(autoEditPresets.isBuiltin, true),
+                  ),
+                ),
+              )
+              .limit(1),
+            (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+          );
+
+          if (!preset) {
+            return err<never, HandlerError>({
+              code: 'NOT_FOUND',
+              message: 'Auto-edit preset not found',
+            });
+          }
         }
 
         // Validate LUT ownership if provided

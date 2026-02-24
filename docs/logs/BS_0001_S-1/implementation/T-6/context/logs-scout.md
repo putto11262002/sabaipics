@@ -49,6 +49,7 @@ Scanned implementation summaries from T-1, T-2, T-3, T-4, T-5, and T-8 to extrac
 ### 4. PDPA Consent API (from T-5)
 
 **Endpoint:** `POST /consent`
+
 - Requires authenticated photographer (uses `requirePhotographer()`)
 - Returns 409 if already consented (`pdpaConsentAt` already set)
 - Returns 201 on success with consent record
@@ -64,24 +65,28 @@ Scanned implementation summaries from T-1, T-2, T-3, T-4, T-5, and T-8 to extrac
 ### 5. Existing UI Patterns (from current codebase)
 
 **File locations:**
+
 - Routes: `apps/dashboard/src/routes/`
 - Components: `apps/dashboard/src/components/`
 - Auth components: `apps/dashboard/src/components/auth/`
 
 **Auth package imports:**
+
 - `import { SignUp, SignIn, SignedIn, SignedOut, useAuth } from "@sabaipics/auth/react"`
 
 **Clerk component configuration:**
+
 ```tsx
 <SignUp
   routing="path"
   path="/sign-up"
   signInUrl="/sign-in"
-  afterSignUpUrl="/dashboard"  // <-- T-6 may need to intercept this
+  afterSignUpUrl="/dashboard" // <-- T-6 may need to intercept this
 />
 ```
 
 **ProtectedRoute pattern:**
+
 ```tsx
 // apps/dashboard/src/components/auth/ProtectedRoute.tsx
 const { isLoaded, isSignedIn } = useAuth();
@@ -89,6 +94,7 @@ const { isLoaded, isSignedIn } = useAuth();
 ```
 
 **Route structure:**
+
 ```tsx
 // Public routes
 <Route path="/sign-up/*" element={<SignUpPage />} />
@@ -147,16 +153,19 @@ const { isLoaded, isSignedIn } = useAuth();
 ## Relevant Files
 
 ### API (for reference)
+
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/routes/consent.ts`
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/middleware/require-photographer.ts`
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/middleware/require-consent.ts`
 
 ### UI (to modify/extend)
+
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/dashboard/src/App.tsx`
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/dashboard/src/routes/sign-up.tsx`
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/dashboard/src/components/auth/ProtectedRoute.tsx`
 
 ### Schema (for types)
+
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/packages/db/src/schema/photographers.ts`
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/packages/db/src/schema/consent-records.ts`
 
@@ -165,12 +174,14 @@ const { isLoaded, isSignedIn } = useAuth();
 ## Test Patterns to Follow
 
 ### From T-5 consent.test.ts
+
 - Test auth middleware rejection (401, 403)
 - Test happy path (201)
 - Test idempotency/conflict (409)
 - Use Hono's `testClient` for API tests
 
 ### UI Tests (per task requirements)
+
 - E2E test signup flow (mock Clerk)
 - Test PDPA modal blocking behavior
 - Test on mobile browsers (Thai users)

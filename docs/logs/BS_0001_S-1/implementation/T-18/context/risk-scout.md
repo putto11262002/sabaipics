@@ -19,16 +19,11 @@
 const [event] = await db
   .select({ id: events.id })
   .from(events)
-  .where(
-    and(
-      eq(events.id, eventId),
-      eq(events.photographerId, photographer.id)
-    )
-  )
+  .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
   .limit(1);
 
 if (!event) {
-  return c.json({ error: { code: "NOT_FOUND", message: "Event not found" } }, 404);
+  return c.json({ error: { code: 'NOT_FOUND', message: 'Event not found' } }, 404);
 }
 ```
 
@@ -39,6 +34,7 @@ if (!event) {
 **[RISK] Presigned URLs might leak if not properly scoped**
 
 **Mitigation:**
+
 - Use short expiry (15 minutes max)
 - URLs are specific to individual photos (not bulk)
 - No sensitive data in URLs (only R2 keys)
@@ -68,7 +64,7 @@ const querySchema = z.object({
 
 ```typescript
 const paramsSchema = z.object({
-  eventId: z.string().uuid("Invalid event ID format"),
+  eventId: z.string().uuid('Invalid event ID format'),
 });
 ```
 
@@ -81,11 +77,13 @@ const paramsSchema = z.object({
 **[RISK] Event with 1000+ photos could cause slow queries**
 
 **Current mitigation:**
+
 - Cursor-based pagination (efficient for large sets)
 - Max limit of 50 per request
 - Index on `photos_event_id_idx`
 
 **Query performance:**
+
 ```sql
 -- Uses index: photos_event_id_idx
 SELECT * FROM photos
@@ -117,6 +115,7 @@ LIMIT 51;
 **Impact:** URLs would 404
 
 **Mitigation:**
+
 - `[NEED_VALIDATION]` Verify R2 custom domain is set up in Cloudflare dashboard
 - Add ops note to verify before deployment
 
@@ -125,10 +124,12 @@ LIMIT 51;
 **[RISK] Incorrect transform parameters could break images**
 
 **Current parameters (from research doc):**
+
 - Thumbnail: `width=400,fit=cover,format=auto,quality=75`
 - Preview: `width=1200,fit=contain,format=auto,quality=85`
 
 **Validation:**
+
 - `fit=cover` crops to fill (good for grid thumbnails)
 - `fit=contain` fits within bounds (good for preview)
 - `format=auto` serves WebP/AVIF to supported browsers
@@ -148,15 +149,15 @@ LIMIT 51;
 **[NEED_VALIDATION]** Exact API for presigned URLs in Cloudflare Workers:
 
 **Option A:** `signUrl` method
+
 ```typescript
-const url = await bucket.signUrl(
-  `https://${bucket.http().hostname}/${key}`,
-  900,
-  { method: 'GET' }
-);
+const url = await bucket.signUrl(`https://${bucket.http().hostname}/${key}`, 900, {
+  method: 'GET',
+});
 ```
 
 **Option B:** `presign` method
+
 ```typescript
 const url = await bucket.presign(key, { expiresIn: 900 });
 ```
@@ -178,6 +179,7 @@ const url = await bucket.presign(key, { expiresIn: 900 });
 **Scenario:** Event with no photos uploaded
 
 **Expected response:**
+
 ```json
 {
   "data": [],
@@ -203,6 +205,7 @@ const url = await bucket.presign(key, { expiresIn: 900 });
 **Scenario:** Event with exactly 1 photo
 
 **Behavior:**
+
 - First request (no cursor): Returns 1 photo, `hasMore: false`
 - Next request with cursor: Returns empty array, `hasMore: false`
 
@@ -225,6 +228,7 @@ const url = await bucket.presign(key, { expiresIn: 900 });
 **[GAP] Exact pagination response format not specified in task**
 
 **Proposed format:**
+
 ```json
 {
   "data": [...],
@@ -236,6 +240,7 @@ const url = await bucket.presign(key, { expiresIn: 900 });
 ```
 
 **Alternative formats considered:**
+
 1. `{ data, nextCursor, hasMore }` - Flat structure
 2. `{ data, meta: { cursor, limit, total } }` - More metadata
 
@@ -262,6 +267,7 @@ const url = await bucket.presign(key, { expiresIn: 900 });
 ## 9. Implementation Checklist
 
 ### Must Do
+
 - [ ] Verify event ownership BEFORE querying photos
 - [ ] Use `requirePhotographer()` middleware
 - [ ] Use cursor-based pagination with `uploaded_at`
@@ -271,12 +277,14 @@ const url = await bucket.presign(key, { expiresIn: 900 });
 - [ ] Validate `limit` is between 1-50
 
 ### Should Do
+
 - [ ] Return consistent error responses (`{ error: { code, message } }`)
 - [ ] Include `status` field in response
 - [ ] Use 15-minute expiry for presigned URLs
 - [ ] Use exact CF Images transform URL format from research doc
 
 ### Could Do
+
 - [ ] Add response time logging
 - [ ] Add cache headers (short TTL, user-specific)
 
@@ -285,6 +293,7 @@ const url = await bucket.presign(key, { expiresIn: 900 });
 ## 10. Test Cases
 
 ### Unit Tests
+
 1. **Pagination:** Returns correct subset with cursor
 2. **Next cursor:** Correctly calculates next cursor from last item
 3. **HasMore flag:** Accurately determines if more photos exist
@@ -294,6 +303,7 @@ const url = await bucket.presign(key, { expiresIn: 900 });
 7. **Presigned URL:** Generates valid R2 presigned URL
 
 ### Integration Tests
+
 1. **Auth:** Unauthenticated → 401
 2. **Ownership:** Different photographer's event → 404
 3. **Non-existent event:** Invalid event ID → 404
@@ -304,13 +314,14 @@ const url = await bucket.presign(key, { expiresIn: 900 });
 
 ## 11. Open Questions for Human Decision
 
-| # | Question | Options | Impact |
-|---|----------|---------|--------|
-| 1 | R2 presigned URL method | `signUrl` vs `presign` | Implementation code |
-| 2 | Pagination response format | Nested vs flat | API contract |
-| 3 | Include `downloadUrl` or only thumbnail/preview | Yes (per spec) vs No | API response size |
+| #   | Question                                        | Options                | Impact              |
+| --- | ----------------------------------------------- | ---------------------- | ------------------- |
+| 1   | R2 presigned URL method                         | `signUrl` vs `presign` | Implementation code |
+| 2   | Pagination response format                      | Nested vs flat         | API contract        |
+| 3   | Include `downloadUrl` or only thumbnail/preview | Yes (per spec) vs No   | API response size   |
 
 **Recommendations:**
+
 1. **R2 method:** Validate against Cloudflare docs (implementv3 will verify)
 2. **Pagination format:** Use nested `{ data, pagination: {...} }`
 3. **downloadUrl:** Include per spec (15-minute presigned URL)
@@ -319,20 +330,21 @@ const url = await bucket.presign(key, { expiresIn: 900 });
 
 ## Summary
 
-| Category | Item | Status |
-|----------|------|--------|
-| **[RISK]** | Authorization leakage | Mitigated - verify ownership |
-| **[RISK]** | Invalid cursor format | Mitigated - Zod datetime validation |
-| **[NEED_VALIDATION]** | R2 presigned URL method | Check Cloudflare docs |
-| **[NEED_VALIDATION]** | R2 custom domain configured | Verify in Cloudflare dashboard |
-| **[GAP]** | Pagination response format | Resolved - use nested format |
-| **[GAP]** | Events without photos | Handled - empty array response |
+| Category              | Item                        | Status                              |
+| --------------------- | --------------------------- | ----------------------------------- |
+| **[RISK]**            | Authorization leakage       | Mitigated - verify ownership        |
+| **[RISK]**            | Invalid cursor format       | Mitigated - Zod datetime validation |
+| **[NEED_VALIDATION]** | R2 presigned URL method     | Check Cloudflare docs               |
+| **[NEED_VALIDATION]** | R2 custom domain configured | Verify in Cloudflare dashboard      |
+| **[GAP]**             | Pagination response format  | Resolved - use nested format        |
+| **[GAP]**             | Events without photos       | Handled - empty array response      |
 
 ---
 
 ## Provenance
 
 **Files read:**
+
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/docs/logs/BS_0001_S-1/tasks.md` - Task definition
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/docs/logs/BS_0001_S-1/plan/final.md` - Execution plan
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/docs/logs/BS_0001_S-1/research/cf-images-thumbnails.md` - CF Images research

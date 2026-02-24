@@ -112,9 +112,7 @@ function extractAttributes(detail?: any): FaceAttributes | undefined {
   if (!detail) return undefined;
 
   return {
-    age: detail.AgeRange
-      ? { low: detail.AgeRange.Low, high: detail.AgeRange.High }
-      : undefined,
+    age: detail.AgeRange ? { low: detail.AgeRange.Low, high: detail.AgeRange.High } : undefined,
     gender: detail.Gender
       ? {
           value: detail.Gender.Value ?? '',
@@ -209,9 +207,7 @@ function transformSearchResponse(data: any): SimilarFace[] {
     data.FaceMatches?.map((m: any) => ({
       faceId: m.Face?.FaceId || '',
       similarity: normalizeConfidence(m.Similarity),
-      boundingBox: m.Face?.BoundingBox
-        ? normalizeBoundingBox(m.Face.BoundingBox)
-        : undefined,
+      boundingBox: m.Face?.BoundingBox ? normalizeBoundingBox(m.Face.BoundingBox) : undefined,
       confidence: normalizeConfidence(m.Face?.Confidence),
       externalImageId: m.Face?.ExternalImageId,
       provider: 'aws',
@@ -297,7 +293,8 @@ export function createAWSProvider(config: AWSProviderConfig): FaceRecognitionPro
             ExternalImageId: request.photoId,
             DetectionAttributes: ['ALL'],
             MaxFaces: request.options?.maxFaces ?? 100,
-            QualityFilter: request.options?.qualityFilter?.toUpperCase() === 'NONE' ? 'NONE' : 'AUTO',
+            QualityFilter:
+              request.options?.qualityFilter?.toUpperCase() === 'NONE' ? 'NONE' : 'AUTO',
           }),
         }),
         networkErrorToFaceServiceError,
@@ -315,7 +312,9 @@ export function createAWSProvider(config: AWSProviderConfig): FaceRecognitionPro
       return ok(transformIndexResponse(data));
     });
 
-  const findSimilarFaces = (request: FindSimilarRequest): ResultAsync<SimilarFace[], FaceServiceError> =>
+  const findSimilarFaces = (
+    request: FindSimilarRequest,
+  ): ResultAsync<SimilarFace[], FaceServiceError> =>
     safeTry(async function* () {
       const response = yield* ResultAsync.fromPromise(
         aws.fetch(endpoint, {
@@ -346,7 +345,9 @@ export function createAWSProvider(config: AWSProviderConfig): FaceRecognitionPro
       return ok(transformSearchResponse(data));
     });
 
-  const findImagesByFace = (request: FindImagesByFaceRequest): ResultAsync<FindImagesByFaceResponse, FaceServiceError> =>
+  const findImagesByFace = (
+    request: FindImagesByFaceRequest,
+  ): ResultAsync<FindImagesByFaceResponse, FaceServiceError> =>
     safeTry(async function* () {
       const response = yield* ResultAsync.fromPromise(
         aws.fetch(endpoint, {

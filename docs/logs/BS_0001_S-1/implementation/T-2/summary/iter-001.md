@@ -17,19 +17,19 @@ Implemented `requirePhotographer` and `requireConsent` middlewares in the API ap
 
 ## Files Created
 
-| File | Purpose |
-|------|---------|
-| `apps/api/src/lib/db.ts` | DB helper to get Drizzle client from Hono context |
-| `apps/api/src/middleware/require-photographer.ts` | Middleware verifying auth + photographer exists |
-| `apps/api/src/middleware/require-consent.ts` | Middleware verifying PDPA consent given |
-| `apps/api/src/middleware/index.ts` | Barrel export |
+| File                                              | Purpose                                           |
+| ------------------------------------------------- | ------------------------------------------------- |
+| `apps/api/src/lib/db.ts`                          | DB helper to get Drizzle client from Hono context |
+| `apps/api/src/middleware/require-photographer.ts` | Middleware verifying auth + photographer exists   |
+| `apps/api/src/middleware/require-consent.ts`      | Middleware verifying PDPA consent given           |
+| `apps/api/src/middleware/index.ts`                | Barrel export                                     |
 
 ## Files Modified
 
-| File | Change |
-|------|--------|
+| File                              | Change                                         |
+| --------------------------------- | ---------------------------------------------- |
 | `packages/auth/src/middleware.ts` | Removed placeholder `requirePhotographer` stub |
-| `apps/api/package.json` | Added `drizzle-orm` dependency |
+| `apps/api/package.json`           | Added `drizzle-orm` dependency                 |
 
 ---
 
@@ -48,14 +48,16 @@ Use in any route/middleware to get a Drizzle DB instance.
 ### `requirePhotographer()` — `apps/api/src/middleware/require-photographer.ts`
 
 Checks:
+
 1. Valid Clerk auth exists (returns 401 if not)
 2. Photographer record exists in DB by `clerkId` (returns 403 if not)
 
 Sets minimal `PhotographerContext` in request:
+
 ```typescript
 type PhotographerContext = {
-  id: string;           // For FK queries
-  pdpaConsentAt: string | null;  // For consent checks
+  id: string; // For FK queries
+  pdpaConsentAt: string | null; // For consent checks
 };
 ```
 
@@ -67,9 +69,9 @@ Must run AFTER `requirePhotographer()`. Checks `photographer.pdpaConsentAt` is n
 
 ## Exported Types
 
-| Type | Description |
-|------|-------------|
-| `PhotographerContext` | Minimal photographer data stored in context |
+| Type                    | Description                                             |
+| ----------------------- | ------------------------------------------------------- |
+| `PhotographerContext`   | Minimal photographer data stored in context             |
 | `PhotographerVariables` | `AuthVariables & { photographer: PhotographerContext }` |
 
 ---
@@ -77,14 +79,14 @@ Must run AFTER `requirePhotographer()`. Checks `photographer.pdpaConsentAt` is n
 ## Usage Pattern
 
 ```typescript
-import { requirePhotographer, requireConsent, PhotographerVariables } from "./middleware";
+import { requirePhotographer, requireConsent, PhotographerVariables } from './middleware';
 
 // Consent endpoint - no consent check needed
-app.post("/consent", requirePhotographer(), consentHandler);
+app.post('/consent', requirePhotographer(), consentHandler);
 
 // Protected routes - both required
-app.use("/dashboard/*", requirePhotographer(), requireConsent());
-app.use("/events/*", requirePhotographer(), requireConsent());
+app.use('/dashboard/*', requirePhotographer(), requireConsent());
+app.use('/events/*', requirePhotographer(), requireConsent());
 ```
 
 ---

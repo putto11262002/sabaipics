@@ -1,6 +1,6 @@
 ---
-url: "https://developer.apple.com/documentation/imagecapturecore/iccamerafile"
-title: "ICCameraFile | Apple Developer Documentation"
+url: 'https://developer.apple.com/documentation/imagecapturecore/iccamerafile'
+title: 'ICCameraFile | Apple Developer Documentation'
 ---
 
 [Skip Navigation](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#app-main)
@@ -40,12 +40,12 @@ Only search within “Documentation”
 
 [Open Menu](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#)
 
-- SwiftLanguage:  Swift  Objective-C
+- SwiftLanguage: Swift Objective-C
 
 Language:
 
-  - Swift
-  - [Objective-C](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#)
+- Swift
+- [Objective-C](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#)
 
 All Technologies
 
@@ -151,7 +151,7 @@ To navigate the symbols, press Up Arrow, Down Arrow, Left Arrow or Right Arrow
 
 M
 
-8 of 49 symbols inside -674669743 [func requestReadData(atOffset: off\_t, length: off\_t, completion: (Data?, (any Error)?) -> Void)](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/3131470-requestreaddata)
+8 of 49 symbols inside -674669743 [func requestReadData(atOffset: off_t, length: off_t, completion: (Data?, (any Error)?) -> Void)](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/3131470-requestreaddata)
 
 To navigate the symbols, press Up Arrow, Down Arrow, Left Arrow or Right Arrow
 
@@ -223,7 +223,7 @@ To navigate the symbols, press Up Arrow, Down Arrow, Left Arrow or Right Arrow
 
 P
 
-20 of 49 symbols inside -674669743 [var fileSize: off\_t](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/1389013-filesize)
+20 of 49 symbols inside -674669743 [var fileSize: off_t](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/1389013-filesize)
 
 To navigate the symbols, press Up Arrow, Down Arrow, Left Arrow or Right Arrow
 
@@ -540,33 +540,33 @@ iOS 13.0+iPadOS 13.0+Mac Catalyst 13.1+macOS 10.4+visionOS 1.0+
 class ICCameraFile
 ```
 
-## [Topics](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#topics)
+## [Topics](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#topics)
 
-### [Requesting Metadata](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Requesting-Metadata)
+### [Requesting Metadata](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Requesting-Metadata)
 
-[`func requestMetadataDictionary(options: [ICCameraItemMetadataOption : Any]?, completion: ([AnyHashable : Any]?, (any Error)?) -> Void)`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestmetadatadictionary(options:completion:))
+[`func requestMetadataDictionary(options: [ICCameraItemMetadataOption : Any]?, completion: ([AnyHashable : Any]?, (any Error)?) -> Void)`](<https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestmetadatadictionary(options:completion:)>)
 
 Requests metadata and executes the completion block in place of the delegate.
 
-### [Requesting Thumbnails](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Requesting-Thumbnails)
+### [Requesting Thumbnails](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Requesting-Thumbnails)
 
-[`func requestThumbnailData(options: [ICCameraItemThumbnailOption : Any]?, completion: (Data?, (any Error)?) -> Void)`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestthumbnaildata(options:completion:))
+[`func requestThumbnailData(options: [ICCameraItemThumbnailOption : Any]?, completion: (Data?, (any Error)?) -> Void)`](<https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestthumbnaildata(options:completion:)>)
 
 Requests a thumbnail and executes the completion block in place of the delegate.
 
-### [Requesting Downloads](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Requesting-Downloads)
+### [Requesting Downloads](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Requesting-Downloads)
 
-[`func requestDownload(options: [ICDownloadOption : Any]?, completion: (String?, (any Error)?) -> Void) -> Progress?`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestdownload(options:completion:))
+[`func requestDownload(options: [ICDownloadOption : Any]?, completion: (String?, (any Error)?) -> Void) -> Progress?`](<https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestdownload(options:completion:)>)
 
 Requests a download and executes the completion block in place of the delegate.
 
-### [Requesting Data](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Requesting-Data)
+### [Requesting Data](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Requesting-Data)
 
-[`func requestReadData(atOffset: off_t, length: off_t, completion: (Data?, (any Error)?) -> Void)`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestreaddata(atoffset:length:completion:))
+[`func requestReadData(atOffset: off_t, length: off_t, completion: (Data?, (any Error)?) -> Void)`](<https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestreaddata(atoffset:length:completion:)>)
 
 Requests to asynchronously read data of a specified length from a specified offset, then executes the completion block.
 
-### [Inspecting a File’s Name](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Inspecting-a-Files-Name)
+### [Inspecting a File’s Name](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Inspecting-a-Files-Name)
 
 [`var originalFilename: String?`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/originalfilename)
 
@@ -576,7 +576,7 @@ The original name of the file on disk.
 
 The created name of the file.
 
-### [Inspecting a File’s Identity](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Inspecting-a-Files-Identity)
+### [Inspecting a File’s Identity](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Inspecting-a-Files-Identity)
 
 [`var groupUUID: String?`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/groupuuid)
 
@@ -590,7 +590,7 @@ A related UUID correlating several images from an Apple device.
 
 The originating asset ID of an `HEIF` or `HVEC` file.
 
-### [Determining When a File Was Created or Modified](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Determining-When-a-File-Was-Created-or-Modified)
+### [Determining When a File Was Created or Modified](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Determining-When-a-File-Was-Created-or-Modified)
 
 [`var fileCreationDate: Date?`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/filecreationdate)
 
@@ -600,13 +600,13 @@ The creation date of the file.
 
 The modification date of the file.
 
-### [Inspecting a File’s Size](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Inspecting-a-Files-Size)
+### [Inspecting a File’s Size](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Inspecting-a-Files-Size)
 
 [`var fileSize: off_t`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/filesize)
 
 The size of the file, in bytes.
 
-### [Inspecting a File’s Dimensions](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Inspecting-a-Files-Dimensions)
+### [Inspecting a File’s Dimensions](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Inspecting-a-Files-Dimensions)
 
 [`var width: Int`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/width)
 
@@ -616,7 +616,7 @@ The width of an image or movie frame.
 
 The height of an image or movie frame.
 
-### [Inspecting a File’s EXIF Data](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Inspecting-a-Files-EXIF-Data)
+### [Inspecting a File’s EXIF Data](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Inspecting-a-Files-EXIF-Data)
 
 [`var orientation: ICEXIFOrientationType`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/orientation)
 
@@ -634,13 +634,13 @@ The `EXIF` creation date of the file.
 
 The `EXIF` modification date of the file.
 
-### [Identifying a File’s Location](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Identifying-a-Files-Location)
+### [Identifying a File’s Location](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Identifying-a-Files-Location)
 
 [`var gpsString: String?`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/gpsstring)
 
 The GPS String of the file in standard format.
 
-### [Inspecting a File in a Burst](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Inspecting-a-File-in-a-Burst)
+### [Inspecting a File in a Burst](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Inspecting-a-File-in-a-Burst)
 
 [`var firstPicked: Bool`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/firstpicked)
 
@@ -658,7 +658,7 @@ A Boolean value that indicates this file is the burst favorite in a burst.
 
 A Boolean value that indicates whether this file is user picked in a burst.
 
-### [Inspecting Video Properties](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Inspecting-Video-Properties)
+### [Inspecting Video Properties](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Inspecting-Video-Properties)
 
 [`var duration: Double`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/duration)
 
@@ -672,7 +672,7 @@ A Boolean value that indicates whether the file is a slow motion or high-frame-r
 
 A Boolean value that indicates whether the file is a time-lapse video file.
 
-### [Identifying Related Files](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Identifying-Related-Files)
+### [Identifying Related Files](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Identifying-Related-Files)
 
 [`var sidecarFiles: [ICCameraItem]?`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/sidecarfiles)
 
@@ -682,27 +682,27 @@ An array of two camera files associated with this file.
 
 A sidecar file containing the logical `RAW` compliment of a `JPG` or other two-format image.
 
-### [Instance Properties](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Instance-Properties)
+### [Instance Properties](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Instance-Properties)
 
 [`var fingerprint: String?`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/fingerprint)
 
-### [Instance Methods](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Instance-Methods)
+### [Instance Methods](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Instance-Methods)
 
-[`func requestFingerprint(completion: (String?, (any Error)?) -> Void)`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestfingerprint(completion:))
+[`func requestFingerprint(completion: (String?, (any Error)?) -> Void)`](<https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestfingerprint(completion:)>)
 
-[`func requestSecurityScopedURL(completion: (URL?, (any Error)?) -> Void)`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestsecurityscopedurl(completion:))
+[`func requestSecurityScopedURL(completion: (URL?, (any Error)?) -> Void)`](<https://developer.apple.com/documentation/imagecapturecore/iccamerafile/requestsecurityscopedurl(completion:)>)
 
-### [Type Methods](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Type-Methods)
+### [Type Methods](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Type-Methods)
 
-[`class func fingerprintForFile(at: URL) -> String?`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile/fingerprintforfile(at:))
+[`class func fingerprintForFile(at: URL) -> String?`](<https://developer.apple.com/documentation/imagecapturecore/iccamerafile/fingerprintforfile(at:)>)
 
-## [Relationships](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#relationships)
+## [Relationships](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#relationships)
 
-### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#inherits-from)
+### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#inherits-from)
 
 - [`ICCameraItem`](https://developer.apple.com/documentation/imagecapturecore/iccameraitem)
 
-### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#conforms-to)
+### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#conforms-to)
 
 - [`CVarArg`](https://developer.apple.com/documentation/Swift/CVarArg)
 - [`CustomDebugStringConvertible`](https://developer.apple.com/documentation/Swift/CustomDebugStringConvertible)
@@ -711,9 +711,9 @@ A sidecar file containing the logical `RAW` compliment of a `JPG` or other two-f
 - [`Hashable`](https://developer.apple.com/documentation/Swift/Hashable)
 - [`NSObjectProtocol`](https://developer.apple.com/documentation/ObjectiveC/NSObjectProtocol)
 
-## [See Also](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#see-also)
+## [See Also](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#see-also)
 
-### [Cameras](https://developer.apple.com/documentation/imagecapturecore/iccamerafile\#Cameras)
+### [Cameras](https://developer.apple.com/documentation/imagecapturecore/iccamerafile#Cameras)
 
 [`class ICCameraDevice`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice)
 

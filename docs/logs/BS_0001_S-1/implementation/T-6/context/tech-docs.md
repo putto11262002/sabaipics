@@ -10,25 +10,27 @@ Root ID: BS_0001_S-1
 
 ### 1.1 Technology Stack (from `/docs/tech/TECH_STACK.md`)
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| React | ^19.2.0 | UI framework |
-| React Router | ^7.10.1 | Routing |
-| Vite | ^7.2.4 | Build tool |
-| TanStack Query | ^5.90.12 | Data fetching & caching |
-| Tailwind CSS | ^4.1.17 | Styling framework |
-| shadcn/ui | latest (new-york style) | Component library |
-| Clerk | @clerk/clerk-react ^5.58.0 | Authentication |
-| Lucide React | ^0.556.0 | Icons |
+| Technology     | Version                    | Purpose                 |
+| -------------- | -------------------------- | ----------------------- |
+| React          | ^19.2.0                    | UI framework            |
+| React Router   | ^7.10.1                    | Routing                 |
+| Vite           | ^7.2.4                     | Build tool              |
+| TanStack Query | ^5.90.12                   | Data fetching & caching |
+| Tailwind CSS   | ^4.1.17                    | Styling framework       |
+| shadcn/ui      | latest (new-york style)    | Component library       |
+| Clerk          | @clerk/clerk-react ^5.58.0 | Authentication          |
+| Lucide React   | ^0.556.0                   | Icons                   |
 
 ### 1.2 Styling Conventions (from `/docs/tech/ui/index.md`)
 
 MUST follow:
+
 - Use Tailwind CSS for all styling
 - Use shadcn predefined variables for colors, borders, etc.
 - Reuse shadcn components, blocks, examples as much as possible
 
 Reference docs:
+
 - Components: `docs/shadcn/components`
 - Blocks: `docs/shadcn/blocks`
 - Examples: `docs/shadcn/examples`
@@ -76,6 +78,7 @@ apps/dashboard/
 ```
 
 MUST follow:
+
 - Auth provider wraps everything
 - QueryClient has `staleTime: 1000 * 60` (1 minute) and `retry: 1`
 - Environment variable: `VITE_CLERK_PUBLISHABLE_KEY`
@@ -100,6 +103,7 @@ MUST follow:
 ```
 
 MUST follow:
+
 - Auth pages use `/*` wildcard for Clerk's internal routing
 - Protected routes wrapped with `ProtectedRoute` component
 - `Layout` component contains `<Outlet />` for nested routes
@@ -113,18 +117,13 @@ MUST follow:
 The project uses a wrapper package `@sabaipics/auth` around Clerk.
 
 Import patterns:
+
 - React components/hooks: `import { ... } from "@sabaipics/auth/react"`
 
 ### 3.2 Exported Components (from `/packages/auth/src/components.tsx`)
 
 ```tsx
-export {
-  SignIn,
-  SignUp,
-  UserButton,
-  SignedIn,
-  SignedOut,
-} from "@clerk/clerk-react";
+export { SignIn, SignUp, UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 ```
 
 ### 3.3 Auth Hooks (from `/packages/auth/src/hooks.ts`)
@@ -157,23 +156,19 @@ interface User {
 ### 3.4 Current Sign-up Page Pattern (from `/apps/dashboard/src/routes/sign-up.tsx`)
 
 ```tsx
-import { SignUp } from "@sabaipics/auth/react";
+import { SignUp } from '@sabaipics/auth/react';
 
 export function SignUpPage() {
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <SignUp
-        routing="path"
-        path="/sign-up"
-        signInUrl="/sign-in"
-        afterSignUpUrl="/dashboard"
-      />
+      <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" afterSignUpUrl="/dashboard" />
     </div>
   );
 }
 ```
 
 MUST follow:
+
 - Use `routing="path"` for path-based routing
 - Specify `path` matching the route
 - Use `afterSignUpUrl` for post-signup redirect
@@ -185,8 +180,8 @@ MUST follow:
 From `/apps/dashboard/src/components/auth/ProtectedRoute.tsx`:
 
 ```tsx
-import { useAuth } from "@sabaipics/auth/react";
-import { Navigate, useLocation } from "react-router";
+import { useAuth } from '@sabaipics/auth/react';
+import { Navigate, useLocation } from 'react-router';
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
@@ -205,6 +200,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 ```
 
 T-6 MUST extend this pattern to:
+
 - Check `photographer.pdpaConsentAt` after auth check
 - Show PDPA modal if consent not given
 - Block dashboard access until consent recorded
@@ -216,9 +212,9 @@ T-6 MUST extend this pattern to:
 From `/apps/dashboard/src/lib/api.ts`:
 
 ```tsx
-import { hc } from "hono/client";
-import type { AppType } from "@sabaipics/api";
-import { useAuth } from "@sabaipics/auth/react";
+import { hc } from 'hono/client';
+import type { AppType } from '@sabaipics/api';
+import { useAuth } from '@sabaipics/auth/react';
 
 // Hook for authenticated API calls
 export function useApiClient() {
@@ -236,6 +232,7 @@ export function useApiClient() {
 ```
 
 MUST follow:
+
 - Use `hc` from `hono/client` for type-safe API calls
 - Use `useApiClient()` hook for authenticated requests
 - Environment variable: `VITE_API_URL`
@@ -248,18 +245,18 @@ From `/packages/ui/`:
 
 ### 6.1 Currently Installed
 
-| Component | Path | Use Case |
-|-----------|------|----------|
-| Button | `@sabaipics/ui/components/button` | Actions, form submit |
-| Card | `@sabaipics/ui/components/card` | Content containers |
-| Alert | `@sabaipics/ui/components/alert` | Status messages, errors |
+| Component | Path                              | Use Case                |
+| --------- | --------------------------------- | ----------------------- |
+| Button    | `@sabaipics/ui/components/button` | Actions, form submit    |
+| Card      | `@sabaipics/ui/components/card`   | Content containers      |
+| Alert     | `@sabaipics/ui/components/alert`  | Status messages, errors |
 
 ### 6.2 Component Import Pattern
 
 ```tsx
-import { Button } from "@sabaipics/ui/components/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@sabaipics/ui/components/card";
-import { Alert, AlertTitle, AlertDescription } from "@sabaipics/ui/components/alert";
+import { Button } from '@sabaipics/ui/components/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@sabaipics/ui/components/card';
+import { Alert, AlertTitle, AlertDescription } from '@sabaipics/ui/components/alert';
 ```
 
 ### 6.3 Adding New Components
@@ -272,6 +269,7 @@ pnpm --filter=@sabaipics/ui ui:add dialog
 ```
 
 Or from project root:
+
 ```bash
 cd packages/ui && pnpm dlx shadcn@latest add dialog
 ```
@@ -302,11 +300,11 @@ cd packages/ui && pnpm dlx shadcn@latest add dialog
 ### 6.5 Utility Function (from `/packages/ui/src/lib/utils.ts`)
 
 ```tsx
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 ```
 
@@ -323,6 +321,7 @@ From `/apps/api/src/routes/consent.ts`:
 ### 7.2 Response Shape
 
 Success (201):
+
 ```json
 {
   "data": {
@@ -334,6 +333,7 @@ Success (201):
 ```
 
 Already consented (409):
+
 ```json
 {
   "error": {
@@ -354,13 +354,13 @@ The API captures `CF-Connecting-IP` header for audit. The UI does not need to se
 From `/apps/dashboard/src/routes/dashboard/index.tsx`:
 
 ```tsx
-import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../lib/api";
+import { useQuery } from '@tanstack/react-query';
+import { useApiClient } from '../../lib/api';
 
 const { getToken } = useApiClient();
 
 const { data, isLoading, error } = useQuery({
-  queryKey: ["profile"],
+  queryKey: ['profile'],
   queryFn: async () => {
     const token = await getToken();
     const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/profile`, {
@@ -379,20 +379,21 @@ const { data, isLoading, error } = useQuery({
 ```
 
 For mutations (like consent):
+
 ```tsx
-import { useMutation } from "@tanstack/react-query";
+import { useMutation } from '@tanstack/react-query';
 
 const mutation = useMutation({
   mutationFn: async () => {
     const token = await getToken();
     const response = await fetch(`${import.meta.env.VITE_API_URL}/consent`, {
-      method: "POST",
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
     });
-    if (!response.ok) throw new Error("...");
+    if (!response.ok) throw new Error('...');
     return response.json();
   },
   onSuccess: () => {
@@ -434,31 +435,37 @@ From `/docs/logs/BS_0001_S-1/tasks.md`:
 ## 10. Summary of Must-Follow Rules
 
 ### File Locations
+
 - New auth routes: `apps/dashboard/src/routes/auth/`
 - New components: `apps/dashboard/src/components/`
 - Shared UI: `packages/ui/src/components/`
 
 ### Imports
+
 - Auth: `@sabaipics/auth/react`
 - UI: `@sabaipics/ui/components/*`
 - Utils: `@sabaipics/ui/lib/utils`
 
 ### Styling
+
 - Use Tailwind CSS classes
 - Use shadcn CSS variables (e.g., `bg-card`, `text-muted-foreground`)
 - Use `cn()` utility for conditional classes
 
 ### API Calls
+
 - Use `useApiClient()` hook for authenticated requests
 - Use TanStack Query for data fetching/mutations
 - Handle loading, error, success states
 
 ### Components
+
 - Add Dialog via shadcn CLI before implementing modal
 - Follow shadcn new-york style
 - Use Lucide icons from `lucide-react`
 
 ### Auth Flow
+
 - Extend `ProtectedRoute` pattern for consent check
 - Use Clerk's `afterSignUpUrl` to control post-signup flow
 - Modal must be blocking (prevent dashboard access)

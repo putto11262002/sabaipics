@@ -14,6 +14,7 @@ Clerk provides native support for LINE Login as a social connection (OAuth provi
 ## Key Findings
 
 ### 1. Native LINE Support
+
 - **LINE is officially supported** as one of Clerk's 25+ social connection providers
 - Available alongside Google, GitHub, Microsoft, Facebook, Discord, and others
 - Listed in official documentation: https://clerk.com/docs/authentication/social-connections/oauth
@@ -21,6 +22,7 @@ Clerk provides native support for LINE Login as a social connection (OAuth provi
 ### 2. Development vs Production Setup
 
 **Development Instances:**
+
 - Clerk provides pre-configured shared OAuth credentials
 - **Zero configuration required** - just enable LINE in dashboard
 - Default region: **Japan**
@@ -28,6 +30,7 @@ Clerk provides native support for LINE Login as a social connection (OAuth provi
 - Perfect for testing and prototyping
 
 **Production Instances:**
+
 - Requires custom OAuth credentials from LINE Developers Console
 - Need to create a LINE channel and configure:
   - Channel ID (Client ID)
@@ -40,6 +43,7 @@ Clerk provides native support for LINE Login as a social connection (OAuth provi
 When a user authenticates via LINE, Clerk creates a User object containing:
 
 **Core Identity Fields:**
+
 - `id` - Unique Clerk user identifier
 - `firstName` - User's first name (if provided by LINE)
 - `lastName` - User's last name (if provided by LINE)
@@ -47,17 +51,20 @@ When a user authenticates via LINE, Clerk creates a User object containing:
 - `hasImage` - Boolean indicating if profile image exists
 
 **Authentication Identifiers:**
+
 - `emailAddresses[]` - Array of EmailAddress objects (includes primary email)
 - `primaryEmailAddress` - Main email from LINE profile
 - `externalAccounts[]` - Array containing LINE OAuth connection details
 - `externalId` - Optional ID for syncing with external systems
 
 **Metadata (Extensible):**
+
 - `publicMetadata` - Readable from frontend and backend
 - `privateMetadata` - Backend-only (sensitive data)
 - `unsafeMetadata` - User-editable, can be set during sign-up
 
 **OAuth-Specific:**
+
 - OAuth access tokens can be retrieved via `getUserOauthAccessToken()` method
 - Access tokens are refreshed on-demand (not proactively)
 - LINE profile picture is copied to Clerk's CDN
@@ -65,6 +72,7 @@ When a user authenticates via LINE, Clerk creates a User object containing:
 ### 4. Default OAuth Scopes
 
 Clerk automatically requests essential scopes from LINE:
+
 - **Profile information**: Basic profile data (name, picture)
 - **Email access**: User's email address (if available)
 
@@ -73,6 +81,7 @@ These scopes are pre-configured and included by default. Additional scopes can b
 ### 5. Authentication Flow
 
 **User-Facing Flow:**
+
 1. User clicks "Sign in with LINE" button in Clerk's UI
 2. User redirected to LINE's authorization page
 3. User logs in to LINE and grants permissions
@@ -83,6 +92,7 @@ These scopes are pre-configured and included by default. Additional scopes can b
 8. User redirected back to your application (authenticated)
 
 **Technical Flow:**
+
 ```
 [Your App] -> [Clerk UI] -> [LINE OAuth]
                              ↓
@@ -100,6 +110,7 @@ These scopes are pre-configured and included by default. Additional scopes can b
 ```
 
 **Key Security Features:**
+
 - State parameter for CSRF protection
 - PKCE (Proof Key for Code Exchange) for public clients
 - Clerk handles all token management
@@ -147,6 +158,7 @@ These scopes are pre-configured and included by default. Additional scopes can b
 ### Accessing LINE User Data
 
 **Basic User Info (from Clerk):**
+
 ```javascript
 // Frontend (React example)
 import { useUser } from '@clerk/nextjs';
@@ -157,7 +169,9 @@ function Profile() {
   return (
     <div>
       <img src={user.imageUrl} alt="Profile" />
-      <p>{user.firstName} {user.lastName}</p>
+      <p>
+        {user.firstName} {user.lastName}
+      </p>
       <p>{user.primaryEmailAddress.emailAddress}</p>
     </div>
   );
@@ -165,6 +179,7 @@ function Profile() {
 ```
 
 **OAuth Access Token (Backend only):**
+
 ```javascript
 // Backend API route
 import { clerkClient } from '@clerk/nextjs/server';
@@ -179,27 +194,32 @@ async function getLINEAccessToken(userId) {
 ### Important Considerations
 
 **Regional Differences:**
+
 - LINE has separate channels for different regions
 - Default development credentials use Japan region
 - For production, configure channel for target region
 - Can support multiple regions by adding multiple LINE connections with different credentials
 
 **Email Availability:**
+
 - Not all LINE users have email addresses in their profiles
 - Email may be null - implement fallback authentication methods
 - Consider requiring email during onboarding flow
 
 **Account Linking:**
+
 - Users can connect multiple social providers to one account
 - If user signs up with email first, they can later connect LINE
 - Clerk handles account linking automatically based on email matching
 
 **Sign-up vs Sign-in:**
+
 - OAuth flows are equivalent in Clerk
 - If user doesn't exist, account is created automatically
 - If user exists (matched by email), they're signed in
 
 **Custom Flows:**
+
 - Can build custom UI using Clerk's JavaScript SDK
 - Use `authenticateWithRedirect()` method for LINE OAuth
 - Useful if prebuilt components don't fit your design
@@ -293,6 +313,7 @@ A: Email may be null in User object. Design your app to handle this case (prompt
 **Verdict:** Clerk's native LINE Login support is production-ready and requires minimal implementation effort. Recommended approach for Facelink.
 
 **Rationale:**
+
 - Zero custom OAuth code required
 - Secure, standards-compliant implementation
 - Handles token management automatically

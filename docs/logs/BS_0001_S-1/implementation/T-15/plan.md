@@ -6,6 +6,7 @@ Date: `2026-01-11`
 Owner: `Claude (implementv3)`
 
 ## Inputs
+
 - Task: `docs/logs/BS_0001_S-1/tasks.md` (section: T-15)
 - Upstream plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Context reports:
@@ -18,6 +19,7 @@ Owner: `Claude (implementv3)`
 ## Goal / non-goals
 
 **Goal:**
+
 - Enable photographers to create events via responsive modal/drawer (Dialog on desktop, Drawer on mobile)
 - Create dedicated event list page (`/events`) showing all events in card grid with QR thumbnails
 - Create event detail page (`/events/:id`) with tabs (for future use), large QR display, download functionality, and copyable slideshow link
@@ -25,12 +27,14 @@ Owner: `Claude (implementv3)`
 - Support both search and slideshow URLs with copy-to-clipboard functionality
 
 **Non-goals:**
+
 - Event editing/deletion (not in acceptance criteria)
 - Slideshow functionality implementation (out of scope, shows "Coming soon")
 - Gallery/upload UI (T-19)
 - Event sharing features (W-7)
 
 **Updated requirements (from user):**
+
 - Dedicated `/events` page (not just dashboard enhancement)
 - Event detail page with tabs in header (future-proofing for Photos/Faces tabs)
 - Copyable slideshow link with copy-to-clipboard hook
@@ -44,6 +48,7 @@ Owner: `Claude (implementv3)`
 Following shadcn-native patterns from `docs/shadcn/` exploration:
 
 **1. Event Creation Flow**
+
 ```
 /events or Dashboard -> Click "Create Event" button
                      -> Open responsive CreateEventModal
@@ -59,6 +64,7 @@ Following shadcn-native patterns from `docs/shadcn/` exploration:
 ```
 
 **2. Event List Page Flow**
+
 ```
 Navigate to /events -> Fetch GET /events
                     -> Display grid of event cards (responsive columns)
@@ -72,6 +78,7 @@ Navigate to /events -> Fetch GET /events
 ```
 
 **3. Event Detail Flow**
+
 ```
 /events/:id -> Fetch GET /events/:id (T-13 API)
             -> Display with Tabs component
@@ -87,6 +94,7 @@ Navigate to /events -> Fetch GET /events
 ```
 
 **4. Dashboard Integration**
+
 ```
 Dashboard page (/dashboard) -> Keep existing event list
                             -> "View All Events" link -> Navigate to /events
@@ -96,6 +104,7 @@ Dashboard page (/dashboard) -> Keep existing event list
 ### File Structure
 
 **New files:**
+
 ```
 apps/dashboard/src/
   routes/events/
@@ -117,6 +126,7 @@ apps/dashboard/src/
 ```
 
 **Modified files:**
+
 ```
 apps/dashboard/src/
   routes/dashboard/index.tsx              # Add "View All Events" link
@@ -124,6 +134,7 @@ apps/dashboard/src/
 ```
 
 **Shadcn components to use (from docs/shadcn exploration):**
+
 - `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` - Event cards
 - `Dialog`, `DialogTrigger`, `DialogContent`, `DialogHeader` - Desktop modal
 - `Drawer`, `DrawerTrigger`, `DrawerContent`, `DrawerHeader` - Mobile drawer
@@ -139,6 +150,7 @@ apps/dashboard/src/
 ### Component Breakdown
 
 **CreateEventModal.tsx**
+
 - **Responsive wrapper:** Dialog on desktop (>640px), Drawer on mobile
 - **Form library:** React Hook Form with zodResolver
 - **Validation schema:** Zod schema in `lib/event-form-schema.ts`
@@ -166,6 +178,7 @@ apps/dashboard/src/
 - **Pattern reference:** `docs/shadcn/examples/form-rhf-complex.tsx`, `docs/shadcn/examples/drawer-dialog.tsx`
 
 **Event List Page (`/events/index.tsx`)**
+
 - **Layout:** PageHeader with "Create Event" button + responsive card grid
 - **Grid pattern:** `grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4`
 - **Data fetching:** useEvents() hook (GET /events)
@@ -177,6 +190,7 @@ apps/dashboard/src/
 - **Pattern reference:** `docs/shadcn/blocks/dashboard-01/components/section-cards.tsx`
 
 **EventCard.tsx**
+
 - **Component:** Card with clickable behavior (navigate to detail)
 - **Structure:**
   - CardHeader: Event name, created date
@@ -186,6 +200,7 @@ apps/dashboard/src/
 - **Pattern reference:** Existing dashboard event cards + Card component variants
 
 **Event Detail Page (`/events/:id/index.tsx`)**
+
 - **Layout:** PageHeader with back button + Tabs component
 - **Tabs structure:**
   - Tab 1: "Details" (default active)
@@ -197,6 +212,7 @@ apps/dashboard/src/
 - **Pattern reference:** `docs/shadcn/examples/tabs-demo.tsx`
 
 **EventQRDisplay.tsx**
+
 - **QR image:** `<img>` tag, 400px x 400px, responsive
 - **Download button:**
   ```tsx
@@ -223,6 +239,7 @@ apps/dashboard/src/
 - **Pattern reference:** `docs/shadcn/examples/input-group-button.tsx`, `docs/shadcn/hooks/use-copy-to-clipboard.ts`
 
 **Dashboard Enhancement (`/dashboard`)**
+
 - Keep existing event list display (from T-11)
 - Add "View All Events" link/button that navigates to `/events`
 - Keep "Create Event" button, wire it to open CreateEventModal
@@ -231,6 +248,7 @@ apps/dashboard/src/
 ### Data Fetching Hooks
 
 **useEvents.ts**
+
 ```typescript
 // Fetches GET /events
 // Returns: { events: Event[], isLoading, error }
@@ -238,6 +256,7 @@ apps/dashboard/src/
 ```
 
 **useEvent.ts**
+
 ```typescript
 // Fetches GET /events/:id
 // Returns: { event: Event | null, isLoading, error }
@@ -245,6 +264,7 @@ apps/dashboard/src/
 ```
 
 **useCreateEvent.ts**
+
 ```typescript
 // Mutation for POST /events
 // Invalidates ['dashboard'] cache on success
@@ -255,6 +275,7 @@ apps/dashboard/src/
 ### API Integration (T-13)
 
 **POST /events**
+
 ```typescript
 Request: {
   name: string;           // required, 1-200 chars
@@ -278,18 +299,26 @@ Errors:
 ```
 
 **GET /events**
+
 ```typescript
 Response: {
   events: Array<{
-    id, name, access_code, qr_code_url,
-    photo_count, face_count,
-    start_date?, end_date?,
-    created_at, expires_at
-  }>
+    id;
+    name;
+    access_code;
+    qr_code_url;
+    photo_count;
+    face_count;
+    start_date?;
+    end_date?;
+    created_at;
+    expires_at;
+  }>;
 }
 ```
 
 **GET /events/:id**
+
 ```typescript
 Response: { id, name, access_code, qr_code_url, ... }
 Errors:
@@ -301,11 +330,13 @@ Reference: `apps/api/src/routes/events/index.ts` (T-13)
 ### QR Code Handling
 
 **Display:**
+
 - Dashboard list: 80px x 80px thumbnail
 - Detail page: 400px x 400px display
 - Source: `qr_code_url` from API response
 
 **Download implementation:**
+
 ```typescript
 const handleDownload = async () => {
   setDownloading(true);
@@ -333,14 +364,17 @@ Reference: risk-scout.md lines 67-84
 ## Contracts (only if touched)
 
 **UI -> API:**
+
 - POST /events (new usage in CreateEventModal)
 - GET /events (new hook, may duplicate data from GET /dashboard)
 - GET /events/:id (new hook)
 
 **Router:**
+
 - Add protected route: `/events/:id` in `App.tsx`
 
 **Cache invalidation:**
+
 - After POST /events success: `queryClient.invalidateQueries(['dashboard'])`
 - Reason: Dashboard already fetches events via GET /dashboard (T-7), invalidating ensures consistency
 
@@ -366,6 +400,7 @@ Reference: risk-scout.md lines 67-84
 ## Failure modes / edge cases (major only)
 
 **1. Event creation failures**
+
 - **Empty name:** Client-side validation prevents submission, shows "Name is required"
 - **Name too long (>200 chars):** Client-side validation shows "Name must be 200 characters or less"
 - **Invalid date range (end < start):** Client-side validation shows "End date must be after start date"
@@ -373,20 +408,24 @@ Reference: risk-scout.md lines 67-84
 - **Network timeout:** React Query retry logic (3 attempts), then show error
 
 **2. QR code download failures**
+
 - **QR image 404 (R2 upload failed):** Show placeholder on detail page "QR code unavailable. Please contact support."
 - **Network failure during download:** Alert "Download failed. Please try again."
 - **Mobile browser blocks download:** iOS Safari may open image in new tab instead of downloading (acceptable fallback)
 
 **3. Event detail page failures**
+
 - **Event not found (404):** Show "Event not found" message with back to dashboard button
 - **Non-owned event (404):** Same as above (API returns 404 to prevent enumeration)
 - **Network timeout:** Show error alert with retry button
 
 **4. Dashboard integration**
+
 - **Cache desync after creation:** Using `invalidateQueries` ensures refetch, prevents stale data
 - **QR thumbnail load failure:** Show fallback icon (image `onError` handler)
 
 **5. Form state bugs**
+
 - **Modal not clearing on close:** Reset form state in `onOpenChange` when closing
 - **Loading state stuck:** Ensure `finally` block resets loading state
 - **Error persists after retry:** Clear error state when form changes
@@ -400,6 +439,7 @@ Following established pattern from T-6, T-11, T-12 (manual testing, no unit test
 **Manual testing checklist:**
 
 _Event Creation_
+
 - [ ] Click "Create Event" button opens modal
 - [ ] Submit with empty name shows validation error
 - [ ] Submit with name >200 chars shows validation error
@@ -411,6 +451,7 @@ _Event Creation_
 - [ ] Create another event after first succeeds
 
 _Event List Page (`/events`)_
+
 - [ ] Navigate to `/events` from dashboard "View All Events" link
 - [ ] Event list displays in responsive grid (1 col mobile, 2 col tablet, 4 col desktop)
 - [ ] Each event card shows: name, QR thumbnail, photo/face counts, dates
@@ -420,6 +461,7 @@ _Event List Page (`/events`)_
 - [ ] "Create Event" button in page header works
 
 _Event Detail Page (`/events/:id`)_
+
 - [ ] Navigate from event list card to `/events/:id`
 - [ ] Page header shows back button to `/events`
 - [ ] Tabs component displays (Details, Photos, Faces)
@@ -436,11 +478,13 @@ _Event Detail Page (`/events/:id`)_
 - [ ] Invalid event ID shows 404 error
 
 _Dashboard Integration_
+
 - [ ] "View All Events" link/button navigates to `/events`
 - [ ] "Create Event" button opens modal
 - [ ] Dashboard event list still works (no regressions)
 
 _Mobile Testing (Critical for Thai market)_
+
 - [ ] QR download on iOS Safari (may open in new tab, acceptable)
 - [ ] QR download on Android Chrome
 - [ ] QR download on LINE in-app browser
@@ -452,6 +496,7 @@ _Mobile Testing (Critical for Thai market)_
 - [ ] Event detail page responsive on mobile
 
 _Edge Cases_
+
 - [ ] Create event with very long name (199 chars)
 - [ ] Create event with same name as existing event (should succeed, no uniqueness constraint)
 - [ ] Create event with start date = end date (should succeed)
@@ -459,6 +504,7 @@ _Edge Cases_
 - [ ] Download QR for event with missing QR image (404 from R2)
 
 **Commands to run:**
+
 ```bash
 # Build dashboard
 pnpm --filter=@sabaipics/dashboard build
@@ -475,16 +521,19 @@ Note: No automated tests (Vitest not configured for dashboard, established patte
 ## Rollout / rollback
 
 **Environment variables:**
+
 - `VITE_API_URL` - Already configured (dashboard API client)
 - `APP_BASE_URL` - Already configured in API (T-13, used for QR URL generation)
 
 **R2 configuration:**
+
 - QR images stored in `PHOTOS_BUCKET` at path `qr/{access_code}.png` (T-13)
 - `[NEED_VALIDATION]` R2 public access pattern: T-13 uses `${APP_BASE_URL}/r2/${r2Key}` but R2 proxy endpoint doesn't exist yet
 - **Recommendation:** Configure R2 bucket for public read access (QR codes are meant to be public, printed on posters)
 - **Alternative:** Create API proxy endpoint `GET /r2/:key` to stream from R2 (adds latency, complexity)
 
 **Deployment:**
+
 1. Merge PR to master
 2. Dashboard build runs automatically (GitHub Actions)
 3. Deploy to Cloudflare Pages via `pnpm --filter=@sabaipics/dashboard pages:deploy`
@@ -492,11 +541,13 @@ Note: No automated tests (Vitest not configured for dashboard, established patte
 5. No database migrations (T-1 already deployed)
 
 **Rollback:**
+
 - If critical bug found: revert PR, redeploy dashboard
 - API endpoints (T-13) remain functional, no breaking changes
 - Event data persists in database, no data loss
 
 **Monitoring:**
+
 - Event creation success/failure rate (Cloudflare Workers analytics)
 - QR download clicks (can add client-side analytics if needed)
 - Page load performance for `/events/:id` (Cloudflare Pages analytics)
@@ -508,11 +559,13 @@ Note: No automated tests (Vitest not configured for dashboard, established patte
 **Issue discovered:** The `eventsRouter` from T-13 is defined in `apps/api/src/routes/events/index.ts` but **never imported or mounted** in `apps/api/src/index.ts`. This means the Events API endpoints (POST /events, GET /events, GET /events/:id) are currently **not accessible**.
 
 **Current state (apps/api/src/index.ts line 62):**
+
 ```typescript
 .route('/events', photosRouter);  // Only has GET /events/:eventId/photos
 ```
 
 **Required fix:**
+
 ```typescript
 import { eventsRouter } from './routes/events';  // Add import
 
@@ -528,11 +581,13 @@ import { eventsRouter } from './routes/events';  // Add import
 ### [RESOLVED] R2 QR URL Access Pattern
 
 **Verified from T-13 implementation:**
+
 - QR URL pattern: `${APP_BASE_URL}/r2/${r2Key}` where `r2Key = qr/${accessCode}.png`
 - Example: `https://api.sabaipics.com/r2/qr/ABC123.png`
 - TODO comment on line 175-176 indicates this is a placeholder
 
 **Decision:** Use placeholder pattern as-is for now
+
 - T-15 will consume the `qrCodeUrl` field from API responses
 - If QR URLs return 404, that's a separate ops/infrastructure issue to fix
 - T-15 implementation is not blocked by R2 configuration
@@ -545,10 +600,12 @@ import { eventsRouter } from './routes/events';  // Add import
 **Issue:** After event creation success, how to provide feedback beyond modal close + list update?
 
 **Options:**
+
 - A) Add toast library (e.g., sonner, react-hot-toast) for success message
 - B) Rely on implicit feedback (modal closes, new event appears in list)
 
 **Recommendation:** Option B (implicit feedback)
+
 - Consistent with existing patterns (T-6, T-12 have no toasts)
 - Simpler, no new dependency
 - Modal close + list update is clear success signal
@@ -559,6 +616,7 @@ import { eventsRouter } from './routes/events';  // Add import
 **Issue:** Task acceptance doesn't mention event deletion, but photographers may need to remove test events.
 
 **Recommendation:** Out of scope for T-15 (not in acceptance criteria)
+
 - Can be added later as enhancement
 - Would need DELETE /events/:id API endpoint (not implemented in T-13)
 
@@ -567,6 +625,7 @@ import { eventsRouter } from './routes/events';  // Add import
 **Decision:** React Hook Form + Zod + shadcn field primitives
 
 **Rationale:**
+
 - User requirement: Use React Hook Form + Zod + shadcn field primitives
 - Shadcn exploration found comprehensive patterns in `docs/shadcn/examples/form-rhf-complex.tsx`
 - Establishes pattern for future forms (Photos upload, Face search, etc.)
@@ -574,30 +633,36 @@ import { eventsRouter } from './routes/events';  // Add import
 - More robust validation and error handling
 
 **Implementation pattern:**
+
 ```typescript
 // lib/event-form-schema.ts
-import { z } from "zod"
+import { z } from 'zod';
 
-export const eventFormSchema = z.object({
-  name: z.string().min(1, "Event name is required").max(200, "Event name must be 200 characters or less"),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
-}).refine(
-  (data) => {
-    if (data.startDate && data.endDate) {
-      return new Date(data.endDate) >= new Date(data.startDate)
-    }
-    return true
-  },
-  {
-    message: "End date must be after start date",
-    path: ["endDate"],
-  }
-)
+export const eventFormSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1, 'Event name is required')
+      .max(200, 'Event name must be 200 characters or less'),
+    startDate: z.string().datetime().optional(),
+    endDate: z.string().datetime().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.startDate && data.endDate) {
+        return new Date(data.endDate) >= new Date(data.startDate);
+      }
+      return true;
+    },
+    {
+      message: 'End date must be after start date',
+      path: ['endDate'],
+    },
+  );
 
 // CreateEventModal.tsx
 const form = useForm<z.infer<typeof eventFormSchema>>({
   resolver: zodResolver(eventFormSchema),
-  defaultValues: { name: "", startDate: "", endDate: "" },
-})
+  defaultValues: { name: '', startDate: '', endDate: '' },
+});
 ```

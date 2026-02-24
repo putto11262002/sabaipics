@@ -47,11 +47,7 @@ const bulkDownloadSchema = z.object({
     .max(15, 'Maximum 15 photos per download'),
 });
 
-const ALLOWED_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-] as const;
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 const MAX_SELFIE_SIZE = 5 * 1024 * 1024; // 5 MB
 
@@ -278,7 +274,11 @@ export const participantRouter = new Hono<Env>()
 
         // Step 1: Validate eventId exists
         const [event] = yield* ResultAsync.fromPromise(
-          db.select({ id: activeEvents.id }).from(activeEvents).where(eq(activeEvents.id, eventId)).limit(1),
+          db
+            .select({ id: activeEvents.id })
+            .from(activeEvents)
+            .where(eq(activeEvents.id, eventId))
+            .limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 
@@ -693,7 +693,11 @@ export const participantRouter = new Hono<Env>()
 
         // Verify event exists
         const [event] = yield* ResultAsync.fromPromise(
-          db.select({ id: activeEvents.id }).from(activeEvents).where(eq(activeEvents.id, eventId)).limit(1),
+          db
+            .select({ id: activeEvents.id })
+            .from(activeEvents)
+            .where(eq(activeEvents.id, eventId))
+            .limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 

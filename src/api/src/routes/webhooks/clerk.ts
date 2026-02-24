@@ -213,10 +213,7 @@ export const clerkWebhookRouter = new Hono<Env>().post('/', async (c) => {
         }
 
         if (Object.keys(set).length > 0) {
-          await db
-            .update(photographers)
-            .set(set)
-            .where(eq(photographers.clerkId, user.id));
+          await db.update(photographers).set(set).where(eq(photographers.clerkId, user.id));
 
           console.log('[Clerk Webhook] user.updated: photographer updated', {
             clerkId: user.id,

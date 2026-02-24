@@ -5,7 +5,7 @@
   "compatibility_date": "2025-12-06",
   "compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
   "alias": {
-    "@": "./src"
+    "@": "./src",
   },
   "dev": {
     "port": 8081,
@@ -92,10 +92,10 @@
         "queue": "upload-processing-dev",
         // CF Images handles the heavy decode externally; Photon is only used for
         // LUT grading on the already-resized output (~14 MB RGBA). Safe to batch.
-        "max_batch_size": 4,
+        "max_batch_size": 10,
         "max_batch_timeout": 5,
         "max_retries": 1,
-        "max_concurrency": 4,
+        "max_concurrency": 8,
         "dead_letter_queue": "upload-processing-dlq-dev",
       },
       {
@@ -245,10 +245,10 @@
           {
             "queue": "upload-processing-staging",
             // CF Images handles heavy decode — see dev comment above
-            "max_batch_size": 4,
+            "max_batch_size": 10,
             "max_batch_timeout": 5,
             "max_retries": 1,
-            "max_concurrency": 4,
+            "max_concurrency": 8,
             "dead_letter_queue": "upload-processing-dlq-staging",
           },
           {
@@ -304,7 +304,15 @@
         ],
       },
       "triggers": {
-        "crons": ["0 20 * * *", "0 21 * * *", "0 22 * * *", "0 23 * * *", "10 23 * * *", "20 23 * * *", "30 23 * * *"],
+        "crons": [
+          "0 20 * * *",
+          "0 21 * * *",
+          "0 22 * * *",
+          "0 23 * * *",
+          "10 23 * * *",
+          "20 23 * * *",
+          "30 23 * * *",
+        ],
       },
       "observability": {
         "enabled": true,
@@ -392,10 +400,10 @@
           {
             "queue": "upload-processing",
             // CF Images handles heavy decode — see dev comment above
-            "max_batch_size": 4,
+            "max_batch_size": 10,
             "max_batch_timeout": 5,
             "max_retries": 1,
-            "max_concurrency": 4,
+            "max_concurrency": 8,
             "dead_letter_queue": "upload-processing-dlq",
           },
           {
@@ -451,7 +459,15 @@
         ],
       },
       "triggers": {
-        "crons": ["0 20 * * *", "0 21 * * *", "0 22 * * *", "0 23 * * *", "10 23 * * *", "20 23 * * *", "30 23 * * *"],
+        "crons": [
+          "0 20 * * *",
+          "0 21 * * *",
+          "0 22 * * *",
+          "0 23 * * *",
+          "10 23 * * *",
+          "20 23 * * *",
+          "30 23 * * *",
+        ],
       },
       "preview_urls": false,
       "observability": {

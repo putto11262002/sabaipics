@@ -17,6 +17,7 @@ T-13 implements the Events API with CRUD operations and QR code generation, buil
 **Risk:** Generating unique 6-character access codes could fail due to collisions or race conditions.
 
 **Analysis:**
+
 - Schema defines `access_code` as `text("access_code").notNull().unique()` with index
 - No existing access code generation pattern in the codebase (no nanoid or similar library)
 - 6-character uppercase alphanumeric (A-Z0-9) gives 36^6 = 2,176,782,336 possible combinations
@@ -24,11 +25,13 @@ T-13 implements the Events API with CRUD operations and QR code generation, buil
 - BUT: database unique constraint violations require retry logic
 
 **Current state:**
+
 - No access code generation utility exists
 - No retry pattern for unique constraint violations in existing routes
 - Admin credit packages uses database-generated UUIDs
 
 **Potential failure modes:**
+
 ```typescript
 // What if this happens?
 const accessCode = generateAccessCode(); // "ABC123"
@@ -37,6 +40,7 @@ await db.insert(events).values({ accessCode, ... });
 ```
 
 **Mitigation:**
+
 ```typescript
 async function generateUniqueAccessCode(db: Database, maxRetries = 5): Promise<string> {
   for (let i = 0; i < maxRetries; i++) {
@@ -50,7 +54,7 @@ async function generateUniqueAccessCode(db: Database, maxRetries = 5): Promise<s
       continue;
     }
   }
-  throw new Error("Failed to generate unique access code");
+  throw new Error('Failed to generate unique access code');
 }
 ```
 
@@ -65,15 +69,18 @@ async function generateUniqueAccessCode(db: Database, maxRetries = 5): Promise<s
 **Risk:** QR code generation or R2 upload failure should not prevent event creation.
 
 **Analysis:**
+
 - T-14 provides `generateEventQR()` that can throw on invalid input
 - R2 upload to `PHOTOS_BUCKET` could fail (network, permissions, quota)
 - Current plan doesn't specify whether QR generation is optional or required
 
 **From tasks.md (T-13):**
+
 > Generate QR PNG with two URLs (search + slideshow)
 > Uploads QR to R2
 
 **Failure modes:**
+
 1. Invalid access code (should never happen if we generate it ourselves)
 2. QR library throws unexpected error
 3. R2 upload fails (permissions, network, quota)
@@ -82,6 +89,7 @@ async function generateUniqueAccessCode(db: Database, maxRetries = 5): Promise<s
 **[NEED_DECISION] QR failure handling strategy**
 
 Options:
+
 - A) QR generation is **required** - event creation fails if QR generation fails
 - B) QR generation is **optional** - event created, `qr_code_r2_key` is NULL, retry later
 - C) QR generation is **async** - event created immediately, QR generated in background
@@ -97,17 +105,20 @@ Options:
 **Risk:** R2 upload failure or incorrect storage key format could cause QR retrieval issues.
 
 **Analysis:**
+
 - `PHOTOS_BUCKET` binding already configured in `wrangler.jsonc`
 - Existing pattern: `apps/api/src/queue/photo-consumer.ts` shows R2 usage for photos
 - QR storage path not specified in plan (need to define convention)
 
 **Storage key pattern:**
+
 - Task spec: `qr_code_r2_key` stores R2 key
 - T-14 plan suggests: `qr/${eventId}.png` format
 - But eventId is not known until AFTER database insert
 - Chicken-and-egg problem: need eventId to generate R2 key, need R2 key to insert event
 
 **Options:**
+
 1. Insert event first (NULL qr_code_r2_key), generate QR, update event
 2. Generate QR with temp key, insert event, rename in R2
 3. Use access code as R2 key (known before insert): `qr/${accessCode}.png`
@@ -125,23 +136,27 @@ Options:
 **Risk:** Event dates could be invalid, ambiguous, or cause timezone issues.
 
 **Analysis:**
+
 - Schema: `start_date` and `end_date` are `timestamptz` (nullable)
 - Task spec: "name (required), start/end dates (optional)"
 - No timezone specified in requirements
 - Thai market: UTC+7, but Cloudflare Workers uses UTC
 
 **Potential issues:**
+
 - User passes `start_date` > `end_date` (invalid range)
 - User passes dates in the past (should this be allowed?)
 - User passes dates without timezone info (ambiguous)
 - Frontend passes ISO 8601 strings (need to validate format)
 
 **Current validation patterns:**
+
 - Admin credit packages: uses Zod for number/string validation
 - Credits checkout: minimal validation, mostly database queries
 - No date validation examples in existing routes
 
 **Mitigation:**
+
 ```typescript
 // Add Zod schema for event creation
 const createEventSchema = z.object({
@@ -151,13 +166,16 @@ const createEventSchema = z.object({
 });
 
 // Validate in handler
-const data = c.req.valid("json");
+const data = c.req.valid('json');
 
 // Business rule: if both dates provided, start <= end
 if (data.startDate && data.endDate && data.startDate > data.endDate) {
-  return c.json({
-    error: { code: "INVALID_DATE_RANGE", message: "Start date must be before end date" }
-  }, 400);
+  return c.json(
+    {
+      error: { code: 'INVALID_DATE_RANGE', message: 'Start date must be before end date' },
+    },
+    400,
+  );
 }
 ```
 
@@ -170,37 +188,42 @@ if (data.startDate && data.endDate && data.startDate > data.endDate) {
 **Risk:** Photographers must only access their own events, not others' events.
 
 **Analysis:**
+
 - `requirePhotographer()` middleware ensures authenticated photographer
 - `requireConsent()` middleware ensures PDPA consent
 - Need to verify photographer owns the event they're trying to access
 
 **From existing patterns:**
+
 - Dashboard route: filters by `photographerId` in WHERE clause
 - Credits route: creates resources for authenticated photographer
 - Admin routes: uses API key auth, bypasses photographer context
 
 **For T-13:**
+
 - `GET /events` - must filter by `photographerId` (already in context)
 - `GET /events/:id` - must verify `event.photographerId === photographer.id`
 - `POST /events` - creates event for authenticated photographer (no additional check needed)
 
 **Attack vectors:**
+
 1. Enumerate event IDs by guessing UUIDs
 2. Access another photographer's event details
 3. Modify another photographer's event (if PATCH/PUT added)
 
 **Mitigation:**
+
 ```typescript
 // GET /events/:id
 const event = await db.select().from(events).where(eq(events.id, id)).limit(1);
 
 if (!event) {
-  return c.json({ error: { code: "NOT_FOUND", message: "Event not found" } }, 404);
+  return c.json({ error: { code: 'NOT_FOUND', message: 'Event not found' } }, 404);
 }
 
 if (event.photographerId !== photographer.id) {
   // Return NOT_FOUND instead of FORBIDDEN to prevent enumeration
-  return c.json({ error: { code: "NOT_FOUND", message: "Event not found" } }, 404);
+  return c.json({ error: { code: 'NOT_FOUND', message: 'Event not found' } }, 404);
 }
 ```
 
@@ -215,17 +238,20 @@ if (event.photographerId !== photographer.id) {
 **Risk:** Attackers could guess access codes to access private event galleries.
 
 **Analysis:**
+
 - 6-character uppercase alphanumeric = 2.1 billion combinations
 - If sequential or predictable, significantly easier to guess
 - Brute force: 2.1B requests at 1 req/sec = 68 years
 - BUT: if photographer creates 1000 events, and access codes are sequential...
 
 **From T-14 risk scout:**
+
 > Generate accessCode as 6-char uppercase alphanumeric (e.g., nanoid(6).toUpperCase())
 
 **[GAP] No decision on access code generation method**
 
 Options:
+
 - A) Cryptographically random (nanoid with custom alphabet) - recommended
 - B) Sequential with obfuscation (easier, but predictable)
 - C) Database auto-increment encoded (very predictable, don't use)
@@ -233,6 +259,7 @@ Options:
 **Recommendation:** Option A with nanoid or crypto.getRandomValues()
 
 **Mitigation:**
+
 ```typescript
 // Use nanoid with custom alphabet (A-Z0-9, no ambiguous chars)
 import { customAlphabet } from 'nanoid';
@@ -250,6 +277,7 @@ const accessCode = nanoid(); // e.g., "A1B2C3"
 **Risk:** Malicious access code could inject unwanted URLs into QR code.
 
 **Status:** Already mitigated by T-14 validation
+
 - T-14's `generateEventQR()` validates format: `/^[A-Z0-9]{6}$/`
 - URL construction uses template literal with validated input
 - No additional mitigation needed in T-13
@@ -263,6 +291,7 @@ const accessCode = nanoid(); // e.g., "A1B2C3"
 **Risk:** Exposed QR codes could reveal event access patterns.
 
 **Analysis:**
+
 - QR encodes `https://sabaipics.com/search/{accessCode}`
 - Access codes are not sequential (if using random generation)
 - No authentication required to search (public endpoint)
@@ -271,6 +300,7 @@ const accessCode = nanoid(); // e.g., "A1B2C3"
 **[GAP] Should event search be rate-limited?**
 
 Options:
+
 - A) No rate limit (simplest, allows public access)
 - B) IP-based rate limit (prevents abuse)
 - C) Captcha after N attempts (more complex)
@@ -286,11 +316,13 @@ Options:
 ### Upstream Dependencies
 
 **T-13 depends on:**
+
 - **T-1 (DB Schema)** - `events` table must exist with all columns
 - **T-2 (Auth Middleware)** - `requirePhotographer()`, `requireConsent()`
 - **T-14 (QR Library)** - `generateEventQR()` function must be available
 
 **Blocked by:**
+
 - T-14 (must be merged first)
 
 ---
@@ -298,11 +330,13 @@ Options:
 ### Downstream Consumers
 
 **T-13 blocks:**
+
 - **T-15 (Events UI)** - needs `GET /events`, `GET /events/:id`, QR URL
 - **T-16 (Upload API)** - needs `events.id` and `events.accessCode` for photo uploads
 - **T-18 (Gallery API)** - depends on events existing
 
 **Expected usage:**
+
 ```typescript
 // T-15 UI will call:
 GET /events // List photographer's events
@@ -319,14 +353,17 @@ GET /events/:id // Get single event with QR URL
 ### Implicit Dependencies
 
 **Environment variables:**
+
 - `APP_BASE_URL` - must be set for QR generation (already configured in wrangler.jsonc)
 - `PHOTOS_BUCKET` - R2 binding for QR storage (already configured)
 
 **Database indexes:**
+
 - `events_photographer_id_idx` - for efficient queries by photographer
 - `events_access_code_idx` - for unique constraint enforcement
 
 **R2 lifecycle rules:**
+
 - Plan mentions: "delete QR codes after 30 days"
 - Not configured yet (needs R2 lifecycle rule setup)
 
@@ -335,6 +372,7 @@ GET /events/:id // Get single event with QR URL
 ### Integration Points
 
 **File locations (T-13 deliverables):**
+
 - `apps/api/src/routes/events.ts` - Main events router (NEW)
 - `apps/api/src/routes/events/index.ts` - Export (NEW)
 - `apps/api/src/routes/events/test.ts` - Tests (NEW)
@@ -342,6 +380,7 @@ GET /events/:id // Get single event with QR URL
 - Update `apps/api/src/index.ts` - Register events router
 
 **Router registration:**
+
 ```typescript
 // apps/api/src/index.ts
 import { eventsRouter } from "./routes/events";
@@ -351,6 +390,7 @@ import { eventsRouter } from "./routes/events";
 ```
 
 **Route pattern:**
+
 ```typescript
 // POST /events - Create event (auth required)
 // GET /events - List photographer's events (auth required)
@@ -368,6 +408,7 @@ import { eventsRouter } from "./routes/events";
 **Question:** If QR generation or R2 upload fails, should event creation fail or proceed?
 
 **Options:**
+
 - A) Required - Event creation fails, return 500 error (recommended for MVP)
 - B) Optional - Event created, `qr_code_r2_key` NULL, retry later
 - C) Async - Event created immediately, QR generated in background job
@@ -385,6 +426,7 @@ import { eventsRouter } from "./routes/events";
 **Question:** What should be the R2 key format for QR codes?
 
 **Options:**
+
 - A) `qr/${accessCode}.png` - Uses access code (unique, known before insert)
 - B) `qr/${eventId}.png` - Uses UUID (need to insert event first, then update)
 - C) `qr/${photographerId}/${accessCode}.png` - Namespaced by photographer
@@ -402,6 +444,7 @@ import { eventsRouter } from "./routes/events";
 **Question:** How should access codes be generated?
 
 **Options:**
+
 - A) nanoid with custom alphabet (cryptographically random, recommended)
 - B) crypto.getRandomValues() with base36 encoding
 - C) Sequential with prefix (predictable, don't use)
@@ -423,6 +466,7 @@ import { eventsRouter } from "./routes/events";
 **Current plan:** "name (required)" with no length specified
 
 **Options:**
+
 - A) 1-200 characters (reasonable default, matches credit packages)
 - B) 1-100 characters (stricter)
 - C) No limit (not recommended)
@@ -440,6 +484,7 @@ import { eventsRouter } from "./routes/events";
 **From plan:** "Set `expires_at = created_at + 30 days`"
 
 **Options:**
+
 - A) Fixed 30 days from creation (simple, per plan)
 - B) Configurable by photographer (not in scope for T-13)
 - C) Based on end_date + 30 days (more complex)
@@ -455,10 +500,12 @@ import { eventsRouter } from "./routes/events";
 **Question:** Should we use nanoid or write custom access code generator?
 
 **Current state:**
+
 - No nanoid in `apps/api/package.json`
 - No access code generation utility exists
 
 **Options:**
+
 - A) Install nanoid: `pnpm --filter=@sabaipics/api add nanoid`
 - B) Use Web Crypto API directly (no dependency)
 - C) Use another library (custom-alphabet, randomstring)
@@ -562,6 +609,7 @@ import { eventsRouter } from "./routes/events";
 **Conflict potential:** High if multiple tasks add routes simultaneously
 
 **Mitigation:**
+
 - Add events router in separate PR
 - Keep router registration additive
 - Use consistent pattern
@@ -584,6 +632,7 @@ import { eventsRouter } from "./routes/events";
 **Conflict potential:** Low (lock file handles merges)
 
 **Mitigation:**
+
 - Add nanoid if needed
 - Accept both additions if conflict
 
@@ -606,53 +655,53 @@ import { eventsRouter } from "./routes/events";
 ```typescript
 // apps/api/src/routes/events.test.ts
 
-describe("POST /events", () => {
-  it("creates event with QR code for valid input", async () => {
+describe('POST /events', () => {
+  it('creates event with QR code for valid input', async () => {
     // Test successful event creation
     // Verify access code format
     // Verify QR uploaded to R2
     // Verify database record
   });
 
-  it("rejects invalid event names", async () => {
+  it('rejects invalid event names', async () => {
     // Test name too long, empty, etc.
   });
 
-  it("validates date range", async () => {
+  it('validates date range', async () => {
     // Test startDate > endDate
   });
 
-  it("retries on access code collision", async () => {
+  it('retries on access code collision', async () => {
     // Mock database unique constraint violation
     // Verify retry logic
   });
 
-  it("fails if QR generation fails", async () => {
+  it('fails if QR generation fails', async () => {
     // Mock generateEventQR to throw
     // Verify error handling
   });
 });
 
-describe("GET /events", () => {
+describe('GET /events', () => {
   it("returns photographer's events only", async () => {
     // Verify filtering by photographerId
   });
 
-  it("returns empty array for new photographer", async () => {
+  it('returns empty array for new photographer', async () => {
     // Test empty state
   });
 
-  it("orders by createdAt desc", async () => {
+  it('orders by createdAt desc', async () => {
     // Verify sorting
   });
 });
 
-describe("GET /events/:id", () => {
-  it("returns event if photographer owns it", async () => {
+describe('GET /events/:id', () => {
+  it('returns event if photographer owns it', async () => {
     // Test successful fetch
   });
 
-  it("returns 404 if event not found", async () => {
+  it('returns 404 if event not found', async () => {
     // Test not found
   });
 
@@ -668,16 +717,16 @@ describe("GET /events/:id", () => {
 
 ```typescript
 // Test R2 upload integration
-it("uploads QR to R2 with correct key", async () => {
+it('uploads QR to R2 with correct key', async () => {
   const event = await createEvent(photographerId);
   const qrKey = `qr/${event.accessCode}.png`;
   const qrObject = await env.PHOTOS_BUCKET.get(qrKey);
   expect(qrObject).toBeTruthy();
-  expect(qrObject?.httpMetadata?.contentType).toBe("image/png");
+  expect(qrObject?.httpMetadata?.contentType).toBe('image/png');
 });
 
 // Test QR scannability
-it("generates scannable QR code", async () => {
+it('generates scannable QR code', async () => {
   const event = await createEvent(photographerId);
   const qrPng = await env.PHOTOS_BUCKET.get(event.qrCodeR2Key);
   // Verify PNG is valid and scannable (manual or with QR decoder)
@@ -717,12 +766,14 @@ it("generates scannable QR code", async () => {
 ### Implementation (T-13 Scope)
 
 **Create utility:**
+
 - [ ] Create `apps/api/src/lib/access-code.ts`
   - [ ] Export `generateAccessCode(): string`
   - [ ] Use nanoid with custom alphabet (A-Z0-9)
   - [ ] Add unit tests
 
 **Create routes:**
+
 - [ ] Create `apps/api/src/routes/events.ts`
   - [ ] POST /events - Create event with QR
   - [ ] GET /events - List photographer's events
@@ -732,11 +783,13 @@ it("generates scannable QR code", async () => {
   - [ ] Add authorization checks
 
 **Register router:**
+
 - [ ] Update `apps/api/src/index.ts`
   - [ ] Import events router
   - [ ] Register `/events` route after auth middleware
 
 **Tests:**
+
 - [ ] Create `apps/api/src/routes/events.test.ts`
   - [ ] Unit tests for all endpoints
   - [ ] Authorization tests
@@ -744,6 +797,7 @@ it("generates scannable QR code", async () => {
   - [ ] Error handling tests
 
 **Integration:**
+
 - [ ] Test QR generation integration
 - [ ] Test R2 upload
 - [ ] Manual QR scanning tests
@@ -793,6 +847,7 @@ it("generates scannable QR code", async () => {
 ## Provenance
 
 **Files examined:**
+
 - `docs/logs/BS_0001_S-1/tasks.md` - Task definition for T-13
 - `docs/logs/BS_0001_S-1/plan/final.md` - Execution plan with events API requirements
 - `docs/logs/BS_0001_S-1/research/qr-code-library.md` - QR library selection
@@ -810,12 +865,14 @@ it("generates scannable QR code", async () => {
 - `apps/api/package.json` - Dependencies
 
 **Decisions referenced:**
+
 - Plan decision #7: QR codes (eager generation, two URLs) - clarified to single URL
 - Plan decision: 30-day event expiration
 - T-14 decision: Search URL only in QR (not two URLs)
 - T-14 decision: Error correction level M (15%)
 
 **Patterns identified:**
+
 - Use Zod for request validation
 - Use custom error objects with `{ error: { code, message } }` shape
 - Use `requirePhotographer()` and `requireConsent()` middleware

@@ -1,11 +1,11 @@
-import { useRef, useState } from "react";
-import { Upload, XCircle } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { Alert, AlertDescription } from "@/shared/components/ui/alert";
-import { cn } from "@/shared/utils/ui";
+import { useRef, useState } from 'react';
+import { Upload, XCircle } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
+import { Alert, AlertDescription } from '@/shared/components/ui/alert';
+import { cn } from '@/shared/utils/ui';
 
-const ACCEPTED_FORMATS = ["image/jpeg", "image/png", "image/webp"];
-const ACCEPTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
+const ACCEPTED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
+const ACCEPTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 interface ValidationError {
@@ -21,21 +21,18 @@ interface PhotoUploadZoneProps {
 function validateFile(file: File): string | null {
   // Check file type
   if (!ACCEPTED_FORMATS.includes(file.type.toLowerCase())) {
-    return "Accepted formats: JPEG, PNG, WebP";
+    return 'Accepted formats: JPEG, PNG, WebP';
   }
 
   // Check file size
   if (file.size > MAX_FILE_SIZE) {
-    return "Maximum file size is 10MB";
+    return 'Maximum file size is 10MB';
   }
 
   return null;
 }
 
-export function PhotoUploadZone({
-  onFilesSelected,
-  disabled = false,
-}: PhotoUploadZoneProps) {
+export function PhotoUploadZone({ onFilesSelected, disabled = false }: PhotoUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,7 +102,7 @@ export function PhotoUploadZone({
     handleFiles(e.target.files);
     // Reset input so the same file can be selected again
     if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+      fileInputRef.current.value = '';
     }
   };
 
@@ -124,17 +121,17 @@ export function PhotoUploadZone({
         onDrop={handleDrop}
         onClick={handleClick}
         className={cn(
-          "relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 transition-colors",
+          'relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 transition-colors',
           isDragging && !disabled
-            ? "border-info bg-info/5"
-            : "border-muted-foreground/25 hover:border-muted-foreground/50",
-          disabled && "cursor-not-allowed opacity-50"
+            ? 'border-info bg-info/5'
+            : 'border-muted-foreground/25 hover:border-muted-foreground/50',
+          disabled && 'cursor-not-allowed opacity-50',
         )}
       >
         <Upload className="mb-4 size-12 text-muted-foreground" />
         <div className="text-center">
           <p className="mb-2 text-lg font-medium">
-            {isDragging ? "Drop photos here" : "Drag photos here or click to browse"}
+            {isDragging ? 'Drop photos here' : 'Drag photos here or click to browse'}
           </p>
           <p className="text-sm text-muted-foreground">
             Accepted formats: JPEG, PNG, WebP (max 10MB each)
@@ -144,7 +141,7 @@ export function PhotoUploadZone({
           ref={fileInputRef}
           type="file"
           multiple
-          accept={ACCEPTED_EXTENSIONS.join(",")}
+          accept={ACCEPTED_EXTENSIONS.join(',')}
           onChange={handleFileInputChange}
           className="hidden"
         />
@@ -158,8 +155,8 @@ export function PhotoUploadZone({
             <div className="flex items-center justify-between">
               <div>
                 <p className="mb-2 font-medium">
-                  {validationErrors.length} {validationErrors.length === 1 ? 'file was' : 'files were'}{' '}
-                  rejected:
+                  {validationErrors.length}{' '}
+                  {validationErrors.length === 1 ? 'file was' : 'files were'} rejected:
                 </p>
                 <div className="space-y-1 text-sm">
                   {validationErrors.map((error, index) => (
@@ -169,12 +166,7 @@ export function PhotoUploadZone({
                   ))}
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearErrors}
-                className="h-8 px-2 text-xs"
-              >
+              <Button variant="ghost" size="sm" onClick={clearErrors} className="h-8 px-2 text-xs">
                 Dismiss
               </Button>
             </div>

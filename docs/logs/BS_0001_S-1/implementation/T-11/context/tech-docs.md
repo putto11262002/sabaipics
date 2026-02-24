@@ -36,12 +36,14 @@
 ## Repo stack (UI)
 
 ### Framework & Build
+
 - **Framework:** React ^19.2.0
 - **Build Tool:** Vite ^7.2.4
 - **Router:** React Router ^7.10.1
 - **TypeScript:** 5.9.2
 
 ### Component Library
+
 - **Component System:** shadcn/ui (new-york style)
 - **Component Primitives:** Radix UI (@radix-ui/react-slot ^1.2.4)
 - **Styling:** Tailwind CSS ^4.1.17
@@ -50,6 +52,7 @@
 - **Icon Library:** Lucide React ^0.556.0
 
 ### State Management & Data Fetching
+
 - **Data Fetching:** TanStack Query ^5.90.12
 - **API Client:** Hono RPC client (`hc` from `hono/client`)
 - **Auth State:** Clerk React SDK (@clerk/clerk-react ^5.58.0)
@@ -57,6 +60,7 @@
 ### Available shadcn/ui Components
 
 From `/packages/ui/src/components/`:
+
 - alert
 - avatar
 - breadcrumb
@@ -77,6 +81,7 @@ From `/packages/ui/src/components/`:
 - tooltip
 
 ### Testing
+
 - **Framework:** Vitest ^3.2.0
 - **Test Location:** Co-located with components or in `__tests__` directories
 
@@ -87,6 +92,7 @@ From `/packages/ui/src/components/`:
 ### File Locations
 
 From CLAUDE.md and project structure:
+
 - **Dashboard routes:** `apps/dashboard/src/routes/dashboard/`
 - **Shared components:** `apps/dashboard/src/components/`
 - **Shell components:** `apps/dashboard/src/components/shell/` (sidebar, page-header, nav components)
@@ -103,33 +109,34 @@ From CLAUDE.md and project structure:
 
 ```typescript
 // Auth
-import { useAuth, useUser } from "@sabaipics/auth/react";
+import { useAuth, useUser } from '@sabaipics/auth/react';
 
 // UI Components
-import { Button } from "@sabaipics/ui/components/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@sabaipics/ui/components/card";
-import { Alert, AlertTitle, AlertDescription } from "@sabaipics/ui/components/alert";
-import { Skeleton } from "@sabaipics/ui/components/skeleton";
+import { Button } from '@sabaipics/ui/components/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@sabaipics/ui/components/card';
+import { Alert, AlertTitle, AlertDescription } from '@sabaipics/ui/components/alert';
+import { Skeleton } from '@sabaipics/ui/components/skeleton';
 
 // Shell Components
-import { PageHeader } from "../../components/shell/page-header";
+import { PageHeader } from '../../components/shell/page-header';
 
 // Utils
-import { cn } from "@sabaipics/ui/lib/utils";
+import { cn } from '@sabaipics/ui/lib/utils';
 
 // Icons
-import { Plus, CreditCard, Calendar } from "lucide-react";
+import { Plus, CreditCard, Calendar } from 'lucide-react';
 
 // Data Fetching
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from '@tanstack/react-query';
 
 // API
-import { useApiClient } from "../../lib/api";
+import { useApiClient } from '../../lib/api';
 ```
 
 ### Form Error Display Pattern
 
 From existing dashboard page:
+
 ```typescript
 {error && (
   <Alert variant="destructive">
@@ -142,12 +149,14 @@ From existing dashboard page:
 ### Loading/Empty/Error States
 
 **Loading:**
+
 ```typescript
 {isLoading && <Skeleton className="h-32 w-full" />}
 // Or use spinner from @sabaipics/ui/components/spinner
 ```
 
 **Empty State:**
+
 ```typescript
 // Use the Empty component from @sabaipics/ui/components/empty
 import { Empty } from "@sabaipics/ui/components/empty";
@@ -165,6 +174,7 @@ import { Empty } from "@sabaipics/ui/components/empty";
 ```
 
 **Error:**
+
 ```typescript
 {error && (
   <Alert variant="destructive">
@@ -177,12 +187,14 @@ import { Empty } from "@sabaipics/ui/components/empty";
 ### Styling
 
 From `docs/tech/ui/index.md`:
+
 - **MUST:** Use Tailwind CSS for all styling
 - **MUST:** Use shadcn predefined variables for colors, borders, etc.
 - **MUST:** Reuse shadcn components, blocks, examples as much as possible
 - **MUST:** Use `cn()` utility for conditional classes
 
 **shadcn CSS Variables (use in Tailwind classes):**
+
 ```css
 bg-card
 bg-background
@@ -195,6 +207,7 @@ rounded-xl
 ```
 
 **Reference Docs:**
+
 - Components: `docs/shadcn/components`
 - Blocks: `docs/shadcn/blocks`
 - Examples: `docs/shadcn/examples`
@@ -212,11 +225,12 @@ From `apps/api/src/routes/dashboard/route.ts`:
 **Authentication:** Requires photographer auth + PDPA consent (via `requirePhotographer()` and `requireConsent()` middleware)
 
 **Response Type** (from `apps/api/src/routes/dashboard/types.ts`):
+
 ```typescript
 export type DashboardResponse = {
   credits: {
     balance: number;
-    nearestExpiry: string | null;  // ISO timestamp
+    nearestExpiry: string | null; // ISO timestamp
   };
   events: DashboardEvent[];
   stats: {
@@ -238,6 +252,7 @@ export type DashboardEvent = {
 ```
 
 **Success Response (200):**
+
 ```json
 {
   "data": {
@@ -270,23 +285,20 @@ export type DashboardEvent = {
 From `apps/dashboard/src/lib/api.ts`:
 
 ```typescript
-import { useApiClient } from "../../lib/api";
-import { useQuery } from "@tanstack/react-query";
+import { useApiClient } from '../../lib/api';
+import { useQuery } from '@tanstack/react-query';
 
 const { getToken } = useApiClient();
 
 const { data, isLoading, error } = useQuery({
-  queryKey: ["dashboard"],
+  queryKey: ['dashboard'],
   queryFn: async () => {
     const token = await getToken();
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/dashboard`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -301,16 +313,17 @@ const dashboardData = data?.data as DashboardResponse | undefined;
 ```
 
 **Alternative using Hono RPC client:**
+
 ```typescript
 const { createAuthClient } = useApiClient();
 
 const { data, isLoading, error } = useQuery({
-  queryKey: ["dashboard"],
+  queryKey: ['dashboard'],
   queryFn: async () => {
     const client = await createAuthClient();
     const response = await client.dashboard.$get();
     if (!response.ok) {
-      throw new Error("Failed to fetch dashboard");
+      throw new Error('Failed to fetch dashboard');
     }
     return response.json();
   },
@@ -320,11 +333,12 @@ const { data, isLoading, error } = useQuery({
 ### Query Configuration
 
 From `apps/dashboard/src/main.tsx`:
+
 ```typescript
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60,  // 1 minute
+      staleTime: 1000 * 60, // 1 minute
       retry: 1,
     },
   },
@@ -360,12 +374,13 @@ export function Layout() {
 ```
 
 **Dashboard page structure:**
+
 ```typescript
 export function DashboardPage() {
   return (
     <>
       <PageHeader breadcrumbs={[{ label: "Dashboard" }]} />
-      
+
       <div className="flex flex-1 flex-col gap-4 p-4">
         {/* Page content */}
       </div>
@@ -379,6 +394,7 @@ export function DashboardPage() {
 From `apps/dashboard/src/components/shell/app-sidebar.tsx`:
 
 Current nav items:
+
 - Dashboard (`/dashboard`) - active
 - Events (`/events`) - placeholder
 - Galleries (`/galleries`) - placeholder
@@ -391,7 +407,7 @@ For T-11, "Buy Credits" button should link to `/credits/packages` (to be impleme
 From `apps/dashboard/src/components/shell/page-header.tsx`:
 
 ```typescript
-<PageHeader 
+<PageHeader
   breadcrumbs={[{ label: "Dashboard" }]}
   // Optional: actions prop for header buttons
 />
@@ -406,6 +422,7 @@ From `apps/dashboard/src/components/shell/page-header.tsx`:
 From `apps/dashboard/src/App.tsx`:
 
 Dashboard route is wrapped with:
+
 1. **ProtectedRoute:** Checks Clerk authentication
 2. **ConsentGate:** Checks PDPA consent
 
@@ -428,7 +445,7 @@ Dashboard route is wrapped with:
 From `@sabaipics/auth/react`:
 
 ```typescript
-import { useAuth, useUser } from "@sabaipics/auth/react";
+import { useAuth, useUser } from '@sabaipics/auth/react';
 
 // Auth state
 const { userId, isLoaded, isSignedIn, getToken } = useAuth();
@@ -441,6 +458,7 @@ const { user } = useUser();
 ### Environment Variables
 
 From dashboard README and existing code:
+
 - `VITE_CLERK_PUBLISHABLE_KEY` - Clerk publishable key
 - `VITE_API_URL` - API base URL
 
@@ -451,6 +469,7 @@ From dashboard README and existing code:
 ### Test Stack
 
 From T-6 tech docs and project conventions:
+
 - **Unit/Component Tests:** Vitest ^3.2.0
 - **Test Location:** Co-located or in `__tests__` directories
 
@@ -468,16 +487,16 @@ From T-6 tech docs and project conventions:
 ### Test Patterns
 
 ```typescript
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { DashboardPage } from "./index";
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { DashboardPage } from './index';
 
-describe("DashboardPage", () => {
-  it("renders credit balance", () => {
+describe('DashboardPage', () => {
+  it('renders credit balance', () => {
     // Test implementation
   });
 
-  it("shows empty state for new user", () => {
+  it('shows empty state for new user', () => {
     // Test implementation
   });
 });
@@ -488,23 +507,27 @@ describe("DashboardPage", () => {
 ## Must-Follow Rules Summary
 
 ### File Organization
+
 - ✅ Route component: `apps/dashboard/src/routes/dashboard/index.tsx`
 - ✅ Shell components: Use existing `PageHeader` from `components/shell/`
 - ✅ Shared UI: Import from `@sabaipics/ui/components/*`
 
 ### Styling Rules
+
 - ✅ Use Tailwind CSS classes only
 - ✅ Use shadcn CSS variables (`bg-card`, `text-muted-foreground`, etc.)
 - ✅ Use `cn()` utility for conditional classes
 - ✅ Follow shadcn new-york style
 
 ### Data Fetching
+
 - ✅ Use TanStack Query with `queryKey: ["dashboard"]`
 - ✅ Use `useApiClient()` hook for auth
 - ✅ Handle loading, error, success states explicitly
 - ✅ Use type assertion for API response
 
 ### Component Patterns
+
 - ✅ Use PageHeader with breadcrumbs
 - ✅ Use Empty component for empty states
 - ✅ Use Skeleton for loading states
@@ -512,6 +535,7 @@ describe("DashboardPage", () => {
 - ✅ Use Card components for content containers
 
 ### Performance
+
 - ✅ Target: <2s p95 load time
 - ✅ Use TanStack Query caching (1 min staleTime)
 - ✅ Consider skeleton loaders for perceived performance

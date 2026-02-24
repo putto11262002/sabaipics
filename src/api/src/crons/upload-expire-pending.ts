@@ -19,54 +19,51 @@ const BATCH_SIZE = 100;
  * Schedule: 30 23 * * * (6:30 AM Bangkok)
  */
 export async function expireStalePendingIntents(env: Bindings): Promise<void> {
-	const startTime = Date.now();
-	const db = createDb(env.DATABASE_URL);
+  const startTime = Date.now();
+  const db = createDb(env.DATABASE_URL);
 
-	const cutoff = new Date();
-	cutoff.setDate(cutoff.getDate() - 7);
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 7);
 
-	const intents = await db
-		.select({ id: uploadIntents.id })
-		.from(uploadIntents)
-		.where(
-			and(
-				eq(uploadIntents.status, 'pending'),
-				lt(uploadIntents.createdAt, cutoff.toISOString()),
-			),
-		)
-		.limit(BATCH_SIZE);
+  const intents = await db
+    .select({ id: uploadIntents.id })
+    .from(uploadIntents)
+    .where(
+      and(eq(uploadIntents.status, 'pending'), lt(uploadIntents.createdAt, cutoff.toISOString())),
+    )
+    .limit(BATCH_SIZE);
 
-	if (intents.length === 0) {
-		console.log('[UploadIntentCleanup] No stale pending intents to expire');
-		return;
-	}
+  if (intents.length === 0) {
+    console.log('[UploadIntentCleanup] No stale pending intents to expire');
+    return;
+  }
 
-	let expired = 0;
-	let failed = 0;
+  let expired = 0;
+  let failed = 0;
 
-	for (const intent of intents) {
-		try {
-			// Compare-and-set: only expire if still pending (prevents overwriting
-			// a concurrent completed/failed transition from the upload consumer).
-			await db
-				.update(uploadIntents)
-				.set({ status: 'expired' })
-				.where(and(eq(uploadIntents.id, intent.id), eq(uploadIntents.status, 'pending')));
+  for (const intent of intents) {
+    try {
+      // Compare-and-set: only expire if still pending (prevents overwriting
+      // a concurrent completed/failed transition from the upload consumer).
+      await db
+        .update(uploadIntents)
+        .set({ status: 'expired' })
+        .where(and(eq(uploadIntents.id, intent.id), eq(uploadIntents.status, 'pending')));
 
-			expired++;
-		} catch (error) {
-			failed++;
-			console.error('[UploadIntentCleanup] Failed to expire stale pending intent', {
-				intentId: intent.id,
-				error: error instanceof Error ? error.message : String(error),
-			});
-		}
-	}
+      expired++;
+    } catch (error) {
+      failed++;
+      console.error('[UploadIntentCleanup] Failed to expire stale pending intent', {
+        intentId: intent.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
-	console.log('[UploadIntentCleanup] Stale pending expiry done', {
-		processed: intents.length,
-		expired,
-		failed,
-		durationMs: Date.now() - startTime,
-	});
+  console.log('[UploadIntentCleanup] Stale pending expiry done', {
+    processed: intents.length,
+    expired,
+    failed,
+    durationMs: Date.now() - startTime,
+  });
 }

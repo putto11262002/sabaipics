@@ -50,12 +50,9 @@ export default async function NikonGuidesPage({ params }: Props) {
           </h1>
         </header>
         <Separator className="my-8" />
-        <p className="text-sm text-muted-foreground">
-          We’re drafting Nikon setup flows next.
-        </p>
+        <p className="text-sm text-muted-foreground">We’re drafting Nikon setup flows next.</p>
       </main>
       <Footer />
     </div>
   );
 }
-

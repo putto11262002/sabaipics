@@ -32,7 +32,7 @@ export function calculateTieredDiscount(amount: number): DiscountResult {
   let discountPercent: number;
 
   if (amount >= 600) {
-    effectiveRate = 0.10; // 0.12 * (1 - 0.1667) = 0.10
+    effectiveRate = 0.1; // 0.12 * (1 - 0.1667) = 0.10
     discountPercent = 17;
   } else if (amount >= 300) {
     effectiveRate = 0.11; // 0.12 * (1 - 0.0833) = 0.11

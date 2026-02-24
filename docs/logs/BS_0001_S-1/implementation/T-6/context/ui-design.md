@@ -54,19 +54,20 @@ User Flow:
 ## 2. Shadcn Components to Use
 
 ### Required (install via CLI)
+
 ```bash
 pnpm --filter=@sabaipics/ui ui:add dialog checkbox
 ```
 
 ### Component List
 
-| Component | Source | Usage |
-|-----------|--------|-------|
-| `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription`, `DialogFooter` | `@sabaipics/ui/components/dialog` | Consent modal |
-| `Checkbox` | `@sabaipics/ui/components/checkbox` | Consent acceptance |
-| `Button` | `@sabaipics/ui/components/button` | Accept/Decline/Retry/SignOut |
-| `Alert`, `AlertTitle`, `AlertDescription` | `@sabaipics/ui/components/alert` | Error states, decline explanation |
-| `Loader2`, `AlertTriangle` | `lucide-react` | Loading spinner, warning icon |
+| Component                                                                                     | Source                              | Usage                             |
+| --------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------------------- |
+| `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription`, `DialogFooter` | `@sabaipics/ui/components/dialog`   | Consent modal                     |
+| `Checkbox`                                                                                    | `@sabaipics/ui/components/checkbox` | Consent acceptance                |
+| `Button`                                                                                      | `@sabaipics/ui/components/button`   | Accept/Decline/Retry/SignOut      |
+| `Alert`, `AlertTitle`, `AlertDescription`                                                     | `@sabaipics/ui/components/alert`    | Error states, decline explanation |
+| `Loader2`, `AlertTriangle`                                                                    | `lucide-react`                      | Loading spinner, warning icon     |
 
 ---
 
@@ -145,20 +146,19 @@ pnpm --filter=@sabaipics/ui ui:add dialog checkbox
 
 ```tsx
 // /apps/dashboard/src/hooks/useConsentStatus.ts
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@sabaipics/auth/react";
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@sabaipics/auth/react';
 
 export function useConsentStatus() {
   const { isSignedIn, getToken } = useAuth();
 
   const query = useQuery({
-    queryKey: ["consent-status"],
+    queryKey: ['consent-status'],
     queryFn: async () => {
       const token = await getToken();
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/auth/profile`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     },
@@ -179,17 +179,21 @@ export function useConsentStatus() {
 
 ```tsx
 // /apps/dashboard/src/components/consent/PDPAConsentModal.tsx
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { useAuth } from "@sabaipics/auth/react";
-import { Button } from "@sabaipics/ui/components/button";
-import { Checkbox } from "@sabaipics/ui/components/checkbox";
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { useAuth } from '@sabaipics/auth/react';
+import { Button } from '@sabaipics/ui/components/button';
+import { Checkbox } from '@sabaipics/ui/components/checkbox';
 import {
-  Dialog, DialogContent, DialogDescription,
-  DialogFooter, DialogHeader, DialogTitle,
-} from "@sabaipics/ui/components/dialog";
-import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
-import { AlertTriangle, Loader2 } from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@sabaipics/ui/components/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@sabaipics/ui/components/alert';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 
 interface Props {
   open: boolean;
@@ -205,11 +209,11 @@ export function PDPAConsentModal({ open, onAcceptSuccess, onDecline }: Props) {
     mutationFn: async () => {
       const token = await getToken();
       const response = await fetch(`${import.meta.env.VITE_API_URL}/consent`, {
-        method: "POST",
+        method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok && response.status !== 409) {
-        throw new Error("Failed to submit consent");
+        throw new Error('Failed to submit consent');
       }
       return response.json();
     },
@@ -222,27 +226,41 @@ export function PDPAConsentModal({ open, onAcceptSuccess, onDecline }: Props) {
         <DialogHeader>
           <DialogTitle>PDPA Consent Required</DialogTitle>
           <DialogDescription>
-            We need your consent to process your personal data according to
-            Thailand's Personal Data Protection Act (PDPA).
+            We need your consent to process your personal data according to Thailand's Personal Data
+            Protection Act (PDPA).
           </DialogDescription>
         </DialogHeader>
 
         {/* Scrollable PDPA text */}
         <div className="max-h-[300px] overflow-y-auto border rounded-lg p-4 bg-muted/30">
           <div className="text-sm space-y-3">
-            <p><strong>Data Processing & Storage</strong><br />
-            SabaiPics processes and stores photos you upload, including facial
-            recognition data for matching photos.</p>
-            <p><strong>Your Privacy Rights</strong><br />
-            You may request to access, correct, delete, or port your personal
-            data at any time.</p>
-            <p><strong>Data Retention</strong><br />
-            We retain your photos as long as your account is active. Upon deletion,
-            we remove all personal data within 30 days.</p>
-            <p><strong>Data Sharing</strong><br />
-            We do not share your personal data with third parties without consent.</p>
-            <p><strong>Security Measures</strong><br />
-            We encrypt all data in transit and at rest.</p>
+            <p>
+              <strong>Data Processing & Storage</strong>
+              <br />
+              SabaiPics processes and stores photos you upload, including facial recognition data
+              for matching photos.
+            </p>
+            <p>
+              <strong>Your Privacy Rights</strong>
+              <br />
+              You may request to access, correct, delete, or port your personal data at any time.
+            </p>
+            <p>
+              <strong>Data Retention</strong>
+              <br />
+              We retain your photos as long as your account is active. Upon deletion, we remove all
+              personal data within 30 days.
+            </p>
+            <p>
+              <strong>Data Sharing</strong>
+              <br />
+              We do not share your personal data with third parties without consent.
+            </p>
+            <p>
+              <strong>Security Measures</strong>
+              <br />
+              We encrypt all data in transit and at rest.
+            </p>
           </div>
         </div>
 
@@ -254,9 +272,12 @@ export function PDPAConsentModal({ open, onAcceptSuccess, onDecline }: Props) {
             onCheckedChange={(checked) => setIsAgreed(checked === true)}
             disabled={mutation.isPending}
           />
-          <label htmlFor="pdpa-consent" className="text-sm font-medium leading-relaxed cursor-pointer">
-            I accept the PDPA consent terms and acknowledge that SabaiPics will
-            process my personal data as described above.
+          <label
+            htmlFor="pdpa-consent"
+            className="text-sm font-medium leading-relaxed cursor-pointer"
+          >
+            I accept the PDPA consent terms and acknowledge that SabaiPics will process my personal
+            data as described above.
           </label>
         </div>
 
@@ -274,8 +295,13 @@ export function PDPAConsentModal({ open, onAcceptSuccess, onDecline }: Props) {
           </Button>
           <Button onClick={() => mutation.mutate()} disabled={!isAgreed || mutation.isPending}>
             {mutation.isPending ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Accepting...</>
-            ) : "Accept"}
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Accepting...
+              </>
+            ) : (
+              'Accept'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -288,14 +314,14 @@ export function PDPAConsentModal({ open, onAcceptSuccess, onDecline }: Props) {
 
 ```tsx
 // /apps/dashboard/src/routes/onboarding.tsx
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
-import { useAuth } from "@sabaipics/auth/react";
-import { Loader2, AlertTriangle } from "lucide-react";
-import { Button } from "@sabaipics/ui/components/button";
-import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
-import { PDPAConsentModal } from "../components/consent/PDPAConsentModal";
-import { useConsentStatus } from "../hooks/useConsentStatus";
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { useAuth } from '@sabaipics/auth/react';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { Button } from '@sabaipics/ui/components/button';
+import { Alert, AlertDescription, AlertTitle } from '@sabaipics/ui/components/alert';
+import { PDPAConsentModal } from '../components/consent/PDPAConsentModal';
+import { useConsentStatus } from '../hooks/useConsentStatus';
 
 const MAX_POLL_ATTEMPTS = 30;
 const POLL_INTERVAL = 1000;
@@ -312,15 +338,21 @@ export function OnboardingPage() {
   // Poll until photographer exists or timeout
   useEffect(() => {
     if (data || timeout) return;
-    if (pollAttempts >= MAX_POLL_ATTEMPTS) { setTimeout_(true); return; }
-    const timer = setTimeout(() => { refetch(); setPollAttempts(p => p + 1); }, POLL_INTERVAL);
+    if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+      setTimeout_(true);
+      return;
+    }
+    const timer = setTimeout(() => {
+      refetch();
+      setPollAttempts((p) => p + 1);
+    }, POLL_INTERVAL);
     return () => clearTimeout(timer);
   }, [data, pollAttempts, refetch, timeout]);
 
   // Check consent once data loads
   useEffect(() => {
     if (!data) return;
-    if (isConsented) navigate("/dashboard", { replace: true });
+    if (isConsented) navigate('/dashboard', { replace: true });
     else setShowModal(true);
   }, [data, isConsented, navigate]);
 
@@ -334,7 +366,14 @@ export function OnboardingPage() {
             <AlertTitle>Account Setup Timeout</AlertTitle>
             <AlertDescription>Taking longer than expected. Please try again.</AlertDescription>
           </Alert>
-          <Button onClick={() => { setPollAttempts(0); setTimeout_(false); refetch(); }} className="w-full">
+          <Button
+            onClick={() => {
+              setPollAttempts(0);
+              setTimeout_(false);
+              refetch();
+            }}
+            className="w-full"
+          >
             Retry
           </Button>
         </div>
@@ -351,14 +390,29 @@ export function OnboardingPage() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Consent Required</AlertTitle>
             <AlertDescription>
-              You must accept PDPA consent to use SabaiPics. Without consent, we cannot process your photos.
+              You must accept PDPA consent to use SabaiPics. Without consent, we cannot process your
+              photos.
             </AlertDescription>
           </Alert>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => { setShowDecline(false); setShowModal(true); }} className="flex-1">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDecline(false);
+                setShowModal(true);
+              }}
+              className="flex-1"
+            >
               Try Again
             </Button>
-            <Button variant="destructive" onClick={async () => { await signOut(); navigate("/sign-in", { replace: true }); }} className="flex-1">
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                await signOut();
+                navigate('/sign-in', { replace: true });
+              }}
+              className="flex-1"
+            >
               Use Different Account
             </Button>
           </div>
@@ -376,8 +430,14 @@ export function OnboardingPage() {
       </div>
       <PDPAConsentModal
         open={showModal}
-        onAcceptSuccess={() => { refetch(); navigate("/dashboard", { replace: true }); }}
-        onDecline={() => { setShowModal(false); setShowDecline(true); }}
+        onAcceptSuccess={() => {
+          refetch();
+          navigate('/dashboard', { replace: true });
+        }}
+        onDecline={() => {
+          setShowModal(false);
+          setShowDecline(true);
+        }}
       />
     </div>
   );
@@ -388,8 +448,8 @@ export function OnboardingPage() {
 
 ```tsx
 // /apps/dashboard/src/components/auth/ConsentGate.tsx
-import { Navigate, useLocation } from "react-router";
-import { useConsentStatus } from "../../hooks/useConsentStatus";
+import { Navigate, useLocation } from 'react-router';
+import { useConsentStatus } from '../../hooks/useConsentStatus';
 
 export function ConsentGate({ children }: { children: React.ReactNode }) {
   const { isConsented, isLoading } = useConsentStatus();
@@ -405,12 +465,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
 
 ```tsx
 // Change afterSignUpUrl from "/dashboard" to "/onboarding"
-<SignUp
-  routing="path"
-  path="/sign-up"
-  signInUrl="/sign-in"
-  afterSignUpUrl="/onboarding"
-/>
+<SignUp routing="path" path="/sign-up" signInUrl="/sign-in" afterSignUpUrl="/onboarding" />
 ```
 
 ### 4.6 Updated App.tsx Routes
@@ -422,16 +477,25 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   <Route path="/sign-up/*" element={<SignUpPage />} />
 
   {/* Onboarding (auth required, no consent required) */}
-  <Route path="/onboarding" element={
-    <ProtectedRoute><OnboardingPage /></ProtectedRoute>
-  } />
+  <Route
+    path="/onboarding"
+    element={
+      <ProtectedRoute>
+        <OnboardingPage />
+      </ProtectedRoute>
+    }
+  />
 
   {/* Protected routes (auth + consent required) */}
-  <Route element={
-    <ProtectedRoute>
-      <ConsentGate><Layout /></ConsentGate>
-    </ProtectedRoute>
-  }>
+  <Route
+    element={
+      <ProtectedRoute>
+        <ConsentGate>
+          <Layout />
+        </ConsentGate>
+      </ProtectedRoute>
+    }
+  >
     <Route path="/dashboard" element={<DashboardPage />} />
   </Route>
 
@@ -444,18 +508,18 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
 
 ## 5. States Summary
 
-| Component | State | UI |
-|-----------|-------|-----|
-| OnboardingPage | Loading | Spinner + "Setting up your account..." |
-| OnboardingPage | Timeout | Error alert + Retry button |
-| OnboardingPage | Decline | Explanation + Try Again + Sign Out |
-| PDPAConsentModal | Idle | Checkbox unchecked, Accept disabled |
-| PDPAConsentModal | Checked | Accept enabled |
-| PDPAConsentModal | Submitting | Spinner in button, both disabled |
-| PDPAConsentModal | Error | Red alert with retry option |
-| ConsentGate | Loading | Loading placeholder |
-| ConsentGate | Not consented | Redirect to /onboarding |
-| ConsentGate | Consented | Render children |
+| Component        | State         | UI                                     |
+| ---------------- | ------------- | -------------------------------------- |
+| OnboardingPage   | Loading       | Spinner + "Setting up your account..." |
+| OnboardingPage   | Timeout       | Error alert + Retry button             |
+| OnboardingPage   | Decline       | Explanation + Try Again + Sign Out     |
+| PDPAConsentModal | Idle          | Checkbox unchecked, Accept disabled    |
+| PDPAConsentModal | Checked       | Accept enabled                         |
+| PDPAConsentModal | Submitting    | Spinner in button, both disabled       |
+| PDPAConsentModal | Error         | Red alert with retry option            |
+| ConsentGate      | Loading       | Loading placeholder                    |
+| ConsentGate      | Not consented | Redirect to /onboarding                |
+| ConsentGate      | Consented     | Render children                        |
 
 ---
 

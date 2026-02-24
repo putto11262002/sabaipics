@@ -16,15 +16,15 @@
  * Face metadata stored with vector
  */
 export interface FaceMetadata {
-  externalImageId: string;  // photoId from SabaiPics
+  externalImageId: string; // photoId from SabaiPics
   boundingBox: {
-    x: number;      // Pixel coordinates
+    x: number; // Pixel coordinates
     y: number;
     width: number;
     height: number;
   };
-  confidence: number;       // Detection confidence (0-1)
-  indexedAt: string;        // ISO timestamp
+  confidence: number; // Detection confidence (0-1)
+  indexedAt: string; // ISO timestamp
 }
 
 /**
@@ -32,8 +32,8 @@ export interface FaceMetadata {
  */
 export interface FaceMatch {
   faceId: string;
-  distance: number;         // Euclidean distance (0 = perfect match)
-  similarity: number;       // Converted to percentage (0-100)
+  distance: number; // Euclidean distance (0 = perfect match)
+  similarity: number; // Converted to percentage (0-100)
   metadata: FaceMetadata;
 }
 
@@ -42,7 +42,7 @@ export interface FaceMatch {
  */
 export interface FaceData {
   faceId: string;
-  descriptor: Float32Array;  // 128-D vector
+  descriptor: Float32Array; // 128-D vector
   metadata: FaceMetadata;
 }
 
@@ -90,9 +90,9 @@ export interface VectorStore {
     collectionId: string,
     faces: Array<{
       faceId: string;
-      descriptor: Float32Array;  // 128-D vector (INTERNAL ONLY)
+      descriptor: Float32Array; // 128-D vector (INTERNAL ONLY)
       metadata: FaceMetadata;
-    }>
+    }>,
   ): Promise<void>;
 
   /**
@@ -108,7 +108,7 @@ export interface VectorStore {
     collectionId: string,
     queryDescriptor: Float32Array,
     maxResults: number,
-    threshold: number
+    threshold: number,
   ): Promise<FaceMatch[]>;
 
   /**

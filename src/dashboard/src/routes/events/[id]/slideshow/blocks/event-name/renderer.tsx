@@ -28,8 +28,6 @@ export function EventNameRenderer({
   const fontWeightClass = FONT_WEIGHT_CLASS[props.fontWeight] ?? 'font-bold';
 
   return (
-    <h2 className={cn('text-primary', fontSizeClass, fontWeightClass)}>
-      {context.event.name}
-    </h2>
+    <h2 className={cn('text-primary', fontSizeClass, fontWeightClass)}>{context.event.name}</h2>
   );
 }

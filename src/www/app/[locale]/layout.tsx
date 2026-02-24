@@ -45,9 +45,7 @@ export default async function LocaleLayout({ children, params }: Props) {
         <OrganizationJsonLd />
       </head>
       <body className="antialiased">
-        <NextIntlClientProvider messages={messages}>
-          {children}
-        </NextIntlClientProvider>
+        <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
       </body>
     </html>
   );

@@ -1,4 +1,5 @@
 # ImageCaptureCore WiFi Discovery Research
+
 ## Can ICDeviceBrowser Discover WiFi PTP/IP Cameras?
 
 **Last Updated:** 2026-01-09
@@ -21,12 +22,14 @@ ImageCaptureCore's `ICDeviceBrowser` CAN discover WiFi PTP/IP cameras on iOS, **
 ### Two Different Discovery Protocols
 
 #### 1. Bonjour/mDNS (DNS-SD)
+
 - **Service Type:** `_ptp._tcp.local`
 - **Transport:** UDP multicast to 224.0.0.251:5353
 - **What ImageCaptureCore supports:** `ICDeviceLocationTypeBonjour`
 - **Used by:** Some PTP/IP implementations (rare in consumer cameras)
 
 #### 2. UPnP/SSDP (Universal Plug and Play)
+
 - **Service Type:** `upnp:rootdevice` or specific UPnP device types
 - **Transport:** UDP multicast to 239.255.255.250:1900
 - **What ImageCaptureCore supports:** **NOT SUPPORTED**
@@ -39,6 +42,7 @@ From research findings:
 > "Canon EOS cameras utilize the Universal Plug and Play (UPnP) protocol to notify other devices on the network about their existence. Canon cameras broadcast discovery messages that include location information for device description XML files."
 
 **This means:**
+
 - Canon cameras announce via UPnP/SSDP (not Bonjour)
 - ICDeviceBrowser expects Bonjour (`_ptp._tcp.local`)
 - **ICDeviceBrowser CANNOT discover UPnP-only cameras**
@@ -50,6 +54,7 @@ From research findings:
 ### PTP/IP Bonjour Service Type
 
 From CIPA PTP/IP specification research:
+
 - Standard mDNS service type: **`_ptp._tcp.local`**
 - PTP-IP Initiator enumerates devices in `_ptp._tcp.local`
 
@@ -58,6 +63,7 @@ Source: [PTP/IP Adapter Design and Connectivity Techniques](https://www.research
 ### Canon Camera Discovery
 
 From Canon PTP/IP protocol research:
+
 > "Canon EOS cameras utilize the Universal Plug and Play (UPnP) protocol to notify other devices on the network about their existence."
 
 Source: [Pairing and Initializing a PTP/IP Connection with a Canon EOS Camera](https://julianschroden.com/post/2023-05-10-pairing-and-initializing-a-ptp-ip-connection-with-a-canon-eos-camera/)
@@ -65,6 +71,7 @@ Source: [Pairing and Initializing a PTP/IP Connection with a Canon EOS Camera](h
 ### iOS Apps Using PTP/IP
 
 **Apps that work:**
+
 - **ShutterSnitch:** Supports Canon (5D Mark IV, 6D, 70D) and Nikon (D750, D850, Z7, Z9) via PTP/IP
 - **qDslrDashboard:** Cross-platform app controlling Canon, Nikon, Sony using PTP/IP
 
@@ -73,6 +80,7 @@ These apps likely implement **custom UPnP/SSDP discovery**, not relying on ICDev
 ### ImageCaptureCore Capabilities
 
 From Apple Developer Forums:
+
 - ICDeviceBrowser supports `ICDeviceLocationTypeBonjour` for network devices
 - "Device found over the network by searching for Bonjour services supported by Image Capture"
 - No mention of UPnP/SSDP support
@@ -86,12 +94,14 @@ Source: [Apple Developer Documentation - ICCameraDevice](https://developer.apple
 ### Option 1: ImageCaptureCore Only (USB + Limited WiFi)
 
 **Pros:**
+
 - ✅ No multicast entitlement needed
 - ✅ Works with USB cameras (all PTP cameras)
 - ✅ Works with WiFi cameras that advertise via Bonjour (`_ptp._tcp.local`)
 - ✅ Simpler implementation
 
 **Cons:**
+
 - ❌ **Does NOT discover Canon/Nikon/Sony cameras over WiFi** (they use UPnP/SSDP)
 - ❌ WiFi support limited to rare Bonjour-advertising cameras
 - ❌ Not suitable for your use case (photographers need WiFi)
@@ -99,12 +109,14 @@ Source: [Apple Developer Documentation - ICCameraDevice](https://developer.apple
 ### Option 2: ImageCaptureCore (USB) + Custom UPnP/SSDP (WiFi)
 
 **Pros:**
+
 - ✅ USB works immediately (no entitlement)
 - ✅ Can ship USB-only version first
 - ✅ Add WiFi later with custom discovery
 - ✅ Full camera compatibility (Canon, Nikon, Sony)
 
 **Cons:**
+
 - ❌ Requires multicast entitlement for WiFi
 - ❌ Need to implement custom UPnP/SSDP discovery
 - ❌ Two separate code paths (USB vs WiFi)
@@ -112,11 +124,13 @@ Source: [Apple Developer Documentation - ICCameraDevice](https://developer.apple
 ### Option 3: Custom Implementation for Both (PTP/IP Library)
 
 **Pros:**
+
 - ✅ Full control over both USB and WiFi
 - ✅ Single code path
 - ✅ Can use libpict or ptpy library
 
 **Cons:**
+
 - ❌ Requires multicast entitlement for WiFi
 - ❌ More complex USB implementation (but ImageCaptureCore helps)
 - ❌ More code to maintain
@@ -140,6 +154,7 @@ Source: [Apple Developer Documentation - ICCameraDevice](https://developer.apple
 4. Ship WiFi update
 
 **Why this approach:**
+
 - ✅ Can start development immediately (USB)
 - ✅ Deliver value to users faster (USB works)
 - ✅ No dependency on Apple approval for initial release
@@ -312,6 +327,7 @@ class WiFiCameraProvider: CameraProvider {
 **Since Canon, Nikon, and Sony cameras use UPnP/SSDP (not Bonjour), ImageCaptureCore CANNOT discover them over WiFi.**
 
 **You still need:**
+
 1. ✅ ImageCaptureCore for USB (works immediately)
 2. ❌ Custom UPnP/SSDP implementation for WiFi (needs entitlement)
 

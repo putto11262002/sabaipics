@@ -1,6 +1,6 @@
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
-import * as schema from "./schema";
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import * as schema from './schema';
 
 /**
  * Creates a database client instance for local development with standard PostgreSQL

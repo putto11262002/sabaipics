@@ -47,6 +47,7 @@ MainTabView
 Connection flows (Sony, Canon) are presented as `.sheet` instead of navigation push.
 
 **Why:**
+
 - SwiftUI tab switches dismiss pushed views → leaked PTP/IP connections
 - Sheets persist across tab switches
 - Each presentation creates fresh state

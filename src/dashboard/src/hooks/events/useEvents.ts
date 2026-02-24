@@ -10,8 +10,7 @@ export type Event = EventsResponse['data'][number];
 export function useEvents(page: number = 0, limit: number = 20) {
   return useApiQuery<EventsResponse>({
     queryKey: ['events', 'list', { page, limit }],
-    apiFn: (opts) =>
-      api.events.$get({ query: { page, limit } }, opts),
+    apiFn: (opts) => api.events.$get({ query: { page, limit } }, opts),
     staleTime: 1000 * 30, // 30 seconds
   });
 }

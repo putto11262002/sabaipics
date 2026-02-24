@@ -11,6 +11,7 @@ Date: 2026-01-13
 **Why relevant:** Shows how to bulk mark photos as deleted using `deletedAt` field
 
 **Key patterns to follow:**
+
 - Uses `deletedAt` field with timestamp for soft deletes (line 731)
 - Bulk operations use `inArray()` for multiple IDs (line 734)
 - Combines conditions with `and()` for safety (eventId + photoIds + isNull) (lines 732-736)
@@ -22,11 +23,13 @@ Date: 2026-01-13
 const result = await db
   .update(photos)
   .set({ deletedAt: new Date().toISOString() })
-  .where(and(
-    eq(photos.eventId, eventId),
-    inArray(photos.id, photoIds),
-    isNull(photos.deletedAt),  // Only delete non-deleted photos
-  ))
+  .where(
+    and(
+      eq(photos.eventId, eventId),
+      inArray(photos.id, photoIds),
+      isNull(photos.deletedAt), // Only delete non-deleted photos
+    ),
+  )
   .returning({ id: photos.id });
 
 console.log(`[Bulk Delete] Soft deleted photos`, {
@@ -36,6 +39,7 @@ console.log(`[Bulk Delete] Soft deleted photos`, {
 ```
 
 **T-20 adaptation:**
+
 - For T-20: Query for events with `created_at < NOW() - 30 days AND rekognition_collection_id IS NOT NULL`
 - After deleting Rekognition collection, set `rekognition_collection_id = NULL` (similar to soft delete)
 - Also soft-delete photos: set `deletedAt = NOW()` for all photos in the event
@@ -49,6 +53,7 @@ console.log(`[Bulk Delete] Soft deleted photos`, {
 **Why relevant:** Shows how to delete Rekognition collections
 
 **Key patterns to follow:**
+
 - Uses `DeleteCollectionCommand` with collection ID (lines 173-175)
 - Collection ID is deterministic: uses `getCollectionId(eventId)` helper (line 171)
 - Simple async/await pattern, no explicit error handling (errors bubble up)
@@ -71,13 +76,15 @@ export async function deleteCollection(client: RekognitionClient, eventId: strin
 ```
 
 **Helper function (line 265):**
+
 ```typescript
 export function getCollectionId(eventId: string): string {
-  return eventId;  // Collection ID = event UUID directly
+  return eventId; // Collection ID = event UUID directly
 }
 ```
 
 **T-20 adaptation:**
+
 - Create Rekognition client once at cron start
 - For each expired event, call `deleteCollection(client, event.id)`
 - Handle errors per-collection (don't fail entire batch if one fails)
@@ -91,6 +98,7 @@ export function getCollectionId(eventId: string): string {
 **Why relevant:** Shows how to process batches with per-item error handling and logging
 
 **Key patterns to follow:**
+
 - Process items in batch (line 475-485)
 - Handle each item individually in try-catch (lines 499-519, 520-586)
 - Log success/failure for each item (lines 500, 503-504, 525-531)
@@ -98,6 +106,7 @@ export function getCollectionId(eventId: string): string {
 - Comprehensive logging with structured data (photoId, eventId, etc.)
 
 **Error handling pattern:**
+
 ```typescript
 for (const { message, result } of processed) {
   const job = message.body;
@@ -125,6 +134,7 @@ for (const { message, result } of processed) {
 ```
 
 **T-20 adaptation:**
+
 - Fetch batch of expired events
 - For each event:
   1. Try to delete Rekognition collection
@@ -142,6 +152,7 @@ for (const { message, result } of processed) {
 **Why relevant:** Shows pattern for multi-step DB operations without transactions
 
 **Key patterns to follow:**
+
 - Sequential updates: status → data → final status (lines 124, 188, 192-201)
 - Check-then-create pattern with idempotency (lines 127-172)
 - Handle race conditions gracefully (AlreadyExistsException, lines 155-168)
@@ -170,15 +181,19 @@ if (data.faceRecords.length > 0) {
 }
 
 // STEP 4: Update photo to 'indexed' (success)
-await db.update(photos).set({
-  status: 'indexed',
-  faceCount: data.faceRecords.length,
-  retryable: null,
-  errorName: null,
-}).where(eq(photos.id, job.photo_id));
+await db
+  .update(photos)
+  .set({
+    status: 'indexed',
+    faceCount: data.faceRecords.length,
+    retryable: null,
+    errorName: null,
+  })
+  .where(eq(photos.id, job.photo_id));
 ```
 
 **T-20 adaptation:**
+
 - Step 1: Delete Rekognition collection
 - Step 2: Soft-delete all photos for the event
 - Step 3: Update event: set `rekognition_collection_id = NULL`
@@ -194,17 +209,22 @@ await db.update(photos).set({
 **Schema reference (lines 6-28):**
 
 ```typescript
-export const events = pgTable("events", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  photographerId: uuid("photographer_id").notNull().references(() => photographers.id),
-  name: text("name").notNull(),
-  rekognitionCollectionId: text("rekognition_collection_id"), // Nullable
-  expiresAt: timestamptz("expires_at").notNull(),
+export const events = pgTable('events', {
+  id: uuid('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  photographerId: uuid('photographer_id')
+    .notNull()
+    .references(() => photographers.id),
+  name: text('name').notNull(),
+  rekognitionCollectionId: text('rekognition_collection_id'), // Nullable
+  expiresAt: timestamptz('expires_at').notNull(),
   createdAt: createdAtCol(),
 });
 ```
 
 **T-20 query pattern:**
+
 ```typescript
 // Find events older than 30 days with Rekognition collections
 const expiredEvents = await db
@@ -218,8 +238,8 @@ const expiredEvents = await db
   .where(
     and(
       lt(events.createdAt, sql`NOW() - INTERVAL '30 days'`),
-      isNotNull(events.rekognitionCollectionId)
-    )
+      isNotNull(events.rekognitionCollectionId),
+    ),
   )
   .limit(100); // Process in batches
 ```
@@ -227,6 +247,7 @@ const expiredEvents = await db
 ### Bulk photo soft-delete by event
 
 **Pattern from bulk delete (lines 729-737):**
+
 ```typescript
 const result = await db
   .update(photos)
@@ -234,8 +255,8 @@ const result = await db
   .where(
     and(
       eq(photos.eventId, eventId),
-      isNull(photos.deletedAt)  // Only update non-deleted photos
-    )
+      isNull(photos.deletedAt), // Only update non-deleted photos
+    ),
   )
   .returning({ id: photos.id });
 ```
@@ -250,6 +271,7 @@ const result = await db
 **Lines:** 50-95
 
 **Error classification:**
+
 ```typescript
 const RETRYABLE_AWS_ERRORS = new Set([
   'ThrottlingException',
@@ -279,6 +301,7 @@ function mapAwsError(awsError: unknown): RekognitionError {
 ```
 
 **T-20 error handling:**
+
 - `ResourceNotFoundException`: Collection already deleted (expected, not an error)
 - Retryable errors: Skip for now, log, continue to next event
 - Non-retryable errors: Log, mark event as problematic, continue
@@ -286,6 +309,7 @@ function mapAwsError(awsError: unknown): RekognitionError {
 ### Per-item error handling with continuation
 
 **Pattern from photo consumer (lines 494-586):**
+
 ```typescript
 for (const item of batch) {
   try {
@@ -317,12 +341,14 @@ console.log(`[Cron] Batch complete`, {
 
 **File:** `/Users/putsuthisrisinlpa/Development/sabai/sabaipics/apps/api/src/routes/photos.test.ts`
 **Pattern:**
+
 - Uses Vitest framework
 - Mock Cloudflare bindings (env)
 - Mock database responses
 - Test happy path + error cases
 
 **T-20 test cases:**
+
 1. No expired events → returns { processed: 0, succeeded: 0, failed: 0 }
 2. One expired event → deletes collection, updates DB, soft-deletes photos
 3. Multiple expired events → processes all, returns summary
@@ -335,6 +361,7 @@ console.log(`[Cron] Batch complete`, {
 ## Critical code to read before implementing
 
 ### Core files
+
 1. `/Users/putsuthisrisinlpa/Development/sabai/sabaipics/apps/api/src/lib/rekognition/client.ts`
    - Lines 163-178: `deleteCollection()` implementation
    - Lines 265-267: `getCollectionId()` helper
@@ -349,6 +376,7 @@ console.log(`[Cron] Batch complete`, {
    - Lines 111-218: Multi-step DB operations pattern
 
 ### Schema files
+
 4. `/Users/putsuthisrisinlpa/Development/sabai/sabaipics/packages/db/src/schema/events.ts`
    - Events schema with `rekognition_collection_id` and `created_at`
 
@@ -356,6 +384,7 @@ console.log(`[Cron] Batch complete`, {
    - Photos schema with `deletedAt` field
 
 ### Infrastructure
+
 6. `/Users/putsuthisrisinlpa/Development/sabai/sabaipics/apps/api/wrangler.jsonc`
    - Lines 1-190: Worker configuration (no cron triggers yet - need to add)
 
@@ -366,12 +395,13 @@ console.log(`[Cron] Batch complete`, {
 **Expected location:** `apps/api/src/crons/`
 
 **Pattern to follow (inferred from queue consumer):**
+
 ```typescript
 // apps/api/src/crons/rekognition-cleanup.ts
 export async function scheduledRekognitionCleanup(
   event: ScheduledEvent,
   env: Bindings,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
 ): Promise<void> {
   console.log(`[Cron] Starting Rekognition cleanup`, {
     scheduledTime: event.scheduledTime,
@@ -393,15 +423,17 @@ export async function scheduledRekognitionCleanup(
 ```
 
 **Wrangler configuration to add:**
+
 ```json
 {
   "triggers": {
-    "crons": ["0 2 * * *"]  // Daily at 2am UTC
+    "crons": ["0 2 * * *"] // Daily at 2am UTC
   }
 }
 ```
 
 **Index.ts export:**
+
 ```typescript
 // apps/api/src/index.ts
 export { scheduledRekognitionCleanup as scheduled } from './crons/rekognition-cleanup';
@@ -412,24 +444,28 @@ export { scheduledRekognitionCleanup as scheduled } from './crons/rekognition-cl
 ## Additional notes
 
 ### Cloudflare Workers Cron Triggers documentation
+
 - Cron triggers use standard cron syntax
 - Handler signature: `async function scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext)`
 - Event object includes: `scheduledTime`, `cron`
 - Use `ctx.waitUntil()` for background tasks that should complete
 
 ### T-17 patterns directly relevant to T-20
+
 - T-17 shows how to create/delete collections
 - T-17 shows multi-step DB operations without transactions
 - T-17 shows comprehensive logging strategy
 - T-17 handles partial failures gracefully
 
 ### Important: No existing cron infrastructure
+
 - No `src/crons/` directory exists yet
 - No cron triggers in wrangler.jsonc
 - No example cron handlers in codebase
 - T-20 will be first cron job - need to create patterns from scratch based on queue consumer patterns
 
 ### Photo soft-delete considerations
+
 - Soft-delete is safer than hard-delete (can be recovered)
 - Query pattern: `WHERE deletedAt IS NULL` to exclude deleted photos
 - All photo queries already use this pattern (line 182, 261)

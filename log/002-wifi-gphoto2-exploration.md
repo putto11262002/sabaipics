@@ -11,6 +11,7 @@ Topic-based changelog for WiFi camera connectivity research and implementation
 After testing USB connection with ImageCaptureCore on iPad:
 
 **What Didn't Work:**
+
 - ❌ Camera shutter button shows "BUSY" when pressed
 - ❌ Camera enters PTP tethered mode (LCD goes black)
 - ❌ Cannot take NEW photos with physical shutter button
@@ -19,6 +20,7 @@ After testing USB connection with ImageCaptureCore on iPad:
 - ❌ **Core issue: Camera shutter is disabled in PTP mode**
 
 **Root Cause:**
+
 - PTP (Picture Transfer Protocol) over USB takes control of camera
 - Camera firmware disables shutter button when in PTP host mode
 - iOS ImageCaptureCore doesn't support remote capture commands
@@ -35,6 +37,7 @@ After testing USB connection with ImageCaptureCore on iPad:
 **Location:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/ios/`
 
 **Key findings:**
+
 - 15 markdown files with complete technical documentation
 - PTP/IP protocol details (port 15740)
 - UPnP/SSDP discovery protocol (UDP 239.255.255.250:1900)
@@ -44,12 +47,14 @@ After testing USB connection with ImageCaptureCore on iPad:
 ### Protocol Details Discovered
 
 **PTP/IP (Picture Transfer Protocol over IP):**
+
 - **Standard:** ISO 15740:2013
 - **Port:** TCP 15740 (primary connection)
 - **Discovery:** UPnP/SSDP multicast (optional, for auto-discovery)
 - **Connection:** Direct IP connection to camera
 
 **Canon WiFi Settings:**
+
 - **Default IP:** 192.168.1.1 (most Canon cameras)
 - **Alternative IPs:** 192.168.1.10 (newer EOS R), 192.168.2.1 (some PowerShot)
 - **Camera Model String:** "Canon EOS (WLAN)"
@@ -57,6 +62,7 @@ After testing USB connection with ImageCaptureCore on iPad:
 - **Connection String:** `ptpip:192.168.1.1`
 
 **Other Brands:**
+
 - Nikon: 192.168.1.1
 - Sony: 192.168.122.1
 - Fujifilm: 192.168.0.1 (uses ports 55740-55742)
@@ -64,11 +70,13 @@ After testing USB connection with ImageCaptureCore on iPad:
 ### Apple Entitlements Required
 
 **For Auto-Discovery (Phase 3):**
+
 - Entitlement: `com.apple.developer.networking.multicast`
 - Info.plist: `NSLocalNetworkUsageDescription`
 - Approval timeline: 2-4 weeks from Apple
 
 **For Manual IP (Phase 2):**
+
 - No special entitlement needed!
 - Only requires standard network access
 
@@ -81,6 +89,7 @@ After testing USB connection with ImageCaptureCore on iPad:
 **GitHub:** https://github.com/touchbyte/GPhoto2Framework
 
 **What it is:**
+
 - iOS port of libgphoto2
 - Production-proven (used by PhotoSync app on App Store)
 - Supports PTP/IP WiFi connections
@@ -88,6 +97,7 @@ After testing USB connection with ImageCaptureCore on iPad:
 - Last updated: August 2022
 
 **Capabilities:**
+
 - Connect to camera via WiFi (PTP/IP)
 - Event monitoring for new photos (`GP_EVENT_FILE_ADDED`)
 - File listing and download
@@ -95,6 +105,7 @@ After testing USB connection with ImageCaptureCore on iPad:
 - Supports Canon, Nikon, Sony, Fuji, Panasonic
 
 **Location:**
+
 ```
 /Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/GPhoto2Framework/
 ```
@@ -124,12 +135,14 @@ GPhoto2Framework/
 **Goal:** Modify GPhoto2Example to work with Canon EOS cameras via WiFi for testing
 
 **Files Modified:**
+
 1. `ViewController.h` - Added properties for event tracking
 2. `ViewController.m` - Added ~400 lines of Canon WiFi code
 
 ### Key Features Implemented
 
 **1. Pre-configured Canon WiFi Settings**
+
 ```objc
 #define CANON_WIFI_IP @"192.168.1.1"
 #define CANON_CAMERA_MODEL @"Canon EOS (WLAN)"
@@ -137,6 +150,7 @@ GPhoto2Framework/
 ```
 
 **2. Enhanced UI (Programmatic)**
+
 - Status label with color coding:
   - Red: Disconnected
   - Orange: Connecting
@@ -151,6 +165,7 @@ GPhoto2Framework/
 **3. Event Monitoring System**
 
 **Core Implementation:**
+
 ```objc
 // Event monitoring loop
 - (void)runEventMonitorLoop {
@@ -177,6 +192,7 @@ GPhoto2Framework/
 ```
 
 **Events Handled:**
+
 - `GP_EVENT_FILE_ADDED` - New photo taken (main event we care about!)
 - `GP_EVENT_TIMEOUT` - No activity (normal)
 - `GP_EVENT_UNKNOWN` - Unknown event
@@ -185,12 +201,14 @@ GPhoto2Framework/
 - `GP_EVENT_FILE_CHANGED` - File modified
 
 **4. Threading Architecture**
+
 - **Main Thread:** UI updates, user interactions
 - **Background Thread (connection):** Camera connection via `gp_camera_init`
 - **Background Serial Queue (events):** Event monitoring loop
 - All UI updates dispatched to main thread (`dispatch_async(dispatch_get_main_queue())`)
 
 **5. Comprehensive Logging**
+
 ```objc
 // Console logging for debugging
 NSLog(@"=== NEW PHOTO DETECTED ===");
@@ -206,6 +224,7 @@ NSLog(@"========================");
 ```
 
 **6. Helper Methods**
+
 - `updateStatusLabel:color:` - Thread-safe status updates
 - `updatePhotoCount:` - Updates photo counter
 - `logEvent:` - Adds timestamped entries (keeps last 5)
@@ -214,6 +233,7 @@ NSLog(@"========================");
 ### Connection Flow
 
 **Step-by-step:**
+
 ```
 1. User taps "Connect to Canon"
    ↓
@@ -260,17 +280,20 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
 ```
 
 **Warnings:**
+
 - Deployment target warnings (cosmetic)
 - libgphoto2 documentation warnings (library-related)
 - No functional impact
 
 **Issues Fixed:**
+
 - Initial error: Property `newPhotosList` violated Cocoa naming conventions
 - Solution: Renamed to `detectedPhotosList`
 
 ### Documentation Created
 
 **1. CANON_WIFI_TEST_SETUP.md** (650+ lines)
+
 - Complete change summary
 - Step-by-step testing procedures
 - Expected console output examples
@@ -280,6 +303,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
 - Future enhancement ideas
 
 **2. QUICK_TEST_GUIDE.md** (Quick reference)
+
 - 5-minute test procedure
 - Visual indicators to watch for
 - Quick troubleshooting table
@@ -294,10 +318,12 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
 ### Test Environment
 
 **Hardware:**
+
 - iPad (USB-C) - Device ID: 00008120-001171EA04114032
 - Canon camera (model TBD - user to confirm)
 
 **Network Setup:**
+
 1. Canon camera creates WiFi network (Access Point mode)
 2. SSID shown on camera LCD (e.g., "Canon_EOS_R5_123")
 3. Camera IP shown on LCD (usually 192.168.1.1)
@@ -307,21 +333,25 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
 ### Testing Procedure
 
 **Step 1: Camera Setup**
+
 - Enable WiFi on Canon camera
 - Select "Connect to Smartphone" mode
 - Note SSID and IP address from LCD
 
 **Step 2: iPad Setup**
+
 - Settings → WiFi → Connect to camera network
 - Open GPhoto2Example app
 - IP pre-filled: 192.168.1.1
 
 **Step 3: Connection Test**
+
 - Tap "Connect to Canon"
 - Wait for green "Status: Connected"
 - Check console for connection logs
 
 **Step 4: Event Monitoring Test**
+
 - Tap "Start Event Monitor"
 - Status changes to blue "Monitoring..."
 - Take photo with camera shutter button
@@ -330,6 +360,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
 - Check event log shows file name
 
 **Step 5: Repeat**
+
 - Take multiple photos
 - Verify each is detected
 - Check for any delays or missed photos
@@ -337,6 +368,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
 ### Expected Results
 
 **Console Output (Success):**
+
 ```
 === Starting Camera Connection ===
 Camera IP: 192.168.1.1
@@ -358,6 +390,7 @@ File type: image/x-canon-cr2
 ```
 
 **iPad Screen (Success):**
+
 - Status: "Connected" (green)
 - Photo count: "Photos Detected: 1 (Total on camera: 145)"
 - Event log: "[15:34:12] File added: IMG_1234.CR2"
@@ -365,6 +398,7 @@ File type: image/x-canon-cr2
 ### Current Status
 
 **✅ Completed:**
+
 - USB/PTP testing (failed, documented)
 - WiFi protocol research
 - GPhoto2Framework repository cloned
@@ -374,6 +408,7 @@ File type: image/x-canon-cr2
 - Code ready for testing
 
 **⏳ Pending:**
+
 - Test on real iPad with real Canon camera
 - Verify WiFi connection works
 - Verify event monitoring detects new photos
@@ -382,6 +417,7 @@ File type: image/x-canon-cr2
 - Test disconnection/reconnection scenarios
 
 **🔜 Next Steps:**
+
 1. Test GPhoto2Example on iPad with Canon camera (5-10 mins)
 2. If successful → Integrate GPhoto2Framework into SabaiPicsStudio
 3. If issues → Debug and iterate
@@ -393,18 +429,21 @@ File type: image/x-canon-cr2
 ### What We Learned
 
 **1. ImageCaptureCore Limitations:**
+
 - Works great for USB connections on macOS
 - Limited functionality for USB on iOS (tethered mode blocks shutter)
 - No remote capture support on iOS
 - Not suitable for event photographers who need to use camera normally
 
 **2. PTP/IP Protocol:**
+
 - Allows camera to operate normally (LCD stays on, shutter works)
 - Camera and app communicate over WiFi network
 - Event system notifies app when new photos are taken
 - Standard protocol (ISO 15740:2013) supported by major brands
 
 **3. GPhoto2Framework:**
+
 - Production-ready (used in PhotoSync app)
 - Comprehensive PTP/IP support
 - Event monitoring works via `gp_camera_wait_for_event()`
@@ -412,6 +451,7 @@ File type: image/x-canon-cr2
 - Well-documented in example code
 
 **4. WiFi Connection Modes:**
+
 - **Access Point Mode:** Camera creates WiFi, iPad joins (simple, works now)
 - **Infrastructure Mode:** Both on same WiFi network (requires discovery)
 - **Manual IP:** No entitlement needed (Phase 2)
@@ -420,6 +460,7 @@ File type: image/x-canon-cr2
 ### Critical Success Factors
 
 **For WiFi to work:**
+
 1. ✅ Camera must have WiFi enabled
 2. ✅ Camera must be in "Connect to Smartphone" mode
 3. ✅ iPad must be on camera's WiFi network
@@ -429,6 +470,7 @@ File type: image/x-canon-cr2
 7. ✅ Port 15740 must be accessible
 
 **For event detection:**
+
 1. ✅ Connection must be established first
 2. ✅ Event loop must be running
 3. ✅ Camera must be taking NEW photos (not browsing old ones)
@@ -437,6 +479,7 @@ File type: image/x-canon-cr2
 ### Advantages of WiFi Approach
 
 **vs USB/PTP:**
+
 - ✅ Camera works normally (shutter button enabled)
 - ✅ Camera LCD stays on
 - ✅ Photographer can see camera settings
@@ -445,6 +488,7 @@ File type: image/x-canon-cr2
 - ⚠️ Slower transfer than USB (acceptable for event photography)
 
 **vs Post-Shoot Import:**
+
 - ✅ Near real-time detection (1-2 second delay)
 - ✅ Can preview photos during event
 - ✅ Detect issues early (focus, exposure)
@@ -459,6 +503,7 @@ File type: image/x-canon-cr2
 **Goal:** Integrate GPhoto2Framework into SabaiPicsStudio app
 
 **Approach:**
+
 1. Add GPhoto2Framework to SabaiPicsStudio project
 2. Create Objective-C wrapper class (bridge to Swift)
 3. Implement WiFi connection mode (parallel to existing USB code)
@@ -469,6 +514,7 @@ File type: image/x-canon-cr2
 ### Architecture Changes
 
 **Current SabaiPicsStudio (USB only):**
+
 ```
 CameraViewModel (Swift)
   ↓
@@ -480,6 +526,7 @@ USB Connection → Camera (PTP mode, shutter blocked ❌)
 ```
 
 **New SabaiPicsStudio (USB + WiFi):**
+
 ```
 CameraViewModel (Swift)
   ↓
@@ -495,11 +542,13 @@ ConnectionMode: .usb or .wifi
 ### Components to Build
 
 **1. Framework Integration**
+
 - Add GPhoto2Framework.framework to project
 - Configure build settings
 - Link framework
 
 **2. Objective-C Bridge**
+
 ```objc
 // WiFiCameraManager.h
 @interface WiFiCameraManager : NSObject
@@ -514,6 +563,7 @@ ConnectionMode: .usb or .wifi
 ```
 
 **3. Swift Wrapper**
+
 ```swift
 class WiFiCameraService: ObservableObject {
     private let bridge: WiFiCameraManager
@@ -526,12 +576,14 @@ class WiFiCameraService: ObservableObject {
 ```
 
 **4. UI Updates**
+
 - Add connection mode picker (USB vs WiFi)
 - Add manual IP entry screen
 - Update SearchingView for WiFi mode
 - Keep existing views for photo display
 
 **5. State Management**
+
 ```swift
 enum ConnectionMode {
     case usb
@@ -550,6 +602,7 @@ enum AppState {
 ### Files to Create/Modify
 
 **New Files:**
+
 - `WiFiCameraManager.h` - Obj-C bridge header
 - `WiFiCameraManager.m` - Obj-C bridge implementation
 - `WiFiCameraService.swift` - Swift wrapper
@@ -557,6 +610,7 @@ enum AppState {
 - `SabaiPicsStudio-Bridging-Header.h` - Obj-C to Swift bridge
 
 **Modified Files:**
+
 - `CameraViewModel.swift` - Add WiFi mode support
 - `ContentView.swift` - Add connection mode picker
 - `SearchingView.swift` - Update for WiFi instructions
@@ -565,27 +619,32 @@ enum AppState {
 ### Phases
 
 **Phase 1: Framework Integration (1-2 hours)**
+
 - Add GPhoto2Framework to project
 - Configure build settings
 - Verify it compiles
 
 **Phase 2: Objective-C Bridge (2-3 hours)**
+
 - Create WiFiCameraManager wrapper
 - Implement connection logic
 - Implement event monitoring
 - Test from Objective-C
 
 **Phase 3: Swift Integration (2-3 hours)**
+
 - Create Swift wrapper class
 - Bridge to ViewModel
 - Handle threading and callbacks
 
 **Phase 4: UI Updates (1-2 hours)**
+
 - Add connection mode picker
 - Add manual IP entry
 - Update existing views
 
 **Phase 5: Testing (1-2 hours)**
+
 - Test WiFi connection
 - Test event monitoring
 - Test photo download
@@ -602,6 +661,7 @@ enum AppState {
 **User question:** Do all Canon cameras use the same IP address?
 
 **Answer:** Usually 192.168.1.1, but not always:
+
 - Most Canon cameras in Access Point mode: `192.168.1.1`
 - Some newer EOS R models: `192.168.1.10`
 - Some PowerShot models: `192.168.2.1`
@@ -612,17 +672,20 @@ enum AppState {
 ### Technical Constraints
 
 **iOS Limitations:**
+
 - No `requestTakePicture()` support (macOS only)
 - Must use event monitoring instead of active triggering
 - Background processing limited (app must be foreground)
 
 **PTP/IP Limitations:**
+
 - Slower than USB (network overhead)
 - Requires WiFi network setup
 - Camera battery drain (WiFi active)
 - Range limited by WiFi signal
 
 **GPhoto2Framework:**
+
 - Last updated August 2022
 - Objective-C only (no Swift wrapper)
 - C library underneath (manual memory management)
@@ -631,24 +694,28 @@ enum AppState {
 ### Future Enhancements
 
 **Phase 3 (Auto-Discovery):**
+
 - Implement UPnP/SSDP discovery
 - Request multicast entitlement from Apple
 - Eliminate manual IP entry
 - Show list of discovered cameras
 
 **Download Implementation:**
+
 - Implement actual photo downloads
 - Add progress tracking
 - Implement local storage
 - Add upload to SabaiPics API
 
 **Error Recovery:**
+
 - Handle WiFi disconnection
 - Reconnect automatically
 - Resume event monitoring
 - Save partial downloads
 
 **Optimization:**
+
 - Adjust polling interval (1s vs 500ms)
 - Implement connection pooling
 - Cache camera info
@@ -659,16 +726,19 @@ enum AppState {
 ## References
 
 ### Documentation
+
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/ios/` - Complete technical docs
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/GPhoto2Framework/CANON_WIFI_TEST_SETUP.md`
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/GPhoto2Framework/QUICK_TEST_GUIDE.md`
 
 ### Code Locations
+
 - **GPhoto2Example (adapted):** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/GPhoto2Framework/GPhoto2Framework/GPhoto2Example/`
 - **SabaiPicsStudio (main app):** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/apps/studio/`
 - **Original USB implementation:** `apps/studio/SabaiPicsStudio/CameraViewModel.swift`
 
 ### External Resources
+
 - GPhoto2Framework: https://github.com/touchbyte/GPhoto2Framework
 - libgphoto2: http://www.gphoto.org/doc/
 - PTP/IP Standard: ISO 15740:2013
@@ -680,6 +750,7 @@ enum AppState {
 ### Definition of Success
 
 **GPhoto2Example Test:**
+
 - ✅ Connects to Canon camera via WiFi
 - ✅ Detects new photos within 2 seconds of shutter press
 - ✅ Shows file name, path, and size
@@ -687,6 +758,7 @@ enum AppState {
 - ✅ Stable connection for 10+ minutes
 
 **SabaiPicsStudio Integration:**
+
 - ✅ WiFi mode available in app
 - ✅ Manual IP entry works
 - ✅ Photos detected and downloaded

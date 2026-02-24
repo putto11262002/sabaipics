@@ -31,9 +31,20 @@ interface PageHeaderProps {
   className?: string;
 }
 
-export function PageHeader({ breadcrumbs = [], backHref, children, leftContent, className }: PageHeaderProps) {
+export function PageHeader({
+  breadcrumbs = [],
+  backHref,
+  children,
+  leftContent,
+  className,
+}: PageHeaderProps) {
   return (
-    <header className={cn("sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 bg-background px-4", className)}>
+    <header
+      className={cn(
+        'sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 bg-background px-4',
+        className,
+      )}
+    >
       {/* Left section */}
       <div className="flex items-center gap-2">
         {/* Back button */}

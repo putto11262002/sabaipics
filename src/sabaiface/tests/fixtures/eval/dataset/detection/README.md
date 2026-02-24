@@ -28,6 +28,7 @@ tests/fixtures/eval/
 ```
 
 **Image Organization:**
+
 - Images stored **flat** (001.jpg, 002.jpg, etc.)
 - Categorized via `category` field in `labels.json`:
   - `single`: 1 face
@@ -40,24 +41,26 @@ tests/fixtures/eval/
 ## Test Set 1: Face Detection
 
 ### Purpose
+
 Evaluate how accurately the system detects faces in images.
 
 ### Metrics
 
-| Metric | Formula | Purpose |
-|--------|---------|---------|
-| **True Positives (TP)** | Correctly detected faces | Faces found |
-| **False Positives (FP)** | Detections that aren't faces | Over-detection |
-| **False Negatives (FN)** | Missed faces | Under-detection |
-| **Precision** | TP / (TP + FP) | Of all detections, how many are correct? |
-| **Recall** | TP / (TP + FN) | Of all faces, how many did we find? |
-| **F1 Score** | 2 × (Precision × Recall) / (Precision + Recall) | Balance of precision & recall |
-| **Exact Match Rate** | Perfect face count / Total images | Binary: exact or not |
-| **MAE** | Mean Absolute Error of face counts | Average error magnitude |
+| Metric                   | Formula                                         | Purpose                                  |
+| ------------------------ | ----------------------------------------------- | ---------------------------------------- |
+| **True Positives (TP)**  | Correctly detected faces                        | Faces found                              |
+| **False Positives (FP)** | Detections that aren't faces                    | Over-detection                           |
+| **False Negatives (FN)** | Missed faces                                    | Under-detection                          |
+| **Precision**            | TP / (TP + FP)                                  | Of all detections, how many are correct? |
+| **Recall**               | TP / (TP + FN)                                  | Of all faces, how many did we find?      |
+| **F1 Score**             | 2 × (Precision × Recall) / (Precision + Recall) | Balance of precision & recall            |
+| **Exact Match Rate**     | Perfect face count / Total images               | Binary: exact or not                     |
+| **MAE**                  | Mean Absolute Error of face counts              | Average error magnitude                  |
 
 ### Ground Truth Format
 
 `dataset/detection/labels.json`:
+
 ```json
 [
   {
@@ -99,7 +102,9 @@ FACE_DETECTOR=ssd pnpm test:detection-eval
 ## Test Set 2: Face Recognition
 
 ### Purpose
+
 Evaluate the ability to:
+
 1. **Index** faces and store descriptors
 2. **Search** and find the same person across different photos
 3. **Match** faces with appropriate similarity thresholds
@@ -107,39 +112,34 @@ Evaluate the ability to:
 ### Metrics
 
 #### Indexing Metrics
+
 Same as detection metrics above (TP, FP, FN, Precision, Recall, F1).
 
 #### Search Metrics
 
-| Metric | Formula | Purpose |
-|--------|---------|---------|
-| **Rank-1 Accuracy** | Correct match is #1 result | Strict accuracy |
-| **Rank-5 Accuracy** | Correct match in top 5 | Relaxed accuracy |
-| **Mean Reciprocal Rank** | Average of (1/rank of correct match) | Ranking quality |
-| **True Positive Rate** | Correct matches / Total queries | Sensitivity |
-| **False Positive Rate** | Wrong matches / Total queries | Specificity |
+| Metric                      | Formula                              | Purpose          |
+| --------------------------- | ------------------------------------ | ---------------- |
+| **Rank-1 Accuracy**         | Correct match is #1 result           | Strict accuracy  |
+| **Rank-5 Accuracy**         | Correct match in top 5               | Relaxed accuracy |
+| **Mean Reciprocal Rank**    | Average of (1/rank of correct match) | Ranking quality  |
+| **True Positive Rate**      | Correct matches / Total queries      | Sensitivity      |
+| **False Positive Rate**     | Wrong matches / Total queries        | Specificity      |
 | **Similarity Distribution** | Confidences for correct vs incorrect | Threshold tuning |
 
 ### Ground Truth Format
 
 `recognition/ground-truth.json`:
+
 ```json
 {
   "identities": {
     "person-001": {
       "name": "John Doe",
-      "photos": [
-        "person-001/photo-001.jpg",
-        "person-001/photo-002.jpg",
-        "person-001/photo-003.jpg"
-      ]
+      "photos": ["person-001/photo-001.jpg", "person-001/photo-002.jpg", "person-001/photo-003.jpg"]
     },
     "person-002": {
       "name": "Jane Smith",
-      "photos": [
-        "person-002/photo-001.jpg",
-        "person-002/photo-002.jpg"
-      ]
+      "photos": ["person-002/photo-001.jpg", "person-002/photo-002.jpg"]
     }
   },
   "groups": {
@@ -208,13 +208,13 @@ pnpm eval:setup-recognition
 
 ### Image Quality Standards
 
-| Category | Requirements |
-|----------|--------------|
-| **single** | Clear, front-facing, good lighting |
-| **multiple** | 2-10 people, varied positions |
-| **crowd** | 10+ people, realistic event photos |
+| Category       | Requirements                                                         |
+| -------------- | -------------------------------------------------------------------- |
+| **single**     | Clear, front-facing, good lighting                                   |
+| **multiple**   | 2-10 people, varied positions                                        |
+| **crowd**      | 10+ people, realistic event photos                                   |
 | **edge-cases** | Challenging angles, partial faces, low light, shadows, hats, glasses |
-| **no-faces** | Photos without faces (negative testing) |
+| **no-faces**   | Photos without faces (negative testing)                              |
 
 ### Recognition Data Requirements
 
@@ -229,28 +229,28 @@ pnpm eval:setup-recognition
 
 ### Detection Benchmarks
 
-| Metric | Target | Acceptable | Poor |
-|--------|--------|------------|------|
-| Precision | >95% | >90% | <90% |
-| Recall | >95% | >85% | <85% |
-| F1 Score | >95% | >90% | <90% |
-| Exact Match Rate | >85% | >70% | <70% |
+| Metric           | Target | Acceptable | Poor |
+| ---------------- | ------ | ---------- | ---- |
+| Precision        | >95%   | >90%       | <90% |
+| Recall           | >95%   | >85%       | <85% |
+| F1 Score         | >95%   | >90%       | <90% |
+| Exact Match Rate | >85%   | >70%       | <70% |
 
 ### Recognition Benchmarks
 
-| Metric | Target | Acceptable | Poor |
-|--------|--------|------------|------|
-| Rank-1 Accuracy | >98% | >95% | <95% |
-| Rank-5 Accuracy | >99% | >98% | <98% |
-| Mean Reciprocal Rank | >0.95 | >0.90 | <0.90 |
+| Metric               | Target | Acceptable | Poor  |
+| -------------------- | ------ | ---------- | ----- |
+| Rank-1 Accuracy      | >98%   | >95%       | <95%  |
+| Rank-5 Accuracy      | >99%   | >98%       | <98%  |
+| Mean Reciprocal Rank | >0.95  | >0.90      | <0.90 |
 
 ### Performance Benchmarks
 
-| Operation | Target | Acceptable |
-|-----------|--------|------------|
-| Detection (per image) | <200ms | <500ms |
-| Indexing (per face) | <100ms | <200ms |
-| Search (per query) | <500ms | <1000ms |
+| Operation             | Target | Acceptable |
+| --------------------- | ------ | ---------- |
+| Detection (per image) | <200ms | <500ms     |
+| Indexing (per face)   | <100ms | <200ms     |
+| Search (per query)    | <500ms | <1000ms    |
 
 ---
 

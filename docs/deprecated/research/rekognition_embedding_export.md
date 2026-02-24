@@ -18,6 +18,7 @@
 **NO** - IndexFaces does not return the actual face embedding/vector data.
 
 **What IndexFaces returns:**
+
 - `FaceId` - A unique identifier (UUID format: `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
 - `ImageId` - Identifier for the input image
 - `ExternalImageId` - Optional user-assigned identifier
@@ -27,6 +28,7 @@
 - `FaceModelVersion` - Version of the face detection model used
 
 **What IndexFaces does NOT return:**
+
 - Face embedding/feature vector
 - Any numerical representation of the face that could be used for comparison outside of Rekognition
 
@@ -35,6 +37,7 @@
 **NO** - There is no API operation to retrieve the actual face embeddings from a collection.
 
 Available operations for retrieving face data:
+
 - **ListFaces** - Returns metadata only (FaceId, ImageId, ExternalImageId, BoundingBox, Confidence, UserId)
 - **DescribeCollection** - Returns collection-level metadata (face count, model version, ARN)
 
@@ -119,6 +122,7 @@ Neither operation exposes the underlying feature vectors.
 ```
 
 **Key observations:**
+
 - Returns a **similarity score** (0-100 float) for matches
 - Returns metadata about matched faces
 - Does **NOT** return embeddings for either the query face or matched faces
@@ -130,6 +134,7 @@ Neither operation exposes the underlying feature vectors.
 > "Amazon Rekognition doesn't save the actual faces that are detected. Instead, the underlying detection algorithm first detects the faces in the input image. For each face, the algorithm extracts facial features into a feature vector, and stores it in the backend database."
 
 The feature vectors are:
+
 - Stored in AWS-managed backend databases
 - Not accessible via any API operation
 - Used internally for face matching operations (SearchFaces, SearchFacesByImage)
@@ -140,16 +145,19 @@ The feature vectors are:
 ## Implications for Vendor Lock-in
 
 ### Cannot Migrate Data
+
 - Face embeddings stored in Rekognition collections cannot be exported
 - If you switch to another face recognition provider (e.g., FaceNet, DeepFace, custom model), you must re-index all faces
 - No way to bulk export face vectors for backup or portability
 
 ### Cannot Use Embeddings Elsewhere
+
 - Cannot use Rekognition-generated embeddings in your own similarity calculations
 - Cannot combine Rekognition embeddings with other systems
 - All face comparison operations must go through Rekognition APIs
 
 ### Dependency on AWS
+
 - Complete dependency on AWS for all face recognition operations
 - Subject to AWS pricing changes
 - Subject to AWS service availability
@@ -202,11 +210,13 @@ If embedding portability is important, consider:
 ## Recommendation
 
 **For FaceLink project:** Given that AWS Rekognition does not allow embedding export and creates vendor lock-in, we should seriously consider self-hosted alternatives if:
+
 - We anticipate high scale (cost becomes prohibitive with Rekognition)
 - Data portability is important
 - We want to avoid dependency on a single vendor
 
 **Mitigation if using Rekognition:**
+
 - Store `ExternalImageId` mapping to original photos for re-indexing capability
 - Keep original photos accessible for potential migration
 - Document the vendor lock-in risk in technical decisions

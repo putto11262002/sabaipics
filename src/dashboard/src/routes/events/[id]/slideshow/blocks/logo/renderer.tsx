@@ -1,8 +1,8 @@
 import type { SlideshowBlock, SlideshowContext, LogoProps } from '../../types';
 
 const SIZE_MAP = {
-  sm: '5vw',  // ~96px on 1920px screen
-  md: '8vw',  // ~154px on 1920px screen
+  sm: '5vw', // ~96px on 1920px screen
+  md: '8vw', // ~154px on 1920px screen
   lg: '12vw', // ~230px on 1920px screen
 };
 
@@ -35,15 +35,8 @@ export function LogoRenderer({
 
   // Live mode - show real logo if available
   return logoUrl ? (
-    <div
-      className="overflow-hidden rounded-lg"
-      style={containerStyle}
-    >
-      <img
-        src={logoUrl}
-        alt="Event logo"
-        className="h-full w-full object-cover"
-      />
+    <div className="overflow-hidden rounded-lg" style={containerStyle}>
+      <img src={logoUrl} alt="Event logo" className="h-full w-full object-cover" />
     </div>
   ) : (
     <div

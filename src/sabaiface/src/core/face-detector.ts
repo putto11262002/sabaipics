@@ -26,16 +26,16 @@ export interface Landmark {
  */
 export interface DetectedFace {
   boundingBox: {
-    x: number;      // Pixel coordinates
+    x: number; // Pixel coordinates
     y: number;
     width: number;
     height: number;
   };
-  descriptor: Float32Array;  // 128-D face descriptor
-  confidence: number;        // Detection confidence (0-1)
-  landmarks?: Landmark[];    // 68-point facial landmarks
-  age?: number;             // Optional age estimation
-  gender?: string;          // Optional gender ('male' | 'female')
+  descriptor: Float32Array; // 128-D face descriptor
+  confidence: number; // Detection confidence (0-1)
+  landmarks?: Landmark[]; // 68-point facial landmarks
+  age?: number; // Optional age estimation
+  gender?: string; // Optional gender ('male' | 'female')
   genderConfidence?: number; // Optional gender confidence (0-1)
   expressions?: Record<string, number>; // Optional emotions
 
@@ -51,8 +51,8 @@ export interface DetectedFace {
  * Face detector configuration
  */
 export interface FaceDetectorConfig {
-  modelsPath: string;       // Path to face-api.js models
-  minConfidence?: number;   // Min detection confidence (default: 0.5)
+  modelsPath: string; // Path to face-api.js models
+  minConfidence?: number; // Min detection confidence (default: 0.5)
   detectAttributes?: boolean; // Detect age, gender, emotions (default: true)
 }
 
@@ -145,7 +145,9 @@ export class FaceDetector {
       }
 
       // Convert to our domain model
-      return detections.map((detection) => this.convertDetection(detection, imageWidth, imageHeight));
+      return detections.map((detection) =>
+        this.convertDetection(detection, imageWidth, imageHeight),
+      );
     } catch (error) {
       console.error('[FaceDetector] Face detection failed:', error);
       throw new Error(`Face detection failed: ${error}`);
@@ -162,7 +164,7 @@ export class FaceDetector {
    */
   async extractDescriptor(
     imageBuffer: ArrayBuffer,
-    box: { x: number; y: number; width: number; height: number }
+    box: { x: number; y: number; width: number; height: number },
   ): Promise<Float32Array> {
     if (!this.modelsLoaded) {
       throw new Error('Models not loaded. Call loadModels() first.');
@@ -176,7 +178,10 @@ export class FaceDetector {
       // Note: This is a simplified implementation. A more sophisticated version
       // would crop the image to the region first.
       const detection = await faceapi
-        .detectSingleFace(img as any, new faceapi.SsdMobilenetv1Options({ minConfidence: this.minConfidence }))
+        .detectSingleFace(
+          img as any,
+          new faceapi.SsdMobilenetv1Options({ minConfidence: this.minConfidence }),
+        )
         .withFaceLandmarks()
         .withFaceDescriptor();
 
@@ -249,7 +254,7 @@ export class FaceDetector {
 export function pixelBoxToRatio(
   box: { x: number; y: number; width: number; height: number },
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
 ): { width: number; height: number; left: number; top: number } {
   return {
     width: box.width / imageWidth,
@@ -270,7 +275,7 @@ export function pixelBoxToRatio(
 export function ratioBoxToPixel(
   box: { width: number; height: number; left: number; top: number },
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
 ): { x: number; y: number; width: number; height: number } {
   return {
     x: box.left * imageWidth,

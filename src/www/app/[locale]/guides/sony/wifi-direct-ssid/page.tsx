@@ -71,9 +71,10 @@ export default async function SonyWifiDirectSsidGuidePage({ params }: Props) {
             เชื่อมต่อกล้อง Sony กับ FrameFast iOS ผ่าน Wi‑Fi Direct
           </h1>
           <p className="text-pretty text-sm leading-6 text-muted-foreground">
-            ใช้กับรุ่นที่ใน iPhone/iPad จะเห็น Wi‑Fi ชื่อขึ้นต้นด้วย <InlineCode>DIRECT-</InlineCode> และกล้องสามารถแสดง{' '}
-            <InlineCode>SSID</InlineCode> กับ <InlineCode>รหัสผ่าน</InlineCode> ได้
-            (ขั้นตอนอ้างอิงจากคู่มือ Sony “การควบคุมกล้องโดยใช้ iPhone หรือ iPad (SSID)”).
+            ใช้กับรุ่นที่ใน iPhone/iPad จะเห็น Wi‑Fi ชื่อขึ้นต้นด้วย{' '}
+            <InlineCode>DIRECT-</InlineCode> และกล้องสามารถแสดง <InlineCode>SSID</InlineCode> กับ{' '}
+            <InlineCode>รหัสผ่าน</InlineCode> ได้ (ขั้นตอนอ้างอิงจากคู่มือ Sony
+            “การควบคุมกล้องโดยใช้ iPhone หรือ iPad (SSID)”).
           </p>
           <p className="text-sm text-muted-foreground">
             ไม่แน่ใจว่ารุ่นไหน?{' '}
@@ -148,14 +149,17 @@ export default async function SonyWifiDirectSsidGuidePage({ params }: Props) {
             <h3 className="text-base font-semibold">1) ทำบนกล้อง Sony</h3>
             <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>
-                เปิดโหมดควบคุมด้วยสมาร์ทโฟน: <InlineCode>MENU → (เครือข่าย) → [ควบคุมด้วยสมาร์ทโฟน]</InlineCode> แล้วตั้งเป็น{' '}
+                เปิดโหมดควบคุมด้วยสมาร์ทโฟน:{' '}
+                <InlineCode>MENU → (เครือข่าย) → [ควบคุมด้วยสมาร์ทโฟน]</InlineCode> แล้วตั้งเป็น{' '}
                 <InlineCode>เปิด</InlineCode>
               </li>
               <li>
-                เลือก <InlineCode>[การเชื่อมต่อ]</InlineCode> เพื่อแสดงหน้าจอเชื่อมต่อ (โดยปกติจะขึ้น QR code)
+                เลือก <InlineCode>[การเชื่อมต่อ]</InlineCode> เพื่อแสดงหน้าจอเชื่อมต่อ
+                (โดยปกติจะขึ้น QR code)
               </li>
               <li>
-                กดปุ่ม <InlineCode>(ลบ)</InlineCode> บนกล้อง เพื่อให้แสดง <InlineCode>SSID</InlineCode> และ <InlineCode>รหัสผ่าน</InlineCode>
+                กดปุ่ม <InlineCode>(ลบ)</InlineCode> บนกล้อง เพื่อให้แสดง{' '}
+                <InlineCode>SSID</InlineCode> และ <InlineCode>รหัสผ่าน</InlineCode>
               </li>
             </ol>
             <GuideImage
@@ -201,7 +205,8 @@ export default async function SonyWifiDirectSsidGuidePage({ params }: Props) {
           <div className="space-y-3">
             <h3 className="text-base font-semibold">3) ทำในแอป FrameFast iOS</h3>
             <p className="text-sm text-muted-foreground">
-              คู่มือ Sony มักบอกให้เปิด PlayMemories Mobile/Imaging Edge Mobile; สำหรับเราให้กลับมาเปิด FrameFast iOS แทน
+              คู่มือ Sony มักบอกให้เปิด PlayMemories Mobile/Imaging Edge Mobile;
+              สำหรับเราให้กลับมาเปิด FrameFast iOS แทน
             </p>
             <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>กลับเข้าแอป FrameFast iOS</li>
@@ -218,13 +223,18 @@ export default async function SonyWifiDirectSsidGuidePage({ params }: Props) {
             <div>
               <p className="font-medium text-foreground">Wi‑Fi ต่อไม่เสถียร</p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
-                <li>คู่มือ Sony ระบุว่า Bluetooth และ Wi‑Fi 2.4GHz อาจรบกวนกันได้: ลองปิด Bluetooth บนโทรศัพท์ชั่วคราว</li>
+                <li>
+                  คู่มือ Sony ระบุว่า Bluetooth และ Wi‑Fi 2.4GHz อาจรบกวนกันได้: ลองปิด Bluetooth
+                  บนโทรศัพท์ชั่วคราว
+                </li>
               </ul>
             </div>
             <div>
               <p className="font-medium text-foreground">หา SSID ไม่เจอ</p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
-                <li>กลับไปที่หน้าจอเชื่อมต่อบนกล้อง แล้วกดปุ่ม (ลบ) เพื่อแสดง SSID/รหัสผ่านอีกครั้ง</li>
+                <li>
+                  กลับไปที่หน้าจอเชื่อมต่อบนกล้อง แล้วกดปุ่ม (ลบ) เพื่อแสดง SSID/รหัสผ่านอีกครั้ง
+                </li>
                 <li>รอ 10–20 วินาที แล้วลองสแกน Wi‑Fi ใหม่</li>
               </ul>
             </div>
@@ -236,4 +246,3 @@ export default async function SonyWifiDirectSsidGuidePage({ params }: Props) {
     </div>
   );
 }
-

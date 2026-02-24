@@ -38,16 +38,19 @@ pnpm test:eval-detection
 **One-time setup:**
 
 1. Set your Kaggle dataset path:
+
    ```bash
    export SABAIFACE_DATASET_PATH=/path/to/kaggle/dataset
    ```
 
 2. Generate ground-truth with full paths:
+
    ```bash
    pnpm eval:generate-ground-truth
    ```
 
 3. Run recognition evals:
+
    ```bash
    # Start the server first
    pnpm dev
@@ -89,6 +92,7 @@ python3 scripts/extract-recognition-dataset.py \
 **Output:** `tests/fixtures/eval/dataset/recognition/ground-truth.local.json`
 
 Contains:
+
 - `datasetPath` - Absolute path to dataset
 - `indexSet` - List of `{name, path}` for index images
 - `identities` - Per-person data with `indexImagePaths`, `queryImagePaths`, `containedInIndexPaths`
@@ -104,6 +108,7 @@ pnpm test:recognition-eval
 ```
 
 **Metrics:**
+
 - Rank-1 Accuracy (target: >95%)
 - Rank-5 Accuracy (target: >98%)
 - Mean Reciprocal Rank (target: >0.95)
@@ -118,6 +123,7 @@ pnpm test:aws-vs-recognition
 ```
 
 **Requires AWS credentials in `.env`:**
+
 ```
 AWS_REGION=us-west-2
 AWS_ACCESS_KEY_ID=your_key
@@ -147,10 +153,10 @@ AWS_SECRET_ACCESS_KEY=
 
 ## File Management
 
-| File | Status | Description |
-|------|--------|-------------|
-| `ground-truth.sample.json` | ✅ Committed | Structure reference only |
-| `ground-truth.local.json` | ❌ Ignored | Generated per-environment with full paths |
+| File                       | Status       | Description                               |
+| -------------------------- | ------------ | ----------------------------------------- |
+| `ground-truth.sample.json` | ✅ Committed | Structure reference only                  |
+| `ground-truth.local.json`  | ❌ Ignored   | Generated per-environment with full paths |
 
 The tests automatically check for `ground-truth.local.json` first, then fall back to `ground-truth.sample.json`.
 

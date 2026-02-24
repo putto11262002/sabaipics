@@ -37,10 +37,10 @@ Generated: 2026-01-10
 
 ## Dependencies Status
 
-| Task | Description | Status | Notes |
-|------|-------------|--------|-------|
-| T-1 | DB Schema (all domain tables) | Done | `credit_ledger` table exists with `stripe_session_id` column |
-| T-9 | Stripe checkout API | Done | PR #15 merged; creates checkout sessions with metadata |
+| Task | Description                   | Status | Notes                                                        |
+| ---- | ----------------------------- | ------ | ------------------------------------------------------------ |
+| T-1  | DB Schema (all domain tables) | Done   | `credit_ledger` table exists with `stripe_session_id` column |
+| T-9  | Stripe checkout API           | Done   | PR #15 merged; creates checkout sessions with metadata       |
 
 **All dependencies complete.**
 
@@ -48,11 +48,11 @@ Generated: 2026-01-10
 
 ## Load-Bearing References
 
-| Path | Purpose |
-|------|---------|
-| `docs/logs/BS_0001_S-1/plan/final.md` | Execution plan with credit ledger mechanics |
-| `docs/logs/BS_0001_S-1/research/stripe-credit-flow.md` | Stripe integration decisions, idempotency patterns |
-| `docs/logs/BS_0001_S-1/implementation/T-9/summary/iter-001.md` | T-9 implementation details, metadata contract |
+| Path                                                           | Purpose                                            |
+| -------------------------------------------------------------- | -------------------------------------------------- |
+| `docs/logs/BS_0001_S-1/plan/final.md`                          | Execution plan with credit ledger mechanics        |
+| `docs/logs/BS_0001_S-1/research/stripe-credit-flow.md`         | Stripe integration decisions, idempotency patterns |
+| `docs/logs/BS_0001_S-1/implementation/T-9/summary/iter-001.md` | T-9 implementation details, metadata contract      |
 
 ---
 
@@ -63,9 +63,10 @@ Generated: 2026-01-10
 The webhook route (`apps/api/src/routes/webhooks/stripe.ts`) already emits `stripe:checkout.completed` events. The handler must consume from the event bus.
 
 **Event payload (from `apps/api/src/lib/stripe/events.ts`):**
+
 ```typescript
 {
-  type: "stripe:checkout.completed";
+  type: 'stripe:checkout.completed';
   session: Stripe.Checkout.Session;
   metadata: Record<string, string>;
   customerId: string | null;
@@ -75,6 +76,7 @@ The webhook route (`apps/api/src/routes/webhooks/stripe.ts`) already emits `stri
 ### Metadata Contract (from T-9)
 
 T-9 passes this metadata to Stripe checkout sessions:
+
 ```typescript
 {
   photographer_id: string,  // UUID of photographer
@@ -99,6 +101,7 @@ T-9 passes this metadata to Stripe checkout sessions:
 ```
 
 **Indexes:**
+
 - `credit_ledger_photographer_expires_idx` on (photographer_id, expires_at)
 - `credit_ledger_stripe_session_idx` on (stripe_session_id)
 
@@ -112,13 +115,13 @@ T-9 passes this metadata to Stripe checkout sessions:
 
 ## Existing Infrastructure
 
-| Component | Path | Status |
-|-----------|------|--------|
-| Webhook route | `apps/api/src/routes/webhooks/stripe.ts` | Ready (emits events) |
-| Event bus | `apps/api/src/events/` | Ready |
-| Handler shell | `apps/api/src/handlers/stripe.ts` | Shell only (TODO comments) |
-| Event types | `apps/api/src/lib/stripe/events.ts` | Ready |
-| Credit ledger schema | `packages/db/src/schema/credit-ledger.ts` | Ready |
+| Component            | Path                                      | Status                     |
+| -------------------- | ----------------------------------------- | -------------------------- |
+| Webhook route        | `apps/api/src/routes/webhooks/stripe.ts`  | Ready (emits events)       |
+| Event bus            | `apps/api/src/events/`                    | Ready                      |
+| Handler shell        | `apps/api/src/handlers/stripe.ts`         | Shell only (TODO comments) |
+| Event types          | `apps/api/src/lib/stripe/events.ts`       | Ready                      |
+| Credit ledger schema | `packages/db/src/schema/credit-ledger.ts` | Ready                      |
 
 ---
 
@@ -127,6 +130,7 @@ T-9 passes this metadata to Stripe checkout sessions:
 ### `[NEED_VALIDATION]` Database Access in Handler
 
 The current handler (`apps/api/src/handlers/stripe.ts`) is synchronous and does not have DB access. Need to confirm:
+
 - How to pass DB client to event handlers
 - Whether to use Drizzle ORM or raw SQL
 
@@ -141,6 +145,7 @@ Should the idempotency check + insert be in a transaction to prevent race condit
 ### `[GAP]` Error Handling Strategy
 
 What should happen if:
+
 1. `photographer_id` in metadata doesn't exist in DB?
 2. `credits` metadata is missing or invalid?
 

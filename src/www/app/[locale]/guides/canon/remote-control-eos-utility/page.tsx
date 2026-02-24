@@ -72,8 +72,9 @@ export default async function CanonRemoteControlEosUtilityGuidePage({ params }: 
             เชื่อมต่อกล้อง Canon กับ FrameFast iOS ผ่าน Remote control (EOS Utility)
           </h1>
           <p className="text-pretty text-sm leading-6 text-muted-foreground">
-            ใช้กับ Canon ที่ในเมนู Wireless/Wi‑Fi มีคำว่า <InlineCode>Wi-Fi/Bluetooth connection</InlineCode>{' '}
-            และ <InlineCode>Remote control (EOS Utility)</InlineCode>.
+            ใช้กับ Canon ที่ในเมนู Wireless/Wi‑Fi มีคำว่า{' '}
+            <InlineCode>Wi-Fi/Bluetooth connection</InlineCode> และ{' '}
+            <InlineCode>Remote control (EOS Utility)</InlineCode>.
           </p>
           <p className="text-sm text-muted-foreground">
             ถ้าเมนูกล้องเป็น <InlineCode>Connect to EOS Utility</InlineCode> ให้ใช้{' '}
@@ -198,7 +199,8 @@ export default async function CanonRemoteControlEosUtilityGuidePage({ params }: 
             <h3 className="text-base font-semibold">1) ทำบนกล้อง Canon</h3>
             <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>
-                ไปที่เมนู Wireless/Wi‑Fi แล้วเลือก <InlineCode>Wi-Fi/Bluetooth connection</InlineCode>
+                ไปที่เมนู Wireless/Wi‑Fi แล้วเลือก{' '}
+                <InlineCode>Wi-Fi/Bluetooth connection</InlineCode>
               </li>
             </ol>
             <GuideImage
@@ -219,7 +221,8 @@ export default async function CanonRemoteControlEosUtilityGuidePage({ params }: 
                 เลือก <InlineCode>Add a device to connect to</InlineCode>
               </li>
               <li>
-                จด/จำ <InlineCode>SSID (network name)</InlineCode> และ <InlineCode>Password</InlineCode>
+                จด/จำ <InlineCode>SSID (network name)</InlineCode> และ{' '}
+                <InlineCode>Password</InlineCode>
               </li>
             </ol>
             <GuideImage
@@ -259,7 +262,9 @@ export default async function CanonRemoteControlEosUtilityGuidePage({ params }: 
 
           <div className="space-y-3">
             <h3 className="text-base font-semibold">3) ทำในแอป FrameFast iOS</h3>
-            <p className="text-sm text-muted-foreground">กลับเข้าแอปแล้วเริ่มขั้นตอนเชื่อมต่อกล้อง</p>
+            <p className="text-sm text-muted-foreground">
+              กลับเข้าแอปแล้วเริ่มขั้นตอนเชื่อมต่อกล้อง
+            </p>
             <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>กลับเข้าแอป FrameFast iOS</li>
               <li>เริ่มขั้นตอน “Connect Camera” (หรือขั้นตอนเชื่อมต่อกล้อง)</li>
@@ -273,7 +278,9 @@ export default async function CanonRemoteControlEosUtilityGuidePage({ params }: 
           <h2 className="text-xl font-semibold">แก้ปัญหาเบื้องต้น</h2>
           <div className="space-y-4 text-sm text-muted-foreground">
             <div>
-              <p className="font-medium text-foreground">เจอหน้าจอประวัติ (history) แทนเมนูเลือกใหม่</p>
+              <p className="font-medium text-foreground">
+                เจอหน้าจอประวัติ (history) แทนเมนูเลือกใหม่
+              </p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
                 <li>ลองสลับหน้าจอด้วยปุ่ม/วงล้อของกล้อง แล้วเลือกเพิ่มอุปกรณ์ใหม่</li>
               </ul>

@@ -6,6 +6,7 @@ Date: `2026-01-10`
 Owner: `Claude`
 
 ## Inputs
+
 - Task: `docs/logs/BS_0001_S-1/tasks.md` (section: `T-6`)
 - Upstream plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Context reports:
@@ -17,6 +18,7 @@ Owner: `Claude`
   - `docs/logs/BS_0001_S-1/implementation/T-6/context/ui-design.md` (UI design with code snippets)
 
 ## Goal / non-goals
+
 - **Goal:** Create photographer signup flow with PDPA consent modal that blocks dashboard access until accepted
 - **Goal:** Handle webhook race condition gracefully via dedicated onboarding route
 - **Goal:** Provide retry and sign-out options on consent decline
@@ -25,11 +27,11 @@ Owner: `Claude`
 
 ## Decisions (from HI)
 
-| Decision | Choice |
-|----------|--------|
-| Webhook race condition | Dedicated `/onboarding` route with polling |
-| Consent decline behavior | Retry + Sign out options |
-| Route path | Keep existing `/sign-up` |
+| Decision                 | Choice                                     |
+| ------------------------ | ------------------------------------------ |
+| Webhook race condition   | Dedicated `/onboarding` route with polling |
+| Consent decline behavior | Retry + Sign out options                   |
+| Route path               | Keep existing `/sign-up`                   |
 
 ## Approach (data-driven)
 
@@ -74,28 +76,30 @@ User Flow:
 
 ### File Changes
 
-| File | Change |
-|------|--------|
-| `apps/dashboard/src/routes/onboarding.tsx` | **New** - Onboarding route with consent modal |
-| `apps/dashboard/src/components/consent/PDPAConsentModal.tsx` | **New** - PDPA consent modal component |
-| `apps/dashboard/src/components/auth/ConsentGate.tsx` | **New** - Consent gate wrapper |
-| `apps/dashboard/src/hooks/useConsentStatus.ts` | **New** - Consent status hook |
-| `apps/dashboard/src/routes/sign-up.tsx` | **Modify** - Change `afterSignUpUrl` to `/onboarding` |
-| `apps/dashboard/src/App.tsx` | **Modify** - Add `/onboarding` route, wrap dashboard with ConsentGate |
-| `packages/ui/src/components/dialog.tsx` | **New** - shadcn Dialog component (via CLI) |
-| `packages/ui/src/components/checkbox.tsx` | **New** - shadcn Checkbox component (via CLI) |
+| File                                                         | Change                                                                |
+| ------------------------------------------------------------ | --------------------------------------------------------------------- |
+| `apps/dashboard/src/routes/onboarding.tsx`                   | **New** - Onboarding route with consent modal                         |
+| `apps/dashboard/src/components/consent/PDPAConsentModal.tsx` | **New** - PDPA consent modal component                                |
+| `apps/dashboard/src/components/auth/ConsentGate.tsx`         | **New** - Consent gate wrapper                                        |
+| `apps/dashboard/src/hooks/useConsentStatus.ts`               | **New** - Consent status hook                                         |
+| `apps/dashboard/src/routes/sign-up.tsx`                      | **Modify** - Change `afterSignUpUrl` to `/onboarding`                 |
+| `apps/dashboard/src/App.tsx`                                 | **Modify** - Add `/onboarding` route, wrap dashboard with ConsentGate |
+| `packages/ui/src/components/dialog.tsx`                      | **New** - shadcn Dialog component (via CLI)                           |
+| `packages/ui/src/components/checkbox.tsx`                    | **New** - shadcn Checkbox component (via CLI)                         |
 
 ## Contracts (only if touched)
 
 ### API (existing, from T-5)
 
 **POST /consent**
+
 - Request: No body (uses auth context)
 - Response 201: `{ data: { id, consentType, createdAt } }`
 - Response 409: `{ error: { code: "ALREADY_CONSENTED", message: "..." } }` (treat as success)
 - Response 401/403: Auth errors
 
 **GET /auth/profile** (existing)
+
 - Returns `{ data: { id, email, pdpaConsentAt: string | null } }`
 - Used to check consent status
 
@@ -115,28 +119,31 @@ User Flow:
 
 ## Failure modes / edge cases (major only)
 
-| Scenario | Handling |
-|----------|----------|
-| Webhook takes >10s | Polling with 1s interval, max 30 attempts, then error with retry button |
-| POST /consent fails (network) | Show error Alert with retry button |
-| User declines consent | Show explanation, "Try Again" and "Use Different Account" (sign out) buttons |
-| User navigates directly to /dashboard without consent | ConsentGate redirects to /onboarding |
-| User refreshes during consent flow | Onboarding re-checks status, resumes where left off |
-| Already consented user visits /onboarding | Immediately redirects to /dashboard |
+| Scenario                                              | Handling                                                                     |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Webhook takes >10s                                    | Polling with 1s interval, max 30 attempts, then error with retry button      |
+| POST /consent fails (network)                         | Show error Alert with retry button                                           |
+| User declines consent                                 | Show explanation, "Try Again" and "Use Different Account" (sign out) buttons |
+| User navigates directly to /dashboard without consent | ConsentGate redirects to /onboarding                                         |
+| User refreshes during consent flow                    | Onboarding re-checks status, resumes where left off                          |
+| Already consented user visits /onboarding             | Immediately redirects to /dashboard                                          |
 
 ## Validation plan
 
 ### Tests to add
+
 - `apps/dashboard/src/routes/onboarding.test.tsx` - Onboarding flow tests
 - `apps/dashboard/src/components/consent/PDPAConsentModal.test.tsx` - Modal interaction tests
 
 ### Commands to run
+
 ```bash
 pnpm --filter=@sabaipics/dashboard build    # Type check + build
 pnpm --filter=@sabaipics/dashboard test     # Run tests (if test script exists)
 ```
 
 ### Manual validation
+
 - [ ] Full signup flow with Google OAuth
 - [ ] Consent modal displays after signup
 - [ ] Accept consent → redirects to dashboard
@@ -148,27 +155,32 @@ pnpm --filter=@sabaipics/dashboard test     # Run tests (if test script exists)
 ## Rollout / rollback
 
 ### Rollout
+
 1. Deploy to staging first
 2. Test full signup flow
 3. Verify mobile browsers (Safari iOS, Chrome Android)
 4. Deploy to production
 
 ### Rollback
+
 - Revert PR
 - No database changes required
 - No breaking API changes
 
 ### Feature flags
+
 - None required (new routes, not modifying existing behavior)
 
 ## Open questions
 
 ### Resolved
+
 - ~~Webhook race condition~~ → Dedicated /onboarding route with polling
 - ~~Consent decline behavior~~ → Retry + sign out options
 - ~~Route path~~ → Keep /sign-up
 
 ### Remaining
+
 - `[PM_FOLLOWUP]` PDPA consent copy text - using placeholder for now
 - `[NEED_VALIDATION]` Clerk session lifetime should be 24h - verify in Clerk dashboard before launch
 - `[NEED_VALIDATION]` Test in LINE in-app browser before launch

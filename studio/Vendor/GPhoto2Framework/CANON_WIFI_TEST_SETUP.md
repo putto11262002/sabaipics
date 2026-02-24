@@ -5,6 +5,7 @@
 The GPhoto2Example iOS app has been successfully modified to support Canon EOS camera WiFi testing with comprehensive event monitoring capabilities.
 
 **Modified Files:**
+
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/GPhoto2Framework/GPhoto2Framework/GPhoto2Example/ViewController.h`
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/GPhoto2Framework/GPhoto2Framework/GPhoto2Example/ViewController.m`
 
@@ -17,6 +18,7 @@ The GPhoto2Example iOS app has been successfully modified to support Canon EOS c
 ### 1. Canon WiFi Pre-Configuration
 
 Added constants for Canon camera connection:
+
 ```objective-c
 #define CANON_WIFI_IP @"192.168.1.1"
 #define CANON_CAMERA_MODEL @"Canon EOS (WLAN)"
@@ -24,6 +26,7 @@ Added constants for Canon camera connection:
 ```
 
 The app now automatically configures:
+
 - IP Address: `192.168.1.1` (standard Canon WiFi IP)
 - Camera Model: `"Canon EOS (WLAN)"`
 - Protocol: `"ptpip"` (PTP over IP)
@@ -56,15 +59,18 @@ The app now automatically configures:
 **New Methods Added:**
 
 #### `- (IBAction)startEventMonitoring:(id)sender`
+
 - Starts background event monitoring loop
 - Enables real-time photo detection
 - Updates UI to show monitoring is active
 
 #### `- (IBAction)stopEventMonitoring:(id)sender`
+
 - Stops the event monitoring loop
 - Displays summary of detected photos
 
 #### `- (void)runEventMonitorLoop`
+
 - Main event loop running on background queue
 - Continuously polls camera using `gp_camera_wait_for_event()`
 - Handles multiple event types:
@@ -77,6 +83,7 @@ The app now automatically configures:
 
 **File Added Event Handling:**
 When a new photo is detected:
+
 - Extracts file path and name
 - Increments photo counter
 - Logs to event log with timestamp
@@ -87,6 +94,7 @@ When a new photo is detected:
 ### 4. Improved Connection Handling
 
 **Enhanced `connectCamera:` Method:**
+
 - Comprehensive NSLog statements at each step
 - Logs camera abilities lookup
 - Logs port configuration
@@ -94,6 +102,7 @@ When a new photo is detected:
 - Better error reporting
 
 **Enhanced `doConnect` Method:**
+
 - Real-time status updates during connection
 - Detailed success/failure messages
 - Troubleshooting tips on failure
@@ -104,16 +113,19 @@ When a new photo is detected:
 **New Helper Methods:**
 
 #### `- (void)logEvent:(NSString *)event`
+
 - Adds timestamped entries to event log
 - Maintains last 5 events in circular buffer
 - Updates event log UI label
 - Writes to NSLog for Xcode console
 
 #### `- (void)updateStatusLabel:color:`
+
 - Thread-safe status updates
 - Color-coded status indicators
 
 #### `- (void)updatePhotoCount:(int)count`
+
 - Updates photo count display
 - Shows both detected and total counts
 
@@ -124,6 +136,7 @@ Updated `ctx_error_func` and `ctx_status_func` to include NSLog statements for b
 ### 7. Code Organization
 
 Added clear pragma marks:
+
 - `#pragma mark - Lifecycle Methods`
 - `#pragma mark - UI Setup`
 - `#pragma mark - GPhoto2 Context Functions`
@@ -139,6 +152,7 @@ All methods include comprehensive Objective-C documentation comments.
 **Build Status:** ✅ SUCCESS
 
 **Build Command Used:**
+
 ```bash
 xcodebuild -project GPhoto2Framework.xcodeproj \
   -scheme GPhoto2Example \
@@ -147,10 +161,12 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
 ```
 
 **Build Warnings:**
+
 - Deployment target warning (9.0 → 12.0 recommended) - cosmetic only
 - Some libgphoto2 documentation warnings - library-related, not affecting functionality
 
 **Build Issues Fixed:**
+
 - Initial compilation error with property name `newPhotosList` (violated Cocoa naming conventions)
 - Renamed to `detectedPhotosList` to avoid `new` prefix issue
 
@@ -175,6 +191,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
 #### Phase 1: Connection Test
 
 1. **Prepare Camera:**
+
    ```
    - Turn on Canon camera
    - Navigate to WiFi settings
@@ -183,6 +200,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
    ```
 
 2. **Connect iPad:**
+
    ```
    - Go to iPad Settings → WiFi
    - Select the camera's WiFi network (EOS_XXXX)
@@ -190,6 +208,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
    ```
 
 3. **Launch App:**
+
    ```
    - Open GPhoto2Example app on iPad
    - You should see pre-filled IP: 192.168.1.1
@@ -197,6 +216,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
    ```
 
 4. **Connect to Camera:**
+
    ```
    - Tap "Connect to Canon" button (or the PTP connect button)
    - Watch status label change: "Disconnected" → "Connecting..." → "Connected"
@@ -230,6 +250,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
 #### Phase 2: Event Monitoring Test
 
 1. **Start Event Monitor:**
+
    ```
    - Tap "Start Event Monitor" button (green button)
    - Status changes to "Status: Monitoring Events"
@@ -238,6 +259,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
    ```
 
 2. **Monitor Xcode Console:**
+
    ```
    Expected log output:
    === Starting Event Monitoring ===
@@ -248,12 +270,14 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
    ```
 
 3. **Take a Photo on Camera:**
+
    ```
    - Use camera to take a photo
    - Watch for immediate detection in app
    ```
 
 4. **Expected Photo Detection Output:**
+
    ```
    Xcode Console:
    === NEW PHOTO DETECTED ===
@@ -272,6 +296,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
    ```
 
 5. **Take Multiple Photos:**
+
    ```
    - Take 3-5 photos in succession
    - Each should be detected and logged
@@ -404,31 +429,37 @@ Connection failed with error code: -2
 ## Key Features Implemented
 
 ### ✅ Pre-Configuration for Canon WiFi
+
 - Automatic IP, model, and protocol setup
 - No manual configuration needed for standard Canon WiFi setup
 
 ### ✅ Real-Time Event Monitoring
+
 - Background queue implementation
 - Non-blocking UI during monitoring
 - GP_EVENT_FILE_ADDED detection and handling
 
 ### ✅ Comprehensive Logging
+
 - All major operations logged to NSLog
 - Event log with timestamps visible in UI
 - Color-coded status indicators
 
 ### ✅ Error Handling
+
 - Detailed error messages
 - Troubleshooting guidance
 - Graceful failure handling
 
 ### ✅ User-Friendly UI
+
 - Clear status indicators
 - Photo count tracking
 - Recent event history
 - Easy start/stop controls
 
 ### ✅ File Information
+
 - File name and path extraction
 - File size reporting
 - File type detection
@@ -521,6 +552,7 @@ isMonitoring = NO → loop exits
 ### Problem: App won't connect to camera
 
 **Solutions:**
+
 1. Verify iPad is connected to camera's WiFi (not regular network)
 2. Check camera WiFi is enabled and in correct mode
 3. Try restarting camera WiFi
@@ -530,6 +562,7 @@ isMonitoring = NO → loop exits
 ### Problem: No events detected when taking photos
 
 **Solutions:**
+
 1. Verify event monitor is actually running (button disabled, status shows "Monitoring")
 2. Check Xcode console for event loop messages
 3. Some Canon modes may not support event notifications - try different camera modes
@@ -540,6 +573,7 @@ isMonitoring = NO → loop exits
 
 **Solution:**
 Build for simulator instead:
+
 ```bash
 xcodebuild -project GPhoto2Framework.xcodeproj \
   -scheme GPhoto2Example \
@@ -552,6 +586,7 @@ Or configure proper signing in Xcode project settings.
 ### Problem: App crashes on event monitoring
 
 **Solutions:**
+
 1. Ensure camera is still connected
 2. Check camera didn't go to sleep
 3. Review Xcode console for error messages
@@ -579,17 +614,21 @@ Potential improvements for future development:
 ## Code Files Modified
 
 ### ViewController.h
+
 **Location:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/GPhoto2Framework/GPhoto2Framework/GPhoto2Example/ViewController.h`
 
 **Changes:**
+
 - Added usage documentation in header comments
 - Added `eventLogLabel` property
 - Added `totalPhotosOnCamera` property
 
 ### ViewController.m
+
 **Location:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/GPhoto2Framework/GPhoto2Framework/GPhoto2Example/ViewController.m`
 
 **Changes:**
+
 - Added Canon WiFi constants
 - Added `eventLog` and `detectedPhotosList` properties
 - Implemented `viewDidLoad` with Canon configuration
@@ -617,7 +656,7 @@ Potential improvements for future development:
 
 Canon cameras typically create a WiFi access point when WiFi is enabled. The camera acts as a WiFi router with these characteristics:
 
-- **SSID**: Usually "EOS_" followed by the camera model or serial
+- **SSID**: Usually "EOS\_" followed by the camera model or serial
 - **IP Range**: Camera typically uses 192.168.1.1
 - **DHCP**: Camera provides DHCP to connected devices
 - **No Internet**: Camera WiFi doesn't provide internet access
@@ -702,6 +741,7 @@ For issues or questions:
 4. Test with Canon camera in correct WiFi mode
 
 **Related Documentation:**
+
 - libgphoto2: http://www.gphoto.org/doc/
 - PTP/IP Spec: ISO 15740
 - Canon WiFi Setup: Refer to camera manual
@@ -711,6 +751,7 @@ For issues or questions:
 ## Version History
 
 **v2.0 - 2026-01-14**
+
 - Added Canon EOS WiFi support
 - Implemented event monitoring system
 - Added comprehensive UI for testing
@@ -718,6 +759,7 @@ For issues or questions:
 - Documented all changes
 
 **v1.0 - Original**
+
 - Basic GPhoto2 example
 - Fuji camera support
 - File listing functionality
@@ -737,6 +779,7 @@ The GPhoto2Example app has been successfully adapted for Canon EOS WiFi camera t
 The app is now ready to be deployed to an iPad for field testing with Canon EOS cameras over WiFi.
 
 **Next Steps:**
+
 1. Deploy to iPad (2) device: `00008120-001171EA04114032`
 2. Connect to Canon camera WiFi
 3. Test connection and event monitoring

@@ -72,11 +72,11 @@ SabaiPics runs on Cloudflare's edge infrastructure with Neon PostgreSQL as the d
 
 ## Domains
 
-| Environment | API                       | Dashboard                 | Event                       | Photos                       | FTP                          |
-| ----------- | ------------------------- | ------------------------- | --------------------------- | ---------------------------- | ---------------------------- |
-| Development | localhost:8081            | localhost:5173            | localhost:5174              | devphotos.sabaipics.com      | localhost:2121 / 990         |
-| Staging     | api-staging.sabaipics.com | app-staging.sabaipics.com | event-staging.sabaipics.com | photos-staging.sabaipics.com | ftp-staging.sabaipics.com    |
-| Production  | api.sabaipics.com         | app.sabaipics.com         | event.sabaipics.com         | photo.sabaipics.com          | ftp.sabaipics.com            |
+| Environment | API                       | Dashboard                 | Event                       | Photos                       | FTP                       |
+| ----------- | ------------------------- | ------------------------- | --------------------------- | ---------------------------- | ------------------------- |
+| Development | localhost:8081            | localhost:5173            | localhost:5174              | devphotos.sabaipics.com      | localhost:2121 / 990      |
+| Staging     | api-staging.sabaipics.com | app-staging.sabaipics.com | event-staging.sabaipics.com | photos-staging.sabaipics.com | ftp-staging.sabaipics.com |
+| Production  | api.sabaipics.com         | app.sabaipics.com         | event.sabaipics.com         | photo.sabaipics.com          | ftp.sabaipics.com         |
 
 ## Related Docs
 

@@ -66,7 +66,7 @@ export default function EventDetailLayout() {
           });
           setDeleteDialogOpen(false);
         },
-      }
+      },
     );
   };
 
@@ -88,7 +88,7 @@ export default function EventDetailLayout() {
           });
           setHardDeleteDialogOpen(false);
         },
-      }
+      },
     );
   };
 
@@ -171,7 +171,10 @@ export default function EventDetailLayout() {
               Download QR Code
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={() => setDeleteDialogOpen(true)}>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
               Delete Event
             </DropdownMenuItem>
             {import.meta.env.DEV && (

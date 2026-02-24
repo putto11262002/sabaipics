@@ -9,6 +9,7 @@ Date: `2026-01-11`
 ## Outcome
 
 Successfully implemented `POST /events/:id/photos` endpoint that:
+
 - Validates file uploads (format, size) using Zod form validation
 - Verifies event ownership and expiration
 - Checks credit balance and deducts 1 credit with FIFO expiry inheritance
@@ -21,13 +22,17 @@ Successfully implemented `POST /events/:id/photos` endpoint that:
 ## Key Code Changes
 
 ### `apps/api/src/routes/events/schema.ts`
+
 Added photo upload validation schema:
+
 - File size validation: ≤ 20 MB
 - MIME type validation: JPEG, PNG, HEIC, HEIF, WebP only
 - Uses `z.instanceof(File)` with refinements for form data validation
 
 ### `apps/api/src/routes/events/index.ts`
+
 Added complete upload endpoint implementation:
+
 - **Credit deduction with transaction**: Row-level locking on photographer to prevent race conditions
 - **FIFO expiry inheritance**: Queries oldest unexpired credit for expiry timestamp
 - **R2 upload**: Streams file to R2 with original format
@@ -36,7 +41,9 @@ Added complete upload endpoint implementation:
 - **Error handling**: Comprehensive logging for post-deduction failures (no refunds)
 
 ### `apps/api/src/routes/events/index.test.ts`
+
 Added comprehensive test suite (12 test cases):
+
 - Authentication tests
 - Authorization tests (event ownership, expiration)
 - Credit validation tests
@@ -49,6 +56,7 @@ Added comprehensive test suite (12 test cases):
 ## Behavioral Notes
 
 ### Success Path
+
 1. Photographer uploads HEIC/WebP/PNG/JPEG file (≤ 20 MB)
 2. API validates format, size, event ownership, and expiration
 3. Credit check passes (balance ≥ 1)
@@ -69,6 +77,7 @@ Added comprehensive test suite (12 test cases):
 ### Key Failure Modes Handled
 
 **Pre-Credit-Deduction (Safe)**:
+
 - Invalid format → 400 (Zod validation)
 - File too large → 400 (Zod validation)
 - Event not found → 404
@@ -77,6 +86,7 @@ Added comprehensive test suite (12 test cases):
 - Insufficient credits → 402
 
 **Post-Credit-Deduction (No Refund)**:
+
 - R2 upload fails → 500, logged with context
 - CF Images transform fails → 500, logged with context
 - Queue enqueue fails → 500, logged with context
@@ -85,21 +95,25 @@ Added comprehensive test suite (12 test cases):
 ### Known Limitations
 
 **`[KNOWN_LIMITATION]` Test Coverage**
+
 - Unit tests written but fail due to Hono testClient FormData limitations
 - Recommend manual testing with real HTTP client (curl, Postman)
 - Or integration tests with @cloudflare/vitest-pool-workers
 
 **`[KNOWN_LIMITATION]` No Rate Limiting**
+
 - Endpoint has no rate limiting (deferred to post-MVP)
 - Photographer can upload unlimited photos if they have credits
 - Risk: abuse via rapid uploads
 
 **`[KNOWN_LIMITATION]` No Idempotency**
+
 - Duplicate uploads are allowed (no hash checking)
 - Photographer pays credit for each duplicate upload
 - Design decision: simplicity over deduplication for MVP
 
 **`[KNOWN_LIMITATION]` Credit Non-Refundable Post-Deduction**
+
 - Per plan decision: no refunds after credit deduction
 - Post-deduction failures (R2, transform, queue) do NOT refund credit
 - Requires manual reconciliation via logs
@@ -107,20 +121,24 @@ Added comprehensive test suite (12 test cases):
 ## Ops / Rollout
 
 ### Environment Variables Used
+
 - `PHOTOS_BUCKET` (R2 binding) - for file storage
 - `PHOTO_QUEUE` (Queue binding) - for async job dispatch
 - `PHOTO_R2_BASE_URL` - base URL for CF Images Transform fetch
 
 ### Migrations/Run Order
+
 No database migrations required (uses existing tables from T-1).
 
 Run order:
+
 1. Deploy API with new endpoint
 2. Verify R2 bucket and queue bindings are configured
 3. Test with real HEIC file from iPhone
 4. Monitor credit deductions in logs
 
 ### Monitoring Needs
+
 1. **Credit deduction errors**: Alert if NO_UNEXPIRED_CREDITS occurs (data integrity issue)
 2. **Post-deduction failures**: Track R2/transform/queue failures requiring manual intervention
 3. **Upload success rate**: Target > 95% (track by format: JPEG, PNG, HEIC, WebP)
@@ -129,6 +147,7 @@ Run order:
 ## How to Validate
 
 ### Commands Run
+
 ```bash
 # Type checking (passed)
 pnpm --filter=@sabaipics/api build
@@ -138,6 +157,7 @@ pnpm --filter=@sabaipics/api test
 ```
 
 ### Key Checks (Manual Testing Required)
+
 1. **Upload JPEG**: Should succeed, deduct 1 credit, return 201
 2. **Upload HEIC from iPhone**: Should transform to JPEG, succeed
 3. **Upload 20 MB file**: Should succeed (at limit)
@@ -150,6 +170,7 @@ pnpm --filter=@sabaipics/api test
 10. **Verify credit ledger**: Check deduction row with inherited expiry
 
 ### Test with curl Example
+
 ```bash
 # Upload photo to event
 curl -X POST "http://localhost:8081/events/{eventId}/photos" \
@@ -165,15 +186,18 @@ curl -X POST "http://localhost:8081/events/{eventId}/photos" \
 ### Engineering Debt
 
 **`[ENG_DEBT]` Test Infrastructure**
+
 - Fix Hono testClient FormData handling or use integration tests
 - Priority: Medium (tests are structurally correct, just execution issue)
 
 **`[ENG_DEBT]` Failed Upload Cleanup**
+
 - Photos with status='processing' forever have no cleanup
 - Recommend: Cron job to mark stale uploads as 'failed' (T-21?)
 - Priority: Low (affects only failure cases)
 
 **`[ENG_DEBT]` DLQ Monitoring**
+
 - Queue messages that fail all retries go to DLQ
 - No monitoring or manual retry process defined
 - Priority: Medium (affects recoverability)
@@ -181,21 +205,25 @@ curl -X POST "http://localhost:8081/events/{eventId}/photos" \
 ### PM Follow-ups
 
 **`[PM_FOLLOWUP]` Rate Limiting Policy**
+
 - Decision needed: What upload rate is acceptable?
 - Suggested: 100 uploads/hour per photographer
 - Priority: Medium (abuse prevention)
 
 **`[PM_FOLLOWUP]` Idempotency Strategy**
+
 - Decision needed: Should duplicate uploads be prevented?
 - Options: Accept duplicates (current) vs SHA-256 hash dedup
 - Priority: Low (simplicity vs user experience trade-off)
 
 **`[PM_FOLLOWUP]` Post-Deduction Refund Process**
+
 - Manual refund process needed for systematic failures
 - Who handles refunds? Support team? How to track?
 - Priority: High (customer satisfaction)
 
 **`[PM_FOLLOWUP]` Original File Retention**
+
 - Current: Only normalized JPEG stored (originals deleted)
 - Future: Consider keeping originals for quality?
 - Priority: Low (storage cost trade-off)

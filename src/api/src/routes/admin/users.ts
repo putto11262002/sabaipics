@@ -63,10 +63,7 @@ export const adminUsersRouter = new Hono<Env>()
       if (search) {
         const pattern = `%${search}%`;
         conditions.push(
-          or(
-            ilike(photographers.name, pattern),
-            ilike(photographers.email, pattern),
-          )!,
+          or(ilike(photographers.name, pattern), ilike(photographers.email, pattern))!,
         );
       }
 
@@ -127,8 +124,14 @@ export const adminUsersRouter = new Hono<Env>()
       const [creditStats] = yield* ResultAsync.fromPromise(
         db
           .select({
-            totalCredits: sql<number>`coalesce(sum(case when ${creditLedger.amount} > 0 then ${creditLedger.amount} else 0 end), 0)`.mapWith(Number),
-            totalDebits: sql<number>`coalesce(sum(case when ${creditLedger.amount} < 0 then ${creditLedger.amount} else 0 end), 0)`.mapWith(Number),
+            totalCredits:
+              sql<number>`coalesce(sum(case when ${creditLedger.amount} > 0 then ${creditLedger.amount} else 0 end), 0)`.mapWith(
+                Number,
+              ),
+            totalDebits:
+              sql<number>`coalesce(sum(case when ${creditLedger.amount} < 0 then ${creditLedger.amount} else 0 end), 0)`.mapWith(
+                Number,
+              ),
           })
           .from(creditLedger)
           .where(eq(creditLedger.photographerId, id)),

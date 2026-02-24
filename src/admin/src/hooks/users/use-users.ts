@@ -3,10 +3,7 @@ import type { InferResponseType } from 'hono/client';
 import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { useAdminQuery } from '../use-admin-query';
 
-type UsersResponse = InferResponseType<
-  typeof api.admin.users.$get,
-  SuccessStatusCode
->;
+type UsersResponse = InferResponseType<typeof api.admin.users.$get, SuccessStatusCode>;
 
 export type UserListItem = UsersResponse['data'][number];
 

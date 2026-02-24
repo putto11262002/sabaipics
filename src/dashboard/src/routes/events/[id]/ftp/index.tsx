@@ -8,7 +8,10 @@ import {
   InputGroupInput,
 } from '@/shared/components/ui/input-group';
 import { Check, Copy, Eye, EyeOff } from 'lucide-react';
-import { useFtpCredentials, useRevealFtpCredentials } from '../../../../hooks/events/useFtpCredentials';
+import {
+  useFtpCredentials,
+  useRevealFtpCredentials,
+} from '../../../../hooks/events/useFtpCredentials';
 import { useCopyToClipboard } from '../../../../hooks/use-copy-to-clipboard';
 
 export default function EventFtpTab() {
@@ -67,7 +70,9 @@ export default function EventFtpTab() {
       <section className="space-y-6">
         <div className="space-y-1">
           <h2 className="text-base font-medium">FTP credentials</h2>
-          <p className="text-sm text-muted-foreground">Use these credentials to upload photos via FTP.</p>
+          <p className="text-sm text-muted-foreground">
+            Use these credentials to upload photos via FTP.
+          </p>
         </div>
         <FieldGroup>
           <Field orientation="responsive">

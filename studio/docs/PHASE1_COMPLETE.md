@@ -7,9 +7,11 @@ Successfully implemented protocol-based dependency injection for the camera serv
 ## What Was Created
 
 ### 1. CameraServiceProtocol
+
 **Location**: `/apps/studio/SabaiPicsStudio/Protocols/CameraServiceProtocol.swift`
 
 Protocol defining the camera service interface with:
+
 - Published properties: `isConnected`, `connectionError`, `detectedPhotos`, `downloadedPhotos`, `currentRetryCount`
 - Methods: `connect(ip:)`, `connectWithRetry(ip:)`, `disconnect()`, `cancelConnection()`, `cancelRetry()`
 - Default implementations for optional methods
@@ -17,9 +19,11 @@ Protocol defining the camera service interface with:
 **Purpose**: Enables dependency injection - any class conforming to this protocol can be used interchangeably.
 
 ### 2. MockCameraService
+
 **Location**: `/apps/studio/SabaiPicsStudio/Services/MockCameraService.swift`
 
 Complete mock implementation featuring:
+
 - Simulated connection (instant or delayed)
 - Simulated photo downloads with auto-generated test images
 - Public helper methods for testing:
@@ -38,9 +42,11 @@ Complete mock implementation featuring:
 **Purpose**: Testing and SwiftUI previews without real camera hardware.
 
 ### 3. WiFiCameraService Refactoring
+
 **Location**: `/apps/studio/SabaiPicsStudio/Services/WiFiCameraService.swift` (moved from root)
 
 Changes made:
+
 - ✅ Added `CameraServiceProtocol` conformance
 - ✅ Added protocol-compatible methods `connect(ip:)` and `connectWithRetry(ip:)`
 - ✅ Moved to `Services/` directory for better organization
@@ -50,6 +56,7 @@ Changes made:
 ## Verification
 
 ### Build Status
+
 ✅ **Project builds successfully**
 
 ```bash
@@ -61,6 +68,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio \
 ```
 
 ### Protocol Conformance Verified
+
 ```swift
 // Both services conform to the same protocol
 let realService: CameraServiceProtocol = WiFiCameraService()
@@ -72,6 +80,7 @@ mockService.connect(ip: "192.168.1.1")
 ```
 
 ### Mock Service Testing Examples
+
 ```swift
 // Simulate successful connection
 let mock = MockCameraService()
@@ -109,6 +118,7 @@ With the protocol layer in place, Phase 2 can now proceed:
 4. **Enable testing** - Write unit tests using MockCameraService
 
 Example Phase 2 structure:
+
 ```swift
 class ConnectionStore: ObservableObject {
     private let cameraService: CameraServiceProtocol  // ✅ Protocol, not concrete class
@@ -129,24 +139,29 @@ let mockStore = ConnectionStore(cameraService: MockCameraService())
 ## Key Design Decisions
 
 ### 1. Why Protocol-First?
+
 - Enables dependency injection
 - Allows testing without hardware
 - Supports multiple implementations (future: USB, WiFi, Bluetooth)
 
 ### 2. Why Mock Service?
+
 - SwiftUI previews can show all UI states
 - Unit tests don't need real camera
 - Faster development iteration
 - More reliable CI/CD
 
 ### 3. Why Keep Existing WiFiCameraService?
+
 - No breaking changes to existing code
 - CameraViewModel still works as-is
 - Gradual migration path (Phase 2+)
 - Backwards compatible
 
 ### 4. Serialization Preserved?
+
 **YES** - The refactoring only touches the Swift layer. The Objective-C `WiFiCameraManager` still:
+
 - Runs event monitoring on ONE background thread
 - Serializes all `gp_camera_wait_for_event()` and `gp_camera_file_get()` calls
 - Maintains sequential download queue
@@ -155,6 +170,7 @@ let mockStore = ConnectionStore(cameraService: MockCameraService())
 ## iOS Compatibility
 
 ✅ iOS 16.6+ compatible
+
 - Uses `@Published` (Combine)
 - Uses `async/await` (Swift 5.5+)
 - Uses `Task` for concurrency
@@ -163,6 +179,7 @@ let mockStore = ConnectionStore(cameraService: MockCameraService())
 ## Documentation
 
 See also:
+
 - **Architecture Plan**: `log/008-architecture-refactoring.md`
 - **Verification Code**: `PHASE1_VERIFICATION.swift`
 - **Protocol Definition**: `Protocols/CameraServiceProtocol.swift`

@@ -18,7 +18,14 @@ export type UseGiftCodeRedemptionsParams = {
 
 export function useGiftCodeRedemptions(params: UseGiftCodeRedemptionsParams) {
   return useAdminQuery<RedemptionsResponse>({
-    queryKey: ['admin', 'gift-codes', 'detail', params.id, 'redemptions', { cursor: params.cursor }],
+    queryKey: [
+      'admin',
+      'gift-codes',
+      'detail',
+      params.id,
+      'redemptions',
+      { cursor: params.cursor },
+    ],
     apiFn: (opts) =>
       api.admin['gift-codes'][':id'].redemptions.$get(
         {

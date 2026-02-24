@@ -18,10 +18,10 @@ import type { ResultAsync } from 'neverthrow';
  * Values are ratios of the image dimensions (0-1).
  */
 export interface BoundingBox {
-  width: number;   // 0-1
-  height: number;  // 0-1
-  left: number;    // 0-1
-  top: number;     // 0-1
+  width: number; // 0-1
+  height: number; // 0-1
+  left: number; // 0-1
+  top: number; // 0-1
 }
 
 /**
@@ -36,7 +36,7 @@ export interface AgeRange {
  * Emotion detection
  */
 export interface Emotion {
-  type: string;      // e.g., 'HAPPY', 'SAD', 'ANGRY'
+  type: string; // e.g., 'HAPPY', 'SAD', 'ANGRY'
   confidence: number; // 0-1
 }
 
@@ -44,7 +44,7 @@ export interface Emotion {
  * Gender estimation
  */
 export interface Gender {
-  value: string;     // 'Male' | 'Female'
+  value: string; // 'Male' | 'Female'
   confidence: number; // 0-1
 }
 
@@ -118,7 +118,7 @@ export interface AWSRawFaceRecord {
  */
 export interface SabaiFaceRawRecord {
   faceId: string;
-  descriptor: string;        // Base64 encoded 128-D descriptor
+  descriptor: string; // Base64 encoded 128-D descriptor
   detection: {
     box: { x: number; y: number; width: number; height: number };
     confidence: number;
@@ -144,10 +144,10 @@ export type ProviderRawResponse = AWSRawFaceRecord | SabaiFaceRawRecord;
  * Includes both normalized data and raw response for training.
  */
 export interface Face {
-  faceId: string;            // Provider's face identifier
-  boundingBox: BoundingBox;  // Face location in image (normalized 0-1)
-  confidence: number;        // Detection confidence (0-1)
-  externalImageId?: string;  // Our photo ID
+  faceId: string; // Provider's face identifier
+  boundingBox: BoundingBox; // Face location in image (normalized 0-1)
+  confidence: number; // Detection confidence (0-1)
+  externalImageId?: string; // Our photo ID
   attributes?: FaceAttributes; // Optional face attributes
   provider: 'aws' | 'sabaiface'; // Which provider indexed this face
   rawResponse?: ProviderRawResponse; // Raw provider response for training
@@ -169,10 +169,10 @@ export interface UnindexedFace {
  */
 export interface SimilarFace {
   faceId: string;
-  similarity: number;        // Similarity score (0-1, higher = more similar)
+  similarity: number; // Similarity score (0-1, higher = more similar)
   boundingBox?: BoundingBox;
-  confidence?: number;       // Detection confidence (0-1)
-  externalImageId?: string;  // Our photo ID
+  confidence?: number; // Detection confidence (0-1)
+  externalImageId?: string; // Our photo ID
   provider: 'aws' | 'sabaiface';
 }
 
@@ -180,9 +180,9 @@ export interface SimilarFace {
  * Result of indexing a photo
  */
 export interface PhotoIndexed {
-  faces: Face[];               // Successfully indexed faces
+  faces: Face[]; // Successfully indexed faces
   unindexedFaces: UnindexedFace[]; // Faces that couldn't be indexed
-  modelVersion?: string;       // Provider's model version
+  modelVersion?: string; // Provider's model version
   provider: 'aws' | 'sabaiface';
 }
 
@@ -252,14 +252,33 @@ export interface FindImagesByFaceRequest {
  */
 export type FaceServiceError =
   // Domain errors (not retryable)
-  | { type: 'not_found'; resource: 'collection' | 'face'; id: string; retryable: false; throttle: false }
+  | {
+      type: 'not_found';
+      resource: 'collection' | 'face';
+      id: string;
+      retryable: false;
+      throttle: false;
+    }
   | { type: 'invalid_input'; field: string; reason: string; retryable: false; throttle: false }
 
   // AWS provider failures - bubbles retryable/throttle from AWS
-  | { type: 'provider_failed'; provider: 'aws'; retryable: boolean; throttle: boolean; cause: unknown; errorName?: string }
+  | {
+      type: 'provider_failed';
+      provider: 'aws';
+      retryable: boolean;
+      throttle: boolean;
+      cause: unknown;
+      errorName?: string;
+    }
 
   // SabaiFace provider failures - CAN be retryable (network/server errors)
-  | { type: 'provider_failed'; provider: 'sabaiface'; retryable: boolean; throttle: boolean; cause: unknown }
+  | {
+      type: 'provider_failed';
+      provider: 'sabaiface';
+      retryable: boolean;
+      throttle: boolean;
+      cause: unknown;
+    }
 
   // Database errors - retryable
   | { type: 'database'; operation: string; retryable: true; throttle: false; cause: unknown };
@@ -277,7 +296,9 @@ export type FaceServiceError =
 export interface FaceRecognitionProvider {
   indexPhoto(request: IndexPhotoRequest): ResultAsync<PhotoIndexed, FaceServiceError>;
   findSimilarFaces(request: FindSimilarRequest): ResultAsync<SimilarFace[], FaceServiceError>;
-  findImagesByFace(request: FindImagesByFaceRequest): ResultAsync<FindImagesByFaceResponse, FaceServiceError>;
+  findImagesByFace(
+    request: FindImagesByFaceRequest,
+  ): ResultAsync<FindImagesByFaceResponse, FaceServiceError>;
   deleteFaces(eventId: string, faceIds: string[]): ResultAsync<void, FaceServiceError>;
   deleteCollection(eventId: string): ResultAsync<void, FaceServiceError>;
   createCollection(eventId: string): ResultAsync<string, FaceServiceError>;

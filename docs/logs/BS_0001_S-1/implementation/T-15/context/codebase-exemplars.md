@@ -8,6 +8,7 @@ Date: 2026-01-11
 ## Primary Surface: UI
 
 Inferred from upstream context: T-15 requires implementing Events UI in the dashboard with:
+
 - Event list display on dashboard/events page
 - Create event modal with form validation
 - Event detail view with QR code display and download
@@ -23,103 +24,113 @@ Inferred from upstream context: T-15 requires implementing Events UI in the dash
 ### Key patterns to copy
 
 1. **Page Structure:**
+
 ```tsx
 <>
-  <PageHeader breadcrumbs={[{ label: "Dashboard" }]}>
+  <PageHeader breadcrumbs={[{ label: 'Dashboard' }]}>
     <Button asChild size="sm">
       <Link to="/credits/packages">Buy Credits</Link>
     </Button>
   </PageHeader>
-  <div className="flex flex-1 flex-col gap-4 p-4">
-    {/* Content */}
-  </div>
+  <div className="flex flex-1 flex-col gap-4 p-4">{/* Content */}</div>
 </>
 ```
 
 2. **Three-state rendering (Loading/Error/Success):**
+
 ```tsx
 // Loading State
-{isLoading && (
-  <>
-    <Skeleton className="h-32 w-full rounded-xl" />
-    <Skeleton className="h-64 w-full rounded-xl" />
-  </>
-)}
+{
+  isLoading && (
+    <>
+      <Skeleton className="h-32 w-full rounded-xl" />
+      <Skeleton className="h-64 w-full rounded-xl" />
+    </>
+  );
+}
 
 // Error State
-{error && (
-  <Alert variant="destructive">
-    <AlertCircle className="size-4" />
-    <AlertTitle>Error loading dashboard</AlertTitle>
-    <AlertDescription className="flex items-center justify-between">
-      <span>{error.message}</span>
-      <Button onClick={() => refetch()} disabled={isRefetching}>
-        {isRefetching ? <Spinner className="mr-2 size-3" /> : <RefreshCw className="mr-2 size-3" />}
-        Retry
-      </Button>
-    </AlertDescription>
-  </Alert>
-)}
+{
+  error && (
+    <Alert variant="destructive">
+      <AlertCircle className="size-4" />
+      <AlertTitle>Error loading dashboard</AlertTitle>
+      <AlertDescription className="flex items-center justify-between">
+        <span>{error.message}</span>
+        <Button onClick={() => refetch()} disabled={isRefetching}>
+          {isRefetching ? (
+            <Spinner className="mr-2 size-3" />
+          ) : (
+            <RefreshCw className="mr-2 size-3" />
+          )}
+          Retry
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 // Success State
-{dashboardData && (
-  <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-    {/* Cards */}
-  </div>
-)}
+{
+  dashboardData && <div className="grid auto-rows-min gap-4 md:grid-cols-3">{/* Cards */}</div>;
+}
 ```
 
 3. **Event List Pattern (already in dashboard):**
+
 ```tsx
-{dashboardData.events.length === 0 ? (
-  <Empty>
-    <EmptyHeader>
-      <EmptyMedia variant="icon">
-        <Calendar className="size-12 text-muted-foreground" />
-      </EmptyMedia>
-      <EmptyTitle>No events yet</EmptyTitle>
-      <EmptyDescription>
-        Create your first event to start organizing and sharing photos
-      </EmptyDescription>
-    </EmptyHeader>
-  </Empty>
-) : (
-  <div className="space-y-2">
-    {dashboardData.events.map((event) => (
-      <div
-        key={event.id}
-        className="flex items-center justify-between rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors"
-      >
-        <div className="flex-1 space-y-1">
-          <div className="font-semibold">{event.name}</div>
-          <div className="text-sm text-muted-foreground">
-            Created {formatDistanceToNow(parseISO(event.createdAt))} ago •
-            Expires {formatDistanceToNow(parseISO(event.expiresAt))} from now
+{
+  dashboardData.events.length === 0 ? (
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Calendar className="size-12 text-muted-foreground" />
+        </EmptyMedia>
+        <EmptyTitle>No events yet</EmptyTitle>
+        <EmptyDescription>
+          Create your first event to start organizing and sharing photos
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  ) : (
+    <div className="space-y-2">
+      {dashboardData.events.map((event) => (
+        <div
+          key={event.id}
+          className="flex items-center justify-between rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors"
+        >
+          <div className="flex-1 space-y-1">
+            <div className="font-semibold">{event.name}</div>
+            <div className="text-sm text-muted-foreground">
+              Created {formatDistanceToNow(parseISO(event.createdAt))} ago • Expires{' '}
+              {formatDistanceToNow(parseISO(event.expiresAt))} from now
+            </div>
+          </div>
+          <div className="flex gap-6 text-center">
+            <div>
+              <div className="text-2xl font-bold tabular-nums">{event.photoCount}</div>
+              <div className="text-xs text-muted-foreground">Photos</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold tabular-nums">{event.faceCount}</div>
+              <div className="text-xs text-muted-foreground">Faces</div>
+            </div>
           </div>
         </div>
-        <div className="flex gap-6 text-center">
-          <div>
-            <div className="text-2xl font-bold tabular-nums">{event.photoCount}</div>
-            <div className="text-xs text-muted-foreground">Photos</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold tabular-nums">{event.faceCount}</div>
-            <div className="text-xs text-muted-foreground">Faces</div>
-          </div>
-        </div>
-      </div>
-    ))}
-  </div>
-)}
+      ))}
+    </div>
+  );
+}
 ```
 
 4. **Date formatting helpers:**
+
 ```tsx
-import { formatDistanceToNow, parseISO, differenceInDays } from "date-fns";
+import { formatDistanceToNow, parseISO, differenceInDays } from 'date-fns';
 
 // Usage
-formatDistanceToNow(parseISO(event.createdAt))  // "5 days"
-new Date(event.expiresAt).toLocaleDateString()   // "1/15/2026"
+formatDistanceToNow(parseISO(event.createdAt)); // "5 days"
+new Date(event.expiresAt).toLocaleDateString(); // "1/15/2026"
 ```
 
 ---
@@ -133,10 +144,10 @@ new Date(event.expiresAt).toLocaleDateString()   // "1/15/2026"
 ### Key patterns for Create Event Modal
 
 ```tsx
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@sabaipics/auth/react";
-import { Button } from "@sabaipics/ui/components/button";
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@sabaipics/auth/react';
+import { Button } from '@sabaipics/ui/components/button';
 import {
   Dialog,
   DialogContent,
@@ -144,10 +155,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@sabaipics/ui/components/dialog";
-import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
-import { AlertTriangle } from "lucide-react";
-import { Spinner } from "@sabaipics/ui/components/spinner";
+} from '@sabaipics/ui/components/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@sabaipics/ui/components/alert';
+import { AlertTriangle } from 'lucide-react';
+import { Spinner } from '@sabaipics/ui/components/spinner';
 
 interface CreateEventModalProps {
   open: boolean;
@@ -156,48 +167,45 @@ interface CreateEventModalProps {
 }
 
 export function CreateEventModal({ open, onOpenChange, onSuccess }: CreateEventModalProps) {
-  const [name, setName] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [name, setName] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async () => {
       const token = await getToken();
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/events`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name,
-            startDate: startDate || null,
-            endDate: endDate || null,
-          }),
-        }
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/events`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          startDate: startDate || null,
+          endDate: endDate || null,
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error?.message || "Failed to create event");
+        throw new Error(errorData.error?.message || 'Failed to create event');
       }
 
       return response.json();
     },
     onSuccess: (data) => {
       // Invalidate queries to refresh event lists
-      queryClient.invalidateQueries({ queryKey: ["events"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+
       // Reset form
-      setName("");
-      setStartDate("");
-      setEndDate("");
-      
+      setName('');
+      setStartDate('');
+      setEndDate('');
+
       // Close modal and notify parent
       onOpenChange(false);
       onSuccess(data.data.id);
@@ -214,9 +222,7 @@ export function CreateEventModal({ open, onOpenChange, onSuccess }: CreateEventM
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Create Event</DialogTitle>
-          <DialogDescription>
-            Create a new event to organize and share photos
-          </DialogDescription>
+          <DialogDescription>Create a new event to organize and share photos</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
@@ -244,7 +250,7 @@ export function CreateEventModal({ open, onOpenChange, onSuccess }: CreateEventM
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>
-                {mutation.error?.message || "Failed to create event. Please try again."}
+                {mutation.error?.message || 'Failed to create event. Please try again.'}
               </AlertDescription>
             </Alert>
           )}
@@ -259,17 +265,14 @@ export function CreateEventModal({ open, onOpenChange, onSuccess }: CreateEventM
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={!name || mutation.isPending}
-            >
+            <Button type="submit" disabled={!name || mutation.isPending}>
               {mutation.isPending ? (
                 <>
                   <Spinner className="mr-2" />
                   Creating...
                 </>
               ) : (
-                "Create Event"
+                'Create Event'
               )}
             </Button>
           </DialogFooter>
@@ -291,20 +294,26 @@ export function CreateEventModal({ open, onOpenChange, onSuccess }: CreateEventM
 ### Key patterns
 
 1. **Card Grid Layout:**
+
 ```tsx
 <div className="mx-auto grid w-full max-w-5xl gap-6 md:grid-cols-3">
   {displayPackages.map((pkg, index) => (
-    <Card key={pkg.id} className={isPopular ? "relative border-primary shadow-lg" : ""}>
+    <Card key={pkg.id} className={isPopular ? 'relative border-primary shadow-lg' : ''}>
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">{pkg.name}</CardTitle>
         <CardDescription>Perfect for getting started</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Content */}
-      </CardContent>
+      <CardContent className="space-y-6">{/* Content */}</CardContent>
       <CardFooter>
         <Button onClick={() => handlePurchase(pkg.id)} disabled={isPending}>
-          {isPending ? <><Spinner />Processing...</> : "Buy Now"}
+          {isPending ? (
+            <>
+              <Spinner />
+              Processing...
+            </>
+          ) : (
+            'Buy Now'
+          )}
         </Button>
       </CardFooter>
     </Card>
@@ -313,6 +322,7 @@ export function CreateEventModal({ open, onOpenChange, onSuccess }: CreateEventM
 ```
 
 2. **Per-item loading state:**
+
 ```tsx
 const [purchasingPackageId, setPurchasingPackageId] = useState<string | null>(null);
 
@@ -332,20 +342,23 @@ disabled={isPurchasing || checkoutMutation.isPending}
 ```
 
 3. **Empty State Pattern:**
+
 ```tsx
-{data && displayPackages.length === 0 && (
-  <Empty className="mx-auto max-w-md">
-    <EmptyHeader>
-      <EmptyMedia variant="icon">
-        <CreditCard className="size-12 text-muted-foreground" />
-      </EmptyMedia>
-      <EmptyTitle>No packages available</EmptyTitle>
-      <EmptyDescription>
-        Credit packages are not currently available. Please check back later.
-      </EmptyDescription>
-    </EmptyHeader>
-  </Empty>
-)}
+{
+  data && displayPackages.length === 0 && (
+    <Empty className="mx-auto max-w-md">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <CreditCard className="size-12 text-muted-foreground" />
+        </EmptyMedia>
+        <EmptyTitle>No packages available</EmptyTitle>
+        <EmptyDescription>
+          Credit packages are not currently available. Please check back later.
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+}
 ```
 
 ---
@@ -359,8 +372,8 @@ disabled={isPurchasing || checkoutMutation.isPending}
 ### Pattern for `useEvents()` hook
 
 ```tsx
-import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../lib/api";
+import { useQuery } from '@tanstack/react-query';
+import { useApiClient } from '../../lib/api';
 
 export interface Event {
   id: string;
@@ -389,14 +402,14 @@ export interface EventsResponse {
 
 interface EventsData {
   data: Event[];
-  pagination: EventsResponse["pagination"];
+  pagination: EventsResponse['pagination'];
 }
 
 export function useEvents(page = 0, limit = 20) {
   const { getToken } = useApiClient();
 
   return useQuery({
-    queryKey: ["events", page, limit],
+    queryKey: ['events', page, limit],
     queryFn: async () => {
       const token = await getToken();
       const response = await fetch(
@@ -405,7 +418,7 @@ export function useEvents(page = 0, limit = 20) {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -431,8 +444,8 @@ export function useEvents(page = 0, limit = 20) {
 ### Pattern for `useCreateEvent()` hook
 
 ```tsx
-import { useMutation } from "@tanstack/react-query";
-import { useApiClient } from "../../lib/api";
+import { useMutation } from '@tanstack/react-query';
+import { useApiClient } from '../../lib/api';
 
 interface CreateEventRequest {
   name: string;
@@ -470,26 +483,22 @@ export function useCreateEvent() {
       const token = await getToken();
 
       if (!token) {
-        throw new Error("Not authenticated. Please sign in and try again.");
+        throw new Error('Not authenticated. Please sign in and try again.');
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/events`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(request),
-        }
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/events`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
 
       if (!response.ok) {
         const errorData = (await response.json()) as CreateEventError;
         throw new Error(
-          errorData.error?.message ||
-            `HTTP ${response.status}: ${response.statusText}`
+          errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`,
         );
       }
 
@@ -506,6 +515,7 @@ export function useCreateEvent() {
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent4/apps/api/src/routes/events/index.ts`
 
 ### GET /events (List)
+
 ```typescript
 {
   data: [
@@ -533,6 +543,7 @@ export function useCreateEvent() {
 ```
 
 ### POST /events (Create)
+
 ```typescript
 // Request
 {
@@ -559,6 +570,7 @@ export function useCreateEvent() {
 ```
 
 ### GET /events/:id (Single Event)
+
 ```typescript
 {
   data: {
@@ -577,6 +589,7 @@ export function useCreateEvent() {
 ```
 
 ### Error Response Shape
+
 ```typescript
 {
   error: {
@@ -593,7 +606,7 @@ export function useCreateEvent() {
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent4/apps/api/src/routes/events/schema.ts`
 
 ```typescript
-import { z } from "zod";
+import { z } from 'zod';
 
 export const createEventSchema = z.object({
   name: z.string().min(1).max(200),
@@ -603,23 +616,24 @@ export const createEventSchema = z.object({
 ```
 
 ### Client-side validation pattern
+
 ```tsx
 // In Create Event Modal
 const [errors, setErrors] = useState<{ name?: string; dateRange?: string }>({});
 
 const validateForm = () => {
   const newErrors: typeof errors = {};
-  
+
   if (!name.trim()) {
-    newErrors.name = "Event name is required";
+    newErrors.name = 'Event name is required';
   } else if (name.length > 200) {
-    newErrors.name = "Event name must be less than 200 characters";
+    newErrors.name = 'Event name must be less than 200 characters';
   }
-  
+
   if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
-    newErrors.dateRange = "Start date must be before or equal to end date";
+    newErrors.dateRange = 'Start date must be before or equal to end date';
   }
-  
+
   setErrors(newErrors);
   return Object.keys(newErrors).length === 0;
 };
@@ -639,21 +653,21 @@ const handleSubmit = (e: React.FormEvent) => {
 ### Event Detail Page with QR Display
 
 ```tsx
-import { QrCode, Download, ExternalLink } from "lucide-react";
+import { QrCode, Download, ExternalLink } from 'lucide-react';
 
 function EventDetailPage() {
   const { id } = useParams();
   const { data, isLoading, error } = useEvent(id);
-  
+
   const event = data?.data;
-  
+
   const handleDownloadQR = () => {
     if (!event?.qrCodeUrl) return;
-    
+
     // Download QR image
     fetch(event.qrCodeUrl)
-      .then(res => res.blob())
-      .then(blob => {
+      .then((res) => res.blob())
+      .then((blob) => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -662,14 +676,13 @@ function EventDetailPage() {
         window.URL.revokeObjectURL(url);
       });
   };
-  
+
   return (
     <>
-      <PageHeader breadcrumbs={[
-        { label: "Events", href: "/events" },
-        { label: event?.name || "..." }
-      ]} />
-      
+      <PageHeader
+        breadcrumbs={[{ label: 'Events', href: '/events' }, { label: event?.name || '...' }]}
+      />
+
       <div className="flex flex-1 flex-col gap-4 p-4">
         {event && (
           <div className="grid gap-6 md:grid-cols-2">
@@ -693,19 +706,11 @@ function EventDetailPage() {
                       className="w-full max-w-sm rounded-lg border"
                     />
                     <div className="flex gap-2 w-full">
-                      <Button
-                        onClick={handleDownloadQR}
-                        variant="outline"
-                        className="flex-1"
-                      >
+                      <Button onClick={handleDownloadQR} variant="outline" className="flex-1">
                         <Download className="mr-2 size-4" />
                         Download QR
                       </Button>
-                      <Button
-                        asChild
-                        variant="outline"
-                        className="flex-1"
-                      >
+                      <Button asChild variant="outline" className="flex-1">
                         <a href={`/search/${event.accessCode}`} target="_blank">
                           <ExternalLink className="mr-2 size-4" />
                           Open Search
@@ -716,7 +721,7 @@ function EventDetailPage() {
                 )}
               </CardContent>
             </Card>
-            
+
             {/* Event Info Card */}
             <Card>
               <CardHeader>
@@ -761,6 +766,7 @@ function EventDetailPage() {
 ## Component Library (shadcn/ui via @sabaipics/ui)
 
 All available components:
+
 - `Button` - `@sabaipics/ui/components/button`
 - `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter`, `CardAction` - `@sabaipics/ui/components/card`
 - `Alert`, `AlertTitle`, `AlertDescription` - `@sabaipics/ui/components/alert`
@@ -772,6 +778,7 @@ All available components:
 - `Tooltip`, `TooltipProvider`, `TooltipTrigger`, `TooltipContent` - `@sabaipics/ui/components/tooltip`
 
 Icons from `lucide-react`:
+
 - `Calendar`, `QrCode`, `Download`, `ExternalLink`, `AlertCircle`, `RefreshCw`, `Spinner`, `ImageIcon`, `Smile`, `CreditCard`
 
 ---
@@ -783,38 +790,45 @@ Icons from `lucide-react`:
 **Recommended pattern for T-15 (if tests required):**
 
 ```tsx
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { EventsPage } from "./index";
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { EventsPage } from './index';
 
 // Mock API client
-vi.mock("../../lib/api", () => ({
+vi.mock('../../lib/api', () => ({
   useApiClient: () => ({
-    getToken: vi.fn().mockResolvedValue("mock-token"),
+    getToken: vi.fn().mockResolvedValue('mock-token'),
   }),
 }));
 
-describe("EventsPage", () => {
-  it("renders loading state initially", () => {
+describe('EventsPage', () => {
+  it('renders loading state initially', () => {
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
         <EventsPage />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
 
-  it("renders event list when data loads", async () => {
+  it('renders event list when data loads', async () => {
     // Mock fetch
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         data: [
-          { id: "1", name: "Test Event", accessCode: "ABC123", createdAt: "2026-01-10T12:00:00Z" }
+          { id: '1', name: 'Test Event', accessCode: 'ABC123', createdAt: '2026-01-10T12:00:00Z' },
         ],
-        pagination: { page: 0, limit: 20, totalCount: 1, totalPages: 1, hasNextPage: false, hasPrevPage: false }
+        pagination: {
+          page: 0,
+          limit: 20,
+          totalCount: 1,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
       }),
     });
 
@@ -822,26 +836,26 @@ describe("EventsPage", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <EventsPage />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Test Event")).toBeInTheDocument();
+      expect(screen.getByText('Test Event')).toBeInTheDocument();
     });
   });
 
-  it("opens create modal when button clicked", async () => {
+  it('opens create modal when button clicked', async () => {
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
         <EventsPage />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
 
     const createButton = screen.getByText(/create event/i);
     fireEvent.click(createButton);
 
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
 ```
@@ -855,16 +869,22 @@ describe("EventsPage", () => {
 ### Add events routes
 
 ```tsx
-import { EventsPage } from "./routes/events";
-import { EventDetailPage } from "./routes/events/[id]";
+import { EventsPage } from './routes/events';
+import { EventDetailPage } from './routes/events/[id]';
 
 // Inside Layout route group
-<Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+<Route
+  element={
+    <ProtectedRoute>
+      <Layout />
+    </ProtectedRoute>
+  }
+>
   <Route path="/dashboard" element={<DashboardPage />} />
   <Route path="/credits/packages" element={<CreditPackagesPage />} />
   <Route path="/events" element={<EventsPage />} />
   <Route path="/events/:id" element={<EventDetailPage />} />
-</Route>
+</Route>;
 ```
 
 ---
@@ -872,16 +892,19 @@ import { EventDetailPage } from "./routes/events/[id]";
 ## Summary: Implementation Checklist for T-15
 
 ### 1. Create Custom Hooks
+
 - [ ] `apps/dashboard/src/hooks/events/useEvents.ts` - List events with pagination
 - [ ] `apps/dashboard/src/hooks/events/useEvent.ts` - Get single event by ID
 - [ ] `apps/dashboard/src/hooks/events/useCreateEvent.ts` - Create event mutation
 
 ### 2. Create Event Components
+
 - [ ] `apps/dashboard/src/routes/events/index.tsx` - Events list page
 - [ ] `apps/dashboard/src/routes/events/[id]/index.tsx` - Event detail page with QR
 - [ ] `apps/dashboard/src/components/events/CreateEventModal.tsx` - Create modal
 
 ### 3. UI Features
+
 - [ ] Events list with pagination
 - [ ] Empty state for no events
 - [ ] Create event modal with name + optional dates
@@ -892,17 +915,20 @@ import { EventDetailPage } from "./routes/events/[id]";
 - [ ] Link to search page (opens in new tab)
 
 ### 4. Update Dashboard
+
 - [ ] Update "Create Event" button to open modal (remove disabled state)
 - [ ] Add navigation to event detail when clicking event card
 - [ ] Invalidate dashboard query after event creation
 
 ### 5. Error Handling
+
 - [ ] Loading states (Skeleton)
 - [ ] Error states (Alert with retry)
 - [ ] Mutation errors (Alert in modal)
 - [ ] Form validation errors
 
 ### 6. Testing (if required)
+
 - [ ] Component tests for events list
 - [ ] Component tests for create modal
 - [ ] Test form validation
@@ -912,19 +938,19 @@ import { EventDetailPage } from "./routes/events/[id]";
 
 ## File Paths Reference
 
-| What | Where |
-|------|-------|
-| Dashboard page | `apps/dashboard/src/routes/dashboard/index.tsx` |
-| Credit packages page | `apps/dashboard/src/routes/credits/packages/index.tsx` |
-| PDPA modal | `apps/dashboard/src/routes/onboarding/_components/PDPAConsentModal.tsx` |
-| Dashboard data hook | `apps/dashboard/src/hooks/dashboard/useDashboardData.ts` |
-| Purchase checkout hook | `apps/dashboard/src/hooks/credits/usePurchaseCheckout.ts` |
-| API client | `apps/dashboard/src/lib/api.ts` |
-| PageHeader | `apps/dashboard/src/components/shell/page-header.tsx` |
-| Layout | `apps/dashboard/src/components/Layout.tsx` |
-| Events API | `apps/api/src/routes/events/index.ts` |
-| Events schema | `apps/api/src/routes/events/schema.ts` |
-| UI components | `packages/ui/src/components/*.tsx` |
+| What                   | Where                                                                   |
+| ---------------------- | ----------------------------------------------------------------------- |
+| Dashboard page         | `apps/dashboard/src/routes/dashboard/index.tsx`                         |
+| Credit packages page   | `apps/dashboard/src/routes/credits/packages/index.tsx`                  |
+| PDPA modal             | `apps/dashboard/src/routes/onboarding/_components/PDPAConsentModal.tsx` |
+| Dashboard data hook    | `apps/dashboard/src/hooks/dashboard/useDashboardData.ts`                |
+| Purchase checkout hook | `apps/dashboard/src/hooks/credits/usePurchaseCheckout.ts`               |
+| API client             | `apps/dashboard/src/lib/api.ts`                                         |
+| PageHeader             | `apps/dashboard/src/components/shell/page-header.tsx`                   |
+| Layout                 | `apps/dashboard/src/components/Layout.tsx`                              |
+| Events API             | `apps/api/src/routes/events/index.ts`                                   |
+| Events schema          | `apps/api/src/routes/events/schema.ts`                                  |
+| UI components          | `packages/ui/src/components/*.tsx`                                      |
 
 ---
 

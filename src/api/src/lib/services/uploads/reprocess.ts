@@ -14,94 +14,96 @@ import type { R2EventMessage } from '../../../types/r2-event';
  * 4. If R2 object missing → hard delete the intent (already cleaned up)
  */
 export async function reprocessInsufficientCredits(
-	env: Bindings,
-	photographerId: string,
+  env: Bindings,
+  photographerId: string,
 ): Promise<{ requeued: number; cleaned: number; failed: number }> {
-	const db = createDb(env.DATABASE_URL);
+  const db = createDb(env.DATABASE_URL);
 
-	const intents = await db
-		.select({
-			id: uploadIntents.id,
-			r2Key: uploadIntents.r2Key,
-			eventId: uploadIntents.eventId,
-		})
-		.from(uploadIntents)
-		.where(
-			and(
-				eq(uploadIntents.photographerId, photographerId),
-				eq(uploadIntents.status, 'failed'),
-				eq(uploadIntents.retryable, true),
-				eq(uploadIntents.errorCode, 'insufficient_credits'),
-			),
-		);
+  const intents = await db
+    .select({
+      id: uploadIntents.id,
+      r2Key: uploadIntents.r2Key,
+      eventId: uploadIntents.eventId,
+    })
+    .from(uploadIntents)
+    .where(
+      and(
+        eq(uploadIntents.photographerId, photographerId),
+        eq(uploadIntents.status, 'failed'),
+        eq(uploadIntents.retryable, true),
+        eq(uploadIntents.errorCode, 'insufficient_credits'),
+      ),
+    );
 
-	if (intents.length === 0) {
-		return { requeued: 0, cleaned: 0, failed: 0 };
-	}
+  if (intents.length === 0) {
+    return { requeued: 0, cleaned: 0, failed: 0 };
+  }
 
-	console.log(`[Reprocess] Found ${intents.length} retryable intents for photographer ${photographerId}`);
+  console.log(
+    `[Reprocess] Found ${intents.length} retryable intents for photographer ${photographerId}`,
+  );
 
-	let requeued = 0;
-	let cleaned = 0;
-	let failed = 0;
+  let requeued = 0;
+  let cleaned = 0;
+  let failed = 0;
 
-	for (const intent of intents) {
-		try {
-			// Verify R2 object still exists
-			const head = await env.PHOTOS_BUCKET.head(intent.r2Key);
+  for (const intent of intents) {
+    try {
+      // Verify R2 object still exists
+      const head = await env.PHOTOS_BUCKET.head(intent.r2Key);
 
-			if (!head) {
-				// R2 object already gone (cron cleaned it up) — delete the orphaned intent
-				await db.delete(uploadIntents).where(eq(uploadIntents.id, intent.id));
-				cleaned++;
-				continue;
-			}
+      if (!head) {
+        // R2 object already gone (cron cleaned it up) — delete the orphaned intent
+        await db.delete(uploadIntents).where(eq(uploadIntents.id, intent.id));
+        cleaned++;
+        continue;
+      }
 
-			// Send synthetic R2 event to upload queue BEFORE updating intent —
-			// if queue send fails, intent stays in failed/retryable for next top-up.
-			const syntheticEvent: R2EventMessage = {
-				account: '',
-				action: 'PutObject',
-				bucket: env.PHOTO_BUCKET_NAME,
-				object: {
-					key: intent.r2Key,
-					size: head.size,
-					eTag: head.etag,
-				},
-				eventTime: new Date().toISOString(),
-			};
+      // Send synthetic R2 event to upload queue BEFORE updating intent —
+      // if queue send fails, intent stays in failed/retryable for next top-up.
+      const syntheticEvent: R2EventMessage = {
+        account: '',
+        action: 'PutObject',
+        bucket: env.PHOTO_BUCKET_NAME,
+        object: {
+          key: intent.r2Key,
+          size: head.size,
+          eTag: head.etag,
+        },
+        eventTime: new Date().toISOString(),
+      };
 
-			await env.UPLOAD_QUEUE.send(syntheticEvent);
+      await env.UPLOAD_QUEUE.send(syntheticEvent);
 
-			// Queue send succeeded — now reset intent to pending with fresh expiry
-			await db
-				.update(uploadIntents)
-				.set({
-					status: 'pending',
-					errorCode: null,
-					errorMessage: null,
-					retryable: null,
-					expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-				})
-				.where(eq(uploadIntents.id, intent.id));
+      // Queue send succeeded — now reset intent to pending with fresh expiry
+      await db
+        .update(uploadIntents)
+        .set({
+          status: 'pending',
+          errorCode: null,
+          errorMessage: null,
+          retryable: null,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        })
+        .where(eq(uploadIntents.id, intent.id));
 
-			requeued++;
-		} catch (error) {
-			failed++;
-			console.error('[Reprocess] Failed to reprocess intent', {
-				intentId: intent.id,
-				error: error instanceof Error ? error.message : String(error),
-			});
-		}
-	}
+      requeued++;
+    } catch (error) {
+      failed++;
+      console.error('[Reprocess] Failed to reprocess intent', {
+        intentId: intent.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
-	console.log('[Reprocess] Reprocessing complete', {
-		photographerId,
-		total: intents.length,
-		requeued,
-		cleaned,
-		failed,
-	});
+  console.log('[Reprocess] Reprocessing complete', {
+    photographerId,
+    total: intents.length,
+    requeued,
+    cleaned,
+    failed,
+  });
 
-	return { requeued, cleaned, failed };
+  return { requeued, cleaned, failed };
 }

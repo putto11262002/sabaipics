@@ -116,9 +116,7 @@ const columnHelper = createColumnHelper<RedemptionItem>();
 const redemptionColumns = [
   columnHelper.accessor('photographer.name', {
     header: 'Photographer',
-    cell: (info) => (
-      <span className="font-medium">{info.getValue() || 'Unnamed'}</span>
-    ),
+    cell: (info) => <span className="font-medium">{info.getValue() || 'Unnamed'}</span>,
   }),
   columnHelper.accessor('photographer.email', {
     header: 'Email',
@@ -152,9 +150,7 @@ function RedemptionsTable({ entries }: { entries: RedemptionItem[] }) {
   return (
     <div className="space-y-4">
       <DataTable table={table} emptyMessage="No redemptions yet" />
-      {table.getPageCount() > 1 && (
-        <DataTablePagination table={table} showSelectedCount={false} />
-      )}
+      {table.getPageCount() > 1 && <DataTablePagination table={table} showSelectedCount={false} />}
     </div>
   );
 }
@@ -201,8 +197,7 @@ function GiftCodeDetailPage() {
       {
         onSuccess: () =>
           toast.success(code.active ? 'Gift code deactivated' : 'Gift code activated'),
-        onError: (e) =>
-          toast.error('Failed to update gift code', { description: e.message }),
+        onError: (e) => toast.error('Failed to update gift code', { description: e.message }),
       },
     );
   };
@@ -276,8 +271,12 @@ function GiftCodeDetailPage() {
             <div className="grid gap-4 sm:grid-cols-3">
               {Array.from({ length: 3 }).map((_, i) => (
                 <Card key={i}>
-                  <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
-                  <CardContent><Skeleton className="h-7 w-16" /></CardContent>
+                  <CardHeader className="pb-2">
+                    <Skeleton className="h-4 w-24" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-7 w-16" />
+                  </CardContent>
                 </Card>
               ))}
             </div>
@@ -290,12 +289,7 @@ function GiftCodeDetailPage() {
             <AlertCircle className="size-4" />
             <AlertTitle>Failed to load gift code</AlertTitle>
             <AlertDescription>{error.message}</AlertDescription>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="mt-2"
-              onClick={() => refetch()}
-            >
+            <Button variant="destructive" size="sm" className="mt-2" onClick={() => refetch()}>
               <RefreshCw className="mr-1 size-4" />
               Retry
             </Button>
@@ -315,33 +309,25 @@ function GiftCodeDetailPage() {
               )}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span>{code.credits.toLocaleString()} credits per redemption</span>
-                <span>Created {formatDate(code.createdAt)} by {code.createdBy}</span>
+                <span>
+                  Created {formatDate(code.createdAt)} by {code.createdBy}
+                </span>
                 <span>Expires: {code.expiresAt ? formatDate(code.expiresAt) : 'Never'}</span>
                 <span>Credit expiry: {code.creditExpiresInDays} days</span>
                 <span>Max per user: {code.maxRedemptionsPerUser}</span>
-                {code.maxRedemptions != null && (
-                  <span>Max total: {code.maxRedemptions}</span>
-                )}
+                {code.maxRedemptions != null && <span>Max total: {code.maxRedemptions}</span>}
               </div>
             </div>
 
             {/* Stats cards */}
             <div className="grid gap-4 sm:grid-cols-3">
-              <StatCard
-                title="Total Redemptions"
-                value={code.stats.totalRedemptions}
-                icon={Hash}
-              />
+              <StatCard title="Total Redemptions" value={code.stats.totalRedemptions} icon={Hash} />
               <StatCard
                 title="Total Credits Issued"
                 value={code.stats.totalCreditsIssued}
                 icon={CreditCard}
               />
-              <StatCard
-                title="Unique Users"
-                value={code.stats.uniqueUsers}
-                icon={Users}
-              />
+              <StatCard title="Unique Users" value={code.stats.uniqueUsers} icon={Users} />
             </div>
 
             {/* Redemptions table */}

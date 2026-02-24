@@ -3,7 +3,11 @@ import type { SlideshowBlock, SlideshowContext, EventHeaderProps } from '../../t
 import { getBlockDef, blockRegistry } from '../registry';
 
 // Utility for creating internal blocks
-function createInternalBlock(type: string, props: any, children?: SlideshowBlock[]): SlideshowBlock {
+function createInternalBlock(
+  type: string,
+  props: any,
+  children?: SlideshowBlock[],
+): SlideshowBlock {
   const def = blockRegistry.get(type);
   if (!def) throw new Error(`Unknown block type: ${type}`);
 

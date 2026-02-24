@@ -12,13 +12,13 @@
 
 1. **ID Type:** Native Postgres `uuid` type with `gen_random_uuid()` default
    - File: `packages/db/src/schema/*.ts`
-   
 2. **Timestamp Helpers:** Use `common.ts` builders
+
    ```typescript
-   import { timestamptz, createdAtCol } from "./common";
-   
-   createdAt: createdAtCol()                    // Standard created_at
-   expiresAt: timestamptz("expires_at").notNull()  // Custom timestamp
+   import { timestamptz, createdAtCol } from './common';
+
+   createdAt: createdAtCol(); // Standard created_at
+   expiresAt: timestamptz('expires_at').notNull(); // Custom timestamp
    ```
 
 3. **Text Enums:** Defined as arrays
@@ -39,12 +39,14 @@
 1. **Middleware Location:** `apps/api/src/middleware/` (business logic stays in api app)
 
 2. **DB Access Pattern:**
+
    ```typescript
-   import { getDb } from "../lib/db";
+   import { getDb } from '../lib/db';
    const db = getDb(c);
    ```
 
 3. **Photographer Context Type:**
+
    ```typescript
    type PhotographerContext = {
      id: string;
@@ -53,12 +55,13 @@
    ```
 
 4. **Middleware Chaining:**
+
    ```typescript
    // Consent endpoint - no consent check needed
-   app.post("/consent", requirePhotographer(), handler);
-   
+   app.post('/consent', requirePhotographer(), handler);
+
    // Protected routes - both required
-   app.use("/dashboard/*", requirePhotographer(), requireConsent());
+   app.use('/dashboard/*', requirePhotographer(), requireConsent());
    ```
 
 5. **Type Export Pattern:**
@@ -70,6 +73,7 @@
 1. **Admin Auth:** `X-Admin-API-Key` header, checked via `requireAdmin()` middleware
 
 2. **Route Ordering (Critical):**
+
    ```typescript
    const app = new Hono()
      .route("/webhooks", webhookRouter)       // No auth
@@ -84,26 +88,25 @@
    - Enables testClient type inference
 
 4. **Testing Pattern:** Hono `testClient`
+
    ```typescript
-   import { testClient } from "hono/testing";
+   import { testClient } from 'hono/testing';
    const client = testClient(app, MOCK_ENV);
-   
+
    // GET
-   await client["resource"].$get(undefined, { headers });
-   
+   await client['resource'].$get(undefined, { headers });
+
    // POST
-   await client["resource"].$post({ json: body }, { headers });
-   
+   await client['resource'].$post({ json: body }, { headers });
+
    // PATCH with params
-   await client["resource"][":id"].$patch(
-     { param: { id }, json: body },
-     { headers }
-   );
+   await client['resource'][':id'].$patch({ param: { id }, json: body }, { headers });
    ```
 
 ### Webhook Patterns (T-4)
 
 1. **DB Injection for Webhooks:** Add before webhook router
+
    ```typescript
    .use("/webhooks/*", (c, next) => {
      c.set("db", () => createDb(c.env.DATABASE_URL));
@@ -113,6 +116,7 @@
    ```
 
 2. **Idempotency:** Query before insert to prevent duplicates
+
    ```typescript
    const [existing] = await db
      .select({ id: table.id })
@@ -138,6 +142,7 @@
    - 409: Already exists (idempotent conflict)
 
 2. **Route Registration:** After Clerk auth middleware
+
    ```typescript
    .use("/*", createClerkAuth())
    .route("/consent", consentRouter)
@@ -149,18 +154,18 @@
 
 ## Known Limitations
 
-| Source | Limitation | Status |
-|--------|------------|--------|
-| T-4 | `handleUserUpdated` and `handleUserDeleted` are stubs | Deferred (not in scope) |
-| T-5 | No transaction wrapping for insert + update | Accepted for MVP (both idempotent-safe) |
+| Source | Limitation                                            | Status                                  |
+| ------ | ----------------------------------------------------- | --------------------------------------- |
+| T-4    | `handleUserUpdated` and `handleUserDeleted` are stubs | Deferred (not in scope)                 |
+| T-5    | No transaction wrapping for insert + update           | Accepted for MVP (both idempotent-safe) |
 
 ---
 
 ## Follow-ups That May Impact T-7
 
-| Source | Follow-up | Impact |
-|--------|-----------|--------|
-| T-5 | PDPA consent copy needs review before launch | No code impact for T-7 |
+| Source | Follow-up                                    | Impact                 |
+| ------ | -------------------------------------------- | ---------------------- |
+| T-5    | PDPA consent copy needs review before launch | No code impact for T-7 |
 
 ---
 

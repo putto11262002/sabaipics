@@ -1,7 +1,7 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import { drizzle as drizzleServerless } from "drizzle-orm/neon-serverless";
-import * as schema from "./schema";
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { drizzle as drizzleServerless } from 'drizzle-orm/neon-serverless';
+import * as schema from './schema';
 
 /**
  * HTTP adapter - for non-transactional queries (90% of cases)

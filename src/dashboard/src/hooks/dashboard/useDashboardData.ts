@@ -3,10 +3,7 @@ import type { InferResponseType } from 'hono/client';
 import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
-type DashboardDataResponse = InferResponseType<
-  typeof api.dashboard.$get,
-  SuccessStatusCode
->;
+type DashboardDataResponse = InferResponseType<typeof api.dashboard.$get, SuccessStatusCode>;
 
 export interface DashboardEvent {
   id: string;

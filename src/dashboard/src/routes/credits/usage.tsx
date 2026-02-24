@@ -1,9 +1,5 @@
 import { useMemo, useState } from 'react';
-import {
-  useReactTable,
-  getCoreRowModel,
-  createColumnHelper,
-} from '@tanstack/react-table';
+import { useReactTable, getCoreRowModel, createColumnHelper } from '@tanstack/react-table';
 import { Badge } from '@/shared/components/ui/badge';
 import {
   Card,
@@ -13,7 +9,13 @@ import {
   CardDescription,
 } from '@/shared/components/ui/card';
 import { Skeleton } from '@/shared/components/ui/skeleton';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/shared/components/ui/empty';
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from '@/shared/components/ui/empty';
 import { TrendingDown } from 'lucide-react';
 import {
   Select,
@@ -110,9 +112,7 @@ export default function CreditUsageTab() {
       pagination: { pageIndex: page, pageSize },
     },
     onPaginationChange: (updater) => {
-      const next = typeof updater === 'function'
-        ? updater({ pageIndex: page, pageSize })
-        : updater;
+      const next = typeof updater === 'function' ? updater({ pageIndex: page, pageSize }) : updater;
       setPage(next.pageIndex);
       setPageSize(next.pageSize);
     },
@@ -125,9 +125,7 @@ export default function CreditUsageTab() {
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Credit Usage</CardTitle>
-            <CardDescription>
-              Daily credits used over the last {timeRange} days
-            </CardDescription>
+            <CardDescription>Daily credits used over the last {timeRange} days</CardDescription>
           </div>
 
           {/* Time Range - Desktop */}
@@ -149,10 +147,7 @@ export default function CreditUsageTab() {
           </ToggleGroup>
 
           {/* Time Range - Mobile */}
-          <Select
-            value={timeRange}
-            onValueChange={(value) => setTimeRange(value as TimeRange)}
-          >
+          <Select value={timeRange} onValueChange={(value) => setTimeRange(value as TimeRange)}>
             <SelectTrigger className="w-[140px] sm:hidden">
               <SelectValue />
             </SelectTrigger>
@@ -168,10 +163,7 @@ export default function CreditUsageTab() {
             <Skeleton className="h-[300px] w-full" />
           ) : (
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <BarChart
-                data={filledChartData}
-                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-              >
+              <BarChart data={filledChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis
                   dataKey="date"
@@ -185,15 +177,8 @@ export default function CreditUsageTab() {
                   }}
                 />
                 <YAxis tickLine={false} axisLine={false} tickMargin={8} />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent indicator="line" />}
-                />
-                <Bar
-                  dataKey="credits"
-                  fill="var(--color-credits)"
-                  radius={[4, 4, 0, 0]}
-                />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                <Bar dataKey="credits" fill="var(--color-credits)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ChartContainer>
           )}
@@ -214,7 +199,9 @@ export default function CreditUsageTab() {
       ) : entries.length === 0 ? (
         <Empty>
           <EmptyHeader>
-            <EmptyMedia variant="icon"><TrendingDown /></EmptyMedia>
+            <EmptyMedia variant="icon">
+              <TrendingDown />
+            </EmptyMedia>
             <EmptyTitle>No usage yet</EmptyTitle>
             <EmptyDescription>Credits are deducted when you upload photos.</EmptyDescription>
           </EmptyHeader>

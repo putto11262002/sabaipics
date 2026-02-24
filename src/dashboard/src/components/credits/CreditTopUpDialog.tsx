@@ -9,12 +9,7 @@ import {
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Field, FieldLabel, FieldDescription } from '@/shared/components/ui/field';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-} from '@/shared/components/ui/table';
+import { Table, TableBody, TableCell, TableRow } from '@/shared/components/ui/table';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { CheckCircle2, XCircle, AlertCircle, X, RefreshCw } from 'lucide-react';
 import { Spinner } from '@/shared/components/ui/spinner';
@@ -49,7 +44,7 @@ export function CreditTopUpDialog({
   const debouncedPromoCode = useDebounce(promoCode, 500);
   const validateQuery = useValidatePromoCode(
     debouncedPromoCode,
-    open && debouncedPromoCode.length > 0
+    open && debouncedPromoCode.length > 0,
   );
 
   const promoData = validateQuery.data?.data;
@@ -57,7 +52,8 @@ export function CreditTopUpDialog({
   const isValidPromo = validateQuery.isSuccess && isDiscountCode;
 
   // Check if amount meets minimum requirement
-  const minAmountRequired = isValidPromo && promoData ? promoData.minAmountThb || MIN_AMOUNT : MIN_AMOUNT;
+  const minAmountRequired =
+    isValidPromo && promoData ? promoData.minAmountThb || MIN_AMOUNT : MIN_AMOUNT;
   const meetsMinimum = amount >= minAmountRequired;
   const canApplyDiscount = isValidPromo && meetsMinimum;
 
@@ -227,9 +223,7 @@ export function CreditTopUpDialog({
                     {validateQuery.isSuccess && isValidPromo && meetsMinimum && (
                       <CheckCircle2 className="size-4 text-success" />
                     )}
-                    {validateQuery.isError && (
-                      <XCircle className="size-4 text-destructive" />
-                    )}
+                    {validateQuery.isError && <XCircle className="size-4 text-destructive" />}
                   </>
                 )}
               </div>
@@ -267,9 +261,7 @@ export function CreditTopUpDialog({
             )}
 
             {initialPromoCode && (
-              <p className="text-xs text-success font-medium">
-                Discount code applied!
-              </p>
+              <p className="text-xs text-success font-medium">Discount code applied!</p>
             )}
           </Field>
 
@@ -277,9 +269,7 @@ export function CreditTopUpDialog({
           {!isValidAmount && amount > 0 && (
             <Alert variant="warning">
               <AlertCircle className="size-4" />
-              <AlertDescription>
-                Minimum purchase is {MIN_AMOUNT} THB
-              </AlertDescription>
+              <AlertDescription>Minimum purchase is {MIN_AMOUNT} THB</AlertDescription>
             </Alert>
           )}
 
@@ -324,7 +314,8 @@ export function CreditTopUpDialog({
                       preview.bonusCredits > 0 ? 'text-success/80' : 'text-muted-foreground'
                     }`}
                   >
-                    {preview.bonusCredits > 0 ? `+${preview.bonusCredits}` : '0'} ({preview.discountPercent}%)
+                    {preview.bonusCredits > 0 ? `+${preview.bonusCredits}` : '0'} (
+                    {preview.discountPercent}%)
                   </TableCell>
                 </TableRow>
                 {preview.promoDiscount > 0 && (
@@ -344,7 +335,6 @@ export function CreditTopUpDialog({
               </TableBody>
             </Table>
           </div>
-
         </div>
 
         <DialogFooter>

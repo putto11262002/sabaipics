@@ -31,17 +31,17 @@ All Cloudflare infrastructure is defined in `apps/api/wrangler.jsonc` and provis
 
 Staging/production have 8 queues (4 primary + 4 DLQs). Dev only provisions `r2-notification-proxy` (all other queues are locally simulated by wrangler dev).
 
-| Queue                           | Purpose                                              |
-| ------------------------------- | ---------------------------------------------------- |
-| `photo-processing[-env]`        | Face detection on uploaded photos                    |
-| `photo-processing-dlq[-env]`    | Dead letter queue for failed photo jobs              |
-| `rekognition-cleanup[-env]`     | Cleanup AWS Rekognition collections                  |
-| `rekognition-cleanup-dlq[-env]` | Dead letter queue for failed cleanup jobs            |
+| Queue                           | Purpose                                                |
+| ------------------------------- | ------------------------------------------------------ |
+| `photo-processing[-env]`        | Face detection on uploaded photos                      |
+| `photo-processing-dlq[-env]`    | Dead letter queue for failed photo jobs                |
+| `rekognition-cleanup[-env]`     | Cleanup AWS Rekognition collections                    |
+| `rekognition-cleanup-dlq[-env]` | Dead letter queue for failed cleanup jobs              |
 | `upload-processing[-env]`       | R2 upload notifications for photos (`uploads/` prefix) |
-| `upload-processing-dlq[-env]`   | Dead letter queue for failed upload jobs             |
-| `logo-processing[-env]`         | R2 upload notifications for logos (`logos/` prefix)  |
-| `logo-processing-dlq[-env]`     | Dead letter queue for failed logo jobs               |
-| `r2-notification-proxy`         | Dev only — forwards R2 events to local dev via ngrok |
+| `upload-processing-dlq[-env]`   | Dead letter queue for failed upload jobs               |
+| `logo-processing[-env]`         | R2 upload notifications for logos (`logos/` prefix)    |
+| `logo-processing-dlq[-env]`     | Dead letter queue for failed logo jobs                 |
+| `r2-notification-proxy`         | Dev only — forwards R2 events to local dev via ngrok   |
 
 ### Durable Objects
 

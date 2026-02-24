@@ -11,22 +11,26 @@
 Pick by: **does the user need to act?** → Alert. **Acknowledgment only?** → Toast.
 
 **Alert (persistent, in-page)**
+
 - `error` — Page/form failure. User must act or fix.
 - `warning` — Approaching limits, degraded state.
 - `success` — Rare. Onboarding, first-time milestones.
 - `info` — System notice, maintenance.
 
 Alert rules:
+
 - Form error → inline below fields, cleared on next submit
 - Page error → with retry button (`variant="destructive"`)
 
 **Toast (ephemeral, floating)**
+
 - `toast.error` — Background action failed. Include `description`.
 - `toast.warning` — Non-critical caution. Include `description`.
 - `toast.success` — Action completed. Title only is fine.
 - `toast.info` — Background process update. Title only is fine.
 
 Toast rules:
+
 - Always `bottom-right`
 - Error/warning → include `description` for context
 - Success/info → title only is fine

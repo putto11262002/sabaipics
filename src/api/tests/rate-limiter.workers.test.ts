@@ -5,12 +5,12 @@
  * Tests DO behavior without external dependencies.
  */
 
-import { describe, it, expect } from "vitest";
-import { env } from "cloudflare:test";
+import { describe, it, expect } from 'vitest';
+import { env } from 'cloudflare:test';
 
-describe("RekognitionRateLimiter DO", () => {
-  it("returns zero delay for first batch (cold start)", async () => {
-    const id = env.AWS_REKOGNITION_RATE_LIMITER.idFromName("test-cold");
+describe('RekognitionRateLimiter DO', () => {
+  it('returns zero delay for first batch (cold start)', async () => {
+    const id = env.AWS_REKOGNITION_RATE_LIMITER.idFromName('test-cold');
     const rateLimiter = env.AWS_REKOGNITION_RATE_LIMITER.get(id);
 
     const result = await rateLimiter.reserveBatch(10);
@@ -20,8 +20,8 @@ describe("RekognitionRateLimiter DO", () => {
     expect(result.intervalMs).toBeLessThanOrEqual(40); // ~37ms expected (30 TPS)
   });
 
-  it("returns delay for back-to-back batches", async () => {
-    const id = env.AWS_REKOGNITION_RATE_LIMITER.idFromName("test-backtoback");
+  it('returns delay for back-to-back batches', async () => {
+    const id = env.AWS_REKOGNITION_RATE_LIMITER.idFromName('test-backtoback');
     const rateLimiter = env.AWS_REKOGNITION_RATE_LIMITER.get(id);
 
     // First batch - no delay
@@ -37,8 +37,8 @@ describe("RekognitionRateLimiter DO", () => {
     expect(second.delay).toBeGreaterThanOrEqual(expectedDelay - 50); // Allow 50ms tolerance
   });
 
-  it("increases delay after throttle report", async () => {
-    const id = env.AWS_REKOGNITION_RATE_LIMITER.idFromName("test-throttle");
+  it('increases delay after throttle report', async () => {
+    const id = env.AWS_REKOGNITION_RATE_LIMITER.idFromName('test-throttle');
     const rateLimiter = env.AWS_REKOGNITION_RATE_LIMITER.get(id);
 
     // Reserve a batch
@@ -52,8 +52,8 @@ describe("RekognitionRateLimiter DO", () => {
     expect(next.delay).toBeGreaterThanOrEqual(2000);
   });
 
-  it("calculates correct interval for 30 TPS", async () => {
-    const id = env.AWS_REKOGNITION_RATE_LIMITER.idFromName("test-interval");
+  it('calculates correct interval for 30 TPS', async () => {
+    const id = env.AWS_REKOGNITION_RATE_LIMITER.idFromName('test-interval');
     const rateLimiter = env.AWS_REKOGNITION_RATE_LIMITER.get(id);
 
     const result = await rateLimiter.reserveBatch(1);

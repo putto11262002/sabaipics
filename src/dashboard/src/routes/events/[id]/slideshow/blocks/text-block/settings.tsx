@@ -27,7 +27,10 @@ export function TextBlockSettings({
       {/* Variant selector */}
       <div className="flex items-center gap-2">
         <Label className="w-20 text-xs">Style</Label>
-        <Select value={props.variant} onValueChange={(v) => update({ variant: v as TextBlockVariant })}>
+        <Select
+          value={props.variant}
+          onValueChange={(v) => update({ variant: v as TextBlockVariant })}
+        >
           <SelectTrigger className="h-8 flex-1">
             <SelectValue />
           </SelectTrigger>

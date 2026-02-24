@@ -20,12 +20,22 @@ export const dashboardRouter = new Hono<Env>()
 
     return safeTry(async function* () {
       // Query 1: Credit balance (sum of unexpired credits)
-      const creditBalance = yield* getBalance(db, photographer.id)
-        .mapErr((e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }));
+      const creditBalance = yield* getBalance(db, photographer.id).mapErr(
+        (e): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Database error',
+          cause: e.cause,
+        }),
+      );
 
       // Query 2: Nearest expiry (earliest expiry from purchase rows)
-      const nearestExpiry = yield* getNextExpiry(db, photographer.id)
-        .mapErr((e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }));
+      const nearestExpiry = yield* getNextExpiry(db, photographer.id).mapErr(
+        (e): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Database error',
+          cause: e.cause,
+        }),
+      );
 
       // Query 3: Total stats across ALL events (not limited)
       const [statsResult] = yield* ResultAsync.fromPromise(
