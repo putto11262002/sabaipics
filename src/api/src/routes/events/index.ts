@@ -497,7 +497,6 @@ export const eventsRouter = new Hono<Env>()
                     startDate: body.startDate,
                     endDate: body.endDate,
                     qrCodeR2Key: null, // No longer storing QR codes
-                    rekognitionCollectionId: null,
                     expiresAt: expiresAt.toISOString(),
                   })
                   .returning();
@@ -526,7 +525,6 @@ export const eventsRouter = new Hono<Env>()
             startDate: created.startDate,
             endDate: created.endDate,
             qrCodeUrl: null, // Client-side generation
-            rekognitionCollectionId: created.rekognitionCollectionId,
             expiresAt: created.expiresAt,
             createdAt: created.createdAt,
           });
@@ -643,7 +641,6 @@ export const eventsRouter = new Hono<Env>()
           startDate: event.startDate,
           endDate: event.endDate,
           qrCodeUrl: null, // Client-side generation
-          rekognitionCollectionId: event.rekognitionCollectionId,
           expiresAt: event.expiresAt,
           createdAt: event.createdAt,
         });
@@ -705,7 +702,6 @@ export const eventsRouter = new Hono<Env>()
             startDate: updated.startDate,
             endDate: updated.endDate,
             qrCodeUrl: null,
-            rekognitionCollectionId: updated.rekognitionCollectionId,
             expiresAt: updated.expiresAt,
             createdAt: updated.createdAt,
           },

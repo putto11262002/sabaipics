@@ -2,7 +2,7 @@
  * Hard Delete Event Service
  *
  * Permanently deletes an event and all related data:
- * - Database: 7 tables (face_embeddings, faces, photos, participants, uploads, ftp, event)
+ * - Database: 6 tables (photos, participants, uploads, logo uploads, ftp, event)
  * - R2: Photos, logos, QR codes, selfies
  *
  * Face embeddings cascade-delete with photos (ON DELETE CASCADE).
@@ -15,7 +15,6 @@ import type { DatabaseTx } from '@/db';
 import {
 	events,
 	photos,
-	faces,
 	participantSearches,
 	uploadIntents,
 	logoUploadIntents,
@@ -32,7 +31,6 @@ export interface HardDeleteResult {
 	error?: EventServiceError; // Present when success = false
 	deleted: {
 		database: {
-			faces: number;
 			photos: number;
 			participantSearches: number;
 			uploadIntents: number;
@@ -59,7 +57,6 @@ export interface HardDeleteEventsOptions {
  * Order of operations (per event, all in ONE transaction):
  * 1. Collect R2 keys and delete database records atomically (transaction)
  * 2. Delete R2 objects (parallel, best effort)
- * 3. Delete Rekognition collection (best effort)
  *
  * Events are deleted in parallel using Promise.allSettled for optimal performance.
  * Returns Ok with array of results (may include failures). Only returns Err if
@@ -139,16 +136,6 @@ export function hardDeleteEvents(
 
 							// Step 2: Delete from database in dependency order
 							// face_embeddings cascade-delete with photos (ON DELETE CASCADE)
-							// Old faces table still uses RESTRICT, so delete explicitly
-							const photoIdList = eventPhotos.map((p) => p.id);
-
-							const facesDeleted =
-								photoIdList.length > 0
-									? await tx
-											.delete(faces)
-											.where(inArray(faces.photoId, photoIdList))
-											.returning({ id: faces.id })
-									: [];
 
 							const photosDeleted = await tx
 								.delete(photos)
@@ -182,7 +169,6 @@ export function hardDeleteEvents(
 
 							return {
 								dbCounts: {
-									faces: facesDeleted.length,
 									photos: photosDeleted.length,
 									participantSearches: searchesDeleted.length,
 									uploadIntents: uploadsDeleted.length,
@@ -249,7 +235,6 @@ export function hardDeleteEvents(
 								error,
 								deleted: {
 									database: {
-										faces: 0,
 										photos: 0,
 										participantSearches: 0,
 										uploadIntents: 0,
@@ -286,7 +271,6 @@ export function hardDeleteEvents(
 							},
 							deleted: {
 								database: {
-									faces: 0,
 									photos: 0,
 									participantSearches: 0,
 									uploadIntents: 0,

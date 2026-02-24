@@ -84,5 +84,8 @@ export type RecognitionError =
  * Stateless: image in → embeddings out.
  */
 export interface FaceExtractor {
+  /** Extract faces from raw image bytes (base64-encoded to the service). Used for selfie search. */
   extractFaces(imageData: ArrayBuffer): ResultAsync<ExtractionResult, RecognitionError>;
+  /** Extract faces by URL (service fetches the image). Used for photo indexing via R2 public URL. */
+  extractFacesFromUrl(imageUrl: string): ResultAsync<ExtractionResult, RecognitionError>;
 }

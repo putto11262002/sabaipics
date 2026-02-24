@@ -3,6 +3,10 @@
  *
  * Calls the self-hosted InsightFace /extract endpoint.
  * Stateless: image in → embeddings out.
+ *
+ * Two input modes:
+ * - extractFaces(ArrayBuffer)  → base64 payload (selfie search)
+ * - extractFacesFromUrl(string) → image_url payload (photo indexing)
  */
 
 import { ResultAsync, err, ok, safeTry } from 'neverthrow';
@@ -64,6 +68,42 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 // =============================================================================
+// Response Type
+// =============================================================================
+
+interface ExtractResponse {
+  faces: Array<{
+    embedding: number[];
+    bounding_box: { x: number; y: number; width: number; height: number };
+    confidence: number;
+  }>;
+  image_width: number;
+  image_height: number;
+  model: string;
+  inference_ms: number;
+}
+
+function parseExtractionResponse(data: ExtractResponse): ExtractionResult {
+  const faces: DetectedFace[] = data.faces.map((f) => ({
+    embedding: f.embedding,
+    boundingBox: {
+      x: f.bounding_box.x,
+      y: f.bounding_box.y,
+      width: f.bounding_box.width,
+      height: f.bounding_box.height,
+    },
+    confidence: f.confidence,
+  }));
+
+  return {
+    faces,
+    imageWidth: data.image_width,
+    imageHeight: data.image_height,
+    inferenceMs: data.inference_ms,
+  };
+}
+
+// =============================================================================
 // Factory
 // =============================================================================
 
@@ -77,19 +117,16 @@ export interface ExtractorConfig {
 export function createExtractor(config: ExtractorConfig): FaceExtractor {
   const endpoint = config.endpoint;
 
-  const extractFaces = (imageData: ArrayBuffer): ResultAsync<ExtractionResult, RecognitionError> =>
+  /**
+   * Shared fetch + parse logic for both input modes.
+   */
+  const callExtract = (body: Record<string, unknown>): ResultAsync<ExtractionResult, RecognitionError> =>
     safeTry(async function* () {
-      const base64Image = arrayBufferToBase64(imageData);
-
       const response = yield* ResultAsync.fromPromise(
         fetch(`${endpoint}/extract`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            image: base64Image,
-            max_faces: 100,
-            min_confidence: 0.5,
-          }),
+          body: JSON.stringify(body),
         }),
         networkError,
       ).safeUnwrap();
@@ -105,17 +142,7 @@ export function createExtractor(config: ExtractorConfig): FaceExtractor {
       }
 
       const data = yield* ResultAsync.fromPromise(
-        response.json() as Promise<{
-          faces: Array<{
-            embedding: number[];
-            bounding_box: { x: number; y: number; width: number; height: number };
-            confidence: number;
-          }>;
-          image_width: number;
-          image_height: number;
-          model: string;
-          inference_ms: number;
-        }>,
+        response.json() as Promise<ExtractResponse>,
         (cause): RecognitionError => ({
           type: 'extraction_failed',
           retryable: true,
@@ -124,24 +151,22 @@ export function createExtractor(config: ExtractorConfig): FaceExtractor {
         }),
       ).safeUnwrap();
 
-      const faces: DetectedFace[] = data.faces.map((f) => ({
-        embedding: f.embedding,
-        boundingBox: {
-          x: f.bounding_box.x,
-          y: f.bounding_box.y,
-          width: f.bounding_box.width,
-          height: f.bounding_box.height,
-        },
-        confidence: f.confidence,
-      }));
-
-      return ok<ExtractionResult, RecognitionError>({
-        faces,
-        imageWidth: data.image_width,
-        imageHeight: data.image_height,
-        inferenceMs: data.inference_ms,
-      });
+      return ok(parseExtractionResponse(data));
     });
 
-  return { extractFaces };
+  const extractFaces = (imageData: ArrayBuffer): ResultAsync<ExtractionResult, RecognitionError> =>
+    callExtract({
+      image: arrayBufferToBase64(imageData),
+      max_faces: 100,
+      min_confidence: 0.5,
+    });
+
+  const extractFacesFromUrl = (imageUrl: string): ResultAsync<ExtractionResult, RecognitionError> =>
+    callExtract({
+      image_url: imageUrl,
+      max_faces: 100,
+      min_confidence: 0.5,
+    });
+
+  return { extractFaces, extractFacesFromUrl };
 }

@@ -2,31 +2,35 @@
 
 ## v2 Face Recognition — Remaining Work
 
-Code changes are done (staged, not yet committed). Python service deployed to Modal.
-
 **Modal endpoint:** `https://putto11262002--framefast-recognition-serve.modal.run`
 
+### Done
+- [x] Modal deployment with T4 GPU + CUDA (`modal_app.py`)
+- [x] Eval: Modal matches AWS Rekognition accuracy (~73% Precision@10, 98% Rank-5)
+- [x] `RECOGNITION_ENDPOINT` as wrangler var (dev=localhost:8082, staging/prod=Modal)
+- [x] `pnpm dev:recognition` / `pnpm deploy:recognition` scripts
+- [x] Face-eval modal provider
+
 ### 1. DB Migration
-- [ ] Run `drizzle-kit generate` to create migration SQL for `face_embeddings` table
-- [ ] Hand-edit the generated migration to add:
-  - `CREATE EXTENSION IF NOT EXISTS vector;` at the top
-  - HNSW index: `CREATE INDEX face_embeddings_embedding_hnsw_idx ON face_embeddings USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);`
+- [ ] `pnpm db:generate` — create migration for `face_embeddings` table
+- [ ] Hand-edit migration SQL:
+  - `CREATE EXTENSION IF NOT EXISTS vector;` at top
+  - HNSW index: `CREATE INDEX face_embeddings_embedding_hnsw_idx ON face_embeddings USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);`
 - [ ] Run migration against staging DB
 
-### 2. Worker-Side Updates
-- [ ] Update `extractor.ts` — add `extractFacesFromUrl(imageUrl)` method
-- [ ] Update `photo-consumer.ts` — use `extractFacesFromUrl` with R2 public URL instead of base64
-- [ ] Set `RECOGNITION_ENDPOINT` env var to Modal URL in `.dev.vars` and wrangler secrets
+### 2. Worker-Side: `extractFacesFromUrl`
+- [ ] Add `extractFacesFromUrl(imageUrl)` to `extractor.ts`
+- [ ] Update `photo-consumer.ts` to send R2 public URL instead of base64
 
-### 3. Verification
-- [x] Integration test: call `POST /extract` against Modal, verify response format
-- [ ] DB: run migration, insert test embedding, verify HNSW index works
-- [ ] E2E: upload photo → verify `face_embeddings` row → selfie search → results
-- [ ] Re-run `face-eval` suite against new `/extract` endpoint
-
-### 4. Post-Migration Cleanup (later)
-- [ ] Backfill existing photos (re-index through queue)
+### 3. Clean Slate
+- [ ] Hard-delete all events + photos in staging DB (no users yet, no backfill)
 - [ ] Drop old `faces` table (migration)
 - [ ] Drop `rekognitionCollectionId` column from `events` table (migration)
+
+### 4. Verification
+- [ ] E2E: upload photo → face_embeddings row → selfie search → results
+- [ ] Verify HNSW index works (cosine similarity query)
+
+### 5. Cleanup (after verification)
 - [ ] Remove `AWS_REGION` from wrangler vars
 - [ ] Remove old `infra/recognition/fly.toml` and Fly.io Dockerfile

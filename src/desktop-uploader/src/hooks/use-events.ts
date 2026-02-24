@@ -9,7 +9,6 @@ export type Event = {
   startDate: string | null;
   endDate: string | null;
   qrCodeUrl: string | null;
-  rekognitionCollectionId: string | null;
   expiresAt: string;
   createdAt: string;
 };
