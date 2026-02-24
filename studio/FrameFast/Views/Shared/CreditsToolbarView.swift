@@ -25,7 +25,7 @@ struct CreditsToolbarView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "creditcard.fill")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.green)
+                        .foregroundStyle(Color.accentColor)
                     Text(balance.formatted(.number.notation(.compactName)))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.primary)
