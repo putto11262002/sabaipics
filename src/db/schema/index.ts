@@ -12,6 +12,7 @@ export * from './gift-codes';
 export * from './events';
 export * from './photos';
 export * from './faces';
+export * from './face-embeddings';
 export * from './consent-records';
 export * from './upload-intents';
 export * from './logo-upload-intents';

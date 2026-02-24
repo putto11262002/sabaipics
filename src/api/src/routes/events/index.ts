@@ -26,7 +26,6 @@ import { safeHandler } from '../../lib/safe-handler';
 import { generatePresignedPutUrl } from '../../lib/r2/presign';
 import { createFtpCredentialsWithRetry } from '../../lib/ftp/credentials';
 import { hardDeleteEvents } from '../../lib/services/events/hard-delete';
-import { createFaceProvider } from '../../lib/rekognition';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -1128,23 +1127,11 @@ export const eventsRouter = new Hono<Env>()
         return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
       }
 
-      // Create Rekognition provider and deleteRekognition function
-      const provider = createFaceProvider(c.env);
-      const deleteRekognition = async (collectionId: string): Promise<void> => {
-        await provider.deleteCollection(collectionId).match(
-          () => undefined,
-          (error) => {
-            throw new Error(`Rekognition deletion failed: ${error.type}`);
-          },
-        );
-      };
-
       // Hard delete all related data (batch function with single ID)
       const results = yield* hardDeleteEvents({
         db,
         eventIds: [id],
         r2Bucket: c.env.PHOTOS_BUCKET,
-        deleteRekognition,
       }).mapErr(
         (serviceError): HandlerError => ({
           code: 'INTERNAL_ERROR',

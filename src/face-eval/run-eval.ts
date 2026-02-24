@@ -15,6 +15,7 @@ import { appendRunCsv, writeRunMetadata } from './persist.ts';
 import { getPackageRoot } from './repo.ts';
 import { createAWSProvider } from './providers/aws-provider.ts';
 import { createSabaiFaceProvider } from './providers/sabaiface-provider.ts';
+import { createModalProvider } from './providers/modal-provider.ts';
 import type { FaceRecognitionProvider } from './providers/types.ts';
 
 const CSV_HEADER = [
@@ -62,6 +63,17 @@ async function loadImage(filePath: string): Promise<ArrayBuffer> {
 }
 
 function getProvider(cmd: RunCommand): { provider: FaceRecognitionProvider; providerConfig: any } {
+  if (cmd.provider === 'modal') {
+    const endpoint = cmd.endpoint || process.env.RECOGNITION_ENDPOINT;
+    if (!endpoint) {
+      throw new Error('Missing --endpoint (or env RECOGNITION_ENDPOINT) for modal provider');
+    }
+    return {
+      provider: createModalProvider({ endpoint }),
+      providerConfig: { endpoint },
+    };
+  }
+
   if (cmd.provider === 'sabaiface') {
     const endpoint = cmd.endpoint || process.env.SABAIFACE_ENDPOINT;
     if (!endpoint) {

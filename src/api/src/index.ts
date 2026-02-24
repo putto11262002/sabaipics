@@ -35,8 +35,6 @@ import { scheduled } from './crons';
 // Event handlers - registered at module load time
 import { registerStripeHandlers } from './handlers/stripe';
 
-// Durable Objects - must be exported for wrangler
-export { RekognitionRateLimiter } from './durable-objects/rate-limiter';
 
 // =============================================================================
 // Event Bus Initialization

@@ -1,45 +1,32 @@
 # TODO
 
-## Completed
+## v2 Face Recognition — Remaining Work
 
-- [x] Remove global `enabled` field from color/image pipeline settings
-- [x] Auto-edit and LUT each have independent toggles
-- [x] Remove LUT creation from reference image feature
+Code changes are done (staged, not yet committed). Python service deployed to Modal.
 
-## In Progress: Auto-Edit Presets Feature
+**Modal endpoint:** `https://putto11262002--framefast-recognition-serve.modal.run`
 
-### Schema (DONE)
+### 1. DB Migration
+- [ ] Run `drizzle-kit generate` to create migration SQL for `face_embeddings` table
+- [ ] Hand-edit the generated migration to add:
+  - `CREATE EXTENSION IF NOT EXISTS vector;` at the top
+  - HNSW index: `CREATE INDEX face_embeddings_embedding_hnsw_idx ON face_embeddings USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);`
+- [ ] Run migration against staging DB
 
-- [x] Created `auto_edit_presets` table with migration
-- [x] Updated `EventSettings.colorGrade` to use `autoEditPresetId`/`autoEditIntensity`
-- [x] Renamed `intensity` → `lutIntensity`, `style` → `autoEditPresetId`
-- [x] Added 8 built-in presets to migration seed
+### 2. Worker-Side Updates
+- [ ] Update `extractor.ts` — add `extractFacesFromUrl(imageUrl)` method
+- [ ] Update `photo-consumer.ts` — use `extractFacesFromUrl` with R2 public URL instead of base64
+- [ ] Set `RECOGNITION_ENDPOINT` env var to Modal URL in `.dev.vars` and wrangler secrets
 
-### API Routes (IN PROGRESS)
+### 3. Verification
+- [x] Integration test: call `POST /extract` against Modal, verify response format
+- [ ] DB: run migration, insert test embedding, verify HNSW index works
+- [ ] E2E: upload photo → verify `face_embeddings` row → selfie search → results
+- [ ] Re-run `face-eval` suite against new `/extract` endpoint
 
-- [x] Created `/studio/auto-edit` routes (GET/POST/PATCH/DELETE)
-- [x] Created preview endpoint `/studio/auto-edit/:id/preview`
-- [x] Updated `image-pipeline-schema.ts` with new fields
-- [ ] Fix remaining type errors in upload-consumer.ts (style → autoEditPresetId)
-- [ ] Fix remaining type errors in events/index.ts (intensity → lutIntensity)
-- [ ] Update Modal client to accept preset params instead of style
-
-### Frontend (PENDING)
-
-- [ ] Create hooks: `useAutoEditPresets`, `useCreateAutoEditPreset`, etc.
-- [ ] Update sidebar navigation: Studio > LUTs + Auto Edit
-- [ ] Create `/studio/auto-edit` list page
-- [ ] Create auto-edit preview page
-- [ ] Update Event Settings card to use `autoEditPresetId`
-
-### Remaining Type Errors
-
-- `src/api/src/queue/upload-consumer.ts`: Lines 642-700 use old `style`/`intensity`
-- `src/api/src/routes/events/index.ts`: Lines 163, 232, 263, 306, 377, 408 use old schema
-- `src/api/src/routes/studio/auto-edit.ts`: Import `Result` issue (line 65, 70)
-
-## Upcoming
-
-- [ ] **Upload consumer optimization** — Current batch size is 1 (due to OOM with Photon/memory constraints). Explore:
-  - No buffer reading or image parsing touching the worker
-  - Scale out horizontally
+### 4. Post-Migration Cleanup (later)
+- [ ] Backfill existing photos (re-index through queue)
+- [ ] Drop old `faces` table (migration)
+- [ ] Drop `rekognitionCollectionId` column from `events` table (migration)
+- [ ] Remove `AWS_REGION` from wrangler vars
+- [ ] Remove old `infra/recognition/fly.toml` and Fly.io Dockerfile

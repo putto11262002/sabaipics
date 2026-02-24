@@ -13,6 +13,7 @@ export type Bindings = Cloudflare.Env & {
   CF_ACCESS_AUD: string;
   LINE_LOGIN_CHANNEL_ID: string;
   LINE_LOGIN_CHANNEL_SECRET: string;
+  RECOGNITION_ENDPOINT: string;
 };
 
 export type Variables = AuthVariables & {

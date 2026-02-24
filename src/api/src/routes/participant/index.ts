@@ -21,8 +21,7 @@ import { z } from 'zod';
 import { activeEvents, photos, participantSearches, DEFAULT_SLIDESHOW_CONFIG, events, feedback, feedbackCategories } from '@/db';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
-import { createFaceProvider } from '../../lib/rekognition/provider';
-import type { FaceServiceError } from '../../lib/rekognition/types';
+import { createExtractor, searchByFace, type RecognitionError } from '../../lib/recognition';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { createZip } from 'littlezipper';
 import { slideshowPhotosQuerySchema } from '../events/slideshow-schema';
@@ -99,109 +98,40 @@ function generateDownloadUrl(r2Key: string, r2BaseUrl: string): string {
 // Error Mapping
 // =============================================================================
 
-function mapFaceServiceError(e: FaceServiceError): HandlerError {
+function mapRecognitionError(e: RecognitionError): HandlerError {
   switch (e.type) {
-    case 'not_found':
-      return {
-        code: 'NOT_FOUND',
-        message:
-          e.resource === 'collection'
-            ? 'Event has no photos available for search'
-            : 'No matching faces found in the event',
-        cause: e,
-      };
-
-    case 'invalid_input':
+    case 'no_face_detected':
       return {
         code: 'UNPROCESSABLE',
-        message: `Invalid search data: ${e.reason}`,
+        message: 'No face detected in the uploaded image. Please try a clearer photo.',
         cause: e,
       };
 
-    case 'provider_failed':
-      switch (e.provider) {
-        case 'aws': {
-          const errorName = e.errorName;
+    case 'invalid_image':
+      return {
+        code: 'UNPROCESSABLE',
+        message: `Invalid image: ${e.reason}`,
+        cause: e,
+      };
 
-          if (
-            errorName &&
-            [
-              'ThrottlingException',
-              'ProvisionedThroughputExceededException',
-              'LimitExceededException',
-            ].includes(errorName)
-          ) {
-            return {
-              code: 'RATE_LIMITED',
-              message: 'Too many searches. Please wait and try again.',
-              cause: e,
-            };
-          }
-
-          if (
-            errorName &&
-            [
-              'ResourceNotFoundException',
-              'InvalidImageFormatException',
-              'ImageTooLargeException',
-              'InvalidParameterException',
-              'AccessDeniedException',
-            ].includes(errorName)
-          ) {
-            return {
-              code: 'SERVICE_UNAVAILABLE',
-              message: 'Face search service unavailable due to invalid request',
-              cause: e,
-            };
-          }
-
-          if (
-            errorName &&
-            ['InternalServerError', 'ServiceUnavailableException', 'ServiceException'].includes(
-              errorName,
-            )
-          ) {
-            return {
-              code: 'SERVICE_UNAVAILABLE',
-              message: 'Face search temporarily unavailable',
-              cause: e,
-            };
-          }
-
-          return {
-            code: 'SERVICE_UNAVAILABLE',
-            message: 'Face search temporarily unavailable',
-            cause: e,
-          };
-        }
-
-        case 'sabaiface':
-          if (e.throttle) {
-            return {
-              code: 'RATE_LIMITED',
-              message: 'Too many searches. Please wait and try again.',
-              cause: e,
-            };
-          }
-
-          return {
-            code: 'SERVICE_UNAVAILABLE',
-            message: 'Face search temporarily unavailable',
-            cause: e,
-          };
+    case 'extraction_failed':
+      if (e.throttle) {
+        return {
+          code: 'RATE_LIMITED',
+          message: 'Too many searches. Please wait and try again.',
+          cause: e,
+        };
       }
+      return {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Face search temporarily unavailable',
+        cause: e,
+      };
 
     case 'database':
       return {
         code: 'INTERNAL_ERROR',
         message: 'Temporary database error',
-        cause: e,
-      };
-
-    default:
-      return {
-        code: 'SERVICE_UNAVAILABLE',
-        message: 'Face search temporarily unavailable',
         cause: e,
       };
   }
@@ -307,10 +237,10 @@ export const participantRouter = new Hono<Env>()
           }),
         );
 
-        // Step 5: Transform selfie via CF Images (best effort, fallback to original)
-        const MAX_REKOGNITION_SIZE = 5 * 1024 * 1024;
+        // Step 5: Transform selfie via CF Images if too large (best effort, fallback to original)
+        const MAX_EXTRACTION_SIZE = 5 * 1024 * 1024;
         let transformedBytes = originalBytes;
-        if (originalBytes.byteLength > MAX_REKOGNITION_SIZE) {
+        if (originalBytes.byteLength > MAX_EXTRACTION_SIZE) {
           transformedBytes = yield* ResultAsync.fromPromise(
             (async () => {
               const stream = new ReadableStream({
@@ -337,19 +267,25 @@ export const participantRouter = new Hono<Env>()
           });
         }
 
-        // Step 6: Call provider.findImagesByFace({ eventId, imageData })
-        const provider = createFaceProvider(c.env);
-        const searchResult = yield* provider
-          .findImagesByFace({
-            eventId,
-            imageData: transformedBytes,
-            maxResults: 50,
-            minSimilarity: 0.8,
-          })
-          .mapErr(mapFaceServiceError);
+        // Step 6: Extract face embedding from selfie
+        const extractor = createExtractor({ endpoint: c.env.RECOGNITION_ENDPOINT });
+        const extractResult = yield* extractor
+          .extractFaces(transformedBytes)
+          .mapErr(mapRecognitionError);
 
-        // Step 7: Handle empty response - return 200 with empty array (NOT an error)
-        if (searchResult.photos.length === 0) {
+        // Use first face's embedding for search
+        const queryEmbedding = extractResult.faces[0].embedding;
+
+        // Step 7: Search pgvector for similar faces in the event
+        const searchMatches = yield* searchByFace(c.var.db(), {
+          eventId,
+          embedding: queryEmbedding,
+          maxResults: 50,
+          minSimilarity: 0.8,
+        }).mapErr(mapRecognitionError);
+
+        // Step 8: Handle empty response - return 200 with empty array (NOT an error)
+        if (searchMatches.length === 0) {
           yield* ResultAsync.fromPromise(
             db
               .insert(participantSearches)
@@ -373,9 +309,9 @@ export const participantRouter = new Hono<Env>()
           });
         }
 
-        // Step 8: Extract photo IDs and similarities directly from search result
+        // Step 9: Extract photo IDs and similarities from pgvector results
         const photoIdToSimilarity = new Map(
-          searchResult.photos.map((p) => [p.photoId, p.similarity]),
+          searchMatches.map((p) => [p.photoId, p.similarity]),
         );
         const matchedPhotoIds = Array.from(photoIdToSimilarity.keys());
 
@@ -387,7 +323,7 @@ export const participantRouter = new Hono<Env>()
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 
-        // Step 9: Create participant_searches record
+        // Step 10: Create participant_searches record
         yield* ResultAsync.fromPromise(
           db
             .insert(participantSearches)
@@ -405,7 +341,7 @@ export const participantRouter = new Hono<Env>()
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 
-        // Step 10: Generate photo URLs
+        // Step 11: Generate photo URLs
         const isDev = c.env.NODE_ENV === 'development';
         const responsePhotos = photoRecords.map((photo) => ({
           photoId: photo.id,

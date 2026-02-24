@@ -26,17 +26,9 @@ CLERK_WEBHOOK_SIGNING_SECRET=whsec_xxxxx
 # Format: postgres://user:password@host/database?sslmode=require
 DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 
-# Face Recognition Provider Configuration
-# FACE_PROVIDER: 'aws' (default) or 'sabaiface' (for local development)
-# When using sabaiface, set SABAIFACE_ENDPOINT to the local server URL
-FACE_PROVIDER=sabaiface
-SABAIFACE_ENDPOINT=http://localhost:8086
-
-# AWS Credentials for Rekognition (required when FACE_PROVIDER=aws)
-# Get from: AWS IAM Console → Users → Security Credentials
-AWS_ACCESS_KEY_ID=AKIAXXXXXXXXXX
-AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
-AWS_REGION=us-west-2
+# Face Recognition Service (self-hosted InsightFace)
+# URL of the /extract endpoint
+RECOGNITION_ENDPOINT=http://localhost:8087
 
 # Stripe Secret Key (get from Stripe Dashboard → Developers → API Keys)
 # Use TEST mode keys for development (sk_test_xxx)

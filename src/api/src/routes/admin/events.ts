@@ -19,7 +19,6 @@ import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
 import { hardDeleteEvents, type HardDeleteResult } from '../../lib/services/events/hard-delete';
-import { createFaceProvider } from '../../lib/rekognition';
 
 // =============================================================================
 // Constants
@@ -355,21 +354,10 @@ export const adminEventsRouter = new Hono<Env>()
         return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
       }
 
-      const provider = createFaceProvider(c.env);
-      const deleteRekognition = async (collectionId: string): Promise<void> => {
-        await provider.deleteCollection(collectionId).match(
-          () => undefined,
-          (error) => {
-            throw new Error(`Rekognition deletion failed: ${error.type}`);
-          },
-        );
-      };
-
       const results = yield* hardDeleteEvents({
         db,
         eventIds: [id],
         r2Bucket: c.env.PHOTOS_BUCKET,
-        deleteRekognition,
       }).mapErr(
         (serviceError): HandlerError => ({
           code: 'INTERNAL_ERROR',
@@ -399,7 +387,6 @@ export const adminEventsRouter = new Hono<Env>()
           ftp: d.database.ftpCredentials,
         },
         r2Objects: d.r2Objects,
-        rekognitionCollection: d.rekognitionCollection,
       });
 
       return ok(result);
@@ -437,16 +424,6 @@ export const adminEventsRouter = new Hono<Env>()
         return ok({ deletedCount: 0, results: [] });
       }
 
-      const provider = createFaceProvider(c.env);
-      const deleteRekognition = async (collectionId: string): Promise<void> => {
-        await provider.deleteCollection(collectionId).match(
-          () => undefined,
-          (error) => {
-            throw new Error(`Rekognition deletion failed: ${error.type}`);
-          },
-        );
-      };
-
       const eventIds = trashedEvents.map((e) => e.id);
 
       // Chunk into batches of 100 (hardDeleteEvents limit)
@@ -459,7 +436,6 @@ export const adminEventsRouter = new Hono<Env>()
           db,
           eventIds: batch,
           r2Bucket: c.env.PHOTOS_BUCKET,
-          deleteRekognition,
         }).mapErr(
           (serviceError): HandlerError => ({
             code: 'INTERNAL_ERROR',
