@@ -13,7 +13,7 @@ export function useLineDeliveryHistory(page: number = 0, limit: number = 20) {
     queryKey: ['line-delivery', 'history', page, limit],
     apiFn: (opts) =>
       getHistory(
-        { query: { page: String(page), limit: String(limit) } },
+        { query: { page, limit } },
         opts,
       ),
     staleTime: 1000 * 30,
