@@ -11,7 +11,7 @@ import { lineDeliveries } from '@/db';
 import { eq, sql, gte } from 'drizzle-orm';
 import { ResultAsync } from 'neverthrow';
 
-export const FREE_MONTHLY_LINE_MESSAGES = 10;
+export const FREE_MONTHLY_LINE_MESSAGES = 100;
 
 export interface MonthlyUsage {
   used: number;
