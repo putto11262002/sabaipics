@@ -166,7 +166,13 @@ export function SearchPage() {
       {state === 'searching' && <SearchingStep />}
 
       {state === 'results' && searchResult && eventId && (
-        <ResultsStep eventId={eventId} photos={searchResult.photos} onSearchAgain={handleRetry} />
+        <ResultsStep
+          eventId={eventId}
+          searchId={searchResult.searchId}
+          photos={searchResult.photos}
+          searchResult={searchResult}
+          onSearchAgain={handleRetry}
+        />
       )}
 
       {state === 'empty' && <EmptyStep onRetry={handleRetry} />}
