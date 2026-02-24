@@ -26,7 +26,7 @@ const data = {
     },
     {
       title: 'Studio',
-      url: '/studio',
+      url: '/studio/luts',
       icon: Sparkles,
       items: [
         {

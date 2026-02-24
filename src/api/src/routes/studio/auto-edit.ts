@@ -98,6 +98,8 @@ async function transformToPreviewJpeg(params: {
 
 function applyAutoEditToRgba(
   pixels: Uint8Array,
+  width: number,
+  height: number,
   params: {
     contrast: number;
     brightness: number;
@@ -137,7 +139,7 @@ function applyAutoEditToRgba(
   }
 
   if (sharpness !== 1.0) {
-    const sharpened = sharpenRgba(out, sharpness);
+    const sharpened = sharpenRgba(out, width, height, sharpness);
     for (let i = 0; i < pixels.length; i++) {
       out[i] = sharpened[i]!;
     }
@@ -146,10 +148,13 @@ function applyAutoEditToRgba(
   return out;
 }
 
-function sharpenRgba(pixels: Uint8Array, amount: number): Uint8Array {
+function sharpenRgba(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+  amount: number,
+): Uint8Array {
   const out = new Uint8Array(pixels.length);
-  const width = Math.sqrt(pixels.length / 4);
-  const height = width;
 
   const kernel = [0, -amount, 0, -amount, 1 + 4 * amount, -amount, 0, -amount, 0];
 
@@ -242,7 +247,7 @@ function generatePreviewJpegBytes(params: {
     const height = input.get_height();
     const pixels = input.get_raw_pixels().slice();
 
-    const editedPixels = applyAutoEditToRgba(pixels, {
+    const editedPixels = applyAutoEditToRgba(pixels, width, height, {
       contrast: params.preset.contrast,
       brightness: params.preset.brightness,
       saturation: params.preset.saturation,
