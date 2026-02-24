@@ -29,9 +29,20 @@ export const th = {
   results: {
     found: (count: number) => `พบ ${count} รูปที่ตรงกับใบหน้าของคุณ`,
     selected: (count: number) => `เลือก ${count} รูป`,
-    hint: 'แตะรูปเพื่อเลือกและดาวน์โหลด',
+    hint: 'แตะรูปเพื่อเลือก แล้วกดดาวน์โหลด หรือรับรูปทาง LINE',
     download: (count: number) => `ดาวน์โหลด ${count} รูป`,
     downloadAll: 'ดาวน์โหลดทั้งหมด',
+    lineButton: 'รับรูปทาง LINE',
+    lineRedirecting: 'กำลังเปิด LINE...',
+  },
+  lineCallback: {
+    delivering: 'กำลังส่งรูปทาง LINE...',
+    success: (count: number) => `ส่ง ${count} รูปไปยัง LINE แล้ว!`,
+    successHint: 'ตรวจสอบข้อความ LINE ของคุณ',
+    error: 'ส่งรูปไม่สำเร็จ',
+    notFriend: 'กรุณาเพิ่มบัญชี LINE Official เป็นเพื่อนก่อน',
+    retry: 'ลองอีกครั้ง',
+    backToResults: 'กลับไปหน้าผลลัพธ์',
   },
   empty: {
     title: 'ไม่พบรูปที่ตรงกัน',
