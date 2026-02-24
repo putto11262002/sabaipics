@@ -1,6 +1,6 @@
 ---
-url: "https://developer.apple.com/documentation/imagecapturecore/icscannerdevice"
-title: "ICScannerDevice | Apple Developer Documentation"
+url: 'https://developer.apple.com/documentation/imagecapturecore/icscannerdevice'
+title: 'ICScannerDevice | Apple Developer Documentation'
 ---
 
 [Skip Navigation](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#app-main)
@@ -40,12 +40,12 @@ Only search within “Documentation”
 
 [Open Menu](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#)
 
-- SwiftLanguage:  Swift  Objective-C
+- SwiftLanguage: Swift Objective-C
 
 Language:
 
-  - Swift
-  - [Objective-C](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#)
+- Swift
+- [Objective-C](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#)
 
 All Technologies
 
@@ -354,13 +354,13 @@ macOS 10.4+
 class ICScannerDevice
 ```
 
-## [Overview](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice\#overview)
+## [Overview](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#overview)
 
 An instance of ICScannerDevice class is intended to be used by the ICScannerDeviceView object. The ICScannerDeviceView class encapsulates the complexities of setting scan parameters, performing scans and saving the result. The developer should consider using ICScannerDeviceView instead of building their own views using the ICScannerDevice object.
 
-## [Topics](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice\#topics)
+## [Topics](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#topics)
 
-### [Selecting a Functional Unit](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice\#Selecting-a-Functional-Unit)
+### [Selecting a Functional Unit](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#Selecting-a-Functional-Unit)
 
 [`var availableFunctionalUnitTypes: [NSNumber]`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/availablefunctionalunittypes)
 
@@ -370,7 +370,7 @@ An array of functional unit types available on this scanner.
 
 The currently selected functional unit on the scanner.
 
-[`func requestSelect(ICScannerFunctionalUnitType)`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/requestselect(_:))
+[`func requestSelect(ICScannerFunctionalUnitType)`](<https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/requestselect(_:)>)
 
 Requests to select a functional unit on the scanner.
 
@@ -382,21 +382,21 @@ The types of scanner functional units.
 
 Flags to indicate the state of the scanner functional unit.
 
-### [Performing a Scan](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice\#Performing-a-Scan)
+### [Performing a Scan](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#Performing-a-Scan)
 
-[`func requestOpenSession(withCredentials: String, password: String)`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/requestopensession(withcredentials:password:))
+[`func requestOpenSession(withCredentials: String, password: String)`](<https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/requestopensession(withcredentials:password:)>)
 
 Opens a session on the protected device with the authorized username and passcode.
 
-[`func requestOverviewScan()`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/requestoverviewscan())
+[`func requestOverviewScan()`](<https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/requestoverviewscan()>)
 
 Starts an overview scan on the selected functional unit.
 
-[`func requestScan()`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/requestscan())
+[`func requestScan()`](<https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/requestscan()>)
 
 Starts a scan on the selected functional unit.
 
-[`func cancelScan()`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/cancelscan())
+[`func cancelScan()`](<https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/cancelscan()>)
 
 Cancels the current scan.
 
@@ -420,19 +420,19 @@ The transfer mode for the scanned document.
 
 The total maximum band size requested when performing a memory-based transfer.
 
-### [Logging into a Protected Device](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice\#Logging-into-a-Protected-Device)
+### [Logging into a Protected Device](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#Logging-into-a-Protected-Device)
 
 [`var defaultUsername: String`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice/defaultusername)
 
 A default username on protected scanners.
 
-## [Relationships](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice\#relationships)
+## [Relationships](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#relationships)
 
-### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice\#inherits-from)
+### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#inherits-from)
 
 - [`ICDevice`](https://developer.apple.com/documentation/imagecapturecore/icdevice)
 
-### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice\#conforms-to)
+### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#conforms-to)
 
 - [`CVarArg`](https://developer.apple.com/documentation/Swift/CVarArg)
 - [`CustomDebugStringConvertible`](https://developer.apple.com/documentation/Swift/CustomDebugStringConvertible)
@@ -441,9 +441,9 @@ A default username on protected scanners.
 - [`Hashable`](https://developer.apple.com/documentation/Swift/Hashable)
 - [`NSObjectProtocol`](https://developer.apple.com/documentation/ObjectiveC/NSObjectProtocol)
 
-## [See Also](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice\#see-also)
+## [See Also](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#see-also)
 
-### [Scanners](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice\#Scanners)
+### [Scanners](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice#Scanners)
 
 [`protocol ICScannerDeviceDelegate`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevicedelegate)
 

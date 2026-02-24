@@ -23,8 +23,7 @@ export function useCreateGiftCode() {
   const queryClient = useQueryClient();
 
   return useAdminMutation<CreateGiftCodeResponse, CreateGiftCodeInput>({
-    apiFn: (input, opts) =>
-      api.admin['gift-codes'].$post({ json: input }, opts),
+    apiFn: (input, opts) => api.admin['gift-codes'].$post({ json: input }, opts),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'gift-codes', 'list'] });
     },

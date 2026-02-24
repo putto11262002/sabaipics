@@ -13,11 +13,7 @@ export type GiftCodeDetail = GiftCodeResponse['data'];
 export function useGiftCode(id: string) {
   return useAdminQuery<GiftCodeResponse>({
     queryKey: ['admin', 'gift-codes', 'detail', id],
-    apiFn: (opts) =>
-      api.admin['gift-codes'][':id'].$get(
-        { param: { id } },
-        opts,
-      ),
+    apiFn: (opts) => api.admin['gift-codes'][':id'].$get({ param: { id } }, opts),
     enabled: !!id,
   });
 }

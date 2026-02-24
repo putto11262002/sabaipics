@@ -1,15 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import {
-  eq,
-  desc,
-  sql,
-  and,
-  ilike,
-  or,
-  lt,
-  gt as drizzleGt,
-} from 'drizzle-orm';
+import { eq, desc, sql, and, ilike, or, lt, gt as drizzleGt } from 'drizzle-orm';
 import { giftCodes, giftCodeRedemptions, photographers } from '@/db';
 import { requireAdmin } from '../../middleware';
 import { zValidator } from '@hono/zod-validator';
@@ -94,11 +85,7 @@ export const giftCodesRouter = new Hono<Env>()
 
       // Check code uniqueness
       const [existing] = yield* ResultAsync.fromPromise(
-        db
-          .select({ id: giftCodes.id })
-          .from(giftCodes)
-          .where(eq(giftCodes.code, code))
-          .limit(1),
+        db.select({ id: giftCodes.id }).from(giftCodes).where(eq(giftCodes.code, code)).limit(1),
         (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
       );
 
@@ -125,7 +112,11 @@ export const giftCodesRouter = new Hono<Env>()
             createdBy: adminEmail,
           })
           .returning(),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Failed to create gift code', cause }),
+        (cause): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to create gift code',
+          cause,
+        }),
       );
 
       return ok(created);
@@ -150,10 +141,7 @@ export const giftCodesRouter = new Hono<Env>()
         case 'active':
           conditions.push(eq(giftCodes.active, true));
           conditions.push(
-            or(
-              sql`${giftCodes.expiresAt} IS NULL`,
-              drizzleGt(giftCodes.expiresAt, now),
-            )!,
+            or(sql`${giftCodes.expiresAt} IS NULL`, drizzleGt(giftCodes.expiresAt, now))!,
           );
           break;
         case 'inactive':
@@ -167,12 +155,7 @@ export const giftCodesRouter = new Hono<Env>()
 
       if (search) {
         const pattern = `%${search}%`;
-        conditions.push(
-          or(
-            ilike(giftCodes.code, pattern),
-            ilike(giftCodes.description, pattern),
-          )!,
-        );
+        conditions.push(or(ilike(giftCodes.code, pattern), ilike(giftCodes.description, pattern))!);
       }
 
       if (cursor) {
@@ -245,8 +228,11 @@ export const giftCodesRouter = new Hono<Env>()
         db
           .select({
             totalRedemptions: sql<number>`count(*)`.mapWith(Number),
-            totalCreditsIssued: sql<number>`coalesce(sum(${giftCodeRedemptions.creditsGranted}), 0)`.mapWith(Number),
-            uniqueUsers: sql<number>`count(distinct ${giftCodeRedemptions.photographerId})`.mapWith(Number),
+            totalCreditsIssued:
+              sql<number>`coalesce(sum(${giftCodeRedemptions.creditsGranted}), 0)`.mapWith(Number),
+            uniqueUsers: sql<number>`count(distinct ${giftCodeRedemptions.photographerId})`.mapWith(
+              Number,
+            ),
           })
           .from(giftCodeRedemptions)
           .where(eq(giftCodeRedemptions.giftCodeId, id)),
@@ -283,11 +269,7 @@ export const giftCodesRouter = new Hono<Env>()
       return safeTry(async function* () {
         // Check exists
         const [existing] = yield* ResultAsync.fromPromise(
-          db
-            .select({ id: giftCodes.id })
-            .from(giftCodes)
-            .where(eq(giftCodes.id, id))
-            .limit(1),
+          db.select({ id: giftCodes.id }).from(giftCodes).where(eq(giftCodes.id, id)).limit(1),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
 
@@ -301,21 +283,24 @@ export const giftCodesRouter = new Hono<Env>()
         if (input.description !== undefined) updates.description = input.description;
         if (input.expiresAt !== undefined) updates.expiresAt = input.expiresAt;
         if (input.maxRedemptions !== undefined) updates.maxRedemptions = input.maxRedemptions;
-        if (input.maxRedemptionsPerUser !== undefined) updates.maxRedemptionsPerUser = input.maxRedemptionsPerUser;
-        if (input.creditExpiresInDays !== undefined) updates.creditExpiresInDays = input.creditExpiresInDays;
-        if (input.targetPhotographerIds !== undefined) updates.targetPhotographerIds = input.targetPhotographerIds;
+        if (input.maxRedemptionsPerUser !== undefined)
+          updates.maxRedemptionsPerUser = input.maxRedemptionsPerUser;
+        if (input.creditExpiresInDays !== undefined)
+          updates.creditExpiresInDays = input.creditExpiresInDays;
+        if (input.targetPhotographerIds !== undefined)
+          updates.targetPhotographerIds = input.targetPhotographerIds;
 
         if (Object.keys(updates).length === 0) {
           return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'No fields to update' });
         }
 
         const [updated] = yield* ResultAsync.fromPromise(
-          db
-            .update(giftCodes)
-            .set(updates)
-            .where(eq(giftCodes.id, id))
-            .returning(),
-          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Failed to update gift code', cause }),
+          db.update(giftCodes).set(updates).where(eq(giftCodes.id, id)).returning(),
+          (cause): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Failed to update gift code',
+            cause,
+          }),
         );
 
         return ok(updated);
@@ -342,11 +327,7 @@ export const giftCodesRouter = new Hono<Env>()
       return safeTry(async function* () {
         // Verify gift code exists
         const [code] = yield* ResultAsync.fromPromise(
-          db
-            .select({ id: giftCodes.id })
-            .from(giftCodes)
-            .where(eq(giftCodes.id, id))
-            .limit(1),
+          db.select({ id: giftCodes.id }).from(giftCodes).where(eq(giftCodes.id, id)).limit(1),
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
 

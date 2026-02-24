@@ -149,18 +149,18 @@ SabaiPics Pro has **4 main user journeys** based on different scenarios:
 
 ### Step-by-Step Actions
 
-| Step | User Action | App Response | Time |
-|------|------------|--------------|------|
-| 1 | Open app | Shows "Looking for cameras..." | 0s |
-| 2 | Plug in USB cable | Camera detected, shows details | 1-2s |
-| 3 | Tap "Connect Camera" | Opens session, enables tethering | 2-3s |
-| 4 | See "Ready to Shoot" | Waiting for first photo | - |
-| 5 | Take photo with camera | New thumbnail appears (downloading) | <1s |
-| 6 | Wait | Download completes, shows ✅ | 2-5s |
-| 7 | Continue shooting | Grid fills with photos automatically | - |
-| 8 | Tap "End Session" | Shows session summary | 0s |
-| 9 | Tap "Upload to Cloud" | Uploads all photos to SabaiPics | 5-30min |
-| 10 | Done | Photos available in galleries | - |
+| Step | User Action            | App Response                         | Time    |
+| ---- | ---------------------- | ------------------------------------ | ------- |
+| 1    | Open app               | Shows "Looking for cameras..."       | 0s      |
+| 2    | Plug in USB cable      | Camera detected, shows details       | 1-2s    |
+| 3    | Tap "Connect Camera"   | Opens session, enables tethering     | 2-3s    |
+| 4    | See "Ready to Shoot"   | Waiting for first photo              | -       |
+| 5    | Take photo with camera | New thumbnail appears (downloading)  | <1s     |
+| 6    | Wait                   | Download completes, shows ✅         | 2-5s    |
+| 7    | Continue shooting      | Grid fills with photos automatically | -       |
+| 8    | Tap "End Session"      | Shows session summary                | 0s      |
+| 9    | Tap "Upload to Cloud"  | Uploads all photos to SabaiPics      | 5-30min |
+| 10   | Done                   | Photos available in galleries        | -       |
 
 ### Timeline
 
@@ -905,21 +905,21 @@ State 4: None Found
 
 ## All User Journeys Summary Table
 
-| Journey | Trigger | Duration | Complexity | Frequency |
-|---------|---------|----------|------------|-----------|
-| **1. Happy Path (USB)** | Normal event shoot | 2-3 hours | Low | Very High (90%) |
-| **2. WiFi Manual IP** | Development/testing | 5 minutes | Medium | Low (5%) |
-| **3. WiFi Auto-Discovery** | Production WiFi use | 2-3 hours | Low | Medium (20%) |
-| **4A. USB Disconnected** | Accidental unplug | 30 seconds | Low | Low (5%) |
-| **4B. WiFi Dropped** | Network issues | 1 minute | Medium | Low (10%) |
-| **4C. Download Failed** | Network/storage | 30 seconds | Low | Low (5%) |
-| **4D. Storage Full** | Long event | 2 minutes | Medium | Low (3%) |
-| **4E. Permission Denied** | First WiFi use | 1 minute | Low | Low (2%) |
-| **4F. Unsupported Camera** | Wrong camera | 10 seconds | Low | Very Low (1%) |
-| **5. First-Time Onboarding** | First launch | 2 minutes | Low | Once |
-| **6. Multi-Camera** | Pro photographer | 3-4 hours | High | Low (10%) |
-| **7. Review & Delete** | After session | 10 minutes | Low | Medium (30%) |
-| **8. Settings** | Customization | 2 minutes | Low | Low (10%) |
+| Journey                      | Trigger             | Duration   | Complexity | Frequency       |
+| ---------------------------- | ------------------- | ---------- | ---------- | --------------- |
+| **1. Happy Path (USB)**      | Normal event shoot  | 2-3 hours  | Low        | Very High (90%) |
+| **2. WiFi Manual IP**        | Development/testing | 5 minutes  | Medium     | Low (5%)        |
+| **3. WiFi Auto-Discovery**   | Production WiFi use | 2-3 hours  | Low        | Medium (20%)    |
+| **4A. USB Disconnected**     | Accidental unplug   | 30 seconds | Low        | Low (5%)        |
+| **4B. WiFi Dropped**         | Network issues      | 1 minute   | Medium     | Low (10%)       |
+| **4C. Download Failed**      | Network/storage     | 30 seconds | Low        | Low (5%)        |
+| **4D. Storage Full**         | Long event          | 2 minutes  | Medium     | Low (3%)        |
+| **4E. Permission Denied**    | First WiFi use      | 1 minute   | Low        | Low (2%)        |
+| **4F. Unsupported Camera**   | Wrong camera        | 10 seconds | Low        | Very Low (1%)   |
+| **5. First-Time Onboarding** | First launch        | 2 minutes  | Low        | Once            |
+| **6. Multi-Camera**          | Pro photographer    | 3-4 hours  | High       | Low (10%)       |
+| **7. Review & Delete**       | After session       | 10 minutes | Low        | Medium (30%)    |
+| **8. Settings**              | Customization       | 2 minutes  | Low        | Low (10%)       |
 
 ---
 
@@ -999,19 +999,23 @@ Error States (from any):
 ## Next Steps for Implementation
 
 ### Phase 1 (Week 1): Core Flows
+
 - Journey 1: Happy Path (USB)
 - Journey 4A: USB Disconnected
 
 ### Phase 2 (Week 2): WiFi Development
+
 - Journey 2: WiFi Manual IP
 - Journey 4B: WiFi Dropped
 
 ### Phase 3 (Week 3-4): Production Features
+
 - Journey 3: WiFi Auto-Discovery
 - Journey 5: First-Time Onboarding
 - Journey 7: Review & Delete
 
 ### Phase 4 (Later): Advanced
+
 - Journey 6: Multi-Camera
 - Journey 8: Settings
 - Journey 4D-F: Edge cases
@@ -1021,6 +1025,7 @@ Error States (from any):
 ## Complete User Journey Coverage
 
 ✅ **All scenarios covered:**
+
 - Normal operation (USB, WiFi manual, WiFi auto)
 - Error handling (disconnect, network, storage, permissions)
 - First-time use (onboarding)

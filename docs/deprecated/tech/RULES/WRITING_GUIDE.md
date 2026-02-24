@@ -127,10 +127,10 @@ Content...
 Prefer tables for structured information:
 
 ```markdown
-| Rule | Constraint |
-|------|------------|
-| Upload window | Between start and end datetime |
-| Credit required | At least 1 credit |
+| Rule            | Constraint                     |
+| --------------- | ------------------------------ |
+| Upload window   | Between start and end datetime |
+| Credit required | At least 1 credit              |
 ```
 
 ### Referencing Supporting Docs
@@ -206,32 +206,32 @@ How it works (tables, diagrams, NOT code).
 
 ## References
 
-| Topic | URL |
-|-------|-----|
+| Topic         | URL         |
+| ------------- | ----------- |
 | Official docs | https://... |
 | SDK reference | https://... |
 ```
 
 ### What to Include
 
-| Include | Example |
-|---------|---------|
+| Include              | Example                                                   |
+| -------------------- | --------------------------------------------------------- |
 | Integration patterns | "Worker validates token, passes user_id to DO via header" |
-| Critical decisions | "Use Hibernation API for cost efficiency" |
-| Connection flows | "Queue consumer → DO stub → RPC call → broadcast" |
-| Technology choices | "Sentry for frontend, Grafana for backend" |
-| Configuration values | "1 hour signed URL expiry" |
-| References | Links to official docs |
+| Critical decisions   | "Use Hibernation API for cost efficiency"                 |
+| Connection flows     | "Queue consumer → DO stub → RPC call → broadcast"         |
+| Technology choices   | "Sentry for frontend, Grafana for backend"                |
+| Configuration values | "1 hour signed URL expiry"                                |
+| References           | Links to official docs                                    |
 
 ### What NOT to Include
 
-| Exclude | Why | Where It Goes |
-|---------|-----|---------------|
-| Full code implementations | Too detailed | CONTEXT files |
-| API route definitions | Requirements doc | `03_api_design.md` |
-| Specific values/limits per endpoint or resource | Requirements doc (WHAT/WHERE) | Primary docs |
-| Database schemas | Requirements doc | `01_data_schema.md` |
-| Business rules | Requirements doc | `00_business_rules.md` |
+| Exclude                                         | Why                           | Where It Goes          |
+| ----------------------------------------------- | ----------------------------- | ---------------------- |
+| Full code implementations                       | Too detailed                  | CONTEXT files          |
+| API route definitions                           | Requirements doc              | `03_api_design.md`     |
+| Specific values/limits per endpoint or resource | Requirements doc (WHAT/WHERE) | Primary docs           |
+| Database schemas                                | Requirements doc              | `01_data_schema.md`    |
+| Business rules                                  | Requirements doc              | `00_business_rules.md` |
 
 **Key principle:** Supporting docs explain HOW to implement patterns. They don't duplicate WHAT/WHERE information from primary docs. Instead, reference the primary doc and focus on enforcement mechanisms.
 
@@ -240,11 +240,15 @@ How it works (tables, diagrams, NOT code).
 Use ASCII diagrams for flows:
 
 ```markdown
+
 ```
+
 Client → Worker → Durable Object → WebSocket
-           │
-           └── Validate auth first
+│
+└── Validate auth first
+
 ```
+
 ```
 
 Keep diagrams simple. Complex flows belong in `00_flows.md`.
@@ -268,6 +272,7 @@ What technology/service are we integrating?
 ### 3. Identify Critical Decisions
 
 What patterns must we establish?
+
 - Connection patterns
 - Authentication flows
 - Error handling approaches
@@ -290,36 +295,36 @@ Update relevant primary docs to reference this supporting doc.
 ### Decision Tables
 
 ```markdown
-| Option | Pros | Cons | Decision |
-|--------|------|------|----------|
-| Option A | Fast | Expensive | |
-| Option B | Cheap | Slow | ✓ |
+| Option   | Pros  | Cons      | Decision |
+| -------- | ----- | --------- | -------- |
+| Option A | Fast  | Expensive |          |
+| Option B | Cheap | Slow      | ✓        |
 ```
 
 ### Integration Flow Tables
 
 ```markdown
-| Step | Component | Action |
-|------|-----------|--------|
-| 1 | Client | Send request |
-| 2 | Worker | Validate auth |
-| 3 | DO | Process |
+| Step | Component | Action        |
+| ---- | --------- | ------------- |
+| 1    | Client    | Send request  |
+| 2    | Worker    | Validate auth |
+| 3    | DO        | Process       |
 ```
 
 ### Configuration Tables
 
 ```markdown
-| Setting | Value | Why |
-|---------|-------|-----|
-| Token expiry | 1 hour | Balance security/UX |
-| Retry limit | 3 | Prevent infinite loops |
+| Setting      | Value  | Why                    |
+| ------------ | ------ | ---------------------- |
+| Token expiry | 1 hour | Balance security/UX    |
+| Retry limit  | 3      | Prevent infinite loops |
 ```
 
 ### Reference Tables
 
 ```markdown
-| Topic | Reference |
-|-------|-----------|
+| Topic    | Reference   |
+| -------- | ----------- |
 | SDK Docs | https://... |
 | Examples | https://... |
 ```

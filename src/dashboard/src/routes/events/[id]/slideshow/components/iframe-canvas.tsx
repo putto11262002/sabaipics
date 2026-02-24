@@ -166,7 +166,10 @@ export function IframeCanvas({
   const scaledHeight = deviceDimensions.height * scale;
 
   return (
-    <div ref={containerRef} className="flex h-full w-full items-center justify-center bg-muted/50 p-4">
+    <div
+      ref={containerRef}
+      className="flex h-full w-full items-center justify-center bg-muted/50 p-4"
+    >
       {/* Wrapper reserves the scaled visual space */}
       <div
         className="relative overflow-hidden rounded-lg border shadow-sm"

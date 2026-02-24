@@ -10,6 +10,7 @@
 PTP/IP (Picture Transfer Protocol over Internet Protocol) is an **industry-standard protocol** developed by FotoNation and standardized by CIPA (Camera & Imaging Products Association) as DC-X005-2005. It extends the ISO 15740 PTP standard to TCP/IP networks, enabling wireless camera connectivity.
 
 **Key Findings:**
+
 - PTP/IP is supported by **multiple major camera manufacturers** (Canon, Nikon, Sony, Leica)
 - Implementation spans across **professional DSLRs, mirrorless cameras, and prosumer models**
 - Protocol enables wireless image transfer, camera control, and live view over WiFi
@@ -20,6 +21,7 @@ PTP/IP (Picture Transfer Protocol over Internet Protocol) is an **industry-stand
 ## 1. PTP/IP Protocol Overview
 
 ### Standard Information
+
 - **ISO Standard:** ISO 15740:2013 (Photography — Electronic still picture imaging — Picture transfer protocol)
 - **PTP/IP Specification:** CIPA DC-X005-2005
 - **Original Development:** FotoNation Inc., in collaboration with Nikon, Canon, and Microsoft
@@ -27,12 +29,14 @@ PTP/IP (Picture Transfer Protocol over Internet Protocol) is an **industry-stand
 - **Registry Management:** Society for Imaging Science and Technology (IS&T)
 
 ### Technical Capabilities
+
 - Bi-directional image communication over TCP/IP networks
 - Transport-independent standard (USB, WiFi, Ethernet)
 - Vendor Extension Registry maintained by IS&T ($500 per VEID registration)
 - Supports: image transfer, camera control, live view, property management
 
 ### Industry Adoption
+
 According to the Chairman of ISO's Photography Standards arm, "Implementation of the ISO-15740 PTP Standard is now being deployed in virtually almost all new digital cameras." This represents industry-wide adoption across major manufacturers.
 
 ---
@@ -42,21 +46,25 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 ### Confirmed PTP/IP WiFi Support
 
 #### Canon
+
 - **Status:** Primary PTP/IP implementer since 2004
 - **Implementation:** Built-in WiFi with PTP/IP protocol
 - **VEID:** 0x00010000 (registered vendor extension)
 
 #### Nikon
+
 - **Status:** Co-developer of PTP/IP (2004)
 - **Implementation:** Built-in WiFi + Wireless Transmitter accessories with PTP/IP
 - **Historical:** First to implement PTP/IP in consumer cameras (Coolpix P1, P2)
 
 #### Sony
+
 - **Status:** PTP/IP support via proprietary extension
 - **Implementation:** Sony's Camera Remote SDK supports WiFi PTP/IP
 - **Note:** Uses Sony's proprietary extension of ISO standard PTP
 
 #### Leica
+
 - **Status:** Confirmed PTP/IP WiFi support
 - **Models:** M10, M10-P, M11 series
 - **Note:** Third-party apps like Leica Sync utilize PTP/IP for wireless downloads
@@ -64,19 +72,23 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 ### Limited or Proprietary Protocol Support
 
 #### Fujifilm
+
 - **Status:** Modified PTP/IP implementation
 - **Note:** "Reasonably significant fork from PTPIP" (not standard-compliant)
 - **Protocol:** Proprietary WiFi implementation
 
 #### Olympus / OM System
+
 - **Status:** Proprietary HTTP-based WiFi protocol
 - **Note:** Does NOT use standard PTP/IP
 
 #### Panasonic Lumix
+
 - **Status:** Proprietary HTTP-based WiFi protocol
 - **Note:** Does NOT use standard PTP/IP over WiFi
 
 #### Ricoh Theta
+
 - **Status:** Proprietary THETA API v2 for WiFi
 - **Note:** PTP support primarily over USB only
 
@@ -85,11 +97,13 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 ## 3. Canon Camera Models with WiFi PTP/IP Support
 
 ### Professional Full-Frame DSLRs
+
 - **EOS-1D X Mark III** (2020) - Built-in WiFi
 - **EOS 5D Mark IV** (2016) - Built-in WiFi
 - **EOS 6D Mark II** (2017) - Built-in WiFi
 
 ### Consumer/Prosumer DSLRs
+
 - **EOS 90D** (2019) - Built-in WiFi
 - **EOS 80D** (2016) - Built-in WiFi
 - **EOS 77D** (2017) - Built-in WiFi
@@ -99,6 +113,7 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 - **EOS Rebel SL2 / 200D** (2017) - Built-in WiFi
 
 ### Mirrorless - EOS R Full-Frame System
+
 - **EOS R1** (2024) - Built-in WiFi
 - **EOS R3** (2021) - Built-in WiFi
 - **EOS R5 Mark II** (2024) - Built-in WiFi
@@ -110,16 +125,19 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 - **EOS RP** (2019) - Built-in WiFi
 
 ### Mirrorless - EOS R APS-C System
+
 - **EOS R7** (2022) - Built-in WiFi, **Confirmed PTP/IP support**
 - **EOS R10** (2022) - Built-in WiFi
 
 ### Mirrorless - EOS M System
+
 - **EOS M50 Mark II** (2020) - Built-in WiFi, PTP support confirmed
 - **EOS M50** (2018) - Built-in WiFi, PTP support confirmed
 - **EOS M6 Mark II** (2019) - Built-in WiFi, PTP support confirmed
 - **EOS M6** (2017) - Built-in WiFi, PTP support confirmed
 
 ### Notable Technical Information
+
 - **Canon EOS 70D** explicitly documented with PTP/IP protocol support
 - **Canon EOS R7** specifically mentioned with PTP/IP connectivity
 - All Canon WiFi-enabled cameras support remote control via Canon Camera Connect app
@@ -130,12 +148,14 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 ## 4. Nikon Camera Models with WiFi Support
 
 ### Professional Full-Frame DSLRs with Built-in WiFi
+
 - **Nikon D850** (2017) - Built-in WiFi, SnapBridge
 - **Nikon D780** (2020) - Built-in WiFi, SnapBridge
 - **Nikon D7500** (2017) - Built-in WiFi, SnapBridge
 - **Nikon D5600** (2016) - Built-in WiFi, SnapBridge
 
 ### Mirrorless Z-Mount System
+
 - **Nikon Z9** (2021) - Embedded Wireless Transmitter (WT-6/WT-7 equivalent)
 - **Nikon Z8** (2023) - Built-in WiFi
 - **Nikon Z7 II** (2020) - Built-in WiFi (peer-to-peer)
@@ -148,6 +168,7 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 - **Nikon Z fc** (2021) - Built-in WiFi
 
 ### Wireless Transmitter Accessories (PTP/IP Support)
+
 - **WT-5A** - Supports PTP-IP and FTP protocols
   - Compatible with: D810, D810A, D800, D800E, D750, D7200, D7100, D7000
   - Enables Camera Control Pro 2 operation in PC Mode
@@ -157,10 +178,12 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 - **WT-6/WT-7** - Professional wireless transmitters with PTP/IP
 
 ### Historical Models (First PTP/IP Implementation)
+
 - **Nikon Coolpix P1** (2005) - World's first built-in WiFi camera with PTP/IP
 - **Nikon Coolpix P2** (2005) - Built-in WiFi with PTP/IP
 
 ### Technical Notes
+
 - Z6/Z7 have peer-to-peer WiFi (slower, ~3MB/s on 5GHz)
 - Z9 has embedded WT capability (~5MB/s on 2.4GHz)
 - Nikon uses SnapBridge for consumer models (Bluetooth + WiFi)
@@ -172,6 +195,7 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 ## 5. Sony Camera Models with WiFi Support
 
 ### Full-Frame Alpha Series
+
 - **Alpha 1 II (ILCE-1M2)** (2024) - WiFi, **PTP-IP support confirmed**
 - **Alpha 1 (ILCE-1)** (2021) - WiFi, **PTP-IP support confirmed**
 - **Alpha 9 III (ILCE-9M3)** (2023) - WiFi, **PTP-IP support confirmed**
@@ -189,17 +213,20 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 - **Alpha 7 II (ILCE-7M2)** (2014) - WiFi, **PTP-IP support confirmed**
 
 ### APS-C Alpha Series
+
 - **Alpha 6700 (ILCE-6700)** (2023) - WiFi, **PTP-IP support confirmed**
 - **Alpha 6600 (ILCE-6600)** (2019) - WiFi, **PTP-IP support confirmed**
 - **Alpha 6400 (ILCE-6400)** (2019) - WiFi, **PTP-IP support confirmed**
 - **Alpha 6100 (ILCE-6100)** (2019) - WiFi, **PTP-IP support confirmed**
 
 ### Compact/Other Models
+
 - **Sony ZV-1** - WiFi, gPhoto2 support confirmed
 - **Sony DSC-RX100M7** - WiFi, gPhoto2 support confirmed
 - **Sony QX30U** - WiFi, gPhoto2 support confirmed
 
 ### Technical Information
+
 - **Sony Camera Remote SDK** supports PTP-IP over WiFi, USB, and Ethernet
 - Uses Sony's proprietary extension of ISO standard PTP
 - PTP-IP session handling: wraps commands in OpenSession/CloseSession pairs
@@ -211,20 +238,24 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 ## 6. Other Manufacturers
 
 ### Leica
+
 - **M10** - PTP/IP over WiFi confirmed
 - **M10-P** - PTP/IP over WiFi confirmed
 - **M11** - PTP/IP over USB-C confirmed
 - Third-party software (Leica Sync) uses PTP/IP for wireless downloads
 
 ### Pentax
+
 - Limited information on WiFi PTP/IP support
 - Supported by Capture One software
 - No specific WiFi PTP/IP documentation found
 
 ### Hasselblad
+
 - No specific WiFi PTP/IP information found in research
 
 ### Phase One
+
 - Professional medium format systems
 - No specific WiFi PTP/IP documentation found
 
@@ -233,18 +264,21 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 ## 7. Industry Standards & Documentation
 
 ### ISO 15740 Standard History
+
 - **PIMA 15740** (2000) - Original standardization by IT10 Committee
 - **ISO 15740:2005** - First international standard (PTP v1.0)
 - **ISO 15740:2008** - Backwards compatible revision
 - **ISO 15740:2013** - Current version (support for multiple vendor extensions, streaming media)
 
 ### PTP/IP Specification (CIPA DC-X005-2005)
+
 - Developed by Camera & Imaging Products Association (CIPA)
 - Standardizes transport layer for PTP over TCP/IP networks
 - Enables wireless or Ethernet connections
 - Facilitates interoperability across manufacturers
 
 ### Vendor Extension Registry
+
 - **Managed by:** Society for Imaging Science and Technology (IS&T)
 - **Registration Fee:** $500 per Vendor Extension ID (VEID)
 - **Purpose:** Ensures global uniqueness and interoperability
@@ -252,6 +286,7 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 - **Registry Access:** Available as PDF from IS&T Imaging.org portal
 
 ### gPhoto/libgphoto2 Support
+
 - **Total supported devices:** 2,979 cameras and media players (as of 2025)
 - **PTP support:** "Almost all modern cameras" use PTP protocol
 - **PTP/IP support:** Specific fixes for Ricoh Theta and Sony Alpha over WLAN
@@ -263,6 +298,7 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 ## 8. Use Cases for Event Photography
 
 ### Professional Event Photography Requirements
+
 - **Wireless Tethering:** Real-time image transfer to laptop/tablet for client preview
 - **Remote Camera Control:** Adjust settings remotely during events
 - **Live View:** Through-the-lens preview for precise framing
@@ -270,6 +306,7 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 - **Client Sharing:** Immediate image delivery to clients/social media
 
 ### PTP/IP Capabilities for Events
+
 1. **Image Transfer:** Wireless download of RAW/JPEG files over WiFi
 2. **Remote Control:** ISO, aperture, shutter speed, focus control
 3. **Live View:** Real-time preview stream from camera sensor
@@ -277,6 +314,7 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 5. **Bulk Transfer Mode:** Efficient transfer of multiple images
 
 ### WiFi Transfer Performance
+
 - **Canon EOS 70D:** Documented PTP/IP wireless capability
 - **Nikon Z9:** ~5MB/s transfer speed on 2.4GHz WiFi
 - **Sony Alpha:** PTP-IP support via Camera Remote SDK
@@ -287,13 +325,16 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 ## 9. Technical Implementation Details
 
 ### PTP/IP vs USB PTP
+
 **USB Implementation:**
+
 - Synchronous Bulk Transfer Mode
 - Direct physical connection required
 - Higher transfer speeds
 - Single cable for power + data
 
 **PTP/IP Implementation:**
+
 - TCP/IP network transport (WiFi/Ethernet)
 - Wireless connectivity
 - Network-dependent speeds
@@ -301,6 +342,7 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 - Uses UPnP for camera discovery (Canon)
 
 ### Protocol Workflow (Canon Example)
+
 1. **Discovery:** Camera broadcasts presence via UPnP
 2. **Pairing:** Initial pairing and authentication
 3. **Session:** OpenSession command
@@ -309,6 +351,7 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 6. **Closure:** CloseSession
 
 ### Limitations & Considerations
+
 - **Windows:** No drive letter assignment to PTP devices
 - **File Modification:** Limited direct file manipulation
 - **Session Management:** Some implementations (Sony) wrap each command in Session pair
@@ -354,6 +397,7 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
    - Photojournalism rapid image delivery
 
 ### Supporting Evidence
+
 - **Standards Bodies:** ISO, CIPA, IS&T all maintain PTP/IP standards
 - **Technical Documentation:** Public specifications available from CIPA
 - **Academic Research:** IEEE papers on PTP/IP implementation
@@ -365,11 +409,13 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 ## 11. Sources & References
 
 ### Standards Organizations
+
 - [Society for Imaging Science and Technology - PTP Standards](https://www.imaging.org/IST/IST/Standards/PTP_Standards.aspx)
 - [Picture Transfer Protocol - Wikipedia](https://en.wikipedia.org/wiki/Picture_Transfer_Protocol)
 - [CIPA DC-X005 White Paper](https://www.cipa.jp/ptp-ip/documents_e/CIPA_DC-005_Whitepaper_ENG.pdf)
 
 ### Manufacturer Documentation
+
 - [Canon: Wireless EOS Cameras](https://www.usa.canon.com/internet/portal/us/home/explore/product-showcases/cameras-and-lenses/wireless-eos-rebels-wifi)
 - [Canon: EOS Utility Compatible Cameras](https://cam.start.canon/en/S003/manual/html/UG-00_Before_0050.html)
 - [Nikon: Wireless Transmitter WT-5A](https://www.nikonusa.com/en/nikon-products/product/wireless/wt-5a-wireless-transmitter.html)
@@ -377,6 +423,7 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 - [Sony: Camera Remote Command](https://support.d-imaging.sony.co.jp/app/cameraremotecommand/en/index.html)
 
 ### Technical Resources
+
 - [gPhoto - libgphoto2 Supported Cameras](http://www.gphoto.org/proj/libgphoto2/support.php)
 - [GitHub - gphoto/libgphoto2](https://github.com/gphoto/libgphoto2)
 - [Pairing and Initializing PTP/IP with Canon EOS](https://julianschroden.com/post/2023-05-10-pairing-and-initializing-a-ptp-ip-connection-with-a-canon-eos-camera/)
@@ -384,12 +431,14 @@ According to the Chairman of ISO's Photography Standards arm, "Implementation of
 - [Digital Photography Review - Nikon PTP/IP](https://www.dpreview.com/articles/9871487277/nikonptpip)
 
 ### Camera Lists & Compatibility
+
 - [Best Canon DSLR Cameras with WiFi](https://cameradecision.com/features/Best-Canon-DSLR-cameras-with-Wifi)
 - [Best Sony Mirrorless Cameras with WiFi](https://cameradecision.com/features/Best-Sony-Mirrorless-cameras-with-Wifi)
 - [Which Nikon Cameras Have Built-in WiFi](https://www.kentfaith.co.uk/blog/article_which-nikon-camera-has-built-in-wifi_398)
 - [PTP Webcam - Supported Cameras](https://ptpwebcam.org/)
 
 ### Academic & Industry Publications
+
 - [ResearchGate: PTP/IP - A new transport specification for wireless photography](https://www.researchgate.net/publication/3181080_PTPIP_-_A_new_transport_specification_for_wireless_photography)
 - [IEEE: Digital camera connectivity solutions using PTP](https://ieeexplore.ieee.org/document/1037023/)
 

@@ -28,9 +28,7 @@ export function SubtitleRenderer({
 
   if (!context.event.subtitle) {
     return (
-      <p className={cn('text-muted-foreground/50', fontSizeClass, fontWeightClass)}>
-        No subtitle
-      </p>
+      <p className={cn('text-muted-foreground/50', fontSizeClass, fontWeightClass)}>No subtitle</p>
     );
   }
 

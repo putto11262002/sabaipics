@@ -35,6 +35,7 @@
 ## API Conventions
 
 ### Framework & Stack
+
 - **Framework:** Hono ^4.10.7 on Cloudflare Workers
 - **Validation:** Zod ^4.1.13 with `@hono/zod-validator`
 - **ORM:** Drizzle ORM ^0.45.0 with Neon Postgres
@@ -44,17 +45,19 @@
 ### Response Format
 
 **Paginated list response:**
+
 ```typescript
 c.json({
   data: items,
   pagination: {
     nextCursor: string | null,
-    hasMore: boolean
-  }
+    hasMore: boolean,
+  },
 });
 ```
 
 **Error responses:**
+
 ```typescript
 {
   error: {
@@ -77,13 +80,13 @@ c.json({
 **File:** `apps/api/src/routes/photos.ts` (new file)
 
 ```typescript
-import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
-import { eq, and, desc, lt } from "drizzle-orm";
-import type { Bindings } from "../types";
-import { requirePhotographer, type PhotographerVariables } from "../middleware";
-import { photos, events } from "@sabaipics/db";
+import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
+import { eq, and, desc, lt } from 'drizzle-orm';
+import type { Bindings } from '../types';
+import { requirePhotographer, type PhotographerVariables } from '../middleware';
+import { photos, events } from '@sabaipics/db';
 
 type Env = {
   Bindings: Bindings;
@@ -100,15 +103,21 @@ const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
-export const photosRouter = new Hono<Env>()
-  .get("/:eventId/photos", requirePhotographer(), zValidator("param", paramsSchema), zValidator("query", querySchema), async (c) => {
-    const { eventId } = c.req.valid("param");
-    const { cursor, limit } = c.req.valid("query");
+export const photosRouter = new Hono<Env>().get(
+  '/:eventId/photos',
+  requirePhotographer(),
+  zValidator('param', paramsSchema),
+  zValidator('query', querySchema),
+  async (c) => {
+    const { eventId } = c.req.valid('param');
+    const { cursor, limit } = c.req.valid('query');
     // Implementation here
-  });
+  },
+);
 ```
 
 **Mount in index.ts:**
+
 ```typescript
 import { photosRouter } from "./routes/photos";
 
@@ -125,13 +134,17 @@ import { photosRouter } from "./routes/photos";
 2. **requirePhotographer()** - Route-level for photographer-only routes
 
 **Pattern:**
+
 ```typescript
-export const photosRouter = new Hono<Env>()
-  .get("/:eventId/photos", requirePhotographer(), async (c) => {
+export const photosRouter = new Hono<Env>().get(
+  '/:eventId/photos',
+  requirePhotographer(),
+  async (c) => {
     const photographer = c.var.photographer;
     const db = c.var.db();
     // Verify event ownership before querying photos
-  });
+  },
+);
 ```
 
 ### Ownership Verification
@@ -143,16 +156,11 @@ export const photosRouter = new Hono<Env>()
 const [event] = await db
   .select({ id: events.id })
   .from(events)
-  .where(
-    and(
-      eq(events.id, eventId),
-      eq(events.photographerId, photographer.id)
-    )
-  )
+  .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
   .limit(1);
 
 if (!event) {
-  return c.json({ error: { code: "NOT_FOUND", message: "Event not found" } }, 404);
+  return c.json({ error: { code: 'NOT_FOUND', message: 'Event not found' } }, 404);
 }
 ```
 
@@ -203,19 +211,20 @@ if (!event) {
 **Endpoint:** `GET /events/:id/photos?cursor={timestamp}&limit={number}`
 
 **Response shape:**
+
 ```typescript
 {
   data: Array<{
     id: string;
-    thumbnailUrl: string;    // CF Images transform URL (400px)
-    previewUrl: string;      // CF Images transform URL (1200px)
-    downloadUrl: string;     // Presigned R2 URL (15 min expiry)
+    thumbnailUrl: string; // CF Images transform URL (400px)
+    previewUrl: string; // CF Images transform URL (1200px)
+    downloadUrl: string; // Presigned R2 URL (15 min expiry)
     faceCount: number;
-    status: "processing" | "indexed" | "failed";
-    uploadedAt: string;      // ISO 8601 timestamp
+    status: 'processing' | 'indexed' | 'failed';
+    uploadedAt: string; // ISO 8601 timestamp
   }>;
   pagination: {
-    nextCursor: string | null;  // ISO timestamp of last item
+    nextCursor: string | null; // ISO timestamp of last item
     hasMore: boolean;
   }
 }
@@ -233,6 +242,7 @@ Preview:   https://sabaipics.com/cdn-cgi/image/width=1200,fit=contain,format=aut
 ```
 
 **Components:**
+
 - Base domain: `https://sabaipics.com`
 - Transform prefix: `/cdn-cgi/image/`
 - Parameters: `width={px},fit={cover|contain},format=auto,quality={75|85}`
@@ -241,8 +251,8 @@ Preview:   https://sabaipics.com/cdn-cgi/image/width=1200,fit=contain,format=aut
 ### URL Generation Helper
 
 ```typescript
-const R2_BASE_URL = "https://photos.sabaipics.com";
-const CF_DOMAIN = "https://sabaipics.com";
+const R2_BASE_URL = 'https://photos.sabaipics.com';
+const CF_DOMAIN = 'https://sabaipics.com';
 
 function generateThumbnailUrl(r2Key: string): string {
   return `${CF_DOMAIN}/cdn-cgi/image/width=400,fit=cover,format=auto,quality=75/${R2_BASE_URL}/${r2Key}`;
@@ -260,6 +270,7 @@ function generatePreviewUrl(r2Key: string): string {
 ### R2 Binding Configuration
 
 From `apps/api/wrangler.jsonc`:
+
 ```jsonc
 "r2_buckets": [
   {
@@ -278,13 +289,13 @@ From `apps/api/wrangler.jsonc`:
 const downloadUrl = await c.env.PHOTOS_BUCKET.signUrl(
   `https://${c.env.PHOTOS_BUCKET.http().hostname}/${photo.r2Key}`,
   900, // 15 minutes
-  { method: 'GET' }
+  { method: 'GET' },
 );
 
 // Option 2: Using R2's built-in presign (alternative)
 const downloadUrl = await c.env.PHOTOS_BUCKET.presign(
   photo.r2Key,
-  { expiresIn: 900 } // 15 minutes
+  { expiresIn: 900 }, // 15 minutes
 );
 ```
 
@@ -299,6 +310,7 @@ const downloadUrl = await c.env.PHOTOS_BUCKET.presign(
 Use `uploaded_at` (descending order) as the cursor.
 
 **Advantages:**
+
 - Natural ordering (newest first)
 - Stable cursor (timestamps don't change)
 - Efficient index usage
@@ -306,7 +318,7 @@ Use `uploaded_at` (descending order) as the cursor.
 ### Query Pattern
 
 ```typescript
-import { eq, and, desc, lt } from "drizzle-orm";
+import { eq, and, desc, lt } from 'drizzle-orm';
 
 const limit = Math.min(parsedLimit, 50); // Max 50 per acceptance criteria
 const cursorLimit = limit + 1; // Fetch one extra to determine hasMore
@@ -321,10 +333,7 @@ const photoRows = await db
   })
   .from(photos)
   .where(
-    and(
-      eq(photos.eventId, eventId),
-      cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined
-    )
+    and(eq(photos.eventId, eventId), cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined),
   )
   .orderBy(desc(photos.uploadedAt))
   .limit(cursorLimit);
@@ -344,12 +353,12 @@ const nextCursor = hasMore ? items[limit - 1].uploadedAt.toISOString() : null;
 **File:** `apps/api/src/routes/photos.test.ts` (new file)
 
 ```typescript
-import { describe, it, expect, vi } from "vitest";
-import { Hono } from "hono";
-import { testClient } from "hono/testing";
-import { photosRouter } from "./photos";
-import type { Database } from "@sabaipics/db";
-import type { PhotographerVariables } from "../middleware";
+import { describe, it, expect, vi } from 'vitest';
+import { Hono } from 'hono';
+import { testClient } from 'hono/testing';
+import { photosRouter } from './photos';
+import type { Database } from '@sabaipics/db';
+import type { PhotographerVariables } from '../middleware';
 
 // Mock DB factory
 function createMockDb(overrides = {}) {
@@ -370,33 +379,33 @@ function createTestApp(options: {
   hasAuth?: boolean;
 }) {
   const app = new Hono<Env>()
-    .use("/*", (c, next) => {
-      if (options.hasAuth) c.set("auth", { userId: "clerk_123" });
+    .use('/*', (c, next) => {
+      if (options.hasAuth) c.set('auth', { userId: 'clerk_123' });
       return next();
     })
-    .use("/*", (c, next) => {
-      c.set("db", () => options.mockDb);
+    .use('/*', (c, next) => {
+      c.set('db', () => options.mockDb);
       return next();
     })
-    .use("/*", (c, next) => {
-      if (options.photographer) c.set("photographer", options.photographer);
+    .use('/*', (c, next) => {
+      if (options.photographer) c.set('photographer', options.photographer);
       return next();
     })
-    .route("/events", photosRouter);
+    .route('/events', photosRouter);
 
   return { app, mockDb: options.mockDb };
 }
 
-describe("GET /events/:id/photos", () => {
-  it("returns paginated photos with cursor", async () => {
+describe('GET /events/:id/photos', () => {
+  it('returns paginated photos with cursor', async () => {
     // Test implementation
   });
 
-  it("generates CF Images transform URLs", async () => {
+  it('generates CF Images transform URLs', async () => {
     // Test implementation
   });
 
-  it("verifies event ownership", async () => {
+  it('verifies event ownership', async () => {
     // Test implementation
   });
 });
@@ -416,14 +425,14 @@ pnpm --filter=@sabaipics/api test src/routes/photos.test.ts
 
 ## File Locations Summary
 
-| Purpose | Path |
-|---------|------|
-| New route file | `apps/api/src/routes/photos.ts` |
-| New test file | `apps/api/src/routes/photos.test.ts` |
-| Mount route | `apps/api/src/index.ts` |
-| Middleware | `apps/api/src/middleware/require-photographer.ts` |
-| DB schemas | `packages/db/src/schema/photos.ts`, `packages/db/src/schema/events.ts` |
-| Type definitions | `apps/api/src/types.ts` |
+| Purpose          | Path                                                                   |
+| ---------------- | ---------------------------------------------------------------------- |
+| New route file   | `apps/api/src/routes/photos.ts`                                        |
+| New test file    | `apps/api/src/routes/photos.test.ts`                                   |
+| Mount route      | `apps/api/src/index.ts`                                                |
+| Middleware       | `apps/api/src/middleware/require-photographer.ts`                      |
+| DB schemas       | `packages/db/src/schema/photos.ts`, `packages/db/src/schema/events.ts` |
+| Type definitions | `apps/api/src/types.ts`                                                |
 
 ---
 
@@ -432,7 +441,7 @@ pnpm --filter=@sabaipics/api test src/routes/photos.test.ts
 ### Select with cursor-based pagination
 
 ```typescript
-import { eq, and, desc, lt } from "drizzle-orm";
+import { eq, and, desc, lt } from 'drizzle-orm';
 
 const photos = await db
   .select({
@@ -444,10 +453,7 @@ const photos = await db
   })
   .from(photos)
   .where(
-    and(
-      eq(photos.eventId, eventId),
-      cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined
-    )
+    and(eq(photos.eventId, eventId), cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined),
   )
   .orderBy(desc(photos.uploadedAt))
   .limit(limit + 1);
@@ -459,12 +465,7 @@ const photos = await db
 const [event] = await db
   .select({ id: events.id })
   .from(events)
-  .where(
-    and(
-      eq(events.id, eventId),
-      eq(events.photographerId, photographerId)
-    )
-  )
+  .where(and(eq(events.id, eventId), eq(events.photographerId, photographerId)))
   .limit(1);
 ```
 

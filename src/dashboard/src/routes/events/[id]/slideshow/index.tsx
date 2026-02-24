@@ -17,8 +17,18 @@ import {
 import { AlertCircle } from 'lucide-react';
 import { PageHeader } from '../../../../components/shell/page-header';
 import { useEvent } from '../../../../hooks/events/useEvent';
-import { useSlideshowConfig, useUpdateSlideshowConfig } from '../../../../hooks/events/useSlideshowConfig';
-import type { SlideshowConfig, SlideshowBlock, SlideshowContext, DeviceType, Orientation, SlideshowLayout } from './types';
+import {
+  useSlideshowConfig,
+  useUpdateSlideshowConfig,
+} from '../../../../hooks/events/useSlideshowConfig';
+import type {
+  SlideshowConfig,
+  SlideshowBlock,
+  SlideshowContext,
+  DeviceType,
+  Orientation,
+  SlideshowLayout,
+} from './types';
 
 const DEFAULT_LAYOUT: SlideshowLayout = {
   gap: 'md',
@@ -139,7 +149,11 @@ function addChildToBlock(
 export default function EventSlideshowTab() {
   const { id } = useParams<{ id: string }>();
   const { data } = useEvent(id);
-  const { data: slideshowData, isLoading: isLoadingConfig, error: configError } = useSlideshowConfig(id);
+  const {
+    data: slideshowData,
+    isLoading: isLoadingConfig,
+    error: configError,
+  } = useSlideshowConfig(id);
   const updateConfig = useUpdateSlideshowConfig(id);
 
   // Editor mode - no photo fetching, use placeholders only
@@ -365,76 +379,76 @@ export default function EventSlideshowTab() {
         </AlertDialogContent>
       </AlertDialog>
 
-    <div className="flex h-screen flex-col overflow-hidden bg-background">
-      <PageHeader
-        className="border-b"
-        backHref={`/events/${id}/details`}
-        breadcrumbs={[
-          { label: 'Events', href: '/events' },
-          { label: event.name, href: `/events/${id}/details` },
-          { label: 'Slideshow Editor' },
-        ]}
-      >
-        <Toolbar
-          eventId={id!}
-          deviceType={deviceType}
-          orientation={orientation}
-          onDeviceTypeChange={handleDeviceTypeChange}
-          onOrientationChange={setOrientation}
-          onAddBlock={handleAddBlock}
-          onAddPreset={handleAddPreset}
-          onSave={handleSave}
-          disabled={isLoading || hasError}
-          isSaving={updateConfig.isPending}
-          showAddBlock={ENABLE_BLOCK_EDITING}
-        />
-      </PageHeader>
+      <div className="flex h-screen flex-col overflow-hidden bg-background">
+        <PageHeader
+          className="border-b"
+          backHref={`/events/${id}/details`}
+          breadcrumbs={[
+            { label: 'Events', href: '/events' },
+            { label: event.name, href: `/events/${id}/details` },
+            { label: 'Slideshow Editor' },
+          ]}
+        >
+          <Toolbar
+            eventId={id!}
+            deviceType={deviceType}
+            orientation={orientation}
+            onDeviceTypeChange={handleDeviceTypeChange}
+            onOrientationChange={setOrientation}
+            onAddBlock={handleAddBlock}
+            onAddPreset={handleAddPreset}
+            onSave={handleSave}
+            disabled={isLoading || hasError}
+            isSaving={updateConfig.isPending}
+            showAddBlock={ENABLE_BLOCK_EDITING}
+          />
+        </PageHeader>
 
-      <SidebarProvider
-        defaultOpen={true}
-        className="!min-h-0"
-        style={{ '--sidebar-width': '320px', flex: 1 } as React.CSSProperties}
-      >
-        <SidebarInset className="min-h-0">
-          {isLoading ? (
-            <div className="flex h-full items-center justify-center bg-muted/50 p-8">
-              <Spinner className="size-6" />
-            </div>
-          ) : hasError ? (
-            <div className="flex h-full items-center justify-center bg-muted/50 p-8">
-              <Alert variant="destructive">
-                <AlertCircle className="size-4" />
-                <AlertDescription>Something went wrong. Please try again.</AlertDescription>
-              </Alert>
-            </div>
-          ) : (
-            <IframeCanvas
-              config={config}
-              context={context}
-              selectedBlockId={ENABLE_BLOCK_EDITING ? selectedBlockId : null}
-              deviceType={deviceType}
-              orientation={orientation}
-              onSelectBlock={ENABLE_BLOCK_EDITING ? handleIframeSelectBlock : () => {}}
-              onConfigUpdate={ENABLE_BLOCK_EDITING ? handleConfigUpdate : undefined}
-            />
-          )}
-        </SidebarInset>
+        <SidebarProvider
+          defaultOpen={true}
+          className="!min-h-0"
+          style={{ '--sidebar-width': '320px', flex: 1 } as React.CSSProperties}
+        >
+          <SidebarInset className="min-h-0">
+            {isLoading ? (
+              <div className="flex h-full items-center justify-center bg-muted/50 p-8">
+                <Spinner className="size-6" />
+              </div>
+            ) : hasError ? (
+              <div className="flex h-full items-center justify-center bg-muted/50 p-8">
+                <Alert variant="destructive">
+                  <AlertCircle className="size-4" />
+                  <AlertDescription>Something went wrong. Please try again.</AlertDescription>
+                </Alert>
+              </div>
+            ) : (
+              <IframeCanvas
+                config={config}
+                context={context}
+                selectedBlockId={ENABLE_BLOCK_EDITING ? selectedBlockId : null}
+                deviceType={deviceType}
+                orientation={orientation}
+                onSelectBlock={ENABLE_BLOCK_EDITING ? handleIframeSelectBlock : () => {}}
+                onConfigUpdate={ENABLE_BLOCK_EDITING ? handleConfigUpdate : undefined}
+              />
+            )}
+          </SidebarInset>
 
-        <EditorSidebar
-          selectedBlock={ENABLE_BLOCK_EDITING ? selectedBlock : null}
-          parentBlock={ENABLE_BLOCK_EDITING ? parentBlock : null}
-          onUpdateBlock={handleUpdateBlock}
-          onToggleBlock={handleToggleBlock}
-          onDeleteBlock={handleDeleteBlock}
-          onSelectBlock={handleSelectBlock}
-          theme={config.theme}
-          onThemeChange={handleThemeChange}
-          layout={config.layout ?? DEFAULT_LAYOUT}
-          onLayoutChange={handleLayoutChange}
-          onApplyTemplate={handleApplyTemplate}
-        />
-      </SidebarProvider>
-    </div>
+          <EditorSidebar
+            selectedBlock={ENABLE_BLOCK_EDITING ? selectedBlock : null}
+            parentBlock={ENABLE_BLOCK_EDITING ? parentBlock : null}
+            onUpdateBlock={handleUpdateBlock}
+            onToggleBlock={handleToggleBlock}
+            onDeleteBlock={handleDeleteBlock}
+            onSelectBlock={handleSelectBlock}
+            theme={config.theme}
+            onThemeChange={handleThemeChange}
+            layout={config.layout ?? DEFAULT_LAYOUT}
+            onLayoutChange={handleLayoutChange}
+            onApplyTemplate={handleApplyTemplate}
+          />
+        </SidebarProvider>
+      </div>
     </>
   );
 }

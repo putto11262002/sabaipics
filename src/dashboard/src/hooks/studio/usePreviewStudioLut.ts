@@ -2,7 +2,12 @@ import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/auth/react';
 import { shouldRetry, toRequestError, type RequestError } from '@/shared/lib/api-error';
 
-export type PreviewStudioLutInput = { id: string; file: File; intensity: number; includeLuminance: boolean };
+export type PreviewStudioLutInput = {
+  id: string;
+  file: File;
+  intensity: number;
+  includeLuminance: boolean;
+};
 export type PreviewStudioLutResult = Blob;
 
 export function usePreviewStudioLut() {

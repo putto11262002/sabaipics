@@ -29,6 +29,7 @@
 ```
 
 **Problems:**
+
 - ❌ FTP server has direct DB access (coupling)
 - ❌ FTP server has direct R2 access (bypasses API logic)
 - ❌ Credit deduction happens in FTP server (business logic duplication)
@@ -95,6 +96,7 @@
 ```
 
 **Benefits:**
+
 - ✅ Single source of truth for auth/upload logic
 - ✅ FTP server is thin proxy (no business logic, no direct R2 access)
 - ✅ Image validation centralized in API (reason for not using presigned URLs)
@@ -114,6 +116,7 @@
 **Purpose:** Authenticate FTP credentials and issue JWT token
 
 **Request:**
+
 ```json
 {
   "username": "ftp_a7x9k2p5m8q3",
@@ -122,6 +125,7 @@
 ```
 
 **Response (Success):**
+
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -133,6 +137,7 @@
 ```
 
 **Response (Failure):**
+
 ```json
 {
   "error": {
@@ -143,12 +148,14 @@
 ```
 
 **HTTP Status Codes:**
+
 - `200 OK` - Authentication successful
 - `401 Unauthorized` - Invalid credentials
 - `422 Unprocessable Entity` - Event not published, upload window closed, or event deleted
 - `429 Too Many Requests` - Rate limit exceeded (10 attempts per IP per minute)
 
 **JWT Claims:**
+
 ```typescript
 {
   "event_id": "clx12345",
@@ -160,6 +167,7 @@
 ```
 
 **Validation Rules:**
+
 1. Username must be a random string stored in `events.ftp_username` (NOT predictable format)
 2. Password must be verified against `events.ftp_password_hash` (bcrypt)
 3. Event must have `status = 'published'`
@@ -168,6 +176,7 @@
 6. JWT token expiration matches `upload_end_datetime`
 
 **Rate Limiting:**
+
 - 10 requests per IP per minute (prevent brute force)
 - 3 failed attempts → 5 minute cooldown per IP
 
@@ -182,6 +191,7 @@
 **Authentication:** `Authorization: Bearer <jwt_token>`
 
 **Request:**
+
 ```
 POST /api/ftp/upload
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundary...
@@ -200,10 +210,12 @@ Content-Type: image/jpeg
 ```
 
 **FormData Fields:**
+
 - `file` (File, required): The image file binary data (filename encoded in Content-Disposition header)
 - `eventId` (string, required): Event ID for upload context (must match JWT claim)
 
 **Response (Success):**
+
 ```json
 {
   "data": {
@@ -218,6 +230,7 @@ Content-Type: image/jpeg
 ```
 
 **Response (Failure - Insufficient Credits):**
+
 ```json
 {
   "error": {
@@ -230,6 +243,7 @@ Content-Type: image/jpeg
 ```
 
 **Response (Failure - Validation Error):**
+
 ```json
 {
   "error": {
@@ -246,6 +260,7 @@ Content-Type: image/jpeg
 ```
 
 **HTTP Status Codes:**
+
 - `200 OK` - Upload successful, photo record created
 - `400 Bad Request` - Missing fields, invalid eventId, or malformed FormData
 - `401 Unauthorized` - Invalid or expired JWT token
@@ -255,6 +270,7 @@ Content-Type: image/jpeg
 - `500 Internal Server Error` - Failed to upload to R2, update DB, or publish to queue
 
 **Validation Rules:**
+
 1. JWT token must be valid and not expired
 2. `eventId` from FormData must match `event_id` from JWT claims
 3. Event must still have `status = 'published'`
@@ -265,6 +281,7 @@ Content-Type: image/jpeg
 8. File size enforced by Cloudflare edge (before reaching Worker)
 
 **Flow:**
+
 1. Parse FormData (extract `file` and `eventId`)
 2. Verify JWT token → extract `event_id` and `photographer_id`
 3. Verify `eventId` matches JWT claim
@@ -278,12 +295,14 @@ Content-Type: image/jpeg
 11. Return photo record
 
 **Credit Deduction:**
+
 - Credits deducted AFTER successful R2 upload AND validation
 - If validation fails → no credit deducted, return 422
 - If R2 upload fails → no credit deducted, return 500
 - If credit deduction fails (race condition) → delete R2 object, return 422
 
 **Why Not Presigned URLs:**
+
 - Image validation must happen in API (dimensions, format, integrity)
 - Ensures consistent validation with web upload flow
 - Single upload path through API (not split between FTP → R2 and API verification)
@@ -294,19 +313,19 @@ Content-Type: image/jpeg
 
 ### Can FTP Team Implement Independently?
 
-| Requirement | Status | Notes |
-|-------------|--------|-------|
-| **Auth endpoint spec** | ✅ Complete | Request/response schemas defined |
-| **Auth error codes** | ✅ Complete | All failure cases documented |
-| **JWT format** | ✅ Complete | Claims structure specified |
-| **JWT expiration** | ✅ Complete | Expires with upload window |
-| **Upload endpoint spec** | ✅ Complete | FormData approach defined |
-| **Upload error codes** | ✅ Complete | All failure cases documented |
-| **FormData fields** | ✅ Complete | file + eventId (filename in file object) |
-| **Rate limits** | ✅ Complete | Per-IP and per-event limits |
-| **File size limits** | ✅ Complete | Enforced by Cloudflare edge |
-| **Image validation** | ✅ Complete | Format, dimensions, integrity checks |
-| **Credit deduction logic** | ✅ Complete | Optimistic after validation |
+| Requirement                | Status      | Notes                                    |
+| -------------------------- | ----------- | ---------------------------------------- |
+| **Auth endpoint spec**     | ✅ Complete | Request/response schemas defined         |
+| **Auth error codes**       | ✅ Complete | All failure cases documented             |
+| **JWT format**             | ✅ Complete | Claims structure specified               |
+| **JWT expiration**         | ✅ Complete | Expires with upload window               |
+| **Upload endpoint spec**   | ✅ Complete | FormData approach defined                |
+| **Upload error codes**     | ✅ Complete | All failure cases documented             |
+| **FormData fields**        | ✅ Complete | file + eventId (filename in file object) |
+| **Rate limits**            | ✅ Complete | Per-IP and per-event limits              |
+| **File size limits**       | ✅ Complete | Enforced by Cloudflare edge              |
+| **Image validation**       | ✅ Complete | Format, dimensions, integrity checks     |
+| **Credit deduction logic** | ✅ Complete | Optimistic after validation              |
 
 **Verdict:** ✅ **YES - FTP team can implement independently**
 
@@ -568,6 +587,7 @@ UseAPIIntegration bool // Default: false (use direct DB/R2)
 ### Decision 1: Upload Implementation - FORMDATA THROUGH API ✅
 
 **Research Summary:**
+
 - Workers CAN stream to R2 without buffering (`R2.put(key, request.body)`)
 - Request body size limits enforced by Cloudflare edge (100MB Free/Pro, 200MB Business, 500MB Enterprise)
 - Streaming does NOT bypass these limits - enforced before reaching Worker
@@ -576,6 +596,7 @@ UseAPIIntegration bool // Default: false (use direct DB/R2)
 **DECISION: Direct FormData upload through API (NOT presigned URLs)**
 
 **Why:**
+
 1. ✅ Image validation must happen in API (dimensions, format, integrity)
 2. ✅ Consistent with web upload flow (same validation path)
 3. ✅ VPS role is simple proxy (FTP → HTTP only, no direct R2 access)
@@ -583,6 +604,7 @@ UseAPIIntegration bool // Default: false (use direct DB/R2)
 5. ✅ Easier to add future validation (watermarking, format conversion)
 
 **Architecture:**
+
 ```
 ┌─────────────┐         ┌──────────────┐         ┌─────────────┐
 │ FTP Server  │────1───>│ Hono Worker  │────2───>│ R2 Storage  │
@@ -597,12 +619,14 @@ UseAPIIntegration bool // Default: false (use direct DB/R2)
 ```
 
 **Implementation:**
+
 - FTP server builds FormData with fields: `file` (binary), `eventId` (string)
 - API parses FormData, validates image, streams to R2
 - Filename encoded in file object (Content-Disposition header)
 - No presigned URLs, no CORS configuration needed
 
 **Trade-offs:**
+
 - ❌ File size limited by Worker request limits (100-500MB depending on plan)
 - ❌ Upload data flows through Worker (bandwidth costs)
 - ✅ Image validation in API (required for quality control)
@@ -615,6 +639,7 @@ UseAPIIntegration bool // Default: false (use direct DB/R2)
 **ANSWER: Wait for 401 (Reactive Approach) ✅**
 
 **Why:**
+
 1. ✅ **Simpler implementation**: No timer management, no cleanup logic
 2. ✅ **Scales better**: No goroutine overhead per connection (100 connections = 100 timers avoided)
 3. ✅ **More robust**: Handles ALL auth failure scenarios (token expired, revoked, API changed expiration, clock skew)
@@ -622,6 +647,7 @@ UseAPIIntegration bool // Default: false (use direct DB/R2)
 5. ✅ **Natural error flow**: Upload fails with 401 → disconnect client
 
 **Implementation:**
+
 ```go
 // In UploadTransfer.streamToAPI()
 uploadResp, httpResp, err := t.apiClient.UploadFormData(ctx, jwtToken, eventID, filename, reader)
@@ -636,6 +662,7 @@ if err != nil {
 ```
 
 **Alternative (Proactive Timer) - NOT CHOSEN:**
+
 ```go
 // Store expiration time in ClientDriver
 expiresAt := parseJWT(token).ExpiresAt
@@ -646,12 +673,14 @@ defer disconnectTimer.Stop()
 ```
 
 **Why NOT proactive timer:**
+
 - ❌ **Memory overhead**: One goroutine per connected client (100 connections = 100 timer goroutines)
 - ❌ **Cleanup complexity**: Must cancel timers on early disconnection, handle server restarts
 - ❌ **Edge cases**: Doesn't handle token revocation, clock skew between servers
 - ❌ **No UX benefit**: User gets disconnected either way - no difference in experience
 
 **Cost Analysis: "Does keeping time around expensive?"**
+
 - Storing expiration timestamp (int64): **NO - 8 bytes per connection, negligible**
 - Running timer goroutine per connection: **YES - goroutine overhead + cleanup logic**
 - With 100 concurrent connections: 800 bytes for timestamps vs. 100 timer goroutines
@@ -663,6 +692,7 @@ defer disconnectTimer.Stop()
 **DECISION: Shared secret via environment variable (Option A)**
 
 **Implementation:**
+
 ```bash
 # In both API (Workers) and FTP server (VPS)
 JWT_SECRET=<256-bit-secret-generated-once>
@@ -674,18 +704,21 @@ JWT_SECRET=<256-bit-secret-generated-once>
 ```
 
 **Why:**
+
 - ✅ Simple to implement (standard JWT library support)
 - ✅ No additional API calls needed (FTP validates locally)
 - ✅ Fast validation (no network roundtrip)
 - ✅ Secure if secret properly managed
 
 **Secret Generation:**
+
 ```bash
 # Generate 256-bit secret (one time)
 openssl rand -base64 32
 ```
 
 **JWT Validation in FTP Server:**
+
 ```go
 token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
     if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -700,18 +733,21 @@ token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error)
 **DECISION: FTP server trusts API rate limiting (Option A)**
 
 **Implementation:**
+
 - API enforces all upload rate limits (100/min per event)
 - API returns `429 Too Many Requests` when limit exceeded
 - FTP server receives 429, translates to FTP status code, logs, and returns to client
 - FTP server maintains independent connection limits (100 concurrent per event, 50 per IP)
 
 **Why:**
+
 - ✅ Single source of truth for business rules
 - ✅ No state synchronization needed
 - ✅ API controls all upload costs (credits, bandwidth)
 - ✅ FTP server stays stateless (can scale horizontally)
 
 **FTP-Specific Limits (Independent):**
+
 ```go
 // In MainDriver.ClientConnected()
 type ConnectionLimits struct {
@@ -724,6 +760,7 @@ type ConnectionLimits struct {
 ```
 
 **API Upload Limits (Authoritative):**
+
 - 100 uploads per event per minute
 - Enforced by API rate limiter
 - FTP server propagates 429 to client
@@ -770,6 +807,7 @@ type ConnectionLimits struct {
 **New:** FTP → API → R2 (two hops)
 
 **Expected overhead:** +50-100ms per upload
+
 - Network roundtrip: ~30ms (US-West-2 to Cloudflare edge)
 - API processing: ~20ms (JWT validation, DB query, queue publish)
 - Acceptable for professional photographer workflow
@@ -777,6 +815,7 @@ type ConnectionLimits struct {
 ### Streaming Performance
 
 **Critical:** API must not buffer entire file
+
 - Workers should use `request.body.pipeTo(R2.put())`
 - If buffering required → uploads >10MB will fail (Workers memory limit)
 - Alternative: FTP server gets presigned R2 URL from API, uploads directly
@@ -809,12 +848,14 @@ type ConnectionLimits struct {
 ## Summary
 
 ### Current State
+
 - ✅ FTP server uses direct DB access for auth
 - ✅ FTP server uses direct R2 upload
 - ❌ Business logic duplicated (FTP + API)
 - ❌ No image validation in upload pipeline
 
 ### Target State
+
 - ✅ FTP server uses API for auth (JWT-based)
 - ✅ FTP server uses API for FormData upload (image validation in API)
 - ✅ Single source of truth for business logic
@@ -824,6 +865,7 @@ type ConnectionLimits struct {
 - ✅ JWT lifecycle managed reactively (disconnect on 401)
 
 ### Implementation Readiness
+
 - ✅ API contracts defined (auth + upload endpoints)
 - ✅ Error codes specified
 - ✅ FormData structure documented (file + eventId fields)
@@ -834,6 +876,7 @@ type ConnectionLimits struct {
 - ✅ FTP team can implement independently (mock API for testing)
 
 ### Next Steps
+
 1. API team implements `/api/ftp/auth` and `/api/ftp/upload`
 2. API team adds image validation logic (dimensions, format, integrity)
 3. FTP team implements `internal/apiclient` package with FormData support
@@ -867,28 +910,37 @@ app.post('/api/ftp/upload', async (c) => {
 
   // Validate FormData fields
   if (!eventId || !file) {
-    return c.json({
-      error: { code: 'MISSING_FIELDS', message: 'eventId and file are required' }
-    }, 400);
+    return c.json(
+      {
+        error: { code: 'MISSING_FIELDS', message: 'eventId and file are required' },
+      },
+      400,
+    );
   }
 
   // Verify eventId matches JWT claim
   if (eventId !== payload.event_id) {
-    return c.json({
-      error: { code: 'EVENT_MISMATCH', message: 'eventId does not match token' }
-    }, 400);
+    return c.json(
+      {
+        error: { code: 'EVENT_MISMATCH', message: 'eventId does not match token' },
+      },
+      400,
+    );
   }
 
   // Validate image format
   const validTypes = ['image/jpeg', 'image/png', 'image/heic', 'image/heif'];
   if (!validTypes.includes(file.type)) {
-    return c.json({
-      error: {
-        code: 'INVALID_FORMAT',
-        message: `Unsupported format: ${file.type}`,
-        details: { allowed_formats: validTypes }
-      }
-    }, 422);
+    return c.json(
+      {
+        error: {
+          code: 'INVALID_FORMAT',
+          message: `Unsupported format: ${file.type}`,
+          details: { allowed_formats: validTypes },
+        },
+      },
+      422,
+    );
   }
 
   // Check credit balance
@@ -897,14 +949,17 @@ app.post('/api/ftp/upload', async (c) => {
   });
 
   if (photographer.credit_balance < 1) {
-    return c.json({
-      error: {
-        code: 'INSUFFICIENT_CREDITS',
-        message: 'Please purchase credits',
-        credits_required: 1,
-        credits_available: photographer.credit_balance,
+    return c.json(
+      {
+        error: {
+          code: 'INSUFFICIENT_CREDITS',
+          message: 'Please purchase credits',
+          credits_required: 1,
+          credits_available: photographer.credit_balance,
+        },
       },
-    }, 422);
+      422,
+    );
   }
 
   // Optional: Validate image dimensions (requires reading file)
@@ -931,24 +986,28 @@ app.post('/api/ftp/upload', async (c) => {
   });
 
   // Deduct credit (optimistic)
-  const result = await db.update(photographers)
+  const result = await db
+    .update(photographers)
     .set({ credit_balance: sql`credit_balance - 1` })
     .where(
       and(
         eq(photographers.id, payload.photographer_id),
         gte(photographers.credit_balance, 1), // Atomic check
-      )
+      ),
     );
 
   if (result.rowsAffected === 0) {
     // Insufficient credits (race condition) - clean up
     await r2.delete(r2Key);
-    return c.json({
-      error: {
-        code: 'INSUFFICIENT_CREDITS',
-        message: 'Credit deduction failed (race condition)',
-      }
-    }, 422);
+    return c.json(
+      {
+        error: {
+          code: 'INSUFFICIENT_CREDITS',
+          message: 'Credit deduction failed (race condition)',
+        },
+      },
+      422,
+    );
   }
 
   // Create photo record
@@ -986,6 +1045,7 @@ app.post('/api/ftp/upload', async (c) => {
 ```
 
 **Key Points:**
+
 - `file.stream()` allows streaming to R2 without buffering entire file in memory
 - FormData parsing is built into Hono: `c.req.formData()`
 - File size limits enforced by Cloudflare edge (100-500MB depending on plan)
@@ -1135,6 +1195,7 @@ func (c *Client) UploadFormData(ctx context.Context, token, eventID, filename st
 ```
 
 **Key Points:**
+
 - Uses `io.Pipe` to stream FormData without buffering entire file
 - `multipart.Writer` builds FormData incrementally
 - FormData fields written in order: `eventId` (string), then `file` (binary)
@@ -1179,6 +1240,7 @@ func (t *UploadTransfer) streamToAPI() {
 ```
 
 **Error Handling:**
+
 - 401 response → return `ErrAuthExpired` → MainDriver disconnects client
 - 422 response → validation error → log and return to FTP client (550 error)
 - 429 response → rate limit → log and return to FTP client (421 error)
@@ -1191,6 +1253,7 @@ func (t *UploadTransfer) streamToAPI() {
 Before implementing, please review:
 
 ### Primary Documents
+
 1. **`docs/tech/05_ftp_api_integration_plan.md`** (THIS DOCUMENT)
    - Architecture decisions
    - API contracts
@@ -1207,6 +1270,7 @@ Before implementing, please review:
    - Upload window validation
 
 ### Supporting Documents
+
 4. **`docs/tech/01_data_schema.md`**
    - `photos` table schema
    - Credit ledger schema
@@ -1223,6 +1287,7 @@ Before implementing, please review:
    - Testing procedures
 
 ### Implementation Order
+
 1. Review architecture decisions (Section: Architecture Decisions Resolved)
 2. Review API contracts (Section: Required API Contracts)
 3. Review implementation examples (Section: Appendix A)

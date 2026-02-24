@@ -5,7 +5,7 @@
  * Workers don't have Node.js http module, so we use Fetch-based HTTP client.
  */
 
-import Stripe from "stripe";
+import Stripe from 'stripe';
 
 /**
  * Environment variables required for Stripe client
@@ -29,7 +29,7 @@ export interface StripeEnv {
  */
 export function createStripeClient(env: StripeEnv): Stripe {
   if (!env.STRIPE_SECRET_KEY) {
-    throw new Error("STRIPE_SECRET_KEY is required");
+    throw new Error('STRIPE_SECRET_KEY is required');
   }
 
   return new Stripe(env.STRIPE_SECRET_KEY, {

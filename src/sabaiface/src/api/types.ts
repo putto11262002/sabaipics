@@ -47,14 +47,18 @@ export type CreateCollectionResponse = z.infer<typeof CreateCollectionResponseSc
 
 export const IndexFacesRequestSchema = z.object({
   CollectionId: z.string().optional(), // Optional since we use URL param
-  Image: z.object({
-    Bytes: z.string(), // Base64 encoded image
-  }).or(z.object({
-    S3Object: z.object({
-      Bucket: z.string(),
-      Name: z.string(),
-    }),
-  })),
+  Image: z
+    .object({
+      Bytes: z.string(), // Base64 encoded image
+    })
+    .or(
+      z.object({
+        S3Object: z.object({
+          Bucket: z.string(),
+          Name: z.string(),
+        }),
+      }),
+    ),
   ExternalImageId: z.string().optional(),
   DetectionAttributes: z.array(z.enum(['DEFAULT', 'ALL'])).optional(),
   MaxFaces: z.number().min(1).max(100).optional(),
@@ -71,31 +75,43 @@ export const FaceRecordSchema = z.object({
     ExternalImageId: z.string().optional(),
     Confidence: z.number(),
   }),
-  FaceDetail: z.object({
-    BoundingBox: BoundingBoxSchema,
-    Confidence: z.number(),
-    Landmarks: z.array(z.any()).optional(),
-    AgeRange: z.object({
-      Low: z.number(),
-      High: z.number(),
-    }).optional(),
-    Gender: z.object({
-      Value: z.string(),
+  FaceDetail: z
+    .object({
+      BoundingBox: BoundingBoxSchema,
       Confidence: z.number(),
-    }).optional(),
-    Emotions: z.array(z.object({
-      Type: z.string(),
-      Confidence: z.number(),
-    })).optional(),
-  }).optional(),
+      Landmarks: z.array(z.any()).optional(),
+      AgeRange: z
+        .object({
+          Low: z.number(),
+          High: z.number(),
+        })
+        .optional(),
+      Gender: z
+        .object({
+          Value: z.string(),
+          Confidence: z.number(),
+        })
+        .optional(),
+      Emotions: z
+        .array(
+          z.object({
+            Type: z.string(),
+            Confidence: z.number(),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
 });
 
 export type FaceRecord = z.infer<typeof FaceRecordSchema>;
 
 export const UnindexedFaceSchema = z.object({
-  FaceDetail: z.object({
-    BoundingBox: BoundingBoxSchema.optional(),
-  }).optional(),
+  FaceDetail: z
+    .object({
+      BoundingBox: BoundingBoxSchema.optional(),
+    })
+    .optional(),
   Reasons: z.array(z.string()),
 });
 

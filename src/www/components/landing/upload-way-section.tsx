@@ -1,6 +1,13 @@
 'use client';
 
-import { AlertCircle, CheckCircle2, ExternalLink, Hourglass, LoaderCircle, Upload } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  ExternalLink,
+  Hourglass,
+  LoaderCircle,
+  Upload,
+} from 'lucide-react';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -98,7 +105,10 @@ function UploadMethodVisual({ kind }: { kind: UploadMethodKind }) {
 
           <div className="mt-2 space-y-1.5">
             {rows.map((row) => (
-              <div key={row.name} className="flex items-center gap-1.5 border-b border-border/70 pb-1.5">
+              <div
+                key={row.name}
+                className="flex items-center gap-1.5 border-b border-border/70 pb-1.5"
+              >
                 <span className="h-6 w-6 rounded-[6px] border border-border/70 bg-[linear-gradient(160deg,#ffe8c8,#ffd6b3)]" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[7px] font-semibold text-foreground">{row.name}</p>
@@ -135,15 +145,21 @@ function UploadMethodVisual({ kind }: { kind: UploadMethodKind }) {
 
           <div className="space-y-1.5 p-2">
             <div className="rounded-md border border-dashed border-border/80 bg-muted/28 px-2 py-1.5">
-              <p className="text-[8px] font-medium text-foreground">Drag photos here or click to browse</p>
-              <p className="mt-0.5 text-[7px] text-muted-foreground">JPEG, PNG, WebP · max 10MB each</p>
+              <p className="text-[8px] font-medium text-foreground">
+                Drag photos here or click to browse
+              </p>
+              <p className="mt-0.5 text-[7px] text-muted-foreground">
+                JPEG, PNG, WebP · max 10MB each
+              </p>
             </div>
 
             <div className="rounded-md border border-border/80 bg-muted/25 px-2 py-1">
               <div className="flex items-center gap-2">
                 <LoaderCircle className="h-3 w-3 animate-spin text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[8px] font-medium text-foreground">Uploading 12 photos...</p>
+                  <p className="truncate text-[8px] font-medium text-foreground">
+                    Uploading 12 photos...
+                  </p>
                   <div className="mt-1 h-1 w-full rounded-full bg-border/70">
                     <div className="h-1 w-[58%] rounded-full bg-primary" />
                   </div>
@@ -161,7 +177,10 @@ function UploadMethodVisual({ kind }: { kind: UploadMethodKind }) {
                 { name: 'IMG_3019.JPG', status: 'done', size: '4.8MB', source: 'ios' },
                 { name: 'IMG_3012.JPG', status: 'failed', size: '6.2MB', source: 'ftp' },
               ].map((row) => (
-                <div key={row.name} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-1.5 border-b border-border/70 px-2 py-1 last:border-b-0">
+                <div
+                  key={row.name}
+                  className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-1.5 border-b border-border/70 px-2 py-1 last:border-b-0"
+                >
                   <p className="truncate text-[7px] font-medium text-foreground">{row.name}</p>
                   <span className="rounded-full border border-border/80 px-1 py-0 text-[6px] uppercase tracking-[0.08em] text-muted-foreground">
                     {row.source}
@@ -177,7 +196,6 @@ function UploadMethodVisual({ kind }: { kind: UploadMethodKind }) {
                 </div>
               ))}
             </div>
-
           </div>
         </div>
       </div>
@@ -236,7 +254,10 @@ function UploadMethodVisual({ kind }: { kind: UploadMethodKind }) {
           <span className="text-[7px] font-semibold tabular-nums text-foreground">{progress}%</span>
         </div>
         <div className="mt-1 h-1 w-full rounded-full bg-border/70">
-          <div className="h-1 rounded-full bg-primary transition-[width] duration-500" style={{ width: `${progress}%` }} />
+          <div
+            className="h-1 rounded-full bg-primary transition-[width] duration-500"
+            style={{ width: `${progress}%` }}
+          />
         </div>
       </div>
     );
@@ -271,16 +292,20 @@ function UploadMethodVisual({ kind }: { kind: UploadMethodKind }) {
         </div>
 
         <div className="relative flex h-full items-start pt-10">
-          <div className="-ml-4 flex w-[196px] flex-col gap-2">
-            {floatingScene}
-          </div>
+          <div className="-ml-4 flex w-[196px] flex-col gap-2">{floatingScene}</div>
         </div>
       </div>
     </div>
   );
 }
 
-function UploadMethodCard({ kind, t }: { kind: UploadMethodKind; t: ReturnType<typeof useTranslations<'UploadWay'>> }) {
+function UploadMethodCard({
+  kind,
+  t,
+}: {
+  kind: UploadMethodKind;
+  t: ReturnType<typeof useTranslations<'UploadWay'>>;
+}) {
   const locale = useLocale();
   const compatibilityHref = `/${locale}/compatibility`;
 
@@ -290,7 +315,9 @@ function UploadMethodCard({ kind, t }: { kind: UploadMethodKind; t: ReturnType<t
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col">
         <h3 className="text-sm font-semibold tracking-tight">{t(`methods.${kind}.title`)}</h3>
-        <p className="mt-2 min-h-[3.5rem] text-sm leading-5 text-muted-foreground">{t(`methods.${kind}.description`)}</p>
+        <p className="mt-2 min-h-[3.5rem] text-sm leading-5 text-muted-foreground">
+          {t(`methods.${kind}.description`)}
+        </p>
         {kind === 'ios' && (
           <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
             <a
@@ -333,7 +360,13 @@ function UploadMethodCard({ kind, t }: { kind: UploadMethodKind; t: ReturnType<t
   );
 }
 
-function UploadMethodCardMobile({ kind, t }: { kind: UploadMethodKind; t: ReturnType<typeof useTranslations<'UploadWay'>> }) {
+function UploadMethodCardMobile({
+  kind,
+  t,
+}: {
+  kind: UploadMethodKind;
+  t: ReturnType<typeof useTranslations<'UploadWay'>>;
+}) {
   const locale = useLocale();
   const compatibilityHref = `/${locale}/compatibility`;
 
@@ -344,7 +377,9 @@ function UploadMethodCardMobile({ kind, t }: { kind: UploadMethodKind; t: Return
       </div>
       <div className="mt-3">
         <h3 className="text-sm font-semibold tracking-tight">{t(`methods.${kind}.title`)}</h3>
-        <p className="mt-2 text-sm leading-5 text-muted-foreground">{t(`methods.${kind}.description`)}</p>
+        <p className="mt-2 text-sm leading-5 text-muted-foreground">
+          {t(`methods.${kind}.description`)}
+        </p>
         {kind === 'ios' && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <a
@@ -434,11 +469,16 @@ function DesktopConnectors({
         <path id={middleId} d={middlePath} />
       </defs>
 
-      <use href={`#${middleId}`} fill="none" stroke="var(--muted-foreground)" strokeWidth="1.4" strokeLinecap="round" opacity="0.3" />
+      <use
+        href={`#${middleId}`}
+        fill="none"
+        stroke="var(--muted-foreground)"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        opacity="0.3"
+      />
 
-      {!prefersReducedMotion && (
-        <FlowToken pathId={middleId} begin="-1.4s" dur="4.0s" />
-      )}
+      {!prefersReducedMotion && <FlowToken pathId={middleId} begin="-1.4s" dur="4.0s" />}
     </svg>
   );
 }
@@ -567,10 +607,8 @@ export function UploadWaySection() {
     <section id="upload" className="scroll-mt-24 bg-muted/30 pb-16 pt-6 sm:pb-20 sm:pt-8">
       <div className="mx-auto max-w-7xl px-4">
         <div className="max-w-xl">
-        <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('title')}</h2>
-        <p className="mt-2 text-muted-foreground">
-          {t('subtitle')}
-        </p>
+          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('title')}</h2>
+          <p className="mt-2 text-muted-foreground">{t('subtitle')}</p>
         </div>
 
         <div ref={showcaseRef} className="mt-8">
@@ -585,13 +623,13 @@ export function UploadWaySection() {
                 <div className="grid grid-cols-3 gap-6 lg:gap-8" style={{ paddingTop: CONNECTOR_BAND_HEIGHT }}> */}
             <div ref={connectorAreaRef}>
               <div className="grid grid-cols-3 gap-6 lg:gap-8">
-                  {UPLOAD_METHOD_KINDS.map((kind, index) => (
-                    <div
-                      key={kind}
-                      ref={(element) => {
-                        cardRefs.current[index] = element;
-                      }}
-                    >
+                {UPLOAD_METHOD_KINDS.map((kind, index) => (
+                  <div
+                    key={kind}
+                    ref={(element) => {
+                      cardRefs.current[index] = element;
+                    }}
+                  >
                     <UploadMethodCard kind={kind} t={t} />
                   </div>
                 ))}

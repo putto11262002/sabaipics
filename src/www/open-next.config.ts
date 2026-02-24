@@ -1,5 +1,5 @@
-import { defineCloudflareConfig } from "@opennextjs/cloudflare";
-import staticAssetsIncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cache/static-assets-incremental-cache";
+import { defineCloudflareConfig } from '@opennextjs/cloudflare';
+import staticAssetsIncrementalCache from '@opennextjs/cloudflare/overrides/incremental-cache/static-assets-incremental-cache';
 
 export default {
   ...defineCloudflareConfig({
@@ -8,5 +8,5 @@ export default {
     // https://opennext.js.org/cloudflare/caching
     incrementalCache: staticAssetsIncrementalCache,
   }),
-  buildCommand: "cd ../.. && pnpm build:www",
+  buildCommand: 'cd ../.. && pnpm build:www',
 };

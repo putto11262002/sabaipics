@@ -12,6 +12,7 @@
 **Question**: How to generate secure download URLs for R2 objects while enabling edge caching for thumbnails?
 
 **Constraints**:
+
 - Cloudflare Workers runtime (not Node.js)
 - Need edge caching for transform URLs (thumbnails/previews)
 - Need time-limited access for download URLs (prevent hotlinking)
@@ -34,6 +35,7 @@
 > Transformed images are cached on Cloudflare's edge. Only the original is stored in R2.
 
 CF Images automatically caches transformed variants at the edge with:
+
 - Cache key = source URL + transform parameters
 - Min 1 hour cache duration
 - Subsequent requests served from cache (~10-50ms)
@@ -42,13 +44,14 @@ CF Images automatically caches transformed variants at the edge with:
 
 ## 3. Resolution for T-18: Hybrid Approach
 
-| URL Type | Strategy | Why |
-|----------|----------|-----|
-| `thumbnailUrl` (400px) | Public CF Images transform URL | Edge caching, fast loads |
-| `previewUrl` (1200px) | Public CF Images transform URL | Edge caching, fast loads |
-| `downloadUrl` (full) | Presigned R2 URL (15 min expiry) | Prevent hotlinking abuse |
+| URL Type               | Strategy                         | Why                      |
+| ---------------------- | -------------------------------- | ------------------------ |
+| `thumbnailUrl` (400px) | Public CF Images transform URL   | Edge caching, fast loads |
+| `previewUrl` (1200px)  | Public CF Images transform URL   | Edge caching, fast loads |
+| `downloadUrl` (full)   | Presigned R2 URL (15 min expiry) | Prevent hotlinking abuse |
 
 **Rationale:**
+
 - Transform URLs benefit from edge caching (automatic with CF Images)
 - Download URLs need protection (presigned URLs expire)
 - API-level access control is enforced first (ownership check)
@@ -73,10 +76,7 @@ This library is Workers-compatible and specifically designed for AWS signature g
 import { AwsClient } from 'aws4fetch';
 
 // Generate presigned URL for download (15 min expiry)
-async function generateDownloadUrl(
-  env: Env,
-  r2Key: string
-): Promise<string> {
+async function generateDownloadUrl(env: Env, r2Key: string): Promise<string> {
   const aws = new AwsClient({
     accessKeyId: env.R2_ACCESS_KEY_ID,
     secretAccessKey: env.R2_SECRET_ACCESS_KEY,
@@ -110,10 +110,10 @@ function generatePreviewUrl(r2Key: string, cfDomain: string, r2BaseUrl: string):
 
 Environment variables added to all environments:
 
-| Variable | Development | Staging | Production | Purpose |
-|----------|-------------|---------|------------|---------|
-| `CF_DOMAIN` | `https://sabaipics.com` | `https://sabaipics.com` | `https://sabaipics.com` | Zone with Images enabled |
-| `R2_BASE_URL` | R2 dev URL | `https://photos-staging.sabaipics.com` | `https://photos.sabaipics.com` | R2 bucket domain |
+| Variable      | Development             | Staging                                | Production                     | Purpose                  |
+| ------------- | ----------------------- | -------------------------------------- | ------------------------------ | ------------------------ |
+| `CF_DOMAIN`   | `https://sabaipics.com` | `https://sabaipics.com`                | `https://sabaipics.com`        | Zone with Images enabled |
+| `R2_BASE_URL` | R2 dev URL              | `https://photos-staging.sabaipics.com` | `https://photos.sabaipics.com` | R2 bucket domain         |
 
 ### Secrets (set via `wrangler secret put`)
 
@@ -155,15 +155,18 @@ pnpm --filter=@sabaipics/api wrangler secret put CLOUDFLARE_ACCOUNT_ID
 **Status**: Research complete, decision made
 
 **Decision**: Use **hybrid approach** for T-18:
+
 - Public CF Images transform URLs for thumbnails/previews (edge caching)
 - Presigned R2 URLs for downloads (prevents hotlinking)
 
 **Rationale**:
+
 - Transform URLs benefit from edge caching (automatic with CF Images)
 - Download URLs need protection (presigned URLs expire after 15 min)
 - API-level access control is enforced first (ownership check before any URLs returned)
 
 **Configuration complete:**
+
 - ✅ `wrangler.jsonc` updated with CF_DOMAIN and R2_BASE_URL
 - ✅ `types.ts` updated with secret bindings
 - ✅ `.dev.vars.example` updated with setup instructions

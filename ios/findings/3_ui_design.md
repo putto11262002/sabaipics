@@ -8,6 +8,7 @@
 ## App Overview
 
 **What it does:**
+
 - Connects to professional camera (USB/WiFi)
 - Automatically downloads photos as photographer shoots
 - Stores photos locally on iPhone
@@ -1094,6 +1095,7 @@ extension CameraService: ICCameraDeviceDelegate {
 ## SwiftUI Primitives Used
 
 ### Layout Components
+
 - `VStack` - Vertical stacking
 - `HStack` - Horizontal stacking
 - `ZStack` - Layering (for badges on thumbnails)
@@ -1101,18 +1103,21 @@ extension CameraService: ICCameraDeviceDelegate {
 - `LazyVGrid` - Efficient grid for photos
 
 ### Display Components
+
 - `Text` - Labels and content
 - `Image` - Icons and thumbnails
 - `Label` - Icon + text combos
 - `ProgressView` - Loading indicators
 
 ### Interactive Components
+
 - `Button` - Actions
 - `Toggle` - Settings switches
 - `NavigationStack` - Navigation
 - `ScrollView` - Scrollable content
 
 ### Modifiers
+
 - `.padding()` - Spacing
 - `.background()` - Colors/fills
 - `.cornerRadius()` - Rounded corners
@@ -1127,12 +1132,14 @@ extension CameraService: ICCameraDeviceDelegate {
 ## Key Features
 
 ### Real-time Updates
+
 ```swift
 @Published var photos: [CapturedPhoto] = []
 // SwiftUI automatically re-renders when this changes
 ```
 
 ### Thumbnail Grid
+
 ```swift
 LazyVGrid(columns: [
     GridItem(.flexible()),
@@ -1144,6 +1151,7 @@ LazyVGrid(columns: [
 ```
 
 ### Status Badges
+
 ```swift
 ZStack(alignment: .bottomTrailing) {
     Image(thumbnail)
@@ -1152,6 +1160,7 @@ ZStack(alignment: .bottomTrailing) {
 ```
 
 ### Live Stats
+
 ```swift
 // Computed properties auto-update UI
 var savedCount: Int {
@@ -1164,6 +1173,7 @@ var savedCount: Int {
 ## Summary
 
 **Navigation Flow:**
+
 ```
 SearchingView
   → CameraFoundView
@@ -1173,6 +1183,7 @@ SearchingView
 ```
 
 **Key SwiftUI Patterns:**
+
 - `@StateObject` for service
 - `@EnvironmentObject` for sharing state
 - `@Published` for reactive updates
@@ -1180,6 +1191,7 @@ SearchingView
 - Computed properties for live stats
 
 **User Experience:**
+
 - Minimal taps (connect → shoot → done)
 - Live feedback (thumbnails appear instantly)
 - Clear status (downloading/saved badges)

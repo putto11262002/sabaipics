@@ -5,15 +5,26 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/shared/components/ui/table";
-import { Checkbox } from "@/shared/components/ui/checkbox";
-import { Skeleton } from "@/shared/components/ui/skeleton";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/shared/components/ui/empty";
-import { Check, Image as ImageIcon } from "lucide-react";
-import type { Photo } from "../../hooks/photos/usePhotos";
-import { useState, useEffect, useRef } from "react";
-import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from "@tanstack/react-table";
-import { toast } from "sonner";
+} from '@/shared/components/ui/table';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from '@/shared/components/ui/empty';
+import { Check, Image as ImageIcon } from 'lucide-react';
+import type { Photo } from '../../hooks/photos/usePhotos';
+import { useState, useEffect, useRef } from 'react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  flexRender,
+  createColumnHelper,
+} from '@tanstack/react-table';
+import { toast } from 'sonner';
 
 const MAX_SELECTION = 15;
 
@@ -27,9 +38,9 @@ interface PhotosListViewProps {
 
 // Format file size utility
 function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "0 B";
+  if (bytes === 0) return '0 B';
   const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
+  const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
@@ -37,11 +48,11 @@ function formatFileSize(bytes: number): string {
 // Format date utility
 function formatDate(isoString: string): string {
   const date = new Date(isoString);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(date);
 }
 
@@ -52,7 +63,7 @@ export function PhotosListView({
   isLoading,
   onPhotoClick,
   onSelectionChange,
-  isSelectionMode = false
+  isSelectionMode = false,
 }: PhotosListViewProps) {
   const [rowSelection, setRowSelection] = useState({});
   const previousPhotoIdsRef = useRef<string[]>([]);
@@ -61,16 +72,15 @@ export function PhotosListView({
 
   const columns = [
     columnHelper.display({
-      id: "select",
-      header: ({ table }) => (
+      id: 'select',
+      header: ({ table }) =>
         isSelectionMode ? (
           <Checkbox
             checked={table.getIsAllPageRowsSelected()}
             onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
             aria-label="Select all"
           />
-        ) : null
-      ),
+        ) : null,
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
@@ -79,8 +89,8 @@ export function PhotosListView({
         />
       ),
     }),
-    columnHelper.accessor("thumbnailUrl", {
-      header: "Preview",
+    columnHelper.accessor('thumbnailUrl', {
+      header: 'Preview',
       cell: (info) => {
         const photo = info.row.original;
         const isSelected = info.row.getIsSelected();
@@ -107,24 +117,22 @@ export function PhotosListView({
         );
       },
     }),
-    columnHelper.accessor("uploadedAt", {
-      header: "Uploaded At",
+    columnHelper.accessor('uploadedAt', {
+      header: 'Uploaded At',
       cell: (info) => formatDate(info.getValue()),
     }),
-    columnHelper.accessor("fileSize", {
-      header: "File Size",
+    columnHelper.accessor('fileSize', {
+      header: 'File Size',
       cell: (info) => {
         const fileSize = info.getValue();
         return (
-          <span className="text-muted-foreground">
-            {fileSize ? formatFileSize(fileSize) : "-"}
-          </span>
+          <span className="text-muted-foreground">{fileSize ? formatFileSize(fileSize) : '-'}</span>
         );
       },
     }),
-    columnHelper.accessor("faceCount", {
-      header: "Face Count",
-      cell: (info) => info.getValue() ?? "-",
+    columnHelper.accessor('faceCount', {
+      header: 'Face Count',
+      cell: (info) => info.getValue() ?? '-',
     }),
   ];
 
@@ -146,8 +154,8 @@ export function PhotosListView({
 
     // Only notify if the actual photo IDs changed
     const prevIds = previousPhotoIdsRef.current;
-    const hasChanged = photoIds.length !== prevIds.length ||
-      photoIds.some((id, i) => prevIds[i] !== id);
+    const hasChanged =
+      photoIds.length !== prevIds.length || photoIds.some((id, i) => prevIds[i] !== id);
 
     if (hasChanged) {
       previousPhotoIdsRef.current = photoIds;
@@ -185,11 +193,21 @@ export function PhotosListView({
         <TableBody>
           {Array.from({ length: 5 }).map((_, i) => (
             <TableRow key={i}>
-              <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-              <TableCell><Skeleton className="size-12 rounded" /></TableCell>
-              <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-              <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+              <TableCell>
+                <Skeleton className="h-4 w-4" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="size-12 rounded" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="h-4 w-32" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="h-4 w-20" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="h-4 w-16" />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -225,10 +243,7 @@ export function PhotosListView({
                 <TableHead key={header.id}>
                   {header.isPlaceholder
                     ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
+                    : flexRender(header.column.columnDef.header, header.getContext())}
                 </TableHead>
               ))}
             </TableRow>

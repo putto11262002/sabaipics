@@ -20,8 +20,8 @@
  * since no recent API activity.
  */
 
-import { DurableObject } from "cloudflare:workers";
-import type { RateLimiterResponse } from "../types/photo-job";
+import { DurableObject } from 'cloudflare:workers';
+import type { RateLimiterResponse } from '../types/photo-job';
 
 // =============================================================================
 // Configuration

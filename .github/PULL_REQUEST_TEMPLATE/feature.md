@@ -1,6 +1,7 @@
 # PR: <T-?> <short title>
 
 ## Traceability (required)
+
 - TaskId: T-?
 - Execution root: docs/logs/<root-id>/
 - StoryRefs: US-?, US-?
@@ -10,17 +11,20 @@
 - PrimarySurface: DB|API|UI|Jobs|Ops
 
 ## Summary (required)
+
 - Goal: <1–2 sentences outcome>
 - Changes:
   - …
 
 ## Verification (required)
+
 - Commands run:
   - `...`
 - Key checks:
   - [ ] …
 
 ## Risk / Rollout (required, allow “None”)
+
 - Risk level: low|med|high — <1 line why>
 - Rollout: none | flag `<name>` | migration `<name>` | other: …
 - Rollback: <1 line, or “none needed”>
@@ -46,9 +50,10 @@
   - `...`
 - Edge cases / tradeoffs:
   - …
-</details>
+  </details>
 
 ## Audit checklist (required)
+
 - [ ] PR matches TaskId + Acceptance intent
 - [ ] No ADR contradictions (or ADR updated)
 - [ ] Verification evidence included

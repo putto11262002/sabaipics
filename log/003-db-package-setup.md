@@ -32,9 +32,9 @@ packages/db/
 
 ```typescript
 // packages/db/src/client.ts
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import * as schema from "./schema";
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import * as schema from './schema';
 
 export function createDb(connectionString: string) {
   const sql = neon(connectionString);
@@ -45,8 +45,9 @@ export type Database = ReturnType<typeof createDb>;
 ```
 
 **Usage in Workers:**
+
 ```typescript
-export const dbTestRouter = new Hono().get("/", async (c) => {
+export const dbTestRouter = new Hono().get('/', async (c) => {
   const db = createDb(c.env.DATABASE_URL);
   const results = await db.select().from(dbTest);
   return c.json({ success: true, data: results });
@@ -91,6 +92,7 @@ pnpm --filter=@sabaipics/db db:studio    # Open Drizzle Studio GUI
 4. Migrations run automatically in CI before deploy
 
 **CI Integration:**
+
 - Staging: Auto-runs `db:migrate` on master push
 - Production: Auto-runs `db:migrate` on manual deploy trigger
 
@@ -104,13 +106,13 @@ This provides a safety net for production migrations.
 
 ```typescript
 // Main export
-import { createDb, Database } from "@sabaipics/db";
+import { createDb, Database } from '@sabaipics/db';
 
 // Schema export
-import { dbTest, DbTest, NewDbTest } from "@sabaipics/db/schema";
+import { dbTest, DbTest, NewDbTest } from '@sabaipics/db/schema';
 
 // Client only
-import { createDb } from "@sabaipics/db/client";
+import { createDb } from '@sabaipics/db/client';
 ```
 
 ---

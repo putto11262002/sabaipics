@@ -4,13 +4,13 @@
  * Factory for creating LINE SDK client with typed environment configuration.
  */
 
-import { messagingApi } from "@line/bot-sdk";
+import { messagingApi } from '@line/bot-sdk';
 
 /**
  * Environment configuration required for LINE client
  */
 export interface LineEnv {
-	LINE_CHANNEL_ACCESS_TOKEN: string;
+  LINE_CHANNEL_ACCESS_TOKEN: string;
 }
 
 /**
@@ -31,10 +31,8 @@ export interface LineEnv {
  * });
  * ```
  */
-export function createLineClient(
-	env: LineEnv,
-): messagingApi.MessagingApiClient {
-	return new messagingApi.MessagingApiClient({
-		channelAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
-	});
+export function createLineClient(env: LineEnv): messagingApi.MessagingApiClient {
+  return new messagingApi.MessagingApiClient({
+    channelAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+  });
 }

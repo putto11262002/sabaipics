@@ -170,9 +170,11 @@ describeDb('POST /webhooks/stripe - Framework-Level (Hono Router)', () => {
     } else {
       // 500 = fulfillment failed (DB error) — Stripe will retry
       expect(res.status).toBe(500);
-      const body = await res.json() as { error: { code: string; message: string } };
+      const body = (await res.json()) as { error: { code: string; message: string } };
       expect(body.error.message).toContain('Fulfillment failed');
-      console.log(`✓ Stripe webhook correctly returns 500 on fulfillment failure: ${body.error.message}`);
+      console.log(
+        `✓ Stripe webhook correctly returns 500 on fulfillment failure: ${body.error.message}`,
+      );
     }
   }, 30000);
 

@@ -15,11 +15,13 @@ Implemented Go-based FTP server at `apps/ftp-server` using ftpserverlib for uplo
 ### Phase 1-2: Project Scaffolding ✅
 
 **Files Created:**
+
 - `apps/ftp-server/` - Root directory with monorepo structure
 - `go.mod` - Module: `github.com/sabaipics/sabaipics/apps/ftp-server`
 - Directory structure: `cmd/ftp-server/`, `internal/{config,server,driver,client,transfer}/`
 
 **Dependencies Added:**
+
 - `github.com/fclairamb/ftpserverlib` - FTP server library
 - `github.com/getsentry/sentry-go` - Distributed tracing
 - `github.com/jackc/pgx/v5` - PostgreSQL driver
@@ -33,6 +35,7 @@ Implemented Go-based FTP server at `apps/ftp-server` using ftpserverlib for uplo
 **File**: `internal/config/config.go`
 
 Implemented environment-based configuration with:
+
 - FTP server settings (listen address, passive ports, idle timeout)
 - Database connection (PostgreSQL URL)
 - R2/S3 credentials (for future use)
@@ -48,6 +51,7 @@ Documented all environment variables with example values.
 **File**: `internal/driver/main_driver.go`
 
 Implemented ftpserverlib.MainDriver interface:
+
 - ✅ `GetSettings()` - Returns FTP server configuration
 - ✅ `ClientConnected()` - Creates Sentry root span for connection
 - ✅ `ClientDisconnected()` - Finishes Sentry span, cleanup
@@ -56,6 +60,7 @@ Implemented ftpserverlib.MainDriver interface:
 - 🚧 `GetTLSConfig()` - **STUBBED**: Returns nil (plain FTP only)
 
 **Key Design:**
+
 - Maintains `map[uint32]*sentry.Span` to track spans by client ID
 - Logs all connection events with client IP and ID
 
@@ -64,6 +69,7 @@ Implemented ftpserverlib.MainDriver interface:
 **File**: `internal/client/client_driver.go`
 
 Implemented afero.Fs interface for upload-only enforcement:
+
 - ✅ `OpenFile()` - Creates UploadTransfer for write operations
 - ✅ Blocks all read operations: `Open()` returns "download not allowed"
 - ✅ Blocks all delete operations: `Remove()`, `RemoveAll()` return errors
@@ -80,6 +86,7 @@ All blocked operations log the attempt and return proper FTP error codes.
 **File**: `internal/transfer/upload_transfer.go`
 
 Implemented afero.File interface for streaming uploads:
+
 - ✅ `Write()` - Writes to io.Pipe, counts bytes
 - ✅ `Close()` - Waits for upload completion, logs metrics
 - 🚧 `streamToR2()` - **STUBBED**: Reads from pipe and discards
@@ -88,6 +95,7 @@ Implemented afero.File interface for streaming uploads:
 - ✅ Blocks all read/seek operations (upload-only)
 
 **Key Design:**
+
 - Uses `io.Pipe` to avoid disk buffering
 - Background goroutine streams data (stub just reads and logs)
 - Tracks bytes written with `atomic.Int64`
@@ -115,6 +123,7 @@ Implemented afero.File interface for streaming uploads:
    - Finished in `UploadTransfer.Close()` with metrics
 
 **Span Hierarchy:**
+
 ```
 ftp.connection
 ├── ftp.auth
@@ -126,6 +135,7 @@ ftp.connection
 **File**: `internal/server/server.go`
 
 Server lifecycle management:
+
 - `New()` - Creates MainDriver and ftpserverlib.FtpServer
 - `Start()` - Starts FTP server (blocks until stopped)
 - 🚧 `Shutdown()` - **STUBBED**: Graceful shutdown placeholder
@@ -133,6 +143,7 @@ Server lifecycle management:
 **File**: `cmd/ftp-server/main.go`
 
 Main entry point with:
+
 - Configuration loading from environment
 - Sentry SDK initialization (with flush on exit)
 - PostgreSQL connection pool setup (with ping test)
@@ -144,6 +155,7 @@ Main entry point with:
 **File**: `docker-compose.yml`
 
 Local development setup with:
+
 - PostgreSQL 16 container (port 5432)
 - FTP server container (ports 2121, 5000-5099)
 - Health checks for dependencies
@@ -152,12 +164,14 @@ Local development setup with:
 **File**: `Dockerfile`
 
 Multi-stage build:
+
 1. Builder stage: Go 1.23-alpine, compiles binary
 2. Runtime stage: Alpine with CA certificates, runs binary
 
 **File**: `README.md`
 
 Comprehensive documentation:
+
 - Architecture diagram
 - Directory structure
 - Environment variables
@@ -173,6 +187,7 @@ Comprehensive documentation:
 ### Manual Testing (Local Development)
 
 **Prerequisites:**
+
 ```bash
 cd apps/ftp-server
 cp .env.example .env
@@ -182,6 +197,7 @@ docker-compose up ftp-server
 ```
 
 **Test Cases:**
+
 1. ✅ Connect via FTP client (port 2121)
 2. 🚧 Auth with any credentials (stub mode - accepts all)
 3. 🚧 Upload file (stub logs "would upload to R2")
@@ -200,20 +216,25 @@ docker-compose up ftp-server
 ## What's Stubbed (To Be Implemented)
 
 ### 1. Authentication (Phase 11)
+
 **Current**: Accepts any username/password
 **Needed**:
+
 - Query `events` table: `SELECT * FROM events WHERE ftp_username = $1`
 - Verify: `bcrypt.CompareHashAndPassword(event.ftp_password_hash, []byte(pass))`
 - Check: Event published, upload window valid, not deleted
 - Return: Actual eventID and photographerID
 
 **Blockers**:
+
 - Database schema migration needed (add FTP columns to `events` table)
 - Test event data for development
 
 ### 2. R2 Upload (Phase 11)
+
 **Current**: Reads from pipe and discards
 **Needed**:
+
 - Initialize S3-compatible client for Cloudflare R2
 - Stream from `pipeReader` to R2 using multipart upload
 - Store metadata: event_id, photographer_id, upload_time, file_hash
@@ -221,23 +242,29 @@ docker-compose up ftp-server
 - Handle errors and retries
 
 **Blockers**:
+
 - R2 credentials (access key, secret, endpoint, bucket)
 - Object key naming convention decision
 - Metadata schema design
 
 ### 3. TLS/FTPS (Phase 12)
+
 **Current**: Returns nil (plain FTP)
 **Needed**:
+
 - Load TLS certificates from `TLS_CERT_PATH` and `TLS_KEY_PATH`
 - Return `tls.Config` with certificates
 - Support both explicit FTPS (AUTH TLS) and implicit FTPS
 
 **Blockers**:
+
 - TLS certificates (Let's Encrypt or self-signed for dev)
 
 ### 4. Graceful Shutdown (Phase 13)
+
 **Current**: Stub that returns nil
 **Needed**:
+
 - Stop accepting new connections
 - Wait for active transfers to complete (with timeout)
 - Close database connection pool
@@ -278,22 +305,26 @@ apps/ftp-server/
 ## Next Steps (Future Phases)
 
 ### Phase 11: Real Authentication & R2 Upload
+
 - Implement actual database queries in `AuthUser()`
 - Implement R2 streaming in `UploadTransfer.streamToR2()`
 - Add database migrations for FTP columns
 - Test with real event credentials
 
 ### Phase 12: Queue Integration
+
 - Enqueue "photo uploaded" events to message queue
 - Trigger downstream processing (face detection, thumbnail generation)
 - Add queue configuration to config package
 
 ### Phase 13: Prometheus Metrics
+
 - Expose `/metrics` endpoint
 - Track: active connections, upload rate, bytes transferred, auth failures
 - Add Prometheus scrape config to docker-compose
 
 ### Phase 14: Production Deployment
+
 - Deploy to VPS (DigitalOcean/Hetzner)
 - Configure TLS certificates (Let's Encrypt)
 - Set up monitoring and alerts
@@ -364,6 +395,7 @@ apps/ftp-server/
 ### Problem
 
 Initial implementation had logging scattered throughout the codebase:
+
 - Mixed `log.Printf` and `sentry.Logger` calls
 - Logging in business logic (ClientDriver policy enforcement)
 - Verbose per-chunk logging in Write() operations
@@ -375,6 +407,7 @@ Initial implementation had logging scattered throughout the codebase:
 **Principle**: Log only at architectural boundaries, never in business logic
 
 **Boundaries Defined**:
+
 1. **Application Flow** (MainDriver): FTP protocol events (connect, auth, disconnect)
 2. **I/O Operations** (UploadTransfer): External system operations (R2 uploads)
 3. **Business Logic** (ClientDriver): Returns errors without logging (pure)
@@ -384,6 +417,7 @@ Initial implementation had logging scattered throughout the codebase:
 #### 1. Error Sentinels (`internal/client/errors.go`) ✅
 
 Created package-level error sentinels for policy violations:
+
 ```go
 var (
     ErrDownloadNotAllowed = errors.New("download not allowed - upload only")
@@ -398,6 +432,7 @@ var (
 #### 2. Sentry Log Level Filtering (`cmd/ftp-server/main.go`) ✅
 
 Added `BeforeSendLog` callback to Sentry initialization:
+
 ```go
 BeforeSendLog: func(log *sentry.Log) *sentry.Log {
     if cfg.SentryEnvironment == "production" {
@@ -411,6 +446,7 @@ BeforeSendLog: func(log *sentry.Log) *sentry.Log {
 ```
 
 **Benefits**:
+
 - Production: Only critical logs sent to Sentry (cost control)
 - Development: All logs sent for debugging
 - Debug mode: All logs printed locally regardless of filtering
@@ -418,6 +454,7 @@ BeforeSendLog: func(log *sentry.Log) *sentry.Log {
 #### 3. ClientDriver Refactoring ✅
 
 **Before**: Mixed error returns with logging
+
 ```go
 func (d *ClientDriver) Open(name string) (afero.File, error) {
     log.Printf("[ClientDriver] BLOCKED: Open (download) attempt for file=%s", name)
@@ -426,6 +463,7 @@ func (d *ClientDriver) Open(name string) (afero.File, error) {
 ```
 
 **After**: Pure function, returns error sentinel only
+
 ```go
 func (d *ClientDriver) Open(name string) (afero.File, error) {
     return nil, ErrDownloadNotAllowed
@@ -433,6 +471,7 @@ func (d *ClientDriver) Open(name string) (afero.File, error) {
 ```
 
 **Changes**:
+
 - Removed all `log.Printf` calls (17 instances)
 - Removed unused `log` import
 - All methods return error sentinels
@@ -442,6 +481,7 @@ func (d *ClientDriver) Open(name string) (afero.File, error) {
 #### 4. UploadTransfer Refactoring ✅
 
 Added `log()` helper method:
+
 ```go
 func (t *UploadTransfer) log() sentry.Logger {
     if t.uploadSpan != nil {
@@ -452,6 +492,7 @@ func (t *UploadTransfer) log() sentry.Logger {
 ```
 
 **Logging Strategy** - Only at I/O boundaries:
+
 - `NewUploadTransfer()`: INFO - "Upload started: file=X, event=Y"
 - `streamToR2()` start: DEBUG - "STUB: Background upload started"
 - `streamToR2()` complete: INFO - "STUB: R2 upload stream complete (total: X bytes)"
@@ -460,6 +501,7 @@ func (t *UploadTransfer) log() sentry.Logger {
 - **`Write()`: NO LOGGING** (too verbose for per-chunk operations)
 
 **Removed**:
+
 - Per-chunk write logging (was spamming logs)
 - Fallback `log.Printf` calls
 - `log` import
@@ -467,6 +509,7 @@ func (t *UploadTransfer) log() sentry.Logger {
 #### 5. MainDriver Refactoring ✅
 
 Added `log()` helper method:
+
 ```go
 func (d *MainDriver) log(clientID uint32) sentry.Logger {
     if txn, exists := d.transactions[clientID]; exists && txn != nil {
@@ -477,6 +520,7 @@ func (d *MainDriver) log(clientID uint32) sentry.Logger {
 ```
 
 **Logging Strategy** - Application flow boundaries:
+
 - `ClientConnected()`: INFO - "Client connected: IP (ID: X)"
 - `ClientDisconnected()`: INFO - "Client disconnected: IP (ID: X)"
 - `AuthUser()`: INFO - "Auth attempt: user=X, client=Y"
@@ -485,6 +529,7 @@ func (d *MainDriver) log(clientID uint32) sentry.Logger {
 - **`GetTLSConfig()`: NO LOGGING** (not a flow event)
 
 **Removed**:
+
 - Redundant transaction logging (span ID, etc.)
 - Fallback `log.Printf` in disconnected case
 - Verbose settings logging in `GetSettings()`
@@ -493,6 +538,7 @@ func (d *MainDriver) log(clientID uint32) sentry.Logger {
 ### Testing Results ✅
 
 **Upload Test**:
+
 ```
 [Sentry] Client connected: [::1]:52628 (ID: 1)
 [Sentry] Auth attempt: user=testuser, client=[::1]:52628
@@ -506,6 +552,7 @@ func (d *MainDriver) log(clientID uint32) sentry.Logger {
 ```
 
 **Blocked Download Test** (No logging for blocked operation - clean!):
+
 ```
 [Sentry] Client connected: [::1]:52678 (ID: 2)
 [Sentry] Auth attempt: user=testuser, client=[::1]:52678
@@ -533,11 +580,11 @@ func (d *MainDriver) log(clientID uint32) sentry.Logger {
 
 ### Logging Levels by Environment
 
-| Environment | Sent to Sentry | Printed Locally (Debug=true) |
-|-------------|----------------|------------------------------|
-| Development | ALL            | ALL                          |
-| Staging     | ALL            | ALL                          |
-| Production  | WARN/ERROR/FATAL | ALL (if Debug=true)       |
+| Environment | Sent to Sentry   | Printed Locally (Debug=true) |
+| ----------- | ---------------- | ---------------------------- |
+| Development | ALL              | ALL                          |
+| Staging     | ALL              | ALL                          |
+| Production  | WARN/ERROR/FATAL | ALL (if Debug=true)          |
 
 ### Architecture Pattern
 
@@ -588,6 +635,7 @@ func (d *MainDriver) log(clientID uint32) sentry.Logger {
 ### Problem
 
 Initial implementation returned `nil` from `GetTLSConfig()`, meaning the FTP server only supported plain text (unencrypted) connections. This is insecure for production use as:
+
 - Credentials transmitted in clear text
 - File contents transmitted unencrypted
 - Vulnerable to man-in-the-middle attacks
@@ -595,6 +643,7 @@ Initial implementation returned `nil` from `GetTLSConfig()`, meaning the FTP ser
 ### Solution: Explicit FTPS (AUTH TLS)
 
 Implemented TLS certificate loading in `GetTLSConfig()` with support for:
+
 - Self-signed certificates (development/testing)
 - Let's Encrypt certificates (production)
 - TLS 1.2+ with modern cipher suites
@@ -605,6 +654,7 @@ Implemented TLS certificate loading in `GetTLSConfig()` with support for:
 #### 1. TLS Configuration Implementation (`internal/driver/main_driver.go`) ✅
 
 **Before** (stubbed):
+
 ```go
 func (d *MainDriver) GetTLSConfig() (*tls.Config, error) {
     return nil, nil
@@ -612,6 +662,7 @@ func (d *MainDriver) GetTLSConfig() (*tls.Config, error) {
 ```
 
 **After** (fully implemented):
+
 ```go
 func (d *MainDriver) GetTLSConfig() (*tls.Config, error) {
     // If TLS cert/key paths not configured, return nil (plain FTP)
@@ -640,6 +691,7 @@ func (d *MainDriver) GetTLSConfig() (*tls.Config, error) {
 ```
 
 **Key Features**:
+
 - Automatic fallback to plain FTP if certs not configured
 - TLS 1.2 minimum (secure protocol version)
 - Modern cipher suites (forward secrecy with ECDHE)
@@ -648,6 +700,7 @@ func (d *MainDriver) GetTLSConfig() (*tls.Config, error) {
 #### 2. Certificate Directory (.gitignore) ✅
 
 Created `.gitignore` to prevent committing sensitive certificate files:
+
 ```
 # TLS Certificates (never commit private keys!)
 certs/
@@ -662,6 +715,7 @@ certs/
 #### 3. Self-Signed Certificates (Development) ✅
 
 Generated test certificates using OpenSSL:
+
 ```bash
 mkdir -p certs
 openssl req -x509 -newkey rsa:4096 -keyout certs/key.pem -out certs/cert.pem -days 365 -nodes \
@@ -669,6 +723,7 @@ openssl req -x509 -newkey rsa:4096 -keyout certs/key.pem -out certs/cert.pem -da
 ```
 
 **Certificate Details**:
+
 - Issuer: `C=TH, ST=Bangkok, L=Bangkok, O=SabaiPics, OU=Development, CN=localhost`
 - Valid: 365 days (expires Dec 8, 2026)
 - Algorithm: RSA 4096-bit
@@ -677,6 +732,7 @@ openssl req -x509 -newkey rsa:4096 -keyout certs/key.pem -out certs/cert.pem -da
 #### 4. Environment Configuration ✅
 
 **Updated `.env`:**
+
 ```bash
 # TLS/FTPS Configuration (comment out for plain FTP)
 TLS_CERT_PATH=certs/cert.pem
@@ -684,6 +740,7 @@ TLS_KEY_PATH=certs/key.pem
 ```
 
 **Updated `.env.example`** with comprehensive documentation:
+
 - Self-signed certificate generation command
 - Let's Encrypt production paths
 - Comments explaining when to use each option
@@ -691,6 +748,7 @@ TLS_KEY_PATH=certs/key.pem
 ### Testing Results ✅
 
 **FTPS Upload Test** (curl with explicit TLS):
+
 ```bash
 $ curl -v --ftp-ssl --insecure -T /tmp/ftps-test.txt ftp://testuser:testpass@localhost:2121/ftps-test.txt
 
@@ -719,6 +777,7 @@ $ curl -v --ftp-ssl --insecure -T /tmp/ftps-test.txt ftp://testuser:testpass@loc
 ✅ File upload succeeded (226 response)
 
 **Server Logs**:
+
 ```
 [Sentry] Client connected: [::1]:53936 (ID: 1)
 [Sentry] Auth attempt: user=testuser, client=[::1]:53936
@@ -743,11 +802,13 @@ $ curl -v --ftp-ssl --insecure -T /tmp/ftps-test.txt ftp://testuser:testpass@loc
 Added complete **"FTPS (FTP over TLS) Configuration"** section covering:
 
 **Option 1: Self-Signed Certificates**
+
 - OpenSSL command for certificate generation
 - Environment configuration
 - Security warnings for development use
 
 **Option 2: Let's Encrypt (Production)**
+
 - Prerequisites (domain, port 80 access, certbot)
 - Installation instructions (Ubuntu/Debian, CentOS/RHEL)
 - Certificate generation with certbot
@@ -756,11 +817,13 @@ Added complete **"FTPS (FTP over TLS) Configuration"** section covering:
 - Certificate copying strategy for non-root FTP server
 
 **Testing FTPS**
+
 - curl examples (with/without --insecure)
 - FileZilla configuration steps
 - OpenSSL verification command
 
 **Disabling FTPS**
+
 - How to fall back to plain FTP
 
 ### Security Features
@@ -781,11 +844,13 @@ Added complete **"FTPS (FTP over TLS) Configuration"** section covering:
 ### Known Limitations
 
 ⚠️ **Implicit FTPS Not Supported** - Only explicit mode (AUTH TLS) implemented
+
 - Explicit FTPS is more widely supported by clients
 - Implicit FTPS requires separate port (990) and immediate TLS on connect
 - Can be added in future if needed
 
 ⚠️ **Self-Signed Cert Warnings** - Development certs show security warnings
+
 - Expected behavior for self-signed certificates
 - Clients must manually accept certificate
 - Use Let's Encrypt for production to avoid warnings
@@ -793,6 +858,7 @@ Added complete **"FTPS (FTP over TLS) Configuration"** section covering:
 ### Next Steps
 
 For production deployment:
+
 1. Obtain domain name (e.g., `ftp.sabaipics.com`)
 2. Point DNS to server IP
 3. Install certbot on server
@@ -811,9 +877,11 @@ For production deployment:
 ## Phase 12: Implicit FTPS + Client Compatibility (2025-12-08)
 
 ### Objective
+
 Add implicit FTPS support for mobile FTP clients and implement no-op operations for maximum client compatibility.
 
 ### Problem
+
 Mobile FTP clients attempted implicit FTPS (immediate TLS handshake) but server only supported explicit FTPS (AUTH TLS command). Additionally, clients failed uploads due to blocked RENAME/DELETE/MKDIR operations.
 
 ### Implementation
@@ -821,6 +889,7 @@ Mobile FTP clients attempted implicit FTPS (immediate TLS handshake) but server 
 #### 1. Implicit FTPS Support (Port 990)
 
 **Config Changes** (`internal/config/config.go`):
+
 ```go
 // New fields
 ImplicitFTPSEnabled bool   // Enable implicit FTPS server on port 990
@@ -828,11 +897,13 @@ ImplicitFTPSPort    string // Port for implicit FTPS (default: 0.0.0.0:990)
 ```
 
 **Main Driver Updates** (`internal/driver/main_driver.go`):
+
 - Added `tlsMode` field to track explicit vs implicit
 - New constructor: `NewMainDriverImplicit()` for implicit FTPS
 - `GetSettings()` now returns `TLSRequired` setting per mode
 
 **Server Architecture** (`internal/server/server.go`):
+
 - Dual server support: explicit (2121) + implicit (990)
 - Explicit server runs on main thread (blocks)
 - Implicit server runs in background goroutine
@@ -841,6 +912,7 @@ ImplicitFTPSPort    string // Port for implicit FTPS (default: 0.0.0.0:990)
 #### 2. Client Compatibility: No-Op Operations
 
 **Problem**: Mobile clients use "atomic upload" pattern:
+
 1. Upload with temp name (`__rename.tmp`)
 2. Rename to final name after success
 3. Clean up temp files on failure
@@ -849,8 +921,9 @@ ImplicitFTPSPort    string // Port for implicit FTPS (default: 0.0.0.0:990)
 **Solution**: Accept all operations with success codes, but do nothing (no-op).
 
 **No-Op Operations Implemented**:
+
 - `RENAME` (RNFR/RNTO) → 250 OK
-- `DELETE` (DELE) → 250 OK  
+- `DELETE` (DELE) → 250 OK
 - `MKDIR` (MKD) → 257 Created
 - `RMDIR` (RMD) → 250 OK
 - `CHMOD` → 200 OK
@@ -863,12 +936,14 @@ ImplicitFTPSPort    string // Port for implicit FTPS (default: 0.0.0.0:990)
 **Problem**: `CWD /` failed with "Not a Directory" error.
 
 **Solution**: Enhanced `Stat()` to detect directories:
+
 - Root path: `/` → Always directory
-- Trailing slash: `/path/` → Directory  
+- Trailing slash: `/path/` → Directory
 - Common names: `iPhone`, `Camera`, `DCIM` → Directory
 - No extension: Probably directory (heuristic)
 
 Updated `fakeFileInfo`:
+
 - Added `isDir` field
 - `Mode()` returns `os.ModeDir | 0755` for directories
 - `IsDir()` returns actual directory status
@@ -876,6 +951,7 @@ Updated `fakeFileInfo`:
 ### Configuration
 
 **Environment Variables**:
+
 ```bash
 # Enable implicit FTPS (optional)
 IMPLICIT_FTPS_ENABLED=true
@@ -888,14 +964,16 @@ FTP_DEBUG=true
 ### Testing Results
 
 **Port Configuration**:
+
 - Port 2121: Explicit FTPS (AUTH TLS) + Plain FTP ✅
 - Port 990: Implicit FTPS (immediate TLS) ✅
 - Port 5000-5099: Passive data transfers ✅
 
 **Mobile Client Testing** (192.168.1.43):
+
 ```
 ✅ Connection established
-✅ Authentication successful  
+✅ Authentication successful
 ✅ CWD / → 250 CD worked on /
 ✅ LIST → Empty directory listing
 ✅ STOR __rename.tmp → Upload successful (1 byte)
@@ -905,6 +983,7 @@ FTP_DEBUG=true
 ```
 
 **Upload Workflow**:
+
 1. Client uploads with temp name ✅
 2. Client renames to final name ✅ (accepted, but ignored)
 3. Client deletes temp file on retry ✅ (accepted, but ignored)
@@ -913,12 +992,14 @@ FTP_DEBUG=true
 ### Architecture Decisions
 
 **Why No-Op Instead of Blocking?**
+
 - Better UX: Clients don't show errors
 - Atomic uploads: Clients can complete their workflows
 - Directory organization: Clients can create folders (ignored)
 - Flexibility: Support any FTP client behavior
 
 **Why Dual Server Architecture?**
+
 - ftpserverlib limitation: Can't change TLS mode per connection
 - Solution: Run two servers with different TLS settings
 - Explicit server: `TLSRequired = ClearOrEncrypted`
@@ -926,6 +1007,7 @@ FTP_DEBUG=true
 
 **Why Not Track Renames?**
 Since we:
+
 - Don't have a real filesystem
 - Upload directly to R2
 - Generate unique keys server-side
@@ -935,24 +1017,28 @@ Client-side rename is irrelevant. We just accept it to avoid client errors.
 ### Files Modified
 
 **Configuration**:
+
 - `internal/config/config.go` - Added implicit FTPS settings
 - `.env` - Enabled implicit FTPS on port 990
 - `.env.example` - Documented both FTPS modes
 
 **Server Core**:
+
 - `internal/driver/main_driver.go` - Dual driver constructors, TLS mode support
 - `internal/server/server.go` - Dual server architecture, goroutine for implicit server
 
 **Client Compatibility**:
+
 - `internal/client/client_driver.go` - No-op operations, enhanced directory detection
 
 ### Debug Logging
 
 FTP protocol logging shows all commands/responses:
+
 ```
 time=... level=DEBUG msg="Received line" clientId=4 line="RNFR __rename.tmp"
 time=... level=DEBUG msg="Sending answer" clientId=4 line="350 Sure, give me a target"
-time=... level=DEBUG msg="Received line" clientId=4 line="RNTO file.jpg"  
+time=... level=DEBUG msg="Received line" clientId=4 line="RNTO file.jpg"
 time=... level=DEBUG msg="Sending answer" clientId=4 line="250 OK"
 ```
 
@@ -961,6 +1047,7 @@ Controlled by `FTP_DEBUG=true` environment variable.
 ### Known Behavior
 
 **Operations That Do Nothing** (by design):
+
 - File rename (RNFR/RNTO)
 - File deletion (DELE, RMD)
 - Directory creation (MKD)
@@ -968,23 +1055,27 @@ Controlled by `FTP_DEBUG=true` environment variable.
 - Timestamp modification (MFMT)
 
 **Operations That Work**:
+
 - File upload (STOR) → Actually uploads to R2
 - Directory listing (LIST) → Returns empty (by design)
 - Directory navigation (CWD) → Accepts all paths
 - Authentication (USER/PASS) → Validates against DB (stub)
 
 **Operations That Fail** (by design):
+
 - File download (RETR) → 550 Error (upload-only server)
 
 ### Security Considerations
 
 **TLS Configuration** (Both Modes):
+
 - Minimum: TLS 1.2
 - Cipher suites: ECDHE-RSA/ECDSA with AES-GCM
 - Certificate: Shared between explicit and implicit servers
 - Self-signed for development, Let's Encrypt for production
 
 **No-Op Security**:
+
 - No actual filesystem modification
 - Can't delete uploaded files (R2 key remains)
 - Can't rename uploaded files (R2 key unchanged)
@@ -992,23 +1083,25 @@ Controlled by `FTP_DEBUG=true` environment variable.
 
 ### Client Support Matrix
 
-| Client Type | Port | Mode | Status |
-|------------|------|------|--------|
-| Desktop FTP (FileZilla) | 2121 | Plain FTP | ✅ Works |
+| Client Type             | Port | Mode          | Status   |
+| ----------------------- | ---- | ------------- | -------- |
+| Desktop FTP (FileZilla) | 2121 | Plain FTP     | ✅ Works |
 | Desktop FTP (FileZilla) | 2121 | Explicit FTPS | ✅ Works |
-| Mobile FTP (implicit) | 990 | Implicit FTPS | ✅ Works |
-| Camera/Device | 2121 | Plain FTP | ✅ Works |
-| curl | 2121 | Plain FTP | ✅ Works |
-| curl --ftp-ssl | 2121 | Explicit FTPS | ✅ Works |
+| Mobile FTP (implicit)   | 990  | Implicit FTPS | ✅ Works |
+| Camera/Device           | 2121 | Plain FTP     | ✅ Works |
+| curl                    | 2121 | Plain FTP     | ✅ Works |
+| curl --ftp-ssl          | 2121 | Explicit FTPS | ✅ Works |
 
 ### Performance Impact
 
 **Dual Server**:
+
 - Minimal overhead (both use same DB pool)
 - Implicit server runs in background goroutine
 - No resource duplication (shared config, logger)
 
 **No-Op Operations**:
+
 - Zero overhead (just return nil)
 - No I/O operations performed
 - Instant response to client
@@ -1016,6 +1109,7 @@ Controlled by `FTP_DEBUG=true` environment variable.
 ### Next Steps
 
 **Before Production**:
+
 1. ✅ Implicit FTPS support
 2. ✅ Client compatibility (no-op operations)
 3. ⏳ Refactor tracing (upload-based transactions)
@@ -1039,10 +1133,13 @@ Target: Transaction per upload (correct!)
 ## Phase 13: Sentry Tracing Refactor - Upload-Based Transactions (2025-12-08)
 
 ### Objective
+
 Refactor Sentry distributed tracing from connection-level transactions to upload-level transactions for accurate observability and future pipeline tracing.
 
 ### Problem
+
 Sentry transactions were created per FTP connection, not per upload:
+
 - ❌ Transaction started at `ClientConnected()` (lasted hours)
 - ❌ Multiple uploads shared same transaction
 - ❌ Impossible to trace individual uploads
@@ -1050,7 +1147,9 @@ Sentry transactions were created per FTP connection, not per upload:
 - ❌ Can't track upload pipeline (FTP → R2 → DB → Thumbnail)
 
 ### Solution
+
 Create root transactions per upload with comprehensive context:
+
 - ✅ Transaction lifecycle matches upload lifecycle
 - ✅ Each upload independently traceable
 - ✅ Accurate metrics per file (duration, throughput, errors)
@@ -1060,6 +1159,7 @@ Create root transactions per upload with comprehensive context:
 ### Architecture Change
 
 **Before** (Connection-Level):
+
 ```
 ┌───────────────────────────────────────────────┐
 │ MainDriver: ClientConnected()                 │
@@ -1081,6 +1181,7 @@ Create root transactions per upload with comprehensive context:
 ```
 
 **After** (Upload-Level):
+
 ```
 ┌───────────────────────────────────────────────┐
 │ MainDriver: ClientConnected()                 │
@@ -1114,6 +1215,7 @@ Create root transactions per upload with comprehensive context:
 **File**: `internal/driver/main_driver.go`
 
 **Removed**:
+
 - `transactions map[uint32]*sentry.Span` field
 - Map initialization in constructors
 - Transaction creation in `ClientConnected()`
@@ -1121,6 +1223,7 @@ Create root transactions per upload with comprehensive context:
 - `clientID` parameter from `log()` method
 
 **Changes**:
+
 ```go
 // Before
 type MainDriver struct {
@@ -1175,6 +1278,7 @@ func (d *MainDriver) ClientDisconnected(cc ftpserver.ClientContext) {
 ```
 
 **AuthUser Update**:
+
 ```go
 // Before: Pass transaction context to ClientDriver
 var parentCtx context.Context
@@ -1192,6 +1296,7 @@ clientDriver := client.NewClientDriver(eventID, photographerID, clientIP, d.conf
 **File**: `internal/client/client_driver.go`
 
 **Changes**:
+
 ```go
 // Before
 type ClientDriver struct {
@@ -1249,6 +1354,7 @@ func (d *ClientDriver) OpenFile(name string, flag int, perm os.FileMode) (afero.
 **File**: `internal/transfer/upload_transfer.go`
 
 **Changes**:
+
 ```go
 // Before: Child span
 type UploadTransfer struct {
@@ -1360,6 +1466,7 @@ func (t *UploadTransfer) Close() error {
 ### Transaction Lifecycle
 
 **1:1 Relationship** - Each UploadTransfer has exactly one transaction:
+
 ```
 ClientDriver.OpenFile()
     → Creates UploadTransfer
@@ -1374,29 +1481,34 @@ ClientDriver.OpenFile()
 ### Transaction Tags & Metrics
 
 **Tags** (for filtering in Sentry):
+
 - `file.name`: Filename being uploaded
 - `event.id`: Event this upload belongs to
 - `photographer.id`: Photographer performing upload
 - `client.ip`: Client IP address
 
 **Metrics** (for performance analysis):
+
 - `upload.bytes`: Total bytes transferred
 - `upload.duration_ms`: Upload duration in milliseconds
 - `upload.throughput_mbps`: Transfer speed in MB/s
 
 **Status**:
+
 - `SpanStatusOK`: Upload completed successfully
 - `SpanStatusInternalError`: Upload failed with error
 
 ### Testing Results
 
 **Test Command**:
+
 ```bash
 echo "Tracing refactor test" > /tmp/trace-test.txt
 curl -s ftp://testuser:testpass@localhost:2121/ -T /tmp/trace-test.txt
 ```
 
 **Server Logs**:
+
 ```
 [Sentry] Client connected: [::1]:61673 (ID: 1)
 [Sentry] Auth attempt: user=testuser, client=[::1]:61673
@@ -1410,6 +1522,7 @@ curl -s ftp://testuser:testpass@localhost:2121/ -T /tmp/trace-test.txt
 ```
 
 **Key Observations**:
+
 - ✅ Transaction sent immediately after upload (not hours later)
 - ✅ Transaction ID unique per upload: `29751e46f0d94b7783e2fb83b4569acb`
 - ✅ Complete context: file, event, photographer, client IP
@@ -1419,24 +1532,28 @@ curl -s ftp://testuser:testpass@localhost:2121/ -T /tmp/trace-test.txt
 ### Benefits Achieved
 
 **Observability**:
+
 - ✅ Each upload has unique transaction ID
 - ✅ Can filter by file, event, photographer, or client IP
 - ✅ Accurate P50/P95/P99 latency per upload
 - ✅ Easy to identify slow uploads
 
 **Error Tracking**:
+
 - ✅ Know exactly which upload failed
 - ✅ See error message in transaction data
 - ✅ Transaction marked with `error: true` tag
 - ✅ Failed uploads filterable in Sentry
 
 **Future Pipeline**:
+
 - ✅ Ready for distributed tracing
 - ✅ Can propagate traceparent to R2 metadata
 - ✅ Can create child spans for DB insert, thumbnail generation
 - ✅ End-to-end visibility: FTP → R2 → DB → Thumbnails
 
 **Performance**:
+
 - ✅ No connection-level transaction overhead
 - ✅ Transactions only exist during active uploads
 - ✅ Memory efficient (no long-lived transaction map)
@@ -1450,6 +1567,7 @@ curl -s ftp://testuser:testpass@localhost:2121/ -T /tmp/trace-test.txt
 ### Compilation Fix
 
 **Error**:
+
 ```
 internal/client/client_driver.go:4:2: "context" imported and not used
 ```
@@ -1459,6 +1577,7 @@ internal/client/client_driver.go:4:2: "context" imported and not used
 ### Future Work
 
 **Pipeline Tracing** (Out of scope for this phase):
+
 ```
 ROOT Transaction: ftp.upload
     ├─ Span: r2.upload (propagate traceparent)
@@ -1474,27 +1593,29 @@ This architecture is now ready for pipeline tracing when R2 and DB implementatio
 ### Known Behavior
 
 **Connection Events** (No transactions):
+
 - Client connected → INFO log only
 - Client disconnected → INFO log only
 - Auth attempt → INFO log only
 
 **Upload Events** (Root transactions):
+
 - Upload started → Create transaction + INFO log
 - Upload completed → Finish transaction + metrics + INFO log
 - Upload failed → Finish transaction + error status + ERROR log
 
 ### Comparison: Before vs After
 
-| Aspect | Before (Connection) | After (Upload) |
-|--------|-------------------|----------------|
-| Transaction scope | Entire connection | Single upload |
-| Transaction duration | Hours | Seconds |
-| Transactions per connection | 1 | N (one per file) |
-| Traceability | Poor (many uploads in one) | Excellent (one per upload) |
-| Performance metrics | Meaningless (mixed uploads) | Accurate (per file) |
-| Error attribution | Ambiguous | Precise |
-| Pipeline ready | No | Yes |
-| Memory usage | Map grows with clients | Ephemeral (seconds) |
+| Aspect                      | Before (Connection)         | After (Upload)             |
+| --------------------------- | --------------------------- | -------------------------- |
+| Transaction scope           | Entire connection           | Single upload              |
+| Transaction duration        | Hours                       | Seconds                    |
+| Transactions per connection | 1                           | N (one per file)           |
+| Traceability                | Poor (many uploads in one)  | Excellent (one per upload) |
+| Performance metrics         | Meaningless (mixed uploads) | Accurate (per file)        |
+| Error attribution           | Ambiguous                   | Precise                    |
+| Pipeline ready              | No                          | Yes                        |
+| Memory usage                | Map grows with clients      | Ephemeral (seconds)        |
 
 ---
 
@@ -1526,6 +1647,7 @@ This architecture is now ready for pipeline tracing when R2 and DB implementatio
 ### Files Created
 
 **`internal/apiclient/client.go`** - API client with FormData streaming
+
 - `Authenticate()` - POST /api/ftp/auth, returns JWT token
 - `UploadFormData()` - POST /api/ftp/upload with multipart/form-data
 - Uses `io.Pipe` + `multipart.Writer` for streaming (no buffering)
@@ -1534,25 +1656,30 @@ This architecture is now ready for pipeline tracing when R2 and DB implementatio
 ### Files Modified
 
 **`internal/config/config.go`**
+
 - Added `APIURL string` field
 - Made `API_URL` required environment variable
 
 **`.env.example`**
+
 - Added `API_URL=https://api.sabaipics.com`
 
 **`internal/driver/main_driver.go`**
+
 - Added `apiClient *apiclient.Client` field
 - Updated constructors to create API client
 - Replaced auth stub with `apiClient.Authenticate()` call
 - Returns JWT token to ClientDriver
 
 **`internal/client/client_driver.go`**
+
 - Replaced `photographerID` with `jwtToken` field
 - Added `apiClient *apiclient.Client` field
 - Updated constructor signature
 - Passes JWT token and API client to UploadTransfer
 
 **`internal/transfer/upload_transfer.go`**
+
 - Added `jwtToken` and `apiClient` fields
 - Updated constructor signature
 - Replaced `streamToR2()` with `streamToAPI()`
@@ -1561,11 +1688,13 @@ This architecture is now ready for pipeline tracing when R2 and DB implementatio
 ### Key Decisions
 
 **FormData over Presigned URLs**:
+
 - Image validation must happen in API
 - VPS acts as thin proxy only (no direct R2 access)
 - Single upload path through API
 
 **JWT Lifecycle - Reactive (401 Detection)**:
+
 - No timer management, simpler implementation
 - Handles all auth failure scenarios (expired, revoked, clock skew)
 - Works across server restarts
@@ -1573,10 +1702,12 @@ This architecture is now ready for pipeline tracing when R2 and DB implementatio
 ### API Contracts
 
 **POST /api/ftp/auth**
+
 - Request: `{ username, password }`
 - Response: `{ token, event_id, event_name, upload_window_end, credits_remaining }`
 
 **POST /api/ftp/upload**
+
 - FormData fields: `file` (binary), `eventId` (string)
 - Response: `{ data: { id, status, filename, size_bytes, r2_key } }`
 
@@ -1590,6 +1721,7 @@ This architecture is now ready for pipeline tracing when R2 and DB implementatio
 ### Problem
 
 When `UploadTransfer.streamToAPI()` received 401 from API:
+
 1. Returned `ErrAuthExpired` through upload channel
 2. FTP library just sent error response to client
 3. **Connection stayed open** - client could retry
@@ -1611,14 +1743,17 @@ ClientContext.Close() → disconnect
 ### Files Modified
 
 **`internal/client/client_driver.go`**
+
 - Added `clientContext ftpserver.ClientContext` field
 - Updated `NewClientDriver()` to accept `cc ftpserver.ClientContext`
 - Passes `clientContext` to `NewUploadTransfer()`
 
 **`internal/driver/main_driver.go`**
+
 - Updated `AuthUser()` to pass `cc` to `NewClientDriver()`
 
 **`internal/transfer/upload_transfer.go`**
+
 - Added `clientContext ftpserver.ClientContext` field
 - Updated `NewUploadTransfer()` to accept `cc ftpserver.ClientContext`
 - On 401: calls `t.clientContext.Close()` to disconnect client
@@ -1656,6 +1791,7 @@ if httpResp != nil && httpResp.StatusCode == http.StatusUnauthorized {
 ### Problem
 
 Previous implementation had UploadTransfer directly calling `ClientContext.Close()`:
+
 - ❌ Business logic (disconnect decision) mixed with I/O operations
 - ❌ UploadTransfer had too much responsibility
 - ❌ No centralized place to manage client state
@@ -1674,6 +1810,7 @@ UploadTransfer ──[events]──► ClientManager Hub ──[decisions]──
 ```
 
 **Key Principles**:
+
 1. UploadTransfer **reports events** but doesn't make decisions
 2. ClientManager Hub **receives events and decides actions**
 3. All client management logic centralized in one place
@@ -1681,6 +1818,7 @@ UploadTransfer ──[events]──► ClientManager Hub ──[decisions]──
 ### Files Created
 
 **`internal/clientmgr/manager.go`** - Centralized client management
+
 - `EventType` enum: `EventAuthExpired`, `EventUploadFailed`, `EventRateLimited`
 - `ClientEvent` struct: Type, ClientID, Reason
 - `ManagedClient` struct: ID, ClientContext, ClientIP
@@ -1693,6 +1831,7 @@ UploadTransfer ──[events]──► ClientManager Hub ──[decisions]──
 ### Files Modified
 
 **`internal/driver/main_driver.go`**
+
 - Removed `db *pgxpool.Pool` field (PostgreSQL removed)
 - Added `clientMgr *clientmgr.Manager` field
 - Updated constructors to accept clientMgr instead of db
@@ -1701,12 +1840,14 @@ UploadTransfer ──[events]──► ClientManager Hub ──[decisions]──
 - `AuthUser()` → passes clientID and clientMgr to ClientDriver
 
 **`internal/client/client_driver.go`**
+
 - Replaced `clientContext ftpserver.ClientContext` with `clientID uint32`
 - Added `clientMgr *clientmgr.Manager` field
 - Updated constructor signature
 - Passes clientID and clientMgr to UploadTransfer
 
 **`internal/transfer/upload_transfer.go`**
+
 - Replaced `clientContext ftpserver.ClientContext` with `clientID uint32`
 - Added `clientMgr *clientmgr.Manager` field
 - Updated constructor signature
@@ -1716,26 +1857,32 @@ UploadTransfer ──[events]──► ClientManager Hub ──[decisions]──
 - Added `file.extension` Sentry tag
 
 **`internal/server/server.go`**
+
 - Replaced `db *pgxpool.Pool` with `clientMgr *clientmgr.Manager`
 - Updated `New()` to accept clientMgr
 - `Shutdown()` now calls `clientMgr.Stop()`
 
 **`cmd/ftp-server/main.go`**
+
 - Removed PostgreSQL connection code
 - Creates and starts ClientManager
 - Passes clientMgr to server.New()
 
 **`internal/config/config.go`**
+
 - Removed `DatabaseURL`, `R2AccessKey`, `R2SecretKey`, `R2Endpoint`, `R2BucketName`
 - Removed `DATABASE_URL` validation
 
 **`go.mod`**
+
 - Removed `github.com/jackc/pgx/v5` dependency
 
 **`.env.example`**
+
 - Removed `DATABASE_URL` and `R2_*` variables
 
 **`README.md`**
+
 - Updated architecture diagram (API-based)
 - Updated directory structure (added apiclient, clientmgr)
 - Updated prerequisites (removed PostgreSQL)

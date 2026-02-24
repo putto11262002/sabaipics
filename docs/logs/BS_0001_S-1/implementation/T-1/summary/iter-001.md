@@ -13,15 +13,15 @@ Created Drizzle ORM schema for 7 domain tables with migrations, relations, and T
 
 ### Tables Created
 
-| Table | Purpose | Key Features |
-|-------|---------|--------------|
-| `photographers` | Auth anchor for Clerk users | `clerk_id` UNIQUE, `pdpa_consent_at` for compliance |
-| `credit_packages` | Admin-editable pricing tiers | `active` flag, `sort_order` for display |
-| `credit_ledger` | Append-only credit transactions | FIFO expiry via composite index |
-| `events` | Photographer events | `access_code` UNIQUE for QR, nullable `rekognition_collection_id` |
-| `photos` | Uploaded photos | `status` enum, `r2_key` for storage |
-| `faces` | Detected faces per photo | JSONB for full Rekognition response |
-| `consent_records` | PDPA compliance audit trail | IP address tracking |
+| Table             | Purpose                         | Key Features                                                      |
+| ----------------- | ------------------------------- | ----------------------------------------------------------------- |
+| `photographers`   | Auth anchor for Clerk users     | `clerk_id` UNIQUE, `pdpa_consent_at` for compliance               |
+| `credit_packages` | Admin-editable pricing tiers    | `active` flag, `sort_order` for display                           |
+| `credit_ledger`   | Append-only credit transactions | FIFO expiry via composite index                                   |
+| `events`          | Photographer events             | `access_code` UNIQUE for QR, nullable `rekognition_collection_id` |
+| `photos`          | Uploaded photos                 | `status` enum, `r2_key` for storage                               |
+| `faces`           | Detected faces per photo        | JSONB for full Rekognition response                               |
+| `consent_records` | PDPA compliance audit trail     | IP address tracking                                               |
 
 ### Files Created
 
@@ -67,15 +67,18 @@ packages/db/drizzle/
 ### Type Exports
 
 Each table exports:
+
 - `<TableName>` - Select type (e.g., `Photographer`, `Event`)
 - `New<TableName>` - Insert type (e.g., `NewPhotographer`, `NewEvent`)
 
 Plus enum types:
+
 - `CreditLedgerType`
 - `PhotoStatus`
 - `ConsentType`
 
 Plus Rekognition types (from `types.ts`):
+
 - `BoundingBox`
 - `RekognitionFaceRecord`
 - `RekognitionFace`
@@ -85,12 +88,12 @@ Plus Rekognition types (from `types.ts`):
 
 ## Decisions Made
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| UUID generation | DB-side `gen_random_uuid()` | Simpler, no pre-insert ID needed |
-| FK cascade | RESTRICT | Prevent accidental deletion; soft delete is future work |
-| Rekognition types | Local in `types.ts` | Avoid adding `@aws-sdk/client-rekognition` to db package |
-| Type naming | Prefix with `Rekognition` | Avoid collision with `Face` table type |
+| Decision          | Choice                      | Rationale                                                |
+| ----------------- | --------------------------- | -------------------------------------------------------- |
+| UUID generation   | DB-side `gen_random_uuid()` | Simpler, no pre-insert ID needed                         |
+| FK cascade        | RESTRICT                    | Prevent accidental deletion; soft delete is future work  |
+| Rekognition types | Local in `types.ts`         | Avoid adding `@aws-sdk/client-rekognition` to db package |
+| Type naming       | Prefix with `Rekognition`   | Avoid collision with `Face` table type                   |
 
 ---
 
@@ -105,6 +108,7 @@ Plus Rekognition types (from `types.ts`):
 ## Next Steps
 
 1. **Human action required:** Run migration on staging
+
    ```bash
    pnpm --filter=@sabaipics/db db:migrate
    ```

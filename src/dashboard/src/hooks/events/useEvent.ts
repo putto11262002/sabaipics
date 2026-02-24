@@ -3,7 +3,7 @@ import type { InferResponseType } from 'hono/client';
 import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
-type EventResponse = InferResponseType<typeof api.events[':id']['$get'], SuccessStatusCode>;
+type EventResponse = InferResponseType<(typeof api.events)[':id']['$get'], SuccessStatusCode>;
 
 export type Event = EventResponse['data'];
 

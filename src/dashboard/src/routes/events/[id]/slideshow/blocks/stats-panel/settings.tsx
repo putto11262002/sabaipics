@@ -34,7 +34,10 @@ export function StatsPanelSettings({
       {/* Variant selector */}
       <div className="flex items-center gap-2">
         <Label className="w-20 text-xs">Style</Label>
-        <Select value={props.variant} onValueChange={(v) => update({ variant: v as StatsPanelVariant })}>
+        <Select
+          value={props.variant}
+          onValueChange={(v) => update({ variant: v as StatsPanelVariant })}
+        >
           <SelectTrigger className="h-8 flex-1">
             <SelectValue />
           </SelectTrigger>

@@ -5,6 +5,7 @@ Root: `BS_0001_S-1`
 Date: `2026-01-11`
 
 ## Stack (UI surface)
+
 - Framework: React ^19.2.0
 - Component library: shadcn/ui (new-york style)
 - Forms: react-hook-form ^7.70.0 with @hookform/resolvers/zod
@@ -17,6 +18,7 @@ Date: `2026-01-11`
 ## Must-follow conventions
 
 ### 1. File Organization
+
 - **Routes/pages:** `apps/dashboard/src/routes/<route-path>/index.tsx`
 - **Shared components:** `apps/dashboard/src/components/<domain>/<ComponentName>.tsx`
 - **Custom hooks:** `apps/dashboard/src/hooks/<domain>/<hookName>.ts`
@@ -24,6 +26,7 @@ Date: `2026-01-11`
 - **Schema/validation:** `apps/dashboard/src/lib/<domain>-schema.ts`
 
 ### 2. Styling Conventions
+
 - **Required:** Use Tailwind CSS for all styling
 - **Required:** Use shadcn predefined CSS variables (e.g., `bg-card`, `text-muted-foreground`, `border-destructive`)
 - **Required:** Use `cn()` utility from `@sabaipics/ui/lib/utils` for conditional classes
@@ -31,24 +34,26 @@ Date: `2026-01-11`
 - **Reference:** `docs/shadcn/components`, `docs/shadcn/blocks`, `docs/shadcn/examples`
 
 ### 3. Component Import Patterns
+
 ```tsx
 // shadcn/ui components (from packages/ui)
-import { Button } from "@sabaipics/ui/components/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@sabaipics/ui/components/card";
-import { Dialog, DialogContent, DialogHeader } from "@sabaipics/ui/components/dialog";
-import { Alert } from "@sabaipics/ui/components/alert";
-import { Skeleton } from "@sabaipics/ui/components/skeleton";
-import { Badge } from "@sabaipics/ui/components/badge";
-import { Spinner } from "@sabaipics/ui/components/spinner";
+import { Button } from '@sabaipics/ui/components/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@sabaipics/ui/components/card';
+import { Dialog, DialogContent, DialogHeader } from '@sabaipics/ui/components/dialog';
+import { Alert } from '@sabaipics/ui/components/alert';
+import { Skeleton } from '@sabaipics/ui/components/skeleton';
+import { Badge } from '@sabaipics/ui/components/badge';
+import { Spinner } from '@sabaipics/ui/components/spinner';
 
 // Utils
-import { cn } from "@sabaipics/ui/lib/utils";
+import { cn } from '@sabaipics/ui/lib/utils';
 
 // Icons
-import { Upload, Download, X } from "lucide-react";
+import { Upload, Download, X } from 'lucide-react';
 ```
 
 ### 4. Adding New shadcn Components
+
 ```bash
 # From project root
 pnpm --filter=@sabaipics/ui ui:add <component>
@@ -56,26 +61,25 @@ pnpm --filter=@sabaipics/ui ui:add <component>
 ```
 
 ### 5. API Client Pattern
+
 **Hook-based with TanStack Query:**
+
 ```tsx
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useApiClient } from "../../lib/api";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useApiClient } from '../../lib/api';
 
 export function usePhotos(eventId: string | undefined) {
   const { getToken } = useApiClient();
 
   return useQuery({
-    queryKey: ["event", eventId, "photos"],
+    queryKey: ['event', eventId, 'photos'],
     queryFn: async () => {
-      if (!eventId) throw new Error("Event ID is required");
-      
+      if (!eventId) throw new Error('Event ID is required');
+
       const token = await getToken();
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/events/${eventId}/photos`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/events/${eventId}/photos`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -95,35 +99,33 @@ export function useUploadPhoto() {
   return useMutation({
     mutationFn: async ({ eventId, file }: { eventId: string; file: File }) => {
       const token = await getToken();
-      
-      const formData = new FormData();
-      formData.append("file", file);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/events/${eventId}/photos`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        }
-      );
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/events/${eventId}/photos`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error?.message || "Upload failed");
+        throw new Error(errorData.error?.message || 'Upload failed');
       }
 
       return response.json();
     },
     onSuccess: (_, variables) => {
       // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ["event", variables.eventId, "photos"] });
+      queryClient.invalidateQueries({ queryKey: ['event', variables.eventId, 'photos'] });
     },
   });
 }
 ```
 
 **Key patterns:**
+
 - Use `useApiClient()` hook to get `getToken()` function
 - Always include `Authorization: Bearer ${token}` header
 - Use `import.meta.env.VITE_API_URL` for API base URL
@@ -132,14 +134,16 @@ export function useUploadPhoto() {
 - Use `enabled` flag for conditional queries
 
 ### 6. Form Handling Pattern
+
 **With react-hook-form + Zod:**
+
 ```tsx
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 const schema = z.object({
-  name: z.string().min(1, "Required"),
+  name: z.string().min(1, 'Required'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -147,7 +151,7 @@ type FormData = z.infer<typeof schema>;
 export function MyForm() {
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "" },
+    defaultValues: { name: '' },
   });
 
   const onSubmit = async (data: FormData) => {
@@ -178,6 +182,7 @@ export function MyForm() {
 ```
 
 ### 7. Loading/Error/Empty States Pattern
+
 ```tsx
 // Loading state
 if (isLoading) {
@@ -216,59 +221,67 @@ if (!data || data.length === 0) {
 ```
 
 ### 8. File Upload Conventions
+
 **Client-side validation:**
+
 ```tsx
-const ACCEPTED_FORMATS = ["image/jpeg", "image/png", "image/heic", "image/webp"];
+const ACCEPTED_FORMATS = ['image/jpeg', 'image/png', 'image/heic', 'image/webp'];
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
 function validateFile(file: File): string | null {
   if (!ACCEPTED_FORMATS.includes(file.type)) {
-    return "Accepted formats: JPEG, PNG, HEIC, WebP";
+    return 'Accepted formats: JPEG, PNG, HEIC, WebP';
   }
   if (file.size > MAX_FILE_SIZE) {
-    return "Maximum file size is 20MB";
+    return 'Maximum file size is 20MB';
   }
   return null;
 }
 ```
 
 **Upload with FormData:**
+
 ```tsx
 const formData = new FormData();
-formData.append("file", file);
+formData.append('file', file);
 
 const response = await fetch(url, {
-  method: "POST",
+  method: 'POST',
   headers: { Authorization: `Bearer ${token}` },
   body: formData, // No Content-Type header (browser sets it automatically)
 });
 ```
 
 **Progress tracking:**
+
 - For T-19, use per-file mutation tracking (no XMLHttpRequest needed for MVP)
 - Show "uploading", "processing", "indexed" states from API response
 
 ### 9. Routing Pattern
+
 ```tsx
 // In App.tsx
-import { Routes, Route } from "react-router";
+import { Routes, Route } from 'react-router';
 
-<Route path="/events/:id" element={<EventDetailPage />} />
+<Route path="/events/:id" element={<EventDetailPage />} />;
 
 // In component
-import { useParams } from "react-router";
+import { useParams } from 'react-router';
 
 const { id } = useParams<{ id: string }>();
 ```
 
 ### 10. Environment Variables
+
 - `VITE_API_URL` — API base URL
 - `VITE_CLERK_PUBLISHABLE_KEY` — Clerk public key
 
 ## Relevant patterns
 
 ### From CreateEventModal (T-15)
+
 **Modal with form pattern:**
+
 - Use `Dialog` component from shadcn/ui
 - Use `DialogFooter` for action buttons
 - Separate form submission from modal control
@@ -277,7 +290,9 @@ const { id } = useParams<{ id: string }>();
 - Disable actions during submission
 
 ### From EventDetailPage (T-15)
+
 **Page layout pattern:**
+
 - Use breadcrumbs for navigation context
 - Use tabs for different views
 - Use cards for grouped content sections
@@ -286,7 +301,9 @@ const { id } = useParams<{ id: string }>();
 - Use dropdown menu for actions
 
 ### From useCreateEvent hook
+
 **Mutation pattern:**
+
 - Define request/response types
 - Extract error messages from API response
 - Invalidate related queries on success
@@ -295,6 +312,7 @@ const { id } = useParams<{ id: string }>();
 ## API Integration (from T-16, T-18)
 
 ### Upload Endpoint
+
 ```
 POST /events/:eventId/photos
 Headers: Authorization: Bearer <token>
@@ -326,6 +344,7 @@ Status codes:
 ```
 
 ### Gallery Endpoint
+
 ```
 GET /events/:eventId/photos?cursor=<timestamp>&limit=<number>
 Headers: Authorization: Bearer <token>

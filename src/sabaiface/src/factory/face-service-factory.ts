@@ -49,11 +49,7 @@ export interface SabaiFaceProviderConfig {
 export function createFaceService(config: SabaiFaceProviderConfig): FaceService {
   // Use PostgresVectorStore by default if not provided
   const vectorStore = config.vectorStore ?? new PostgresVectorStore(config.db);
-  return new SabaiFaceAdapter(
-    config.faceDetector,
-    vectorStore,
-    config.db
-  );
+  return new SabaiFaceAdapter(config.faceDetector, vectorStore, config.db);
 }
 
 // =============================================================================
@@ -81,7 +77,7 @@ export function createFaceService(config: SabaiFaceProviderConfig): FaceService 
 export function createSabaiFaceService(
   faceDetector: FaceDetector,
   db: InternalDatabase,
-  vectorStore?: VectorStore
+  vectorStore?: VectorStore,
 ): FaceService {
   return createFaceService({
     provider: 'sabaiface',

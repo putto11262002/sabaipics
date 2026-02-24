@@ -7,6 +7,7 @@ The Events Browser allows photographers to view their recent events and see deta
 ## Features
 
 ### Events List View
+
 - Displays the 10 most recent events
 - Pull-to-refresh to reload events
 - Loading state with progress indicator
@@ -15,6 +16,7 @@ The Events Browser allows photographers to view their recent events and see deta
 - Tap event to view details
 
 ### Event Detail View
+
 - Shows complete event information in iOS Settings-style Form:
   - Event name
   - Subtitle (if set, full-width with text wrapping)
@@ -28,6 +30,7 @@ The Events Browser allows photographers to view their recent events and see deta
 ## Architecture
 
 ### Data Flow
+
 ```
 EventsHomeView
     ↓ (init)
@@ -43,23 +46,27 @@ List with NavigationLinks
 ```
 
 ### API Client
+
 - **EventsAPIClient** (actor for thread safety)
   - Authenticates requests using Clerk session token
   - Handles network errors gracefully
   - Provides typed responses
 
 ### Models
+
 - **Event**: Core event data structure
 - **EventsResponse**: List wrapper with pagination
 - **EventResponse**: Single event wrapper
 - **Pagination**: Metadata for list pagination
 
 ### Views
+
 - **EventsHomeView**: Main list view with states (`.insetGrouped` style)
 - **EventRow**: Individual event row component (shows event name + relative time)
 - **EventDetailView**: iOS native Form-based detail view matching ProfileView pattern
 
 ### Utilities
+
 - **DateFormatter+Extensions**: Date parsing and formatting helpers
 
 ## Configuration
@@ -67,18 +74,21 @@ List with NavigationLinks
 Environment-specific URLs are configured in `.xcconfig` files:
 
 ### Debug (Studio.Debug.xcconfig)
+
 ```
 API_BASE_URL = https://dev-api.sabaipics.com
 EVENT_FRONTEND_URL = https://dev.sabaipics.com
 ```
 
 ### Release (Studio.Release.xcconfig)
+
 ```
 API_BASE_URL = https://api.sabaipics.com
 EVENT_FRONTEND_URL = https://sabaipics.com
 ```
 
 These are injected into Info.plist at build time and accessed via:
+
 ```swift
 Bundle.main.object(forInfoDictionaryKey: "APIBaseURL") as? String
 Bundle.main.object(forInfoDictionaryKey: "EventFrontendURL") as? String
@@ -87,7 +97,9 @@ Bundle.main.object(forInfoDictionaryKey: "EventFrontendURL") as? String
 ## API Integration
 
 ### Authentication
+
 All API requests include a Clerk session token:
+
 ```swift
 Authorization: Bearer <jwt>
 ```
@@ -95,11 +107,14 @@ Authorization: Bearer <jwt>
 ### Endpoints
 
 #### GET /events
+
 **Query Parameters:**
+
 - `page`: Page number (default: 0)
 - `limit`: Events per page (default: 10)
 
 **Response:**
+
 ```json
 {
   "data": [
@@ -126,7 +141,9 @@ Authorization: Bearer <jwt>
 ```
 
 #### GET /events/:id
+
 **Response:**
+
 ```json
 {
   "data": {
@@ -145,6 +162,7 @@ Authorization: Bearer <jwt>
 ## Error Handling
 
 ### API Errors
+
 ```swift
 enum APIError: Error {
     case notAuthenticated       // User not signed in
@@ -157,6 +175,7 @@ enum APIError: Error {
 ```
 
 ### User-Facing States
+
 1. **Loading**: Progress indicator while fetching
 2. **Empty**: Calendar icon + "No events yet"
 3. **Error**: Error icon + message + retry button
@@ -165,6 +184,7 @@ enum APIError: Error {
 ## User Experience
 
 ### Navigation Flow
+
 ```
 Events Tab → EventsHomeView (List)
     → Tap Event → EventDetailView
@@ -172,12 +192,14 @@ Events Tab → EventsHomeView (List)
 ```
 
 ### Interactions
+
 - **Pull down**: Refresh events list
 - **Tap event row**: Navigate to detail view
 - **Tap retry button**: Reload after error
 - **Tap copy button**: Copy search link to clipboard
 
 ### Visual Feedback
+
 - Loading spinner with "Loading events..." message
 - Pull-to-refresh indicator
 - Copy confirmation: Green checkmark + "Copied to clipboard" (2 seconds)
@@ -186,6 +208,7 @@ Events Tab → EventsHomeView (List)
 ## Testing
 
 ### Manual Testing Checklist
+
 - [ ] Sign in with Clerk
 - [ ] Navigate to Events tab
 - [ ] Verify events list loads (if photographer has events)
@@ -201,6 +224,7 @@ Events Tab → EventsHomeView (List)
 - [ ] Tap retry button
 
 ### Edge Cases
+
 - No events (new photographer)
 - Events without subtitle
 - Events without start/end dates

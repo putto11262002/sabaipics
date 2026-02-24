@@ -1,4 +1,10 @@
-export function LogoMark({ className, gradientId = 'logo-gradient' }: { className?: string; gradientId?: string }) {
+export function LogoMark({
+  className,
+  gradientId = 'logo-gradient',
+}: {
+  className?: string;
+  gradientId?: string;
+}) {
   return (
     <svg
       viewBox="-4 -4 104 118"
@@ -9,17 +15,72 @@ export function LogoMark({ className, gradientId = 'logo-gradient' }: { classNam
       focusable="false"
     >
       <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="96" y2="110" gradientUnits="userSpaceOnUse">
+        <linearGradient
+          id={gradientId}
+          x1="0"
+          y1="0"
+          x2="96"
+          y2="110"
+          gradientUnits="userSpaceOnUse"
+        >
           <stop offset="0%" stopColor="#FBBF24" />
           <stop offset="100%" stopColor="#EF4444" />
         </linearGradient>
       </defs>
-      <line x1="48" y1="5" x2="70.71" y2="41.5" stroke={`url(#${gradientId})`} strokeWidth="10" strokeLinecap="round" />
-      <line x1="91.3" y1="30" x2="70.71" y2="68.5" stroke={`url(#${gradientId})`} strokeWidth="10" strokeLinecap="round" />
-      <line x1="91.3" y1="80" x2="48" y2="80" stroke={`url(#${gradientId})`} strokeWidth="10" strokeLinecap="round" />
-      <line x1="48" y1="105" x2="25.29" y2="68.5" stroke={`url(#${gradientId})`} strokeWidth="10" strokeLinecap="round" />
-      <line x1="4.7" y1="80" x2="25.29" y2="41.5" stroke={`url(#${gradientId})`} strokeWidth="10" strokeLinecap="round" />
-      <line x1="4.7" y1="30" x2="48" y2="30" stroke={`url(#${gradientId})`} strokeWidth="10" strokeLinecap="round" />
+      <line
+        x1="48"
+        y1="5"
+        x2="70.71"
+        y2="41.5"
+        stroke={`url(#${gradientId})`}
+        strokeWidth="10"
+        strokeLinecap="round"
+      />
+      <line
+        x1="91.3"
+        y1="30"
+        x2="70.71"
+        y2="68.5"
+        stroke={`url(#${gradientId})`}
+        strokeWidth="10"
+        strokeLinecap="round"
+      />
+      <line
+        x1="91.3"
+        y1="80"
+        x2="48"
+        y2="80"
+        stroke={`url(#${gradientId})`}
+        strokeWidth="10"
+        strokeLinecap="round"
+      />
+      <line
+        x1="48"
+        y1="105"
+        x2="25.29"
+        y2="68.5"
+        stroke={`url(#${gradientId})`}
+        strokeWidth="10"
+        strokeLinecap="round"
+      />
+      <line
+        x1="4.7"
+        y1="80"
+        x2="25.29"
+        y2="41.5"
+        stroke={`url(#${gradientId})`}
+        strokeWidth="10"
+        strokeLinecap="round"
+      />
+      <line
+        x1="4.7"
+        y1="30"
+        x2="48"
+        y2="30"
+        stroke={`url(#${gradientId})`}
+        strokeWidth="10"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

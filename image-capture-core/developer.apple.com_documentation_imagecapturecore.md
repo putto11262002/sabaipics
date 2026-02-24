@@ -1,6 +1,6 @@
 ---
-url: "https://developer.apple.com/documentation/imagecapturecore"
-title: "ImageCaptureCore | Apple Developer Documentation"
+url: 'https://developer.apple.com/documentation/imagecapturecore'
+title: 'ImageCaptureCore | Apple Developer Documentation'
 ---
 
 [Skip Navigation](https://developer.apple.com/documentation/imagecapturecore#app-main)
@@ -40,12 +40,12 @@ Only search within “Documentation”
 
 [Open Menu](https://developer.apple.com/documentation/imagecapturecore#)
 
-- SwiftLanguage:  Swift  Objective-C
+- SwiftLanguage: Swift Objective-C
 
 Language:
 
-  - Swift
-  - [Objective-C](https://developer.apple.com/documentation/imagecapturecore#)
+- Swift
+- [Objective-C](https://developer.apple.com/documentation/imagecapturecore#)
 
 All Technologies
 
@@ -239,7 +239,7 @@ Browse for media devices and control them programmatically from your app.
 
 iOS 13.0+iPadOS 13.0+Mac Catalyst 13.0+macOS 10.6+visionOS 1.0+
 
-## [Overview](https://developer.apple.com/documentation/imagecapturecore\#overview)
+## [Overview](https://developer.apple.com/documentation/imagecapturecore#overview)
 
 Using ImageCaptureCore, your app can:
 
@@ -251,10 +251,9 @@ Using ImageCaptureCore, your app can:
 
 - Perform overview scans and scans on a connected scanner
 
-
 ![Diagram showing a macOS device connected by cables to a camera and a scanner, and an iPadOS device connected by cable to a camera.](https://docs-assets.developer.apple.com/published/0060df4265c83f5384bad802fb263ffd/media-3501083%402x.png)
 
-### [Configuring tethered capture and photo import](https://developer.apple.com/documentation/imagecapturecore\#Configuring-tethered-capture-and-photo-import)
+### [Configuring tethered capture and photo import](https://developer.apple.com/documentation/imagecapturecore#Configuring-tethered-capture-and-photo-import)
 
 To import pictures and tether from a macOS app, you first need to enable the Hardened Runtime capability in Xcode, and then add the [`Photos Library Entitlement`](https://developer.apple.com/documentation/BundleResources/Entitlements/com.apple.security.personal-information.photos-library).
 
@@ -264,9 +263,9 @@ Important
 
 In macOS 14 and later, use the [`com.apple.security.device.usb`](https://developer.apple.com/documentation/BundleResources/Entitlements/com.apple.security.device.usb) entitlement key to allow your sandboxed app to interact with USB devices.
 
-## [Topics](https://developer.apple.com/documentation/imagecapturecore\#topics)
+## [Topics](https://developer.apple.com/documentation/imagecapturecore#topics)
 
-### [Essentials](https://developer.apple.com/documentation/imagecapturecore\#Essentials)
+### [Essentials](https://developer.apple.com/documentation/imagecapturecore#Essentials)
 
 [`class ICDeviceBrowser`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser)
 
@@ -280,7 +279,7 @@ A Boolean value that indicates whether the app has read-write access to the user
 
 A message that tells people why the app is requesting access to the device’s camera.
 
-### [Cameras](https://developer.apple.com/documentation/imagecapturecore\#Cameras)
+### [Cameras](https://developer.apple.com/documentation/imagecapturecore#Cameras)
 
 [`class ICCameraDevice`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice)
 
@@ -302,7 +301,7 @@ An object that represents a file on a camera.
 
 An object that represents a folder on a camera.
 
-### [Scanners](https://developer.apple.com/documentation/imagecapturecore\#Scanners)
+### [Scanners](https://developer.apple.com/documentation/imagecapturecore#Scanners)
 
 [`class ICScannerDevice`](https://developer.apple.com/documentation/imagecapturecore/icscannerdevice)
 
@@ -317,7 +316,7 @@ Scanner Configuration](https://developer.apple.com/documentation/imagecapturecor
 
 Examine a scanner’s functional units and features.
 
-### [Errors](https://developer.apple.com/documentation/imagecapturecore\#Errors)
+### [Errors](https://developer.apple.com/documentation/imagecapturecore#Errors)
 
 [`struct ICReturn`](https://developer.apple.com/documentation/imagecapturecore/icreturn)
 
@@ -347,11 +346,11 @@ A PTP device error returned from ImageCaptureCore.
 
 A thumbnail error returned from ImageCaptureCore.
 
-### [Legacy Symbols](https://developer.apple.com/documentation/imagecapturecore\#Legacy-Symbols)
+### [Legacy Symbols](https://developer.apple.com/documentation/imagecapturecore#Legacy-Symbols)
 
 [`let ICRunLoopMode: String`](https://developer.apple.com/documentation/imagecapturecore/icrunloopmode) Deprecated
 
-### [Articles](https://developer.apple.com/documentation/imagecapturecore\#Articles)
+### [Articles](https://developer.apple.com/documentation/imagecapturecore#Articles)
 
 [API Reference\\
 ImageCaptureCore Constants](https://developer.apple.com/documentation/imagecapturecore/imagecapturecore-constants)

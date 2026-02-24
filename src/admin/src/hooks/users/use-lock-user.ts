@@ -15,8 +15,7 @@ export function useLockUser() {
   const queryClient = useQueryClient();
 
   return useAdminMutation<LockUserResponse, LockUserInput>({
-    apiFn: ({ id }, opts) =>
-      api.admin.users[':id'].lock.$post({ param: { id } }, opts),
+    apiFn: ({ id }, opts) => api.admin.users[':id'].lock.$post({ param: { id } }, opts),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users', 'list'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'users', 'detail', variables.id] });

@@ -20,6 +20,7 @@ Clerk Billing is currently in **Beta** with APIs marked as experimental and subj
 ### 2. What Clerk Billing Is Designed For
 
 Clerk Billing is a **subscription management system** for:
+
 - B2C and B2B applications
 - Tier-based pricing (Free, Pro, Enterprise plans)
 - Feature gating (enable/disable features per plan)
@@ -38,6 +39,7 @@ Clerk Billing is a **subscription management system** for:
 ### Does Clerk Support Custom Credits?
 
 **No evidence found** that Clerk Billing supports:
+
 - Custom credit packages (e.g., 200 photos for $50)
 - Consumption tracking (photo uploads, searches, etc.)
 - Credit balances per user
@@ -51,6 +53,7 @@ Searches for "Clerk Billing usage-based," "Clerk metered billing," and "Clerk cr
 ### Workaround Option
 
 If you want credit-based billing with Clerk auth:
+
 1. Use Clerk for authentication only
 2. Build custom credit tracking in your own database
 3. Use Stripe directly for payment processing (not Clerk Billing)
@@ -122,12 +125,14 @@ Subscription (top-level container per user/org)
 Clerk Billing provides webhooks for tracking billing lifecycle:
 
 ### Subscription Events
+
 - `subscription.created` - Top-level subscription created
 - `subscription.updated` - Properties changed (no status change)
 - `subscription.active` - Transitioned to active status
 - `subscription.pastDue` - Payment delinquency detected
 
 ### Subscription Item Events
+
 - `subscriptionItem.updated` - Properties changed
 - `subscriptionItem.active` - Became active
 - `subscriptionItem.canceled` - User canceled
@@ -139,6 +144,7 @@ Clerk Billing provides webhooks for tracking billing lifecycle:
 - `subscriptionItem.freeTrialEnding` - 3 days before trial ends
 
 ### Payment Attempt Events
+
 - `paymentAttempt.created` - Payment initiated (pending)
 - `paymentAttempt.updated` - Payment updated (paid/failed)
 
@@ -148,13 +154,13 @@ Clerk Billing integrates with authorization checks:
 
 ```javascript
 // Check if user has access to a feature
-auth().has({ feature: "teams" })
+auth().has({ feature: 'teams' });
 
 // Check if user is on a specific plan
-auth().has({ plan: "pro" })
+auth().has({ plan: 'pro' });
 
 // Check if org member has permission (combines billing + roles)
-auth().has({ permission: "org:teams:manage" })
+auth().has({ permission: 'org:teams:manage' });
 ```
 
 **Important:** Permission checks only work if the Feature is included in the Organization's active Plan.
@@ -170,6 +176,7 @@ Clerk embeds billing info in session tokens:
 ## Free Trials
 
 ### Key Features
+
 - Minimum 1 day, maximum 365 days trial period
 - Credit card required to start (prevents abuse)
 - Only users who never paid or trialed can start
@@ -177,6 +184,7 @@ Clerk embeds billing info in session tokens:
 - Can extend, cancel, or end immediately (only while active)
 
 ### Trial End Behavior
+
 - **Canceled during trial:** User keeps access until trial end date, no charge
 - **Not canceled:** Default payment method charged, subscription becomes active
 - **If trial < 3 days:** Notifications sent immediately on trial start
@@ -184,6 +192,7 @@ Clerk embeds billing info in session tokens:
 ## Production Usage
 
 ### Pricing
+
 - Free plan: Up to 10,000 monthly active users
 - Organizations feature available in development mode for testing
 - Production use requires paid plan
@@ -191,6 +200,7 @@ Clerk embeds billing info in session tokens:
 ### SDK Compatibility (2025-11-10 API version)
 
 Supported SDKs include:
+
 - Next.js (@clerk/nextjs v6.35.0+)
 - React Router (@clerk/react-router v2.2.0+)
 - Expo (@clerk/expo v2.19.0+)
@@ -203,6 +213,7 @@ Supported SDKs include:
 For a usage-based photo credit system like Facelink:
 
 ### What Clerk Billing Cannot Do:
+
 1. Track per-photo consumption
 2. Manage credit balances (e.g., "200 photos remaining")
 3. Support pay-as-you-go pricing
@@ -211,9 +222,12 @@ For a usage-based photo credit system like Facelink:
 6. Provide usage analytics (photos used per event)
 
 ### Alternative Approach:
+
 If you want to use Clerk (for auth), you would need to:
+
 1. Use Clerk for authentication only (NOT Clerk Billing)
 2. Build custom credit tracking table in your database:
+
    ```sql
    user_credits (
      user_id UUID,
@@ -232,6 +246,7 @@ If you want to use Clerk (for auth), you would need to:
      timestamp TIMESTAMP
    )
    ```
+
 3. Integrate Stripe directly for credit purchases
 4. Track photo consumption in your app logic
 5. Deduct credits on photo operations
@@ -241,6 +256,7 @@ If you want to use Clerk (for auth), you would need to:
 ### If You Need Credit-Based Billing:
 
 **Do NOT use Clerk Billing.** Consider:
+
 1. **Stripe Billing + Metered Usage:** Stripe supports metered billing natively
 2. **Custom Implementation:** Build credit system with your own database + Stripe checkout
 3. **Specialized Tools:** Consider tools like Lago (open-source metered billing) or Metronome
@@ -248,11 +264,13 @@ If you want to use Clerk (for auth), you would need to:
 ### If You Need Subscription Tiers:
 
 **Clerk Billing is appropriate** if your model is:
+
 - Free plan: 50 photos/event
 - Pro plan: 500 photos/event
 - Enterprise plan: Unlimited photos
 
 But NOT if your model is:
+
 - $0.25 per photo
 - Buy 200 credits for $50
 - Pay-as-you-go consumption

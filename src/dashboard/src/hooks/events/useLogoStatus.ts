@@ -4,17 +4,11 @@ import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
 type LogoStatusResponse = InferResponseType<
-  typeof api.events[':id']['logo']['status']['$get'],
+  (typeof api.events)[':id']['logo']['status']['$get'],
   SuccessStatusCode
 >;
 
-export function useLogoStatus({
-  eventId,
-  uploadId,
-}: {
-  eventId: string;
-  uploadId: string | null;
-}) {
+export function useLogoStatus({ eventId, uploadId }: { eventId: string; uploadId: string | null }) {
   return useApiQuery<LogoStatusResponse>({
     queryKey: ['events', 'detail', eventId, 'logo-status', uploadId],
     apiFn: (opts) =>

@@ -13,6 +13,7 @@ Implement disconnect functionality and session lifecycle management for WiFi cam
 ### 1. Disconnect Functionality
 
 **LiveCaptureView.swift**:
+
 - Added "Disconnect" button in toolbar (red color)
 - Added confirmation alert with warning about photo clearing
 - **Critical Fix**: Dismiss alert before state change to prevent NavigationView corruption
@@ -28,6 +29,7 @@ Implement disconnect functionality and session lifecycle management for WiFi cam
 ### 2. Disconnect Implementation
 
 **CameraViewModel.swift**:
+
 - Refactored `disconnectWiFi()` to use `Task.detached` (non-blocking)
 - Cancel pending retry attempts
 - Clear all UI state (photos, counters, flags)
@@ -37,11 +39,13 @@ Implement disconnect functionality and session lifecycle management for WiFi cam
 ### 3. State Naming Clarification
 
 **Renamed `.searching` → `.idle`**:
+
 - `.idle` = Waiting for user input (WiFi IP address)
 - Clearer intent: Not actively searching, just idle/ready
 - Future-proof for UPnP discovery (avoiding confusion)
 
 **Files affected**:
+
 - CameraViewModel.swift (8 occurrences)
 - ContentView.swift (2 occurrences)
 
@@ -73,6 +77,7 @@ Dismiss alert first, wait 0.1s, then change state. This gives NavigationView tim
 ### Unexpected Disconnect Handling
 
 **CameraViewModel.swift** (lines 179-183):
+
 ```swift
 // Listen to WiFi connection state
 wifiService.$isConnected
@@ -97,6 +102,7 @@ wifiService.$isConnected
 **Problem**: After disconnect, could not click anything on WiFi setup page (text field, button, help link all frozen).
 
 **Attempts**:
+
 1. ❌ Reset all state variables in disconnectWiFi() - didn't work
 2. ❌ Initialize cameraIP with default value - didn't work
 3. ✅ Fix NavigationView state corruption with delayed state change
@@ -134,6 +140,7 @@ wifiService.$isConnected
 ## Testing
 
 Manual testing verified:
+
 - Disconnect button works and shows confirmation
 - Photos cleared after disconnect
 - Returns to WiFi setup page (responsive, no freezing)

@@ -4,7 +4,8 @@ import { getLocale, getTranslations } from 'next-intl/server';
 export async function IosAppSection() {
   const locale = await getLocale();
   const t = await getTranslations('IosApp');
-  const appStoreBadgeSrc = locale === 'th' ? '/badges/app-store-th.svg' : '/badges/app-store-en.svg';
+  const appStoreBadgeSrc =
+    locale === 'th' ? '/badges/app-store-th.svg' : '/badges/app-store-en.svg';
   const appStoreAlt = locale === 'th' ? 'ดาวน์โหลดบน App Store' : 'Download on the App Store';
 
   return (
@@ -22,7 +23,9 @@ export async function IosAppSection() {
 
           <div className="relative grid items-center gap-10 p-6 sm:p-8 lg:grid-cols-2 lg:gap-14 lg:p-12">
             <div className="order-2 lg:order-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('label')}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {t('label')}
+              </p>
               <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
                 {t('title')}
               </h2>

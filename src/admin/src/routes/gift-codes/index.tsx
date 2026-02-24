@@ -3,15 +3,7 @@ import { useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import {
-  AlertCircle,
-  RefreshCw,
-  Gift,
-  Search,
-  Plus,
-  Loader2,
-  Copy,
-} from 'lucide-react';
+import { AlertCircle, RefreshCw, Gift, Search, Plus, Loader2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -39,11 +31,7 @@ import {
   DialogTrigger,
 } from '@/shared/components/ui/dialog';
 import { Calendar } from '@/shared/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/shared/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/components/ui/popover';
 import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { useGiftCodes, type GiftCodeListItem } from '../../hooks/gift-codes/use-gift-codes';
 import { useCreateGiftCode } from '../../hooks/gift-codes/use-create-gift-code';
@@ -123,7 +111,8 @@ function CreateGiftCodeDialog({ children }: { children: React.ReactNode }) {
         description: values.description || undefined,
         expiresAt: values.expiresAt?.toISOString(),
         creditExpiresInDays: values.creditExpiresInDays,
-        maxRedemptions: typeof values.maxRedemptions === 'number' ? values.maxRedemptions : undefined,
+        maxRedemptions:
+          typeof values.maxRedemptions === 'number' ? values.maxRedemptions : undefined,
         maxRedemptionsPerUser: values.maxRedemptionsPerUser,
       },
       {
@@ -165,11 +154,7 @@ function CreateGiftCodeDialog({ children }: { children: React.ReactNode }) {
 
           <div className="space-y-2">
             <Label htmlFor="code">Code (optional, auto-generated)</Label>
-            <Input
-              id="code"
-              placeholder="e.g. GIFT-MYCODE"
-              {...form.register('code')}
-            />
+            <Input id="code" placeholder="e.g. GIFT-MYCODE" {...form.register('code')} />
             {form.formState.errors.code && (
               <p className="text-sm text-destructive">{form.formState.errors.code.message}</p>
             )}
@@ -260,12 +245,24 @@ function LoadingSkeleton() {
     <TableBody>
       {Array.from({ length: 5 }).map((_, i) => (
         <TableRow key={i}>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-24" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-12" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-16" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-16" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-24" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-24" />
+          </TableCell>
         </TableRow>
       ))}
     </TableBody>
@@ -348,12 +345,7 @@ function GiftCodesPage() {
             <AlertCircle className="size-4" />
             <AlertTitle>Failed to load gift codes</AlertTitle>
             <AlertDescription>{error.message}</AlertDescription>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="mt-2"
-              onClick={() => refetch()}
-            >
+            <Button variant="destructive" size="sm" className="mt-2" onClick={() => refetch()}>
               <RefreshCw className="mr-1 size-4" />
               Retry
             </Button>
@@ -433,9 +425,7 @@ function GiftCodesPage() {
                       </TableCell>
                       <TableCell>{getStatusBadge(code)}</TableCell>
                       <TableCell>{formatDate(code.createdAt)}</TableCell>
-                      <TableCell>
-                        {code.expiresAt ? formatDate(code.expiresAt) : 'Never'}
-                      </TableCell>
+                      <TableCell>{code.expiresAt ? formatDate(code.expiresAt) : 'Never'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -447,11 +437,7 @@ function GiftCodesPage() {
         {/* Load more */}
         {nextCursor && (
           <div className="flex justify-center pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCursor(nextCursor)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setCursor(nextCursor)}>
               Load more
             </Button>
           </div>

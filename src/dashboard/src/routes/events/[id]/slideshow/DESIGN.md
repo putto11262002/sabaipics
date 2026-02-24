@@ -3,6 +3,7 @@
 ## Overview
 
 The slideshow editor is a **public event page builder** for photographers to:
+
 - Display on screens at events (TV/monitor in fullscreen)
 - Share with participants as an event landing page (mobile/tablet/desktop)
 
@@ -56,7 +57,7 @@ Adding a new block type = one folder with 3 files (index, renderer, settings) + 
 ### Block Categories
 
 | Category   | Can be top-level | Has children | Examples                                          |
-|------------|------------------|--------------|---------------------------------------------------|
+| ---------- | ---------------- | ------------ | ------------------------------------------------- |
 | Layout     | Yes              | Yes          | `flex`                                            |
 | Standalone | Yes              | No           | `gallery`, `qr`, `logo`, `event-name`, `subtitle` |
 | Atom       | No (child only)  | No           | `stat-card`, `social-icon`                        |
@@ -113,6 +114,7 @@ Parent Editor                    Iframe Preview
 ### Device Preview
 
 The iframe supports device preview modes for testing responsive behavior:
+
 - **Desktop**: 1920×1080 (16:9 TV)
 - **Tablet**: 1024×768 (4:3 landscape)
 - **Mobile**: 1080×1920 (9:16 portrait)
@@ -141,6 +143,7 @@ In editor, context has zeroed stats and empty photos. On public page, `liveMode:
 ### Editor Performance
 
 **Placeholder Rendering** (`liveMode: false`):
+
 - Gallery shows skeleton placeholders (no photo fetching)
 - Logo shows "LOGO" text placeholder
 - Context has `photos: []` to prevent expensive API calls

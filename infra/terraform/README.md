@@ -14,14 +14,18 @@ environments/
 ## Modules
 
 ### `cloudflare-infra`
+
 Core infrastructure for all environments:
+
 - R2 buckets (photos storage)
 - R2 custom domains
 - R2 CORS configuration
 - Queues (photo processing, upload processing, etc.)
 
 ### `dev-notification-proxy` (dev only)
+
 Dev-only infrastructure for local testing:
+
 - Queue: `r2-notification-proxy`
 - R2 event notifications (uploads/, logos/)
 - Worker: `r2-notification-proxy` (source in `./worker/`, forwards events to ngrok)

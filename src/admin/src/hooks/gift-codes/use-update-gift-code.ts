@@ -25,10 +25,7 @@ export function useUpdateGiftCode() {
 
   return useAdminMutation<UpdateGiftCodeResponse, UpdateGiftCodeInput>({
     apiFn: ({ id, ...json }, opts) =>
-      api.admin['gift-codes'][':id'].$patch(
-        { param: { id }, json },
-        opts,
-      ),
+      api.admin['gift-codes'][':id'].$patch({ param: { id }, json }, opts),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'gift-codes', 'list'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'gift-codes', 'detail', variables.id] });

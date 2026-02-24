@@ -36,7 +36,10 @@ export function EventHeaderSettings({
         {props.showLogo && (
           <div className="flex items-center gap-2 pl-4">
             <Label className="w-16 text-xs">Size</Label>
-            <Select value={props.logoSize} onValueChange={(v) => update({ logoSize: v as 'sm' | 'md' | 'lg' })}>
+            <Select
+              value={props.logoSize}
+              onValueChange={(v) => update({ logoSize: v as 'sm' | 'md' | 'lg' })}
+            >
               <SelectTrigger className="h-7 flex-1 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -56,7 +59,10 @@ export function EventHeaderSettings({
 
         <div className="flex items-center justify-between">
           <Label className="text-xs">Show Subtitle</Label>
-          <Switch checked={props.showSubtitle} onCheckedChange={(v) => update({ showSubtitle: v })} />
+          <Switch
+            checked={props.showSubtitle}
+            onCheckedChange={(v) => update({ showSubtitle: v })}
+          />
         </div>
 
         <div className="flex items-center justify-between">
@@ -67,7 +73,10 @@ export function EventHeaderSettings({
         {props.showQr && (
           <div className="flex items-center gap-2 pl-4">
             <Label className="w-16 text-xs">Size</Label>
-            <Select value={props.qrSize} onValueChange={(v) => update({ qrSize: v as 'sm' | 'md' | 'lg' })}>
+            <Select
+              value={props.qrSize}
+              onValueChange={(v) => update({ qrSize: v as 'sm' | 'md' | 'lg' })}
+            >
               <SelectTrigger className="h-7 flex-1 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -87,7 +96,10 @@ export function EventHeaderSettings({
 
         <div className="flex items-center gap-2">
           <Label className="w-16 text-xs">Direction</Label>
-          <Select value={props.direction} onValueChange={(v) => update({ direction: v as 'row' | 'column' })}>
+          <Select
+            value={props.direction}
+            onValueChange={(v) => update({ direction: v as 'row' | 'column' })}
+          >
             <SelectTrigger className="h-7 flex-1 text-xs">
               <SelectValue />
             </SelectTrigger>
@@ -100,7 +112,10 @@ export function EventHeaderSettings({
 
         <div className="flex items-center gap-2">
           <Label className="w-16 text-xs">Align</Label>
-          <Select value={props.align} onValueChange={(v) => update({ align: v as 'start' | 'center' | 'end' })}>
+          <Select
+            value={props.align}
+            onValueChange={(v) => update({ align: v as 'start' | 'center' | 'end' })}
+          >
             <SelectTrigger className="h-7 flex-1 text-xs">
               <SelectValue />
             </SelectTrigger>
@@ -114,7 +129,10 @@ export function EventHeaderSettings({
 
         <div className="flex items-center gap-2">
           <Label className="w-16 text-xs">Justify</Label>
-          <Select value={props.justify} onValueChange={(v) => update({ justify: v as 'start' | 'center' | 'end' | 'between' })}>
+          <Select
+            value={props.justify}
+            onValueChange={(v) => update({ justify: v as 'start' | 'center' | 'end' | 'between' })}
+          >
             <SelectTrigger className="h-7 flex-1 text-xs">
               <SelectValue />
             </SelectTrigger>

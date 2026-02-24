@@ -19,11 +19,7 @@ interface GiftCodeDialogProps {
   initialCode?: string;
 }
 
-export function GiftCodeDialog({
-  open,
-  onOpenChange,
-  initialCode = '',
-}: GiftCodeDialogProps) {
+export function GiftCodeDialog({ open, onOpenChange, initialCode = '' }: GiftCodeDialogProps) {
   const [code, setCode] = useState(initialCode);
   const [result, setResult] = useState<{ creditsGranted: number; expiresAt: string } | null>(null);
   const redeemMutation = useRedeemGiftCode();
@@ -61,9 +57,7 @@ export function GiftCodeDialog({
             <Gift className="size-5 text-primary" />
             Gift Credits
           </DialogTitle>
-          <DialogDescription>
-            Enter a gift code to claim your free credits
-          </DialogDescription>
+          <DialogDescription>Enter a gift code to claim your free credits</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -92,7 +86,8 @@ export function GiftCodeDialog({
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="size-4 text-success" />
-                    Expires {new Date(result.expiresAt).toLocaleDateString('en-US', {
+                    Expires{' '}
+                    {new Date(result.expiresAt).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
                       year: 'numeric',
@@ -101,11 +96,7 @@ export function GiftCodeDialog({
                 </ul>
               </div>
 
-              <Button
-                onClick={() => handleOpenChange(false)}
-                className="w-full"
-                size="lg"
-              >
+              <Button onClick={() => handleOpenChange(false)} className="w-full" size="lg">
                 Done
               </Button>
             </>

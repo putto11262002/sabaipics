@@ -4,7 +4,7 @@
  * Utilities for creating and managing Stripe customers linked to photographers.
  */
 
-import type Stripe from "stripe";
+import type Stripe from 'stripe';
 
 // =============================================================================
 // Types
@@ -141,8 +141,8 @@ export async function createCustomer({
     name,
     metadata: {
       photographer_id: photographerId,
-      source: "sabaipics",
-      created_via: "api",
+      source: 'sabaipics',
+      created_via: 'api',
       ...metadata,
     },
   });
@@ -188,7 +188,7 @@ export async function updateCustomer({
  */
 export async function getCustomer(
   stripe: Stripe,
-  customerId: string
+  customerId: string,
 ): Promise<Stripe.Customer | null> {
   try {
     const customer = await stripe.customers.retrieve(customerId);
@@ -218,7 +218,7 @@ export async function getCustomer(
  */
 export async function findCustomerByPhotographerId(
   stripe: Stripe,
-  photographerId: string
+  photographerId: string,
 ): Promise<Stripe.Customer | null> {
   const customers = await stripe.customers.search({
     query: `metadata['photographer_id']:'${photographerId}'`,

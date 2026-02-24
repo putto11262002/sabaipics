@@ -10,6 +10,7 @@
 ## Context
 
 ### Upstream References
+
 - Execution Plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Task Definition: `docs/logs/BS_0001_S-1/tasks.md#T-1`
 
@@ -38,11 +39,11 @@
 
 ## Decisions
 
-| # | Decision | Resolution |
-|---|----------|------------|
-| 1 | UUID generation | DB-side via `gen_random_uuid()` |
-| 2 | FK cascade behavior | RESTRICT (soft delete out of scope) |
-| 3 | Keep `_db_test` table | Yes (used for connection testing) |
+| #   | Decision              | Resolution                          |
+| --- | --------------------- | ----------------------------------- |
+| 1   | UUID generation       | DB-side via `gen_random_uuid()`     |
+| 2   | FK cascade behavior   | RESTRICT (soft delete out of scope) |
+| 3   | Keep `_db_test` table | Yes (used for connection testing)   |
 
 ---
 
@@ -50,63 +51,63 @@
 
 ### Tables Overview
 
-| Table | PK | Key Columns | Notes |
-|-------|-----|-------------|-------|
-| `photographers` | UUID | clerk_id (UNIQUE), email, name, pdpa_consent_at | Auth anchor |
-| `credit_packages` | UUID | name, credits, price_thb, active, sort_order | Admin-editable |
-| `credit_ledger` | UUID | photographer_id (FK), amount, type, expires_at | INDEX on expires_at |
-| `events` | UUID | photographer_id (FK), access_code (UNIQUE), rekognition_collection_id | 30-day expiry |
-| `photos` | UUID | event_id (FK), r2_key, status, face_count | Single normalized JPEG |
-| `faces` | UUID | photo_id (FK), rekognition_response (JSONB) | Full response stored |
-| `consent_records` | UUID | photographer_id (FK), consent_type, ip_address | PDPA compliance |
+| Table             | PK   | Key Columns                                                           | Notes                  |
+| ----------------- | ---- | --------------------------------------------------------------------- | ---------------------- |
+| `photographers`   | UUID | clerk_id (UNIQUE), email, name, pdpa_consent_at                       | Auth anchor            |
+| `credit_packages` | UUID | name, credits, price_thb, active, sort_order                          | Admin-editable         |
+| `credit_ledger`   | UUID | photographer_id (FK), amount, type, expires_at                        | INDEX on expires_at    |
+| `events`          | UUID | photographer_id (FK), access_code (UNIQUE), rekognition_collection_id | 30-day expiry          |
+| `photos`          | UUID | event_id (FK), r2_key, status, face_count                             | Single normalized JPEG |
+| `faces`           | UUID | photo_id (FK), rekognition_response (JSONB)                           | Full response stored   |
+| `consent_records` | UUID | photographer_id (FK), consent_type, ip_address                        | PDPA compliance        |
 
 ### Enums (as const arrays per DBSCHEMA-001)
 
 ```typescript
 // credit_ledger.type
 export const creditLedgerTypes = ['purchase', 'upload'] as const;
-export type CreditLedgerType = typeof creditLedgerTypes[number];
+export type CreditLedgerType = (typeof creditLedgerTypes)[number];
 
 // photos.status
 export const photoStatuses = ['processing', 'indexed', 'failed'] as const;
-export type PhotoStatus = typeof photoStatuses[number];
+export type PhotoStatus = (typeof photoStatuses)[number];
 
 // consent_records.consent_type
 export const consentTypes = ['pdpa'] as const;
-export type ConsentType = typeof consentTypes[number];
+export type ConsentType = (typeof consentTypes)[number];
 ```
 
 ### JSONB Types (per DBSCHEMA-002)
 
 ```typescript
 // faces.bounding_box - quick access to face location
-import type { BoundingBox } from "@aws-sdk/client-rekognition";
-boundingBox: jsonb().$type<BoundingBox>()
+import type { BoundingBox } from '@aws-sdk/client-rekognition';
+boundingBox: jsonb().$type<BoundingBox>();
 
 // faces.rekognition_response - full response for model training
-import type { FaceRecord } from "@aws-sdk/client-rekognition";
-rekognitionResponse: jsonb().$type<FaceRecord>()
+import type { FaceRecord } from '@aws-sdk/client-rekognition';
+rekognitionResponse: jsonb().$type<FaceRecord>();
 ```
 
 ### Indexes (per DBSCHEMA-006)
 
-| Table | Index | Purpose |
-|-------|-------|---------|
-| `photographers` | `clerk_id` | Auth lookup (UNIQUE constraint) |
-| `credit_ledger` | `photographer_id, expires_at` | FIFO balance queries |
-| `events` | `photographer_id` | List photographer's events |
-| `events` | `access_code` | QR code lookup (UNIQUE constraint) |
-| `photos` | `event_id` | Gallery listing |
-| `faces` | `photo_id` | Face lookup by photo |
+| Table           | Index                         | Purpose                            |
+| --------------- | ----------------------------- | ---------------------------------- |
+| `photographers` | `clerk_id`                    | Auth lookup (UNIQUE constraint)    |
+| `credit_ledger` | `photographer_id, expires_at` | FIFO balance queries               |
+| `events`        | `photographer_id`             | List photographer's events         |
+| `events`        | `access_code`                 | QR code lookup (UNIQUE constraint) |
+| `photos`        | `event_id`                    | Gallery listing                    |
+| `faces`         | `photo_id`                    | Face lookup by photo               |
 
 ### Foreign Keys (all RESTRICT)
 
-| Table | Column | References |
-|-------|--------|------------|
-| `credit_ledger` | `photographer_id` | `photographers.id` |
-| `events` | `photographer_id` | `photographers.id` |
-| `photos` | `event_id` | `events.id` |
-| `faces` | `photo_id` | `photos.id` |
+| Table             | Column            | References         |
+| ----------------- | ----------------- | ------------------ |
+| `credit_ledger`   | `photographer_id` | `photographers.id` |
+| `events`          | `photographer_id` | `photographers.id` |
+| `photos`          | `event_id`        | `events.id`        |
+| `faces`           | `photo_id`        | `photos.id`        |
 | `consent_records` | `photographer_id` | `photographers.id` |
 
 ---
@@ -133,6 +134,7 @@ packages/db/src/schema/
 ### Step 2: Define Each Table
 
 For each table:
+
 1. Define the `pgTable` with all columns
 2. Apply timestamp convention: `timestamp({ mode: "string", withTimezone: true })`
 3. Add indexes in the table config callback
@@ -141,6 +143,7 @@ For each table:
 ### Step 3: Define Relations
 
 Create `packages/db/src/schema/relations.ts` using Drizzle v2 `relations()` API:
+
 - photographers → credit_ledger (one-to-many)
 - photographers → events (one-to-many)
 - photographers → consent_records (one-to-many)
@@ -168,6 +171,7 @@ pnpm --filter=@sabaipics/db check-types
 ## Validation Criteria
 
 Per task acceptance criteria:
+
 - [ ] All 7 tables created with correct columns and types
 - [ ] `faces.rekognition_response` is JSONB with proper type
 - [ ] `credit_ledger.expires_at` indexed for balance queries
@@ -179,17 +183,17 @@ Per task acceptance criteria:
 
 ## Files to Create/Modify
 
-| Action | Path |
-|--------|------|
-| CREATE | `packages/db/src/schema/photographers.ts` |
+| Action | Path                                        |
+| ------ | ------------------------------------------- |
+| CREATE | `packages/db/src/schema/photographers.ts`   |
 | CREATE | `packages/db/src/schema/credit-packages.ts` |
-| CREATE | `packages/db/src/schema/credit-ledger.ts` |
-| CREATE | `packages/db/src/schema/events.ts` |
-| CREATE | `packages/db/src/schema/photos.ts` |
-| CREATE | `packages/db/src/schema/faces.ts` |
+| CREATE | `packages/db/src/schema/credit-ledger.ts`   |
+| CREATE | `packages/db/src/schema/events.ts`          |
+| CREATE | `packages/db/src/schema/photos.ts`          |
+| CREATE | `packages/db/src/schema/faces.ts`           |
 | CREATE | `packages/db/src/schema/consent-records.ts` |
-| CREATE | `packages/db/src/schema/relations.ts` |
-| MODIFY | `packages/db/src/schema/index.ts` |
+| CREATE | `packages/db/src/schema/relations.ts`       |
+| MODIFY | `packages/db/src/schema/index.ts`           |
 
 ---
 

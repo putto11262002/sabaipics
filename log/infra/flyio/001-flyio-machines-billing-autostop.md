@@ -13,6 +13,7 @@ We want to understand whether Fly.io Machines can feel "serverless" via autostop
 - Starting an existing stopped Machine is typically fast because the image/rootfs is already prepared; creating a brand new Machine is slower.
 
 Reference:
+
 - https://fly.io/docs/machines/overview/
 
 ### Autostop/autostart (Fly Proxy)
@@ -41,6 +42,7 @@ Important behavior:
 - It uses service concurrency `soft_limit` to reason about excess capacity in a region.
 
 References:
+
 - https://fly.io/docs/launch/autostop-autostart/
 - https://fly.io/docs/reference/fly-proxy-autostop-autostart/
 
@@ -51,6 +53,7 @@ References:
 - Suspend has constraints (notably it is generally intended for <= 2GB memory; no swap; no GPU).
 
 Reference:
+
 - https://fly.io/docs/reference/suspend-resume/
 
 ### Billing / pricing (what we get charged for)
@@ -63,6 +66,7 @@ Fly charges for Machines differently depending on state.
 - Volumes are billed separately: $0.15 per GB-month provisioned, and you pay for them even when the Machine is stopped.
 
 References:
+
 - https://fly.io/docs/about/pricing/
 - https://fly.io/docs/about/billing/
 

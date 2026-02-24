@@ -3,7 +3,13 @@ import { useParams, useSearchParams } from 'react-router';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
-import { Field, FieldContent, FieldGroup, FieldLabel, FieldDescription } from '@/shared/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldGroup,
+  FieldLabel,
+  FieldDescription,
+} from '@/shared/components/ui/field';
 import { Alert, AlertTitle, AlertDescription } from '@/shared/components/ui/alert';
 import { Button } from '@/shared/components/ui/button';
 import { Spinner } from '@/shared/components/ui/spinner';
@@ -183,14 +189,24 @@ export default function StudioLutPreviewPage() {
   // URLs on every intensity tick and is resilient to StrictMode double-execution
   // (the loaded HTMLImageElement stays valid even if the blob URL is later revoked).
   useEffect(() => {
-    if (!originalUrl) { originalImgRef.current = null; return; }
+    if (!originalUrl) {
+      originalImgRef.current = null;
+      return;
+    }
     let cancelled = false;
-    loadImage(originalUrl).then((img) => { if (!cancelled) originalImgRef.current = img; });
-    return () => { cancelled = true; };
+    loadImage(originalUrl).then((img) => {
+      if (!cancelled) originalImgRef.current = img;
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [originalUrl]);
 
   useEffect(() => {
-    if (!gradedBaseUrl) { gradedImgRef.current = null; return; }
+    if (!gradedBaseUrl) {
+      gradedImgRef.current = null;
+      return;
+    }
     let cancelled = false;
     loadImage(gradedBaseUrl).then((img) => {
       if (!cancelled) {
@@ -202,7 +218,9 @@ export default function StudioLutPreviewPage() {
         }
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [gradedBaseUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Client-side intensity blending: draw original + graded at current intensity onto canvas.
@@ -212,7 +230,12 @@ export default function StudioLutPreviewPage() {
     if (!canvas) return;
     if (!originalImgRef.current || !gradedImgRef.current) return;
 
-    blendToCanvas({ canvas, original: originalImgRef.current, graded: gradedImgRef.current, intensity });
+    blendToCanvas({
+      canvas,
+      original: originalImgRef.current,
+      graded: gradedImgRef.current,
+      intensity,
+    });
   }, [intensity]);
 
   const canRender = Boolean(id) && Boolean(file);
@@ -279,7 +302,9 @@ export default function StudioLutPreviewPage() {
                 onValueChange={(v) => setIntensity(v[0] ?? 100)}
                 disabled={!canRender}
               />
-              <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">{intensity}%</span>
+              <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
+                {intensity}%
+              </span>
             </div>
           </Field>
 
@@ -310,9 +335,20 @@ export default function StudioLutPreviewPage() {
                     : 'border-muted-foreground/25 hover:border-muted-foreground/50',
               )}
               onClick={() => fileInputRef.current?.click()}
-              onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
-              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(true);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(false);
+              }}
               onDrop={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -338,10 +374,7 @@ export default function StudioLutPreviewPage() {
             <FieldLabel>After</FieldLabel>
             <div className="relative aspect-[4/3] overflow-hidden rounded-md border bg-muted">
               {gradedBaseUrl ? (
-                <canvas
-                  ref={canvasRef}
-                  className="h-full w-full object-contain"
-                />
+                <canvas ref={canvasRef} className="h-full w-full object-contain" />
               ) : file ? null : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
                   <ImageIcon className="size-8" />

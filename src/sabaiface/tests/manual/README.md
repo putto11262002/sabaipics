@@ -9,6 +9,7 @@ This directory contains manual test scripts for validating SabaiFace with real i
 Tests the core face service directly (bypassing HTTP API).
 
 **What it tests:**
+
 - Face detection accuracy vs labeled ground truth
 - Face indexing with database persistence
 - Vector storage with pgvector
@@ -16,17 +17,20 @@ Tests the core face service directly (bypassing HTTP API).
 - End-to-end workflow
 
 **Prerequisites:**
+
 - Database running with pgvector extension
 - Test images in `tests/fixtures/images/`
 - `labels.json` with expected face counts
 
 **Run:**
+
 ```bash
 cd apps/sabaiface
 pnpm test:images
 ```
 
 **Sample output:**
+
 ```
 🧪 SabaiFace Test Suite
 ============================================================
@@ -63,6 +67,7 @@ Average processing time: 182ms
 Tests the Hono HTTP API endpoints with real images.
 
 **What it tests:**
+
 - Health check endpoint
 - Create collection endpoint
 - Index faces endpoint
@@ -70,10 +75,12 @@ Tests the Hono HTTP API endpoints with real images.
 - Delete collection endpoint
 
 **Prerequisites:**
+
 - Server running: `pnpm dev` (in another terminal)
 - Test images in `tests/fixtures/images/`
 
 **Run:**
+
 ```bash
 # Terminal 1: Start server
 cd apps/sabaiface
@@ -85,6 +92,7 @@ pnpm test:api
 ```
 
 **Sample output:**
+
 ```
 🧪 SabaiFace HTTP API Test
 ============================================================
@@ -148,6 +156,7 @@ tests/fixtures/images/
 ### Common Mismatches
 
 Face detection may differ from labeled counts due to:
+
 - **False negatives**: Faces not detected (blurry, occluded, low quality)
 - **False positives**: Non-faces detected (rare with SSD MobileNet V1)
 - **Threshold sensitivity**: Default confidence threshold is 0.5
@@ -155,6 +164,7 @@ Face detection may differ from labeled counts due to:
 ### Performance Benchmarks
 
 Expected performance on modern CPU:
+
 - Single face: 100-200ms
 - Multiple faces (5): 300-500ms
 - Vector search (10k faces): <1 second
@@ -170,6 +180,7 @@ Error: Model files not found in ./models
 ```
 
 **Solution:** Download face-api.js models:
+
 ```bash
 cd apps/sabaiface
 # Models should be in ./models/ directory
@@ -183,6 +194,7 @@ Error: connect ECONNREFUSED
 ```
 
 **Solution:** Start PostgreSQL with pgvector extension:
+
 ```bash
 # Check database is running
 psql $DATABASE_URL -c "SELECT 1"
@@ -198,6 +210,7 @@ Error: fetch failed
 ```
 
 **Solution:** Start the server:
+
 ```bash
 cd apps/sabaiface
 pnpm dev
@@ -206,6 +219,7 @@ pnpm dev
 ### Low Detection Accuracy
 
 If detection accuracy is <90%:
+
 1. Check image quality (blurry images reduce accuracy)
 2. Verify labels are correct (manual count may differ from ground truth)
 3. Adjust confidence threshold in test script (default: 0.5)
@@ -217,6 +231,7 @@ If detection accuracy is <90%:
 ### Change Confidence Threshold
 
 Edit the test script:
+
 ```typescript
 options: {
   minConfidence: 0.7,  // Increase for stricter detection
@@ -226,13 +241,15 @@ options: {
 ### Test Subset of Images
 
 Edit the test script:
+
 ```typescript
-const testImages = labels.slice(0, 5);  // Test first 5 only
+const testImages = labels.slice(0, 5); // Test first 5 only
 ```
 
 ### Change Similarity Threshold
 
 Edit search parameters:
+
 ```typescript
 options: {
   minSimilarity: 0.85,  // Increase for stricter matching
@@ -244,6 +261,7 @@ options: {
 ## Next Steps
 
 After verifying tests pass:
+
 1. Review detection mismatches (if any)
 2. Tune confidence thresholds if needed
 3. Add more test images for edge cases

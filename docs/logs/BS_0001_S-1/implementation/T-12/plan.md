@@ -6,6 +6,7 @@ Date: `2026-01-10`
 Owner: `Claude (implementv3)`
 
 ## Inputs
+
 - Task: `docs/logs/BS_0001_S-1/tasks.md` (section: T-12)
 - Upstream plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Context reports:
@@ -18,12 +19,14 @@ Owner: `Claude (implementv3)`
 ## Goal / non-goals
 
 **Goal:**
+
 - Create dedicated `/credits/packages` page for browsing active credit packages
 - Enable package selection → Stripe checkout → redirect flow
 - Create `/credits/success` page for post-purchase confirmation
 - Implement mobile-first, responsive UI following existing dashboard patterns
 
 **Non-goals:**
+
 - Package administration UI (Phase 0, admin API only)
 - Email/LINE notifications for purchase completion
 - Promo codes/discounts
@@ -61,6 +64,7 @@ Following the **exact same pattern** as the existing dashboard page (`apps/dashb
 ### Evidence from codebase
 
 **Pattern source:** `apps/dashboard/src/routes/dashboard/index.tsx` (lines 1-150)
+
 - PageHeader with breadcrumbs and action buttons
 - Three-state rendering (loading/error/success)
 - Card grid layout with `md:grid-cols-3`
@@ -68,6 +72,7 @@ Following the **exact same pattern** as the existing dashboard page (`apps/dashb
 - Error handling with retry button
 
 **Data fetching source:** `apps/dashboard/src/hooks/dashboard/useDashboardData.ts` (lines 1-79)
+
 - React Query `useQuery` with authentication
 - Query key naming: `["feature-name"]`
 - Bearer token from `useApiClient().getToken()`
@@ -75,12 +80,14 @@ Following the **exact same pattern** as the existing dashboard page (`apps/dashb
 - Config: `staleTime: 1000 * 60`, `refetchOnWindowFocus: true`
 
 **Mutation source:** `apps/dashboard/src/routes/onboarding/_components/PDPAConsentModal.tsx` (lines 1-137)
+
 - React Query `useMutation` for POST requests
 - Loading state: `mutation.isPending`
 - Error handling: `mutation.isError`
 - Button spinner during mutation
 
 **API contract source:** `apps/api/src/routes/credits.ts` (lines 36-159)
+
 - GET endpoint returns `{ data: Array<{ id, name, credits, priceThb }> }`
 - POST endpoint returns `{ data: { checkoutUrl, sessionId } }`
 - Prices in satang (must divide by 100 for display)
@@ -88,6 +95,7 @@ Following the **exact same pattern** as the existing dashboard page (`apps/dashb
 ### Critical constraint: Price formatting
 
 From `logs-scout.md` and `upstream-dossier.md`:
+
 - Prices stored in **satang** (1 THB = 100 satang)
 - Example: `priceThb: 29900` = 299 THB
 - **Must divide by 100 before display**
@@ -96,6 +104,7 @@ From `logs-scout.md` and `upstream-dossier.md`:
 ### Stripe checkout flow
 
 From `codebase-exemplars.md` (Exemplar 6):
+
 1. User clicks "Purchase" on package card
 2. Frontend calls `POST /credit-packages/checkout` with `{ packageId }`
 3. API returns `{ data: { checkoutUrl, sessionId } }`
@@ -111,18 +120,20 @@ From `codebase-exemplars.md` (Exemplar 6):
 ### API (already implemented, consuming only)
 
 **GET /credit-packages** (T-8, public endpoint):
+
 ```typescript
 Response: {
   data: Array<{
-    id: string;          // UUID
-    name: string;        // "Starter", "Growth", etc.
-    credits: number;     // 100, 500, etc.
-    priceThb: number;    // in satang (29900 = 299 THB)
-  }>
+    id: string; // UUID
+    name: string; // "Starter", "Growth", etc.
+    credits: number; // 100, 500, etc.
+    priceThb: number; // in satang (29900 = 299 THB)
+  }>;
 }
 ```
 
 **POST /credit-packages/checkout** (T-9, authenticated):
+
 ```typescript
 Request: {
   packageId: string;   // UUID from packages list
@@ -168,41 +179,49 @@ None. Webhook fulfillment handled by T-10.
 ## Failure modes / edge cases (major only)
 
 ### 1. Network error during package fetch
+
 - **Symptom:** `GET /credit-packages` fetch fails
 - **Handling:** Show `<Alert variant="destructive">` with error message and retry button
 - **Recovery:** User clicks retry → `refetch()` called
 
 ### 2. Network error during checkout creation
+
 - **Symptom:** `POST /credit-packages/checkout` fetch fails
 - **Handling:** Show error alert below package card with retry
 - **Recovery:** User clicks "Purchase" again
 
 ### 3. User not authenticated during checkout
+
 - **Symptom:** Clerk session expired or user logged out
 - **Handling:** Clerk's `useApiClient()` redirects to `/sign-in` automatically
 - **Recovery:** User signs in → redirected back to `/credits/packages` → retries purchase
 
 ### 4. User cancels Stripe checkout
+
 - **Symptom:** User clicks "Back" or cancel on Stripe page
 - **Handling:** Stripe redirects to `/credits/packages` (cancel URL)
 - **Recovery:** User can select package again, no charge made
 
 ### 5. Payment fails on Stripe
+
 - **Symptom:** Card decline, insufficient funds
 - **Handling:** Stripe shows inline error, allows retry with different card
 - **Recovery:** User retries or cancels back to packages page
 
 ### 6. Webhook delay after successful payment
+
 - **Symptom:** User on success page but balance not updated yet
 - **Handling:** Success page shows "Credits will appear in your account shortly" message
 - **Recovery:** Dashboard `refetchOnWindowFocus` updates balance when user returns
 
 ### 7. Empty packages list
+
 - **Symptom:** `GET /credit-packages` returns `{ data: [] }`
 - **Handling:** Show `<Empty>` component with message "No packages available"
 - **Recovery:** N/A (admin must activate packages)
 
 ### 8. Mobile network timeout
+
 - **Symptom:** Slow network on mobile, fetch timeout
 - **Handling:** Fetch throws error → error alert with retry
 - **Recovery:** User retries with better connection
@@ -212,6 +231,7 @@ None. Webhook fulfillment handled by T-10.
 ### Manual testing checklist
 
 **Desktop (Chrome, Safari, Firefox):**
+
 - [ ] Navigate to `/credits/packages`
 - [ ] Verify packages load correctly (name, credits, price in THB)
 - [ ] Verify loading skeletons display during fetch
@@ -225,6 +245,7 @@ None. Webhook fulfillment handled by T-10.
 - [ ] Verify dashboard balance updates (may take 1-5 seconds)
 
 **Mobile (iOS Safari, Android Chrome):**
+
 - [ ] Test responsive layout (cards stack vertically)
 - [ ] Test Stripe checkout redirect flow
 - [ ] Test PromptPay QR flow (if available in test mode)
@@ -232,6 +253,7 @@ None. Webhook fulfillment handled by T-10.
 - [ ] Test slow network (DevTools throttle to Slow 3G)
 
 **Edge cases:**
+
 - [ ] Test unauthenticated user clicking "Purchase" → verify Clerk login redirect
 - [ ] Test cancel flow (click back on Stripe page) → verify return to packages
 - [ ] Test direct navigation to `/credits/success` without session_id → verify error handling
@@ -252,9 +274,11 @@ pnpm dev
 ### Tests to add
 
 **Unit tests:** SKIPPED (no test infrastructure)
+
 - Document as `[ENG_DEBT]` in summary
 
 **Integration tests:** SKIPPED (no E2E framework)
+
 - Document as `[ENG_DEBT]` in summary
 
 ## Rollout / rollback
@@ -288,6 +312,7 @@ pnpm dev
 **Low risk:** UI-only change, no database migrations or API changes.
 
 **If needed:**
+
 1. Revert dashboard deployment on Cloudflare Pages (instant)
 2. Old `/credits/packages` route will 404 (acceptable, dashboard "Buy Credits" button exists but doesn't work)
 3. API endpoints remain functional for future retry
@@ -297,6 +322,7 @@ pnpm dev
 ## Open questions
 
 None. All context reports confirm:
+
 - APIs implemented and tested
 - Contracts clear
 - Patterns established

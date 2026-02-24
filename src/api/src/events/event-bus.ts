@@ -65,10 +65,7 @@ export interface EventProducer<E extends AnyEvent> {
    * @param type - The event type (discriminator)
    * @param payload - The event payload (type is inferred and enforced)
    */
-  emit<T extends E["type"]>(
-    type: T,
-    payload: Omit<Extract<E, { type: T }>, "type">
-  ): void;
+  emit<T extends E['type']>(type: T, payload: Omit<Extract<E, { type: T }>, 'type'>): void;
 }
 
 /**
@@ -80,7 +77,7 @@ export interface EventProducer<E extends AnyEvent> {
  * @typeParam E - Union type of all events that can be handled
  */
 export type EventHandlers<E extends AnyEvent> = {
-  [K in E["type"]]?: (event: Extract<E, { type: K }>) => void | Promise<void>;
+  [K in E['type']]?: (event: Extract<E, { type: K }>) => void | Promise<void>;
 };
 
 /**
@@ -125,10 +122,7 @@ export interface EventBus {
    * @param handlers - Map of event type to handler function
    * @returns Unsubscribe function
    */
-  handleFiltered<E extends AnyEvent>(
-    filter: FilterFn<E>,
-    handlers: EventHandlers<E>
-  ): () => void;
+  handleFiltered<E extends AnyEvent>(filter: FilterFn<E>, handlers: EventHandlers<E>): () => void;
 }
 
 /**
@@ -181,17 +175,11 @@ export function createEventBus(): EventBus {
           // Catch async errors
           if (result instanceof Promise) {
             result.catch((error) => {
-              console.error(
-                `[EventBus] Async handler error for "${event.type}":`,
-                error
-              );
+              console.error(`[EventBus] Async handler error for "${event.type}":`, error);
             });
           }
         } catch (error) {
-          console.error(
-            `[EventBus] Handler error for "${event.type}":`,
-            error
-          );
+          console.error(`[EventBus] Handler error for "${event.type}":`, error);
         }
       }
     }
@@ -203,18 +191,12 @@ export function createEventBus(): EventBus {
           const result = entry.handler(event);
           if (result instanceof Promise) {
             result.catch((error) => {
-              console.error(
-                `[EventBus] Async filtered handler error for "${event.type}":`,
-                error
-              );
+              console.error(`[EventBus] Async filtered handler error for "${event.type}":`, error);
             });
           }
         }
       } catch (error) {
-        console.error(
-          `[EventBus] Filtered handler error for "${event.type}":`,
-          error
-        );
+        console.error(`[EventBus] Filtered handler error for "${event.type}":`, error);
       }
     }
   };
@@ -263,7 +245,7 @@ export function createEventBus(): EventBus {
 
     handleFiltered<E extends AnyEvent>(
       filter: FilterFn<E>,
-      eventHandlers: EventHandlers<E>
+      eventHandlers: EventHandlers<E>,
     ): () => void {
       const entries: FilteredHandlerEntry[] = [];
 
@@ -272,8 +254,7 @@ export function createEventBus(): EventBus {
 
         // Create a combined filter that checks both type and user filter
         const entry: FilteredHandlerEntry = {
-          filter: (event) =>
-            event.type === type && (filter as FilterFn<AnyEvent>)(event),
+          filter: (event) => event.type === type && (filter as FilterFn<AnyEvent>)(event),
           handler: handler as Handler,
         };
 

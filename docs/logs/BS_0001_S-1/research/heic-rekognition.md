@@ -12,9 +12,11 @@
 ## 1. Decision Frame + Constraints
 
 ### Research question
+
 Does AWS Rekognition IndexFaces accept HEIC images directly, or do we need to convert to JPEG/PNG first? If conversion is needed, what are the options in a Cloudflare Workers environment?
 
 ### Constraints
+
 - **Requirements**: US-7 requires JPEG/PNG/HEIC/WebP upload support (max 5MB); US-8 requires automatic face detection via AWS Rekognition
 - **Architecture**: Hono API on Cloudflare Workers, photos stored in R2, queue consumer calls Rekognition
 - **Environment**: Cloudflare Workers runtime (no native image processing libs like sharp)
@@ -26,20 +28,22 @@ Does AWS Rekognition IndexFaces accept HEIC images directly, or do we need to co
 ## 2. Repo-first Grounding
 
 ### Existing Rekognition implementation
+
 Located at `apps/api/src/lib/rekognition/`:
 
 **`client.ts`** - Current implementation:
+
 ```typescript
 export async function indexFaces(
   client: RekognitionClient,
   eventId: string,
-  imageBytes: ArrayBuffer,  // <-- Raw bytes passed directly
-  photoId: string
+  imageBytes: ArrayBuffer, // <-- Raw bytes passed directly
+  photoId: string,
 ): Promise<IndexFacesResult> {
   const command = new IndexFacesCommand({
     CollectionId: collectionId,
     Image: {
-      Bytes: new Uint8Array(imageBytes),  // <-- No format conversion
+      Bytes: new Uint8Array(imageBytes), // <-- No format conversion
     },
     // ...
   });
@@ -47,14 +51,16 @@ export async function indexFaces(
 ```
 
 **`errors.ts`** - Already handles format errors:
+
 ```typescript
 const NON_RETRYABLE_ERROR_NAMES = new Set([
-  "InvalidImageFormatException",  // <-- Will be thrown for HEIC
+  'InvalidImageFormatException', // <-- Will be thrown for HEIC
   // ...
 ]);
 ```
 
 ### Observation
+
 The current implementation passes raw image bytes directly to Rekognition. No format detection or conversion exists. HEIC uploads will fail with `InvalidImageFormatException`.
 
 ---
@@ -62,12 +68,14 @@ The current implementation passes raw image bytes directly to Rekognition. No fo
 ## 3. Gap List
 
 ### Must-know (blocking)
+
 1. What image formats does AWS Rekognition accept? **ANSWERED**
 2. Does Cloudflare Images support HEIC input and JPEG output? **ANSWERED**
 3. Can Cloudflare Images Transform be called from Workers? **ANSWERED**
 4. What are the size/memory constraints for WASM-based conversion? **ANSWERED**
 
 ### Nice-to-know (non-blocking)
+
 1. Client-side HEIC conversion feasibility (browser support)
 2. Performance comparison between conversion options
 3. Cost implications of Cloudflare Images vs self-hosted
@@ -85,12 +93,14 @@ The current implementation passes raw image bytes directly to Rekognition. No fo
 **Verdict**: **HEIC is NOT supported**. Rekognition only accepts PNG and JPEG.
 
 Additional limits:
+
 - Maximum image size as raw bytes: **5 MB** (aligns with US-7 requirement)
 - Maximum image size from S3: 15 MB
 
 ### Tier B: HEIC/HEIF Format Specifications
 
 HEIC (High Efficiency Image Container) uses HEVC (H.265) compression. Key facts:
+
 - Native format on iOS devices since iOS 11 (2017)
 - Not supported by most web browsers natively
 - Requires decoding before use in most backend services
@@ -102,15 +112,19 @@ HEIC (High Efficiency Image Container) uses HEVC (H.265) compression. Key facts:
 **Source**: [Cloudflare Images Transform Docs](https://developers.cloudflare.com/images/transform-images/), [Cloudflare Upload Images](https://developers.cloudflare.com/images/upload-images/)
 
 **Official Changelog Confirmation** (2026):
+
 > "HEIC support in Cloudflare Images: You can use Images to ingest HEIC images and serve them in supported output formats like AVIF, WebP, JPEG, and PNG."
 
 Supported input formats (per official docs):
+
 - PNG, GIF (including animations), JPEG, WebP (including animated), SVG, **HEIC**
 
 Supported output formats:
+
 - AVIF, WebP, JPEG, baseline-jpeg, PNG, JSON (metadata only)
 
 Upload limits:
+
 - Max dimension: 12,000 px
 - Max area: 100 megapixels
 - Max file size: 10 MB
@@ -121,20 +135,22 @@ Upload limits:
 **Source**: [Transform via Workers](https://developers.cloudflare.com/images/transform-images/transform-via-workers/)
 
 Workers integration example:
+
 ```typescript
 fetch(imageURL, {
   cf: {
     image: {
-      format: "jpeg",
+      format: 'jpeg',
       quality: 85,
-      fit: "scale-down",
-      width: 4096,  // Max for Rekognition
+      fit: 'scale-down',
+      width: 4096, // Max for Rekognition
     },
   },
 });
 ```
 
 **Requirements**:
+
 - Zone must have Image Transformations enabled
 - Image must be accessible via URL (can use R2 public URL or signed URL)
 - Transformed images are cached
@@ -144,16 +160,19 @@ fetch(imageURL, {
 **Source**: [libheif-js on npm](https://www.npmjs.com/package/libheif-js), [Bundlephobia](https://bundlephobia.com/package/libheif-js)
 
 Package size:
+
 - Minified: **2.0 MB**
 - Gzipped: **507.9 kB**
 
 **Source**: [Cloudflare Workers Limits](https://developers.cloudflare.com/workers/platform/limits/)
 
 Worker size limits:
+
 - Free plan: 3 MB compressed
 - Paid plan: **10 MB compressed**
 
 **Verdict**: libheif-js (508 kB gzipped) fits within the 10 MB paid plan limit, but:
+
 - Adds significant bundle size (~500 kB)
 - CPU-intensive decoding in Workers (limited to 5 min CPU time, but HEIC decode is typically <1s)
 - Memory limit is 128 MB per isolate (should be sufficient for single image)
@@ -163,14 +182,17 @@ Worker size limits:
 **Source**: [imgproxy documentation](https://docs.imgproxy.net/), [Features](https://imgproxy.net/features/)
 
 imgproxy supports:
+
 - Input: JPEG, PNG, WebP, AVIF, JPEG XL, GIF, SVG, ICO, **HEIC**, BMP, TIFF
 - Output: Same formats
 
 **Deployment options**:
+
 - Self-hosted Docker container
 - Managed service (imgproxy.net)
 
 **Integration pattern**:
+
 ```
 Worker -> imgproxy (HEIC->JPEG) -> R2 (store converted) -> Rekognition
 ```
@@ -180,10 +202,12 @@ Worker -> imgproxy (HEIC->JPEG) -> R2 (store converted) -> Rekognition
 **Source**: [heic2any](https://github.com/alexcorvi/heic2any), [heic-to](https://github.com/hoppergee/heic-to)
 
 Libraries available:
+
 - `heic2any` - Browser-side WASM conversion
 - `heic-to` - Similar, actively maintained
 
 **Considerations**:
+
 - Only works on devices with sufficient compute (modern phones/laptops)
 - Conversion happens before upload, reducing server load
 - User experience impact: conversion delay before upload starts
@@ -197,6 +221,7 @@ Libraries available:
 **Approach**: Use Cloudflare Image Transformations to convert HEIC to JPEG on-the-fly before sending to Rekognition.
 
 **Flow**:
+
 ```
 1. Upload original (HEIC/JPEG/PNG/WebP) to R2
 2. Queue consumer fetches via CF Images Transform URL with format=jpeg
@@ -205,6 +230,7 @@ Libraries available:
 ```
 
 **Implementation**:
+
 ```typescript
 // In queue consumer
 async function getImageForRekognition(r2Key: string, env: Env): Promise<ArrayBuffer> {
@@ -213,9 +239,9 @@ async function getImageForRekognition(r2Key: string, env: Env): Promise<ArrayBuf
   const response = await fetch(r2Url, {
     cf: {
       image: {
-        format: "jpeg",
+        format: 'jpeg',
         quality: 90,
-        fit: "scale-down",
+        fit: 'scale-down',
         width: 4096,
         height: 4096,
       },
@@ -230,15 +256,16 @@ async function getImageForRekognition(r2Key: string, env: Env): Promise<ArrayBuf
 }
 ```
 
-| Pros | Cons |
-|------|------|
-| Native Cloudflare integration | Requires Image Transformations add-on ($) |
-| No bundle size impact | Adds latency for transform (~100-500ms) |
-| Handles all input formats uniformly | R2 objects need public/signed URL access |
-| Edge caching of transformed images | |
-| Preserves original quality in R2 | |
+| Pros                                | Cons                                      |
+| ----------------------------------- | ----------------------------------------- |
+| Native Cloudflare integration       | Requires Image Transformations add-on ($) |
+| No bundle size impact               | Adds latency for transform (~100-500ms)   |
+| Handles all input formats uniformly | R2 objects need public/signed URL access  |
+| Edge caching of transformed images  |                                           |
+| Preserves original quality in R2    |                                           |
 
 **Prerequisites**:
+
 - Enable Image Transformations on zone
 - Configure R2 bucket for public access or use signed URLs
 - Handle transform errors gracefully
@@ -254,6 +281,7 @@ async function getImageForRekognition(r2Key: string, env: Env): Promise<ArrayBuf
 **Approach**: Bundle libheif-js WASM in the queue consumer Worker, convert HEIC to JPEG in-Worker before Rekognition call.
 
 **Flow**:
+
 ```
 1. Upload original to R2
 2. Queue consumer downloads from R2
@@ -261,15 +289,16 @@ async function getImageForRekognition(r2Key: string, env: Env): Promise<ArrayBuf
 4. Send JPEG to Rekognition
 ```
 
-| Pros | Cons |
-|------|------|
-| Self-contained, no external deps | +500 kB bundle size |
-| No Cloudflare Images cost | CPU-intensive, impacts cold start |
-| Works offline/isolated | Need separate JPEG encoder (canvas-like API) |
-| | Memory pressure for large images |
-| | Complexity: WASM init, error handling |
+| Pros                             | Cons                                         |
+| -------------------------------- | -------------------------------------------- |
+| Self-contained, no external deps | +500 kB bundle size                          |
+| No Cloudflare Images cost        | CPU-intensive, impacts cold start            |
+| Works offline/isolated           | Need separate JPEG encoder (canvas-like API) |
+|                                  | Memory pressure for large images             |
+|                                  | Complexity: WASM init, error handling        |
 
 **Prerequisites**:
+
 - Bundle libheif-js with Worker
 - Add JPEG encoding library (e.g., jpeg-js)
 - Test memory/CPU limits with large images
@@ -283,6 +312,7 @@ async function getImageForRekognition(r2Key: string, env: Env): Promise<ArrayBuf
 **Approach**: Convert HEIC to JPEG in browser before upload. Server validates format and rejects unconverted HEIC.
 
 **Flow**:
+
 ```
 1. User selects HEIC file
 2. Browser detects HEIC, converts to JPEG using heic2any
@@ -291,14 +321,15 @@ async function getImageForRekognition(r2Key: string, env: Env): Promise<ArrayBuf
 5. Normal flow: R2 -> Queue -> Rekognition
 ```
 
-| Pros | Cons |
-|------|------|
-| Zero server-side conversion cost | User experience: conversion delay |
-| Smaller uploads (JPEG < HEIC usually) | Browser compatibility concerns |
-| Simpler server implementation | Can't enforce (user could bypass) |
-| | Original quality lost before storage |
+| Pros                                  | Cons                                 |
+| ------------------------------------- | ------------------------------------ |
+| Zero server-side conversion cost      | User experience: conversion delay    |
+| Smaller uploads (JPEG < HEIC usually) | Browser compatibility concerns       |
+| Simpler server implementation         | Can't enforce (user could bypass)    |
+|                                       | Original quality lost before storage |
 
 **Prerequisites**:
+
 - Add heic2any to dashboard bundle
 - Implement client-side format detection
 - Add server-side format validation
@@ -312,6 +343,7 @@ async function getImageForRekognition(r2Key: string, env: Env): Promise<ArrayBuf
 **Approach**: Client attempts conversion; server has Cloudflare Images fallback.
 
 **Flow**:
+
 ```
 1. Client attempts HEIC->JPEG if capable
 2. If client conversion fails, upload original HEIC
@@ -319,11 +351,11 @@ async function getImageForRekognition(r2Key: string, env: Env): Promise<ArrayBuf
 4. Queue consumer uses transformed URL
 ```
 
-| Pros | Cons |
-|------|------|
-| Best of both worlds | Implementation complexity |
+| Pros                 | Cons                       |
+| -------------------- | -------------------------- |
+| Best of both worlds  | Implementation complexity  |
 | Graceful degradation | Two code paths to maintain |
-| Works on all devices | |
+| Works on all devices |                            |
 
 **Risk**: Higher complexity for marginal benefit
 
@@ -332,16 +364,19 @@ async function getImageForRekognition(r2Key: string, env: Env): Promise<ArrayBuf
 ## 6. Open Questions
 
 ### Answered
+
 1. **Does Rekognition accept HEIC?** No. JPEG and PNG only.
 2. **Can CF Images Transform be called from Workers?** Yes, via `fetch()` with `cf.image` options.
 3. **What's the libheif-js bundle size?** ~508 kB gzipped, fits in 10 MB Worker limit.
 
 ### Requires HI Decision
+
 1. **Cost tolerance**: Is Cloudflare Images Transform cost acceptable?
 2. **UX preference**: Is client-side conversion delay acceptable for HEIC uploads?
 3. **Original preservation**: Must we preserve original HEIC, or is JPEG sufficient?
 
 ### Requires Further Research (non-blocking)
+
 1. Exact Cloudflare Images Transform pricing for expected volume
 2. Cold start impact of bundling libheif-js (~500 kB WASM)
 
@@ -352,6 +387,7 @@ async function getImageForRekognition(r2Key: string, env: Env): Promise<ArrayBuf
 **Primary recommendation: Option A (Cloudflare Images Transform)**
 
 Rationale:
+
 1. **Native integration** - Cloudflare-to-Cloudflare, minimal latency
 2. **No bundle impact** - Workers stay lean, fast cold starts
 3. **Unified handling** - Same code path for all formats (JPEG, PNG, WebP, HEIC)
@@ -359,6 +395,7 @@ Rationale:
 5. **Future-proof** - CF Images supports new formats as they add them
 
 **Implementation notes**:
+
 - Detect format on upload (magic bytes or extension)
 - Store original in R2 regardless of format
 - Queue consumer always fetches via CF Images Transform URL with `format=jpeg`
@@ -402,10 +439,12 @@ If Cloudflare Images cost is prohibitive, Option C (client-side) is viable for M
 ### Implementation Path Forward
 
 Given the confirmation that:
+
 - Rekognition only accepts JPEG/PNG
 - Cloudflare Images accepts HEIC input and outputs JPEG
 
 **Option A (Cloudflare Images Transform)** remains the recommended approach. The implementation should:
+
 1. Store original files in R2 (preserve HEIC/WebP originals)
 2. Use Cloudflare Images Transform URL with `format=jpeg` when fetching for Rekognition
 3. Handle both HEIC and WebP with the same code path

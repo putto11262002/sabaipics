@@ -1,10 +1,7 @@
 import * as Sentry from '@sentry/cloudflare';
 import { safeTry, type Err, type Result } from 'neverthrow';
 import type { Context, TypedResponse } from 'hono';
-import type {
-  ContentlessStatusCode,
-  SuccessStatusCode,
-} from 'hono/utils/http-status';
+import type { ContentlessStatusCode, SuccessStatusCode } from 'hono/utils/http-status';
 
 /** Success codes that carry a JSON body (excludes 204, 205) */
 type ContentfulSuccessStatusCode = Exclude<SuccessStatusCode, ContentlessStatusCode>;

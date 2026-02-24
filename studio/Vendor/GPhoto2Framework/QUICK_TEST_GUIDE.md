@@ -3,6 +3,7 @@
 ## 🚀 5-Minute Test Procedure
 
 ### Prerequisites (1 min)
+
 1. Canon camera WiFi enabled (Settings → WiFi → Enable)
 2. iPad connected to camera's WiFi network (Settings → WiFi → Select "EOS_XXXX")
 3. GPhoto2Example app installed on iPad
@@ -33,12 +34,14 @@
 ## 📱 What to Watch For
 
 ### On iPad Screen:
+
 - **Status Label**: Disconnected → Connecting → Connected → Monitoring Events
 - **Photo Count**: Should increment with each photo
 - **Event Log**: Shows recent events with timestamps
 - **Console Text**: Updates with photo details
 
 ### In Xcode Console:
+
 ```
 === NEW PHOTO DETECTED ===
 File: IMG_1234.CR2
@@ -52,12 +55,12 @@ File size: 25165824 bytes (24.00 MB)
 
 ## ⚡ Quick Troubleshooting
 
-| Problem | Solution |
-|---------|----------|
-| Won't connect | Check iPad is on camera WiFi |
-| No events detected | Restart event monitor |
-| App crashes | Check camera still connected |
-| Wrong IP | Camera might use different IP - check camera WiFi settings |
+| Problem            | Solution                                                   |
+| ------------------ | ---------------------------------------------------------- |
+| Won't connect      | Check iPad is on camera WiFi                               |
+| No events detected | Restart event monitor                                      |
+| App crashes        | Check camera still connected                               |
+| Wrong IP           | Camera might use different IP - check camera WiFi settings |
 
 ---
 
@@ -76,6 +79,7 @@ File size: 25165824 bytes (24.00 MB)
 ## 📝 Test Scenarios
 
 ### Scenario 1: Single Photo
+
 1. Start monitoring
 2. Take one photo
 3. Verify detection
@@ -84,6 +88,7 @@ File size: 25165824 bytes (24.00 MB)
 **Expected:** 1 photo detected
 
 ### Scenario 2: Burst Mode
+
 1. Start monitoring
 2. Take 5 photos quickly
 3. Verify all detected
@@ -91,6 +96,7 @@ File size: 25165824 bytes (24.00 MB)
 **Expected:** 5 photos detected
 
 ### Scenario 3: Long-Running Monitor
+
 1. Start monitoring
 2. Wait 2 minutes
 3. Take photo
@@ -103,6 +109,7 @@ File size: 25165824 bytes (24.00 MB)
 ## 🔧 Build & Deploy
 
 ### Build for Simulator:
+
 ```bash
 cd /Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent6/GPhoto2Framework/GPhoto2Framework
 xcodebuild -project GPhoto2Framework.xcodeproj \
@@ -112,6 +119,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
 ```
 
 ### Deploy to iPad:
+
 1. Open in Xcode
 2. Select target device: iPad (2)
 3. Click Run (⌘R)
@@ -122,6 +130,7 @@ xcodebuild -project GPhoto2Framework.xcodeproj \
 ## 📊 Expected Console Output
 
 ### On Launch:
+
 ```
 === Canon EOS WiFi Test App Started ===
 Camera IP: 192.168.1.1
@@ -132,6 +141,7 @@ Connection String: ptpip:192.168.1.1
 ```
 
 ### On Connection:
+
 ```
 === Starting Camera Connection ===
 Found camera model at index: 12
@@ -143,6 +153,7 @@ Manufacturer: Canon Inc.
 ```
 
 ### On Photo Detection:
+
 ```
 === NEW PHOTO DETECTED ===
 File: IMG_5678.CR2

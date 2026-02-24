@@ -22,12 +22,12 @@ app.get('/images/:filename', async (c) => {
       jpeg: 'image/jpeg',
       png: 'image/png',
       webp: 'image/webp',
-      gif: 'image/gif'
+      gif: 'image/gif',
     };
     const contentType = mimeTypes[ext || 'jpg'] || 'image/jpeg';
 
     return c.body(imageBuffer, 200, {
-      'Content-Type': contentType
+      'Content-Type': contentType,
     });
   } catch (e) {
     return c.text('Image not found', 404);

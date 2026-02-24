@@ -14,7 +14,10 @@ import fs from 'fs';
 import path from 'path';
 
 const DATASET_PATH = path.join(process.cwd(), '../dataset');
-const OUTPUT_PATH = path.join(process.cwd(), 'tests/fixtures/eval/dataset/detection/kaggle-labels.json');
+const OUTPUT_PATH = path.join(
+  process.cwd(),
+  'tests/fixtures/eval/dataset/detection/kaggle-labels.json',
+);
 
 interface GroundEntry {
   faceId: string;
@@ -73,7 +76,9 @@ function categorizeFaceCount(count: number): 'single' | 'multiple' | 'crowd' {
  */
 async function extractLabels(): Promise<void> {
   console.log('╔══════════════════════════════════════════════════════════════════════════════╗');
-  console.log('║           Extract Face Detection Labels from Kaggle Dataset                     ║');
+  console.log(
+    '║           Extract Face Detection Labels from Kaggle Dataset                     ║',
+  );
   console.log('╚══════════════════════════════════════════════════════════════════════════════╝');
 
   // Check dataset exists
@@ -86,10 +91,11 @@ async function extractLabels(): Promise<void> {
   console.log(`\nDataset path: ${DATASET_PATH}`);
 
   // Get all person folders
-  const personFolders = fs.readdirSync(DATASET_PATH)
-    .filter(name => name.match(/^\d+$/))
-    .map(name => path.join(DATASET_PATH, name))
-    .filter(p => fs.statSync(p).isDirectory());
+  const personFolders = fs
+    .readdirSync(DATASET_PATH)
+    .filter((name) => name.match(/^\d+$/))
+    .map((name) => path.join(DATASET_PATH, name))
+    .filter((p) => fs.statSync(p).isDirectory());
 
   console.log(`Found ${personFolders.length} person folders\n`);
 
@@ -167,7 +173,7 @@ print(f'   Output: {output_path}')
   console.log(`   3. Labels will be saved to: kaggle-labels.json\n`);
 }
 
-extractLabels().catch(error => {
+extractLabels().catch((error) => {
   console.error('\n❌ Error:', error.message);
   process.exit(1);
 });

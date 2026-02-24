@@ -9,21 +9,22 @@ Date: 2026-01-10
 ### API patterns
 
 #### Route definition structure
+
 - **Location:** `apps/api/src/routes/<resource>.ts`
 - **Barrel export:** `apps/api/src/routes/index.ts` (if used)
 - **Type definition pattern:**
+
   ```typescript
   type Env = {
     Bindings: Bindings;
     Variables: PhotographerVariables | WebhookVariables | {};
   };
-  
-  export const resourceRouter = new Hono<Env>()
-    .get("/", handler)
-    .post("/", handler);
+
+  export const resourceRouter = new Hono<Env>().get('/', handler).post('/', handler);
   ```
 
 #### Route registration order (apps/api/src/index.ts)
+
 1. **Webhooks** - DB injection → webhook routes (no auth, no CORS)
 2. **CORS** - Applied to all routes
 3. **DB injection** - For non-webhook routes
@@ -33,6 +34,7 @@ Date: 2026-01-10
 7. **Authenticated routes** - After Clerk auth
 
 #### Middleware patterns
+
 - **Location:** `apps/api/src/middleware/`
 - **`requirePhotographer()`** - Verifies Clerk auth + photographer exists in DB
   - Returns 401 if no valid Clerk session
@@ -43,17 +45,19 @@ Date: 2026-01-10
 - **DB access:** `c.var.db()` returns Drizzle database instance
 
 #### Validation
+
 - **Library:** `@hono/zod-validator` with Zod schemas
 - **Pattern:**
+
   ```typescript
   import { zValidator } from "@hono/zod-validator";
   import { z } from "zod";
-  
+
   const createSchema = z.object({
     field: z.string(),
     optional: z.string().optional(),
   });
-  
+
   .post("/", zValidator("json", createSchema), async (c) => {
     const body = c.req.valid("json");
     // ...
@@ -63,6 +67,7 @@ Date: 2026-01-10
 ### Error handling
 
 #### Status codes (established)
+
 - **200** - Success (GET, PATCH)
 - **201** - Created (POST)
 - **400** - Validation error
@@ -73,6 +78,7 @@ Date: 2026-01-10
 - **500** - Internal server error
 
 #### Error response shape
+
 ```typescript
 // Auth errors (from @sabaipics/auth/errors)
 {
@@ -93,6 +99,7 @@ Date: 2026-01-10
 ```
 
 #### Success response shape
+
 ```typescript
 // Single resource
 { data: { ...resource } }
@@ -104,12 +111,13 @@ Date: 2026-01-10
 ### Validation
 
 #### Hono testClient pattern (from T-3, T-5, T-8)
+
 ```typescript
-import { describe, it, expect, vi } from "vitest";
-import { Hono } from "hono";
-import { testClient } from "hono/testing";
-import { resourceRouter } from "./resource";
-import type { Database } from "@sabaipics/db";
+import { describe, it, expect, vi } from 'vitest';
+import { Hono } from 'hono';
+import { testClient } from 'hono/testing';
+import { resourceRouter } from './resource';
+import type { Database } from '@sabaipics/db';
 
 // Mock DB builder
 function createMockDb(overrides = {}) {
@@ -126,24 +134,24 @@ function createMockDb(overrides = {}) {
 // Test app builder
 function createTestApp(options: { mockDb?: ReturnType<typeof createMockDb> }) {
   const { mockDb = createMockDb() } = options;
-  
+
   const app = new Hono()
-    .use("/*", (c, next) => {
-      c.set("db", () => mockDb as unknown as Database);
+    .use('/*', (c, next) => {
+      c.set('db', () => mockDb as unknown as Database);
       return next();
     })
-    .route("/resource", resourceRouter);
-  
+    .route('/resource', resourceRouter);
+
   return { app, mockDb };
 }
 
-describe("GET /resource", () => {
-  it("returns expected data", async () => {
+describe('GET /resource', () => {
+  it('returns expected data', async () => {
     const { app } = createTestApp({});
     const client = testClient(app);
-    
+
     const res = await client.resource.$get();
-    
+
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data).toBeDefined();
@@ -152,6 +160,7 @@ describe("GET /resource", () => {
 ```
 
 #### Test coverage checklist
+
 - Auth middleware tests (401, 403)
 - Happy path (200/201)
 - Validation errors (400)
@@ -162,6 +171,7 @@ describe("GET /resource", () => {
 ### Testing
 
 #### Commands
+
 - `pnpm check-types` - TypeScript type checking
 - `pnpm --filter=@sabaipics/api test` - Run API tests
 - `pnpm --filter=@sabaipics/api build` - Build API
@@ -170,6 +180,7 @@ describe("GET /resource", () => {
 ## Known limitations affecting this task
 
 ### T-14 specific context
+
 - **Task:** QR code generation library
 - **Type:** `scaffold` (infrastructure/library setup)
 - **Surface:** `API`
@@ -178,12 +189,14 @@ describe("GET /resource", () => {
 - **Consumer:** T-13 (Events API) depends on T-14
 
 ### From prior tasks
+
 1. **[T-1] R2 storage pattern** - Store `r2_key` (not URL) for resources
    - URLs can change (domain, CDN config)
    - Keys are immutable identifiers
    - Same key → multiple URL variants
 
 2. **[T-4] Webhook idempotency** - Always check for existing records before insert
+
    ```typescript
    const [existing] = await db
      .select({ id: table.id })
@@ -230,12 +243,14 @@ describe("GET /resource", () => {
    - **Impact:** None (T-14 is independent)
 
 ### No direct follow-ups impact T-14
+
 - T-14 is a foundational library with no upstream debt
 - T-13 (Events API) will consume T-14's output
 
 ## Ops conventions
 
 ### Env vars (from prior tasks)
+
 - `DATABASE_URL` - Postgres connection string
 - `ADMIN_API_KEY` - Admin API authentication
 - `CLERK_PUBLISHABLE_KEY` - Clerk frontend key
@@ -245,9 +260,11 @@ describe("GET /resource", () => {
 - `CORS_ORIGIN` - Frontend origin for CORS and redirects
 
 ### Feature flags
+
 - None established yet
 
 ### Migrations
+
 - **Tool:** Drizzle ORM
 - **Location:** `packages/db/drizzle/`
 - **Generation:** `pnpm --filter=@sabaipics/db db:generate`
@@ -255,6 +272,7 @@ describe("GET /resource", () => {
 - **Pattern:** Auto-generated SQL migrations with sequential naming
 
 ### Cloudflare Workers specifics
+
 1. **Environment compatibility** - All libraries must work in Workers runtime
 2. **No Node.js APIs** - Cannot use `fs`, `path`, etc. unless polyfilled
 3. **Binary data** - Use `Uint8Array` instead of Node.js `Buffer`
@@ -263,6 +281,7 @@ describe("GET /resource", () => {
 ## T-14 implementation notes
 
 ### Requirements from task spec
+
 1. Add `@juit/qrcode` package
 2. Create wrapper function `generateEventQR(accessCode)`
 3. Return PNG as `Uint8Array` (not Node.js Buffer)
@@ -270,6 +289,7 @@ describe("GET /resource", () => {
 5. Must work in Cloudflare Workers environment
 
 ### Expected output for T-13 consumption
+
 ```typescript
 // apps/api/src/lib/qr/index.ts or generate.ts
 export async function generateEventQR(accessCode: string): Promise<Uint8Array> {
@@ -281,17 +301,20 @@ export async function generateEventQR(accessCode: string): Promise<Uint8Array> {
 ```
 
 ### Testing strategy
+
 - Unit test QR generation function
 - Verify output is valid PNG (check magic bytes)
 - Verify QR is scannable (can decode the embedded URLs)
 - Test in Workers environment (not just Node.js)
 
 ### No database access needed
+
 - T-14 is pure library code
 - No middleware, no routes, no DB access
 - Just export the function for T-13 to import
 
 ### No migration needed
+
 - No schema changes
 - No new tables
 - T-14 is pure compute logic

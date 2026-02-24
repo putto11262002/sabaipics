@@ -10,11 +10,11 @@
 
 Several API endpoints perform multi-step database operations without transactional guarantees. This creates risks:
 
-| Endpoint | Risk | Impact |
-|----------|------|--------|
-| T-10 Stripe webhook | Idempotency check + credit allocation not atomic | Double credit allocation on webhook retry |
-| T-16 Photo upload | Credit deduction + photo insert not atomic | User loses credit, photo lost |
-| T-17 Queue consumer | Faces insert + photo/events updates not atomic | Inconsistent UI, possible duplicate processing |
+| Endpoint            | Risk                                             | Impact                                         |
+| ------------------- | ------------------------------------------------ | ---------------------------------------------- |
+| T-10 Stripe webhook | Idempotency check + credit allocation not atomic | Double credit allocation on webhook retry      |
+| T-16 Photo upload   | Credit deduction + photo insert not atomic       | User loses credit, photo lost                  |
+| T-17 Queue consumer | Faces insert + photo/events updates not atomic   | Inconsistent UI, possible duplicate processing |
 
 ---
 
@@ -32,19 +32,21 @@ HTTP Adapter (neon-http)        WebSocket Adapter (neon-js)
 
 ### Why Dual-Adapter?
 
-| Option | Pros | Cons | Decision |
-|--------|------|------|----------|
-| HTTP only | Fast, stateless | No transaction support | ❌ Insufficient |
-| WebSocket only | Transactions everywhere | Higher latency, connection overhead | ❌ Overkill |
-| **Dual-adapter** | Fast for reads, tx when needed | Slightly more complex | ✅ **Chosen** |
+| Option           | Pros                           | Cons                                | Decision        |
+| ---------------- | ------------------------------ | ----------------------------------- | --------------- |
+| HTTP only        | Fast, stateless                | No transaction support              | ❌ Insufficient |
+| WebSocket only   | Transactions everywhere        | Higher latency, connection overhead | ❌ Overkill     |
+| **Dual-adapter** | Fast for reads, tx when needed | Slightly more complex               | ✅ **Chosen**   |
 
 ### Key Trade-offs
 
 **Performance vs. Consistency:**
+
 - HTTP: ~5-10ms per query, no tx
 - WebSocket: ~10-20ms first query, then ~5ms, with tx
 
 **Connection Management:**
+
 - HTTP: Stateless, no pooling needed
 - WebSocket: Singleton pattern in CF Workers for connection reuse
 
@@ -65,7 +67,7 @@ export function createDbHttp(connectionString: string) {
 let wsDbCache: ReturnType<typeof drizzleWs> | null = null;
 
 export function createDbTx(connectionString: string) {
-  if (wsDbCache) return wsDbCache;  // Singleton for connection pooling
+  if (wsDbCache) return wsDbCache; // Singleton for connection pooling
 
   const sql = neon(connectionString, { webSocket: true });
   wsDbCache = drizzleWs(sql, { schema });
@@ -107,20 +109,21 @@ await dbTx.transaction(async (tx) => {
 
 ### Files Modified
 
-| File | Change |
-|------|--------|
-| `packages/db/src/client.ts` | Added `createDbHttp()` and `createDbTx()` |
-| `apps/api/src/index.ts` | Middleware exposes both `db` and `dbTx` |
-| `apps/api/src/types.ts` | Added `dbTx` to Env.Variables |
-| `routes/webhooks/stripe.ts` | T-10: Wrapped in transaction |
-| `routes/photos.ts` | T-16: Wrapped credit deduction in transaction |
-| `queue/photo-consumer.ts` | T-17: Wrapped faces+updates in transaction |
-| `routes/consent.ts` | T-5: Wrapped consent in transaction |
-| `routes/events/index.ts` | T-13: Wrapped event creation in transaction |
+| File                        | Change                                        |
+| --------------------------- | --------------------------------------------- |
+| `packages/db/src/client.ts` | Added `createDbHttp()` and `createDbTx()`     |
+| `apps/api/src/index.ts`     | Middleware exposes both `db` and `dbTx`       |
+| `apps/api/src/types.ts`     | Added `dbTx` to Env.Variables                 |
+| `routes/webhooks/stripe.ts` | T-10: Wrapped in transaction                  |
+| `routes/photos.ts`          | T-16: Wrapped credit deduction in transaction |
+| `queue/photo-consumer.ts`   | T-17: Wrapped faces+updates in transaction    |
+| `routes/consent.ts`         | T-5: Wrapped consent in transaction           |
+| `routes/events/index.ts`    | T-13: Wrapped event creation in transaction   |
 
 ### Transaction Scope by Task
 
 **T-10 Stripe Webhook (HIGH PRIORITY)**
+
 ```typescript
 await dbTx.transaction(async (tx) => {
   // 1. Check if stripe_session_id exists (idempotency)
@@ -129,6 +132,7 @@ await dbTx.transaction(async (tx) => {
 ```
 
 **T-16 Photo Upload (HIGH PRIORITY)**
+
 ```typescript
 await dbTx.transaction(async (tx) => {
   // 1. Check credit balance >= 1
@@ -138,6 +142,7 @@ await dbTx.transaction(async (tx) => {
 ```
 
 **T-17 Queue Consumer (MEDIUM PRIORITY)**
+
 ```typescript
 await dbTx.transaction(async (tx) => {
   // 1. Insert all faces from Rekognition
@@ -147,6 +152,7 @@ await dbTx.transaction(async (tx) => {
 ```
 
 **T-5 Consent API (LOW PRIORITY)**
+
 ```typescript
 await dbTx.transaction(async (tx) => {
   // 1. Insert consent_record
@@ -155,6 +161,7 @@ await dbTx.transaction(async (tx) => {
 ```
 
 **T-13 Events API (LOW PRIORITY)**
+
 ```typescript
 await dbTx.transaction(async (tx) => {
   // 1. Insert event
@@ -183,6 +190,7 @@ let wsDbCache: ReturnType<typeof drizzleWs> | null = null;
 ```
 
 This works because:
+
 1. CF Workers maintain execution context for multiple requests
 2. The WebSocket connection is reused across invocations
 3. Connection is closed when the worker instance is recycled
@@ -208,6 +216,7 @@ This works because:
 ### Monitoring
 
 Add observability for:
+
 - Transaction success/failure rates
 - WebSocket connection lifecycle
 - Transaction duration metrics
@@ -215,6 +224,7 @@ Add observability for:
 ### Alternative Futures
 
 If Neon adds transaction support to HTTP adapter (via session mode), we could:
+
 - Simplify to single adapter
 - Remove WebSocket dependency
 - Reduce connection management complexity
@@ -234,6 +244,7 @@ If Neon adds transaction support to HTTP adapter (via session mode), we could:
 ## Changelog
 
 ### 2026-01-14
+
 - Created log directory
 - Documented dual-adapter design decision
 - Listed transaction scopes for all affected tasks

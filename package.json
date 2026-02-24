@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "check-types": "tsc --noEmit -p tsconfig.browser.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.node.json",
+    "typecheck:api": "tsc --noEmit -p tsconfig.worker.json",
+    "typegen:api": "cd src/api && wrangler types -c ../../wrangler.api.jsonc",
     "dev:api": "trap 'kill 0' EXIT; . .dev.vars; wrangler dev -c wrangler.api.jsonc & ngrok http --domain=$NGROK_DOMAIN --log=stdout --log-format=logfmt 8081 & wait",
     "dev:api:local": "wrangler dev -c wrangler.api.jsonc",
     "dev:dashboard": "vite --config vite.dashboard.config.ts",

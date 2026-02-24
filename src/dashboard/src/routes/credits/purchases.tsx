@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import {
-  useReactTable,
-  getCoreRowModel,
-  createColumnHelper,
-} from '@tanstack/react-table';
+import { useReactTable, getCoreRowModel, createColumnHelper } from '@tanstack/react-table';
 import { Badge } from '@/shared/components/ui/badge';
 import { Skeleton } from '@/shared/components/ui/skeleton';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/shared/components/ui/empty';
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from '@/shared/components/ui/empty';
 import { ExternalLink, Wallet } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { DataTable } from '../../components/events-table/data-table';
@@ -89,9 +91,7 @@ export default function CreditPurchasesTab() {
       pagination: { pageIndex: page, pageSize },
     },
     onPaginationChange: (updater) => {
-      const next = typeof updater === 'function'
-        ? updater({ pageIndex: page, pageSize })
-        : updater;
+      const next = typeof updater === 'function' ? updater({ pageIndex: page, pageSize }) : updater;
       setPage(next.pageIndex);
       setPageSize(next.pageSize);
     },
@@ -119,7 +119,9 @@ export default function CreditPurchasesTab() {
       <div className="py-4">
         <Empty>
           <EmptyHeader>
-            <EmptyMedia variant="icon"><Wallet /></EmptyMedia>
+            <EmptyMedia variant="icon">
+              <Wallet />
+            </EmptyMedia>
             <EmptyTitle>No purchases yet</EmptyTitle>
             <EmptyDescription>Buy credits to get started.</EmptyDescription>
           </EmptyHeader>

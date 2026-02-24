@@ -119,9 +119,7 @@ function extractAttributes(detail?: any): FaceAttributes | undefined {
   if (!detail) return undefined;
 
   return {
-    age: detail.AgeRange
-      ? { low: detail.AgeRange.Low, high: detail.AgeRange.High }
-      : undefined,
+    age: detail.AgeRange ? { low: detail.AgeRange.Low, high: detail.AgeRange.High } : undefined,
     gender: detail.Gender
       ? {
           value: detail.Gender.Value ?? '',
@@ -216,9 +214,7 @@ function transformSearchResponse(data: any): SimilarFace[] {
     data.FaceMatches?.map((m: any) => ({
       faceId: m.Face?.FaceId || '',
       similarity: normalizeConfidence(m.Similarity),
-      boundingBox: m.Face?.BoundingBox
-        ? normalizeBoundingBox(m.Face.BoundingBox)
-        : undefined,
+      boundingBox: m.Face?.BoundingBox ? normalizeBoundingBox(m.Face.BoundingBox) : undefined,
       confidence: normalizeConfidence(m.Face?.Confidence),
       externalImageId: m.Face?.ExternalImageId,
       provider: 'sabaiface',
@@ -321,7 +317,9 @@ export function createSabaiFaceProvider(config: SabaiFaceProviderConfig): FaceRe
       return ok(transformIndexResponse(data));
     });
 
-  const findSimilarFaces = (request: FindSimilarRequest): ResultAsync<SimilarFace[], FaceServiceError> =>
+  const findSimilarFaces = (
+    request: FindSimilarRequest,
+  ): ResultAsync<SimilarFace[], FaceServiceError> =>
     safeTry(async function* () {
       const url = `${endpoint}/collections/${request.eventId}/search-faces-by-image`;
       const base64Image = arrayBufferToBase64(request.imageData);
@@ -357,7 +355,9 @@ export function createSabaiFaceProvider(config: SabaiFaceProviderConfig): FaceRe
       return ok(transformSearchResponse(data));
     });
 
-  const findImagesByFace = (request: FindImagesByFaceRequest): ResultAsync<FindImagesByFaceResponse, FaceServiceError> =>
+  const findImagesByFace = (
+    request: FindImagesByFaceRequest,
+  ): ResultAsync<FindImagesByFaceResponse, FaceServiceError> =>
     safeTry(async function* () {
       const url = `${endpoint}/collections/${request.eventId}/search-faces-by-image`;
       const base64Image = arrayBufferToBase64(request.imageData);

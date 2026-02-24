@@ -105,15 +105,8 @@ interface RecentUploadsTableProps {
 }
 
 export function RecentUploadsTable({ eventId }: RecentUploadsTableProps) {
-  const {
-    data,
-    isLoading,
-    hasNextPage,
-    hasPreviousPage,
-    goToNextPage,
-    goToPreviousPage,
-    page,
-  } = useRecentUploads(eventId);
+  const { data, isLoading, hasNextPage, hasPreviousPage, goToNextPage, goToPreviousPage, page } =
+    useRecentUploads(eventId);
 
   if (isLoading) {
     return (
@@ -133,12 +126,24 @@ export function RecentUploadsTable({ eventId }: RecentUploadsTableProps) {
           <TableBody>
             {Array.from({ length: 5 }).map((_, i) => (
               <TableRow key={i}>
-                <TableCell><Skeleton className="size-12 rounded" /></TableCell>
-                <TableCell><Skeleton className="h-5 w-8 rounded-full" /></TableCell>
-                <TableCell><Skeleton className="h-5 w-8 rounded-full" /></TableCell>
-                <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
-                <TableCell><Skeleton className="h-5 w-10 ml-auto" /></TableCell>
-                <TableCell><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                <TableCell>
+                  <Skeleton className="size-12 rounded" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-8 rounded-full" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-8 rounded-full" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-16 ml-auto" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-10 ml-auto" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-20 ml-auto" />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -192,12 +197,7 @@ export function RecentUploadsTable({ eventId }: RecentUploadsTableProps) {
             <ChevronLeft className="mr-1 size-3" />
             Previous
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={goToNextPage}
-            disabled={!hasNextPage}
-          >
+          <Button variant="outline" size="sm" onClick={goToNextPage} disabled={!hasNextPage}>
             Next
             <ChevronRight className="ml-1 size-3" />
           </Button>
@@ -256,7 +256,9 @@ function IntentRow({ intent }: { intent: UploadIntent }) {
             <Users className="size-3.5" />
             <span className="text-xs">{intent.photo.faceCount}</span>
           </div>
-        ) : intent.photo?.status === 'failed' || intent.status === 'failed' || intent.status === 'expired' ? (
+        ) : intent.photo?.status === 'failed' ||
+          intent.status === 'failed' ||
+          intent.status === 'expired' ? (
           <span className="text-muted-foreground">-</span>
         ) : (
           <Skeleton className="h-5 w-10 ml-auto" />

@@ -26,6 +26,7 @@ Create `GET /events/:id/photos` endpoint returning paginated photos with CF Imag
 - Sorted by uploaded_at desc
 
 **Tests:**
+
 - Unit test pagination
 - Test URL generation
 
@@ -35,10 +36,10 @@ Create `GET /events/:id/photos` endpoint returning paginated photos with CF Imag
 
 ## Dependencies
 
-| Task | Description | Done |
-|------|-------------|------|
-| T-1 | Create database schema (all domain tables) | Yes |
-| T-2 | Implement requirePhotographer middleware | Yes |
+| Task | Description                                | Done |
+| ---- | ------------------------------------------ | ---- |
+| T-1  | Create database schema (all domain tables) | Yes  |
+| T-2  | Implement requirePhotographer middleware   | Yes  |
 
 Both dependencies are complete. T-18 can proceed.
 
@@ -48,14 +49,14 @@ Both dependencies are complete. T-18 can proceed.
 
 ## Load-Bearing References
 
-| Path | Purpose |
-|------|---------|
-| `docs/logs/BS_0001_S-1/plan/final.md` | Execution plan with API contract and URL format |
-| `docs/logs/BS_0001_S-1/research/cf-images-thumbnails.md` | CF Images transform URL format and research |
-| `packages/db/src/schema/photos.ts` | Photos table definition |
-| `packages/db/src/schema/events.ts` | Events table definition |
-| `apps/api/src/routes/dashboard/route.ts` | Reference implementation for API patterns |
-| `apps/api/src/middleware/require-photographer.ts` | Auth middleware providing photographer context |
+| Path                                                     | Purpose                                         |
+| -------------------------------------------------------- | ----------------------------------------------- |
+| `docs/logs/BS_0001_S-1/plan/final.md`                    | Execution plan with API contract and URL format |
+| `docs/logs/BS_0001_S-1/research/cf-images-thumbnails.md` | CF Images transform URL format and research     |
+| `packages/db/src/schema/photos.ts`                       | Photos table definition                         |
+| `packages/db/src/schema/events.ts`                       | Events table definition                         |
+| `apps/api/src/routes/dashboard/route.ts`                 | Reference implementation for API patterns       |
+| `apps/api/src/middleware/require-photographer.ts`        | Auth middleware providing photographer context  |
 
 ---
 
@@ -94,26 +95,26 @@ Download:  Presigned R2 URL (normalized JPEG, ~4000px)
 
 ### photos
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| event_id | uuid | FK to events |
-| r2_key | text | R2 path to normalized JPEG |
-| status | text | Enum: 'processing', 'indexed', 'failed' |
-| face_count | integer | Default 0 |
-| uploaded_at | timestamptz | Default now |
+| Column      | Type        | Notes                                   |
+| ----------- | ----------- | --------------------------------------- |
+| id          | uuid        | PK                                      |
+| event_id    | uuid        | FK to events                            |
+| r2_key      | text        | R2 path to normalized JPEG              |
+| status      | text        | Enum: 'processing', 'indexed', 'failed' |
+| face_count  | integer     | Default 0                               |
+| uploaded_at | timestamptz | Default now                             |
 
 **Index:** `photos_event_id_idx` on (event_id)
 
 ### events
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| photographer_id | uuid | FK to photographers |
-| name | text | Required |
-| expires_at | timestamptz | Required |
-| created_at | timestamptz | Default now |
+| Column          | Type        | Notes               |
+| --------------- | ----------- | ------------------- |
+| id              | uuid        | PK                  |
+| photographer_id | uuid        | FK to photographers |
+| name            | text        | Required            |
+| expires_at      | timestamptz | Required            |
+| created_at      | timestamptz | Default now         |
 
 **Index:** `events_photographer_id_idx` on (photographer_id)
 
@@ -122,6 +123,7 @@ Download:  Presigned R2 URL (normalized JPEG, ~4000px)
 ## Implementation Patterns (from dashboard/route.ts reference)
 
 1. **Env type definition:**
+
 ```typescript
 type Env = {
   Bindings: Bindings;
@@ -130,13 +132,18 @@ type Env = {
 ```
 
 2. **Router setup:**
+
 ```typescript
-export const photosRouter = new Hono<Env>()
-  .get("/:eventId/photos", requirePhotographer(), zValidator("param", schema), async (c) => {
+export const photosRouter = new Hono<Env>().get(
+  '/:eventId/photos',
+  requirePhotographer(),
+  zValidator('param', schema),
+  async (c) => {
     const photographer = c.var.photographer;
     const db = c.var.db();
     // ...
-  });
+  },
+);
 ```
 
 3. **Response format:** Use `c.json({ data: ... }, pagination: ... })` for paginated responses.
@@ -153,13 +160,10 @@ const photos = await db
   .select()
   .from(photos)
   .where(
-    and(
-      eq(photos.eventId, eventId),
-      cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined
-    )
+    and(eq(photos.eventId, eventId), cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined),
   )
   .orderBy(desc(photos.uploadedAt))
-  .limit(limit + 1);  // Fetch one extra to determine hasMore
+  .limit(limit + 1); // Fetch one extra to determine hasMore
 
 // Determine hasMore and nextCursor
 const hasMore = photos.length > limit;
@@ -172,6 +176,7 @@ const nextCursor = hasMore ? items[limit - 1].uploadedAt.toISOString() : null;
 ## R2 Presigned URL Generation
 
 Based on R2 binding configuration in `wrangler.jsonc`:
+
 - Binding: `PHOTOS_BUCKET`
 - Bucket name: `sabaipics-photos`
 
@@ -180,7 +185,7 @@ Based on R2 binding configuration in `wrangler.jsonc`:
 const url = await c.env.PHOTOS_BUCKET.signUrl(
   `https://${c.env.PHOTOS_BUCKET.http().hostname}/${photo.r2Key}`,
   900, // 15 minutes
-  { method: 'GET' }
+  { method: 'GET' },
 );
 ```
 
@@ -197,16 +202,11 @@ const url = await c.env.PHOTOS_BUCKET.signUrl(
 const [event] = await db
   .select({ id: events.id })
   .from(events)
-  .where(
-    and(
-      eq(events.id, eventId),
-      eq(events.photographerId, photographer.id)
-    )
-  )
+  .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
   .limit(1);
 
 if (!event) {
-  return c.json({ error: { code: "NOT_FOUND", message: "Event not found" } }, 404);
+  return c.json({ error: { code: 'NOT_FOUND', message: 'Event not found' } }, 404);
 }
 ```
 
@@ -217,9 +217,9 @@ if (!event) {
 Based on research doc, the URLs should be:
 
 ```typescript
-const R2_BASE_URL = "https://photos.sabaipics.com";
+const R2_BASE_URL = 'https://photos.sabaipics.com';
 
-function generateImageUrl(r2Key: string, width: number, fit: "cover" | "contain") {
+function generateImageUrl(r2Key: string, width: number, fit: 'cover' | 'contain') {
   return `https://sabaipics.com/cdn-cgi/image/width=${width},fit=${fit},format=auto,quality=${width < 800 ? 75 : 85}/${R2_BASE_URL}/${r2Key}`;
 }
 ```
@@ -243,10 +243,7 @@ const photos = await db
   })
   .from(photos)
   .where(
-    and(
-      eq(photos.eventId, eventId),
-      cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined
-    )
+    and(eq(photos.eventId, eventId), cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined),
   )
   .orderBy(desc(photos.uploadedAt))
   .limit(limit + 1);
@@ -258,12 +255,7 @@ const photos = await db
 const [event] = await db
   .select({ id: events.id })
   .from(events)
-  .where(
-    and(
-      eq(events.id, eventId),
-      eq(events.photographerId, photographer.id)
-    )
-  )
+  .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
   .limit(1);
 ```
 
@@ -271,12 +263,12 @@ const [event] = await db
 
 ## Gaps and Uncertainties
 
-| Item | Status | Notes |
-|------|--------|-------|
-| R2 `signUrl` method signature | `[NEED_VALIDATION]` | Need to verify exact API in Workers |
-| R2 custom domain | `[NEED_VALIDATION]` | Need to confirm `photos.sabaipics.com` is configured |
-| Pagination response shape | `[NEED_VALIDATION]` | Should include `pagination.nextCursor` and `pagination.hasMore` |
-| Expired event handling | `[GAP]` | Should gallery work for expired events? |
+| Item                          | Status              | Notes                                                           |
+| ----------------------------- | ------------------- | --------------------------------------------------------------- |
+| R2 `signUrl` method signature | `[NEED_VALIDATION]` | Need to verify exact API in Workers                             |
+| R2 custom domain              | `[NEED_VALIDATION]` | Need to confirm `photos.sabaipics.com` is configured            |
+| Pagination response shape     | `[NEED_VALIDATION]` | Should include `pagination.nextCursor` and `pagination.hasMore` |
+| Expired event handling        | `[GAP]`             | Should gallery work for expired events?                         |
 
 ---
 
@@ -284,11 +276,11 @@ const [event] = await db
 
 From `docs/logs/BS_0001_S-1/plan/final.md`:
 
-| # | Decision | Impact on T-18 |
-|---|----------|---------------|
-| 5 | Thumbnails = CF Images on-demand (400px / 1200px) | URL generation uses `/cdn-cgi/image/` format |
-| 15 | Storage = Normalized JPEG only (no original) | Download URL serves the normalized JPEG directly |
-| 2 | Image format = Normalize to JPEG (4000px max) | All photos in R2 are JPEG format |
+| #   | Decision                                          | Impact on T-18                                   |
+| --- | ------------------------------------------------- | ------------------------------------------------ |
+| 5   | Thumbnails = CF Images on-demand (400px / 1200px) | URL generation uses `/cdn-cgi/image/` format     |
+| 15  | Storage = Normalized JPEG only (no original)      | Download URL serves the normalized JPEG directly |
+| 2   | Image format = Normalize to JPEG (4000px max)     | All photos in R2 are JPEG format                 |
 
 ---
 

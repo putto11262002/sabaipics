@@ -28,11 +28,11 @@ Create `POST /events/:id/photos` endpoint that validates, deducts credit (FIFO),
 
 ## Dependencies
 
-| Task | Status | Description |
-|------|--------|-------------|
+| Task | Status | Description                                                     |
+| ---- | ------ | --------------------------------------------------------------- |
 | T-1  | ✓ Done | DB schema (photographers, credit_ledger, events, photos tables) |
-| T-2  | ✓ Done | requirePhotographer middleware (auth + DB lookup) |
-| T-13 | ✓ Done | Events API (CRUD + QR generation) |
+| T-2  | ✓ Done | requirePhotographer middleware (auth + DB lookup)               |
+| T-13 | ✓ Done | Events API (CRUD + QR generation)                               |
 
 **All dependencies complete** — ready to proceed.
 
@@ -43,6 +43,7 @@ Create `POST /events/:id/photos` endpoint that validates, deducts credit (FIFO),
 ### Storage Strategy (Plan: Architecture Overview)
 
 **One file per photo:** normalized JPEG only (4000px max, ~1-3MB)
+
 - All formats converted on upload (not on-demand)
 - Rekognition receives stored JPEG directly (no conversion needed)
 - CF Images handles thumbnails/previews on-demand (400px/1200px)
@@ -52,15 +53,16 @@ Create `POST /events/:id/photos` endpoint that validates, deducts credit (FIFO),
 
 ### Upload Validation (Plan: Phase 4, US-7)
 
-| Check | Limit |
-|-------|-------|
-| Formats | JPEG, PNG, HEIC, WebP |
-| Max size | 20 MB |
-| Auth | Valid photographer, owns event |
-| Event | Not expired |
-| Credits | Balance ≥ 1 |
+| Check    | Limit                          |
+| -------- | ------------------------------ |
+| Formats  | JPEG, PNG, HEIC, WebP          |
+| Max size | 20 MB                          |
+| Auth     | Valid photographer, owns event |
+| Event    | Not expired                    |
+| Credits  | Balance ≥ 1                    |
 
 **Rejected cases:**
+
 - RAW files (CR2, NEF, ARW) — not supported
 - Files > 20MB — too large
 - Unsupported formats — error message lists accepted formats
@@ -68,6 +70,7 @@ Create `POST /events/:id/photos` endpoint that validates, deducts credit (FIFO),
 ### Credit Deduction Flow (Plan: Phase 4)
 
 **Critical ordering:**
+
 1. Validation (format, size, auth, credits check)
 2. **If validation fails** → 400 error, NO credit deducted
 3. **If validation passes** → Deduct 1 credit HERE (FIFO expiry)
@@ -80,6 +83,7 @@ Create `POST /events/:id/photos` endpoint that validates, deducts credit (FIFO),
 ### Credit Ledger FIFO Mechanics (Plan: Credit Ledger Mechanics)
 
 **Deduction insert (FIFO expiry):**
+
 ```sql
 INSERT INTO credit_ledger (photographer_id, amount, type, expires_at)
 VALUES (
@@ -96,22 +100,24 @@ VALUES (
 ```
 
 **Why FIFO expiry?**
+
 - Deductions inherit expiry from oldest unexpired purchase
 - Prevents negative balance after purchases expire
 - Simple balance query (SUM unexpired rows)
 
 ### Validation Error Messages (Plan: Phase 4, US-7)
 
-| Error | Message |
-|-------|---------|
-| Wrong format | "Accepted formats: JPEG, PNG, HEIC, WebP" |
-| Too large | "Maximum file size is 20MB" |
-| No credits | "Insufficient credits. Purchase more to continue." |
-| Event expired | "This event has expired" |
+| Error         | Message                                            |
+| ------------- | -------------------------------------------------- |
+| Wrong format  | "Accepted formats: JPEG, PNG, HEIC, WebP"          |
+| Too large     | "Maximum file size is 20MB"                        |
+| No credits    | "Insufficient credits. Purchase more to continue." |
+| Event expired | "This event has expired"                           |
 
 ### API Contract (Plan: API Summary, Phase 4)
 
 **Endpoint:**
+
 ```
 POST /events/:id/photos
 Body: multipart/form-data (file)
@@ -119,6 +125,7 @@ Response: { photoId, status: "processing" }
 ```
 
 **Flow after upload:**
+
 1. Photos row: `status=processing`
 2. Job enqueued for face detection
 3. UI shows "Processing..." badge
@@ -129,19 +136,19 @@ Response: { photoId, status: "processing" }
 
 ### Research Documents
 
-| File | Key Findings |
-|------|--------------|
+| File                                                 | Key Findings                                                                                                                                                                                          |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/logs/BS_0001_S-1/research/cf-upload-limits.md` | CF Workers: 100MB limit (Free/Pro)<br>CF Images: 70MB input limit<br>**Recommended: 20MB max upload** (updated from 50MB in research)<br>Supported formats: JPEG, PNG, HEIC, WebP (RAW not supported) |
 
 ### Plan References
 
-| Section | Location | Key Info |
-|---------|----------|----------|
-| Database schema | `plan/final.md` → Database Schema | `photos` table: `id, event_id, r2_key, status, face_count, uploaded_at`<br>Single `r2_key` (normalized JPEG only) |
-| Storage strategy | `plan/final.md` → Architecture Overview | Normalize all uploads to JPEG (4000px max, quality 90%) |
-| Upload flow | `plan/final.md` → Phase 4: US-7 | 11-step flow with credit deduction BEFORE normalization |
-| Credit mechanics | `plan/final.md` → Credit Ledger Mechanics | FIFO expiry inheritance via subquery |
-| Validation rules | `plan/final.md` → Upload Validation | Format + size + auth + event status + credit balance |
+| Section          | Location                                  | Key Info                                                                                                          |
+| ---------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Database schema  | `plan/final.md` → Database Schema         | `photos` table: `id, event_id, r2_key, status, face_count, uploaded_at`<br>Single `r2_key` (normalized JPEG only) |
+| Storage strategy | `plan/final.md` → Architecture Overview   | Normalize all uploads to JPEG (4000px max, quality 90%)                                                           |
+| Upload flow      | `plan/final.md` → Phase 4: US-7           | 11-step flow with credit deduction BEFORE normalization                                                           |
+| Credit mechanics | `plan/final.md` → Credit Ledger Mechanics | FIFO expiry inheritance via subquery                                                                              |
+| Validation rules | `plan/final.md` → Upload Validation       | Format + size + auth + event status + credit balance                                                              |
 
 ---
 
@@ -150,6 +157,7 @@ Response: { photoId, status: "processing" }
 ### Database (photos table)
 
 **Schema (from T-1):**
+
 ```
 photos
   id              uuid primary key
@@ -167,6 +175,7 @@ photos
 **Bucket:** `[NEED_VALIDATION]` Which bucket name? (e.g., `sabaipics-photos-production`)
 
 **Key format:** `[NEED_DECISION]` Suggested: `{event_id}/{photo_id}.jpg`
+
 - Pros: Clean namespace per event, predictable URLs
 - Cons: Event ID exposed in URL (low risk if access_code is secret)
 
@@ -177,6 +186,7 @@ photos
 **Service:** `[NEED_VALIDATION]` CF Images Transform endpoint/binding
 
 **Parameters:**
+
 - Max width: 4000px
 - Format: JPEG
 - Quality: 90%
@@ -186,6 +196,7 @@ photos
 **Output:** Normalized JPEG binary (stream to R2)
 
 **Uncertainty:** `[GAP]` How to call CF Images Transform from Workers?
+
 - Option A: Use `/cdn-cgi/image/` URL transform (public endpoint)
 - Option B: Workers binding (if exists)
 - Option C: External API call to CF Images
@@ -195,6 +206,7 @@ photos
 **Queue:** `[NEED_VALIDATION]` Which queue name? (e.g., `photo-processing-queue`)
 
 **Job payload:**
+
 ```json
 {
   "photoId": "uuid",
@@ -220,6 +232,7 @@ photos
 ### Atomicity
 
 **Critical:** Credit deduction must be atomic with photo row creation.
+
 - Use transaction: deduct credit → insert photo row
 - If either fails, rollback both
 - `[NEED_VALIDATION]` Drizzle transaction support in Cloudflare Workers
@@ -227,11 +240,13 @@ photos
 ### Error Handling
 
 **Before credit deduction:**
+
 - Validation errors → 400 with user-friendly message
 - Auth errors → 401/403
 - Event not found → 404
 
 **After credit deduction:**
+
 - Normalization failure → Log, return 500, NO refund
 - R2 upload failure → Log, return 500, NO refund
 - Queue enqueue failure → Log, return 200 (job will retry), NO refund
@@ -241,6 +256,7 @@ photos
 ### Idempotency
 
 **Consideration:** `[NEED_DECISION]` Should duplicate uploads be prevented?
+
 - Option A: Accept duplicates (photographer's choice)
 - Option B: SHA-256 hash check (expensive, requires reading full file twice)
 
@@ -302,6 +318,7 @@ photos
 **Risk Level:** High (core feature, payments involved)
 
 **Monitoring:**
+
 - Upload success rate (target: > 95%)
 - Validation rejection rate by reason (format, size, credits, etc.)
 - Normalization failures (should be < 1%)
@@ -309,6 +326,7 @@ photos
 - Credit deduction errors (should be 0%)
 
 **Testing:**
+
 - Test with real HEIC files from iPhone
 - Test on slow connections (simulate 1Mbps upload)
 - Test concurrent uploads (same photographer, different events)

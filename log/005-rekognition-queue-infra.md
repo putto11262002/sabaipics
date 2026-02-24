@@ -9,17 +9,20 @@
 ## Summary
 
 Set up infrastructure for AWS Rekognition integration:
+
 - Queue consumer with retry/error handling
 - Rate limiter Durable Object (50 TPS pacing)
 - Rekognition SDK client wrapper
 - Error classification utilities
 
 **Infrastructure layer does:**
+
 - Fetch image from R2
 - Call Rekognition IndexFaces
 - Return SDK types (`FaceRecord[]`, `UnindexedFace[]`)
 
 **Application layer handles (NOT here):**
+
 - Save faces to DB
 - Update photo status
 - WebSocket notifications
@@ -28,26 +31,26 @@ Set up infrastructure for AWS Rekognition integration:
 
 ## Files Created
 
-| File | Purpose |
-|------|---------|
-| `src/types/photo-job.ts` | PhotoJob, RateLimiterResponse types |
-| `src/lib/rekognition/errors.ts` | Error classification, backoff calculation |
-| `src/lib/rekognition/client.ts` | SDK client wrapper, indexFaces, collection ops |
-| `src/lib/rekognition/index.ts` | Re-exports for clean imports |
-| `src/durable-objects/rate-limiter.ts` | DO for pacing at 50 TPS |
-| `src/queue/photo-consumer.ts` | Queue handler with processPhoto implementation |
+| File                                  | Purpose                                        |
+| ------------------------------------- | ---------------------------------------------- |
+| `src/types/photo-job.ts`              | PhotoJob, RateLimiterResponse types            |
+| `src/lib/rekognition/errors.ts`       | Error classification, backoff calculation      |
+| `src/lib/rekognition/client.ts`       | SDK client wrapper, indexFaces, collection ops |
+| `src/lib/rekognition/index.ts`        | Re-exports for clean imports                   |
+| `src/durable-objects/rate-limiter.ts` | DO for pacing at 50 TPS                        |
+| `src/queue/photo-consumer.ts`         | Queue handler with processPhoto implementation |
 
 ---
 
 ## Files Modified
 
-| File | Changes |
-|------|---------|
-| `wrangler.jsonc` | Added R2, Queue, DO bindings + nodejs_compat |
-| `tsconfig.json` | Added @cloudflare/workers-types |
-| `package.json` | Added @aws-sdk/client-rekognition |
-| `src/index.ts` | Export DO, add queue handler, update Bindings |
-| `.dev.vars` | Added AWS credential placeholders |
+| File             | Changes                                       |
+| ---------------- | --------------------------------------------- |
+| `wrangler.jsonc` | Added R2, Queue, DO bindings + nodejs_compat  |
+| `tsconfig.json`  | Added @cloudflare/workers-types               |
+| `package.json`   | Added @aws-sdk/client-rekognition             |
+| `src/index.ts`   | Export DO, add queue handler, update Bindings |
+| `.dev.vars`      | Added AWS credential placeholders             |
 
 ---
 
@@ -56,9 +59,11 @@ Set up infrastructure for AWS Rekognition integration:
 Simplified by using AWS SDK types directly instead of custom parsing.
 
 **Removed:**
+
 - `src/lib/rekognition-parser.ts` - not needed, use SDK types
 
 **Reorganized:**
+
 - `src/lib/rekognition-errors.ts` → `src/lib/rekognition/errors.ts`
 
 **Key decision:** No `ParsedFace` type. Use SDK's `FaceRecord` and `UnindexedFace` directly. Application layer handles mapping to DB schema.
@@ -92,6 +97,7 @@ PHOTOS_BUCKET     → sabaipics-photos (R2)
 ```
 
 Queue consumer config:
+
 - `max_batch_size`: 50
 - `max_retries`: 3
 - `dead_letter_queue`: photo-processing-dlq
@@ -103,15 +109,17 @@ Queue consumer config:
 ## Data Shapes
 
 ### PhotoJob (Queue Message)
+
 ```typescript
 {
-  photo_id: string;   // UUID
-  event_id: string;   // UUID
-  r2_key: string;     // "{event_id}/{photo_id}.{ext}"
+  photo_id: string; // UUID
+  event_id: string; // UUID
+  r2_key: string; // "{event_id}/{photo_id}.{ext}"
 }
 ```
 
 ### IndexFacesResult (returned by processPhoto)
+
 ```typescript
 {
   faceRecords: FaceRecord[];      // SDK type - indexed faces
@@ -121,14 +129,15 @@ Queue consumer config:
 ```
 
 ### UnindexedFace Reasons
-| Reason | Meaning |
-|--------|---------|
-| `EXTREME_POSE` | Head turned too far |
-| `EXCEEDS_MAX_FACES` | Hit MaxFaces limit |
-| `LOW_BRIGHTNESS` | Image too dark |
-| `LOW_SHARPNESS` | Image too blurry |
-| `LOW_CONFIDENCE` | Detection confidence too low |
-| `SMALL_BOUNDING_BOX` | Face too small |
+
+| Reason               | Meaning                      |
+| -------------------- | ---------------------------- |
+| `EXTREME_POSE`       | Head turned too far          |
+| `EXCEEDS_MAX_FACES`  | Hit MaxFaces limit           |
+| `LOW_BRIGHTNESS`     | Image too dark               |
+| `LOW_SHARPNESS`      | Image too blurry             |
+| `LOW_CONFIDENCE`     | Detection confidence too low |
+| `SMALL_BOUNDING_BOX` | Face too small               |
 
 ---
 
@@ -150,12 +159,12 @@ Pacing via DO:
 
 ## Error Handling
 
-| Error Type | Action |
-|------------|--------|
+| Error Type                                 | Action               |
+| ------------------------------------------ | -------------------- |
 | Throttling (ProvisionedThroughputExceeded) | Retry + report to DO |
-| Non-retryable (InvalidImageFormat) | Ack (don't retry) |
-| Retryable (InternalServerError) | Retry with backoff |
-| Unknown | Retry with backoff |
+| Non-retryable (InvalidImageFormat)         | Ack (don't retry)    |
+| Retryable (InternalServerError)            | Retry with backoff   |
+| Unknown                                    | Retry with backoff   |
 
 Backoff: Exponential 2^n seconds, max 300s, ±20% jitter.
 
@@ -210,6 +219,7 @@ wrangler secret put AWS_SECRET_ACCESS_KEY --env production
 ### Step 3: Local Development
 
 Update `.dev.vars`:
+
 ```
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
@@ -218,6 +228,7 @@ AWS_SECRET_ACCESS_KEY=...
 ### Step 4: GitHub Actions
 
 Add to repository secrets:
+
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 
@@ -235,12 +246,14 @@ Add to repository secrets:
 ## Testing
 
 Local dev works:
+
 ```bash
 pnpm --filter=@sabaipics/api dev:local
 # Shows all bindings recognized
 ```
 
 Build passes:
+
 ```bash
 pnpm --filter=@sabaipics/api build
 # No TypeScript errors

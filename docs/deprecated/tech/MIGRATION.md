@@ -30,6 +30,7 @@ dev/tech/
 ```
 
 **Issues:**
+
 1. No clear distinction between Primary (WHAT) and Supporting (HOW) docs
 2. Some docs mix requirements with integration patterns
 3. Missing supporting docs for WebSocket, LINE messaging
@@ -69,33 +70,33 @@ dev/tech/
 
 ### Phase 1: New Docs (Do Now)
 
-| Task | Status |
-|------|--------|
-| Create `RULES/ORGANIZATION.md` | ✅ Done |
+| Task                            | Status  |
+| ------------------------------- | ------- |
+| Create `RULES/ORGANIZATION.md`  | ✅ Done |
 | Create `RULES/WRITING_GUIDE.md` | ✅ Done |
-| Create `06_websocket.md` | ✅ Done |
-| Create `06_line_messaging.md` | ✅ Done |
+| Create `06_websocket.md`        | ✅ Done |
+| Create `06_line_messaging.md`   | ✅ Done |
 
 ### Phase 2: Review Existing Docs (Defer)
 
-| Doc | Review Needed |
-|-----|---------------|
-| `00_use_cases.md` | Ensure it stays WHAT, not HOW |
-| `00_flows.md` | Add references to supporting docs where needed |
-| `00_business_rules.md` | Verify no implementation details leaked in |
-| `01_data_schema.md` | OK - data model is requirements |
-| `02_auth.md` | Verify it's pattern-focused, not code-focused |
-| `03_api_design.md` | OK - API contract is requirements |
-| `05_image_pipeline.md` | Verify it's pattern-focused, add references |
+| Doc                    | Review Needed                                  |
+| ---------------------- | ---------------------------------------------- |
+| `00_use_cases.md`      | Ensure it stays WHAT, not HOW                  |
+| `00_flows.md`          | Add references to supporting docs where needed |
+| `00_business_rules.md` | Verify no implementation details leaked in     |
+| `01_data_schema.md`    | OK - data model is requirements                |
+| `02_auth.md`           | Verify it's pattern-focused, not code-focused  |
+| `03_api_design.md`     | OK - API contract is requirements              |
+| `05_image_pipeline.md` | Verify it's pattern-focused, add references    |
 
 ### Phase 3: Cross-References (Defer)
 
-| Primary Doc | Should Reference |
-|-------------|------------------|
-| `00_flows.md` Flow 4 (Upload) | `05_image_pipeline.md` |
-| `00_flows.md` Flow 8 (LINE) | `06_line_messaging.md` |
-| `00_flows.md` Auth steps | `02_auth.md` |
-| `03_api_design.md` Auth section | `02_auth.md` |
+| Primary Doc                     | Should Reference       |
+| ------------------------------- | ---------------------- |
+| `00_flows.md` Flow 4 (Upload)   | `05_image_pipeline.md` |
+| `00_flows.md` Flow 8 (LINE)     | `06_line_messaging.md` |
+| `00_flows.md` Auth steps        | `02_auth.md`           |
+| `03_api_design.md` Auth section | `02_auth.md`           |
 
 ---
 
@@ -110,6 +111,7 @@ Nothing. New docs can follow the new mental model. Existing docs work fine, just
 **Continue creating new docs following new mental model.**
 
 Defer migration/review of existing docs until:
+
 - All supporting docs created
 - Ready for implementation phase
 - Natural cleanup point

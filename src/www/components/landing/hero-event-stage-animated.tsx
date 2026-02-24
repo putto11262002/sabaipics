@@ -43,9 +43,10 @@ const animationStyles = `
 `;
 
 export function HeroEventStageAnimated({ className }: { className?: string }) {
-  const prefersReducedMotion = typeof window !== 'undefined'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
+  const prefersReducedMotion =
+    typeof window !== 'undefined'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false;
 
   const [captureTick, setCaptureTick] = React.useState(0);
   const [frameIndex, setFrameIndex] = React.useState(0);

@@ -43,10 +43,7 @@ export default function CreditsLayout() {
   return (
     <div className="flex h-full flex-col">
       <SidebarPageHeader
-        breadcrumbs={[
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'Credits' },
-        ]}
+        breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Credits' }]}
       >
         <Button size="sm" variant="outline" onClick={() => setGiftOpen(true)}>
           <Gift className="mr-1 size-4" />
@@ -88,7 +85,9 @@ export default function CreditsLayout() {
               )}
             </CardTitle>
           </CardHeader>
-          <CardFooter className={`text-sm ${(summary?.expiringSoon ?? 0) > 0 ? 'text-warning' : 'text-muted-foreground'}`}>
+          <CardFooter
+            className={`text-sm ${(summary?.expiringSoon ?? 0) > 0 ? 'text-warning' : 'text-muted-foreground'}`}
+          >
             <Clock className="mr-1 size-4" />
             Credits expiring in 30 days
           </CardFooter>
@@ -124,7 +123,7 @@ export default function CreditsLayout() {
                   'border-b-2 pb-3 text-sm font-medium transition-colors',
                   isActive
                     ? 'border-primary text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
                 )
               }
             >

@@ -1,6 +1,6 @@
-import { pgTable, text, uuid, index, vector } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
-import { timestamptz } from "./common";
+import { pgTable, text, uuid, index, vector } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { timestamptz } from './common';
 
 // =============================================================================
 // SabaiFace Internal Database Schema
@@ -21,44 +21,41 @@ import { timestamptz } from "./common";
  * - Isolated from main application database
  */
 export const faces = pgTable(
-  "faces",
+  'faces',
   {
-    id: uuid("id")
+    id: uuid('id')
       .primaryKey()
       .default(sql`gen_random_uuid()`),
 
     // External references (link to main app via IDs only)
-    eventId: text("event_id").notNull(), // Event/collection ID
-    photoId: text("photo_id"), // Photo ID from main app (nullable for testing)
+    eventId: text('event_id').notNull(), // Event/collection ID
+    photoId: text('photo_id'), // Photo ID from main app (nullable for testing)
 
     // Face detection metadata
-    provider: text("provider").notNull().default("sabaiface"), // 'sabaiface' or 'aws'
-    confidence: text("confidence"), // Detection confidence (0-1)
+    provider: text('provider').notNull().default('sabaiface'), // 'sabaiface' or 'aws'
+    confidence: text('confidence'), // Detection confidence (0-1)
 
     // Vector descriptor (128-D face embedding)
     // Uses pgvector for efficient cosine similarity search
-    descriptor: vector("descriptor", { dimensions: 128 }),
+    descriptor: vector('descriptor', { dimensions: 128 }),
 
     // Bounding box (quick access for display)
-    boundingBox: text("bounding_box"), // JSON string: {Width, Height, Left, Top}
+    boundingBox: text('bounding_box'), // JSON string: {Width, Height, Left, Top}
 
     // Timestamps
-    indexedAt: timestamptz("indexed_at").defaultNow().notNull(),
+    indexedAt: timestamptz('indexed_at').defaultNow().notNull(),
   },
   (table) => [
     // Index for event-based queries (collection filtering)
-    index("faces_event_id_idx").on(table.eventId),
+    index('faces_event_id_idx').on(table.eventId),
 
     // Index for provider filtering
-    index("faces_provider_idx").on(table.provider),
+    index('faces_provider_idx').on(table.provider),
 
     // HNSW index for fast vector similarity search
     // Uses cosine distance (vector_cosine_ops)
-    index("faces_descriptor_hnsw_idx").using(
-      "hnsw",
-      table.descriptor.op("vector_cosine_ops")
-    ),
-  ]
+    index('faces_descriptor_hnsw_idx').using('hnsw', table.descriptor.op('vector_cosine_ops')),
+  ],
 );
 
 export type Face = typeof faces.$inferSelect;

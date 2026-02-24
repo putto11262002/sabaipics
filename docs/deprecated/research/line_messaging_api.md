@@ -14,10 +14,10 @@ Participants find their photos → click "Send to LINE" → photos arrive in the
 
 ## 1. LINE Login vs LINE Messaging API
 
-| Service | Purpose | Returns |
-|---------|---------|---------|
-| LINE Login | User authentication | `userId`, profile |
-| LINE Messaging API | Send messages FROM Official Account TO users | - |
+| Service            | Purpose                                      | Returns           |
+| ------------------ | -------------------------------------------- | ----------------- |
+| LINE Login         | User authentication                          | `userId`, profile |
+| LINE Messaging API | Send messages FROM Official Account TO users | -                 |
 
 **Critical:** The `userId` from LINE Login IS the same identifier used in Messaging API `to` field.
 
@@ -25,11 +25,11 @@ Participants find their photos → click "Send to LINE" → photos arrive in the
 
 ## 2. Required Accounts & Channels
 
-| Component | Purpose |
-|-----------|---------|
-| LINE Official Account (OA) | Your brand/service identity to users |
-| Messaging API Channel | Technical channel, provides access token |
-| LINE Login Channel | User authentication (optional but recommended) |
+| Component                  | Purpose                                        |
+| -------------------------- | ---------------------------------------------- |
+| LINE Official Account (OA) | Your brand/service identity to users           |
+| Messaging API Channel      | Technical channel, provides access token       |
+| LINE Login Channel         | User authentication (optional but recommended) |
 
 **All channels must be under the same Provider** in LINE Developers Console.
 
@@ -73,6 +73,7 @@ Authorization: Bearer {channel_access_token}
 ```
 
 **Requirements:**
+
 - Both URLs must be HTTPS (TLS 1.2+)
 - Preview: ~240x240px recommended
 - Original: No hard limit, <5MB practical
@@ -106,6 +107,7 @@ Authorization: Bearer {channel_access_token}
 ```
 
 **Advantages:**
+
 - Users swipe horizontally through photos
 - Can add action buttons (download link)
 - ~10 images per carousel
@@ -124,6 +126,7 @@ Full customization with images, text, buttons. Complex JSON structure.
 **You can ONLY send push messages to users who have added your Official Account as a friend.**
 
 If user is not a friend:
+
 - Message silently fails
 - HTTP 200 returned but not delivered
 - No error indication
@@ -131,6 +134,7 @@ If user is not a friend:
 ### Solution: Add Friend During LINE Login
 
 LINE Login can prompt users to add OA as friend during authentication:
+
 - "Add as friend" toggle on consent screen
 - Design improved September 2025 (more visible)
 - Seamless UX - happens during login flow
@@ -138,6 +142,7 @@ LINE Login can prompt users to add OA as friend during authentication:
 ### Tracking Friendship Status
 
 Use webhooks:
+
 - `follow` event → user added OA as friend
 - `unfollow` event → user removed OA as friend
 
@@ -149,15 +154,16 @@ Store `line_linked` boolean in database.
 
 ### Events
 
-| Event | When |
-|-------|------|
-| `follow` | User adds OA as friend |
+| Event      | When                      |
+| ---------- | ------------------------- |
+| `follow`   | User adds OA as friend    |
 | `unfollow` | User removes OA as friend |
-| `message` | User sends message to OA |
+| `message`  | User sends message to OA  |
 
 ### Signature Verification
 
 LINE sends `X-Line-Signature` header. Verify with:
+
 - HMAC-SHA256
 - Channel Secret as key
 - Request body as message
@@ -168,11 +174,11 @@ LINE sends `X-Line-Signature` header. Verify with:
 
 ### LINE Official Account Plans
 
-| Plan | Free Messages/Month | Price |
-|------|---------------------|-------|
-| Free | 200 | Free |
-| Light | 10,000 | ~$1/month |
-| Standard | 100,000 | ~$15/month |
+| Plan     | Free Messages/Month | Price      |
+| -------- | ------------------- | ---------- |
+| Free     | 200                 | Free       |
+| Light    | 10,000              | ~$1/month  |
+| Standard | 100,000             | ~$15/month |
 
 **No per-message fees** once subscribed (unlike SMS/WhatsApp).
 
@@ -204,6 +210,7 @@ LINE sends `X-Line-Signature` header. Verify with:
 ### userId Consistency
 
 **Same userId across:**
+
 - LINE Login response
 - Webhook events
 - Push message `to` field
@@ -212,13 +219,13 @@ LINE sends `X-Line-Signature` header. Verify with:
 
 ## 9. Gotchas
 
-| Gotcha | Detail |
-|--------|--------|
-| Preview required | Must provide both `originalContentUrl` AND `previewImageUrl` |
-| HTTPS only | All image URLs must be HTTPS with TLS 1.2+ |
-| Friendship silent failure | Push returns 200 but doesn't deliver if not friend |
+| Gotcha                         | Detail                                                        |
+| ------------------------------ | ------------------------------------------------------------- |
+| Preview required               | Must provide both `originalContentUrl` AND `previewImageUrl`  |
+| HTTPS only                     | All image URLs must be HTTPS with TLS 1.2+                    |
+| Friendship silent failure      | Push returns 200 but doesn't deliver if not friend            |
 | Image URLs fetched immediately | LINE servers fetch preview on send - hosting must be reliable |
-| No native download tracking | User downloads go to phone album, can't track directly |
+| No native download tracking    | User downloads go to phone album, can't track directly        |
 
 ---
 
@@ -250,9 +257,9 @@ LINE sends `X-Line-Signature` header. Verify with:
 
 ## References
 
-| Topic | URL |
-|-------|-----|
-| Messaging API Docs | https://developers.line.biz/en/docs/messaging-api/ |
-| API Reference | https://developers.line.biz/en/reference/messaging-api/ |
-| Message Types | https://developers.line.biz/en/docs/messaging-api/message-types/ |
-| Sending Messages | https://developers.line.biz/en/docs/messaging-api/sending-messages/ |
+| Topic              | URL                                                                 |
+| ------------------ | ------------------------------------------------------------------- |
+| Messaging API Docs | https://developers.line.biz/en/docs/messaging-api/                  |
+| API Reference      | https://developers.line.biz/en/reference/messaging-api/             |
+| Message Types      | https://developers.line.biz/en/docs/messaging-api/message-types/    |
+| Sending Messages   | https://developers.line.biz/en/docs/messaging-api/sending-messages/ |

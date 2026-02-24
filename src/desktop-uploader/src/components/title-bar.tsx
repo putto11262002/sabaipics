@@ -1,7 +1,7 @@
-import { getCurrentWindow } from "@tauri-apps/api/window"
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 export function TitleBar() {
-  const window = getCurrentWindow()
+  const window = getCurrentWindow();
 
   return (
     <div
@@ -31,5 +31,5 @@ export function TitleBar() {
       <div className="text-muted-foreground text-xs font-medium">FrameFast</div>
       <div className="w-12" />
     </div>
-  )
+  );
 }

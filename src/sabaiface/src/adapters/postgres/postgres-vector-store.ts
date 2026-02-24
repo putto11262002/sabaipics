@@ -17,12 +17,7 @@
 import type { InternalDatabase } from '../../db';
 import { faces } from '../../db/schema';
 import { eq, and, inArray, sql, type SQL } from 'drizzle-orm';
-import type {
-  VectorStore,
-  FaceMetadata,
-  FaceMatch,
-  FaceData,
-} from '../../core/vector-store';
+import type { VectorStore, FaceMetadata, FaceMatch, FaceData } from '../../core/vector-store';
 import { distanceToSimilarity } from '../../core/vector-store';
 
 // =============================================================================
@@ -101,7 +96,7 @@ export class PostgresVectorStore implements VectorStore {
       faceId: string;
       descriptor: Float32Array;
       metadata: FaceMetadata;
-    }>
+    }>,
   ): Promise<void> {
     if (facesToAdd.length === 0) {
       return;
@@ -148,7 +143,7 @@ export class PostgresVectorStore implements VectorStore {
     collectionId: string,
     queryDescriptor: Float32Array,
     maxResults: number,
-    threshold: number
+    threshold: number,
   ): Promise<FaceMatch[]> {
     // Convert Float32Array to array for SQL
     const queryVector = Array.from(queryDescriptor);
@@ -165,7 +160,8 @@ export class PostgresVectorStore implements VectorStore {
       bounding_box: string;
       indexed_at: string;
       distance: number;
-    }>(sql.raw(`
+    }>(
+      sql.raw(`
       SELECT
         id,
         photo_id,
@@ -180,7 +176,8 @@ export class PostgresVectorStore implements VectorStore {
         AND (descriptor <=> '${vectorStr}'::vector) < ${threshold}
       ORDER BY descriptor <=> '${vectorStr}'::vector
       LIMIT ${maxResults}
-    `));
+    `),
+    );
 
     // Handle neon-http response format (returns { rows: [...] })
     const rows = 'rows' in result ? result.rows : result;
@@ -228,12 +225,7 @@ export class PostgresVectorStore implements VectorStore {
       // Note: We could add eventId validation via join, but for now trust the caller
       await this.db
         .delete(faces)
-        .where(
-          and(
-            eq(faces.provider, 'sabaiface'),
-            inArray(faces.id, faceIds)
-          )
-        );
+        .where(and(eq(faces.provider, 'sabaiface'), inArray(faces.id, faceIds)));
 
       console.log(`Deleted ${faceIds.length} faces from collection ${collectionId}`);
     } catch (error) {

@@ -1,6 +1,6 @@
 ---
-url: "https://developer.apple.com/documentation/imagecapturecore/iccamerafolder"
-title: "ICCameraFolder | Apple Developer Documentation"
+url: 'https://developer.apple.com/documentation/imagecapturecore/iccamerafolder'
+title: 'ICCameraFolder | Apple Developer Documentation'
 ---
 
 [Skip Navigation](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder#app-main)
@@ -40,12 +40,12 @@ Only search within “Documentation”
 
 [Open Menu](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder#)
 
-- SwiftLanguage:  Swift  Objective-C
+- SwiftLanguage: Swift Objective-C
 
 Language:
 
-  - Swift
-  - [Objective-C](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder#)
+- Swift
+- [Objective-C](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder#)
 
 All Technologies
 
@@ -258,21 +258,21 @@ iOS 13.0+iPadOS 13.0+Mac Catalyst 13.1+macOS 10.4+visionOS 1.0+
 class ICCameraFolder
 ```
 
-## [Topics](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder\#topics)
+## [Topics](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder#topics)
 
-### [Inspecting a Folder’s Contents](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder\#Inspecting-a-Folders-Contents)
+### [Inspecting a Folder’s Contents](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder#Inspecting-a-Folders-Contents)
 
 [`var contents: [ICCameraItem]?`](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder/contents)
 
 A list of items that this folder contains.
 
-## [Relationships](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder\#relationships)
+## [Relationships](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder#relationships)
 
-### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder\#inherits-from)
+### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder#inherits-from)
 
 - [`ICCameraItem`](https://developer.apple.com/documentation/imagecapturecore/iccameraitem)
 
-### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder\#conforms-to)
+### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder#conforms-to)
 
 - [`CVarArg`](https://developer.apple.com/documentation/Swift/CVarArg)
 - [`CustomDebugStringConvertible`](https://developer.apple.com/documentation/Swift/CustomDebugStringConvertible)
@@ -281,9 +281,9 @@ A list of items that this folder contains.
 - [`Hashable`](https://developer.apple.com/documentation/Swift/Hashable)
 - [`NSObjectProtocol`](https://developer.apple.com/documentation/ObjectiveC/NSObjectProtocol)
 
-## [See Also](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder\#see-also)
+## [See Also](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder#see-also)
 
-### [Cameras](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder\#Cameras)
+### [Cameras](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder#Cameras)
 
 [`class ICCameraDevice`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice)
 

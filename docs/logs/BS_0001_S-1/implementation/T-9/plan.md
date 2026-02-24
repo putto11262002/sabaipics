@@ -6,6 +6,7 @@ Date: `2026-01-10`
 Owner: `implementv3 skill`
 
 ## Inputs
+
 - Task: `docs/logs/BS_0001_S-1/tasks.md` (section: `T-9`)
 - Upstream plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Research: `docs/logs/BS_0001_S-1/research/stripe-credit-flow.md`
@@ -16,6 +17,7 @@ Owner: `implementv3 skill`
 Create `POST /credits/checkout` endpoint that creates a Stripe Checkout session for the selected credit package, enabling photographers to purchase credits via PromptPay/card.
 
 **Non-goals:**
+
 - Webhook fulfillment (handled by T-10)
 - Success/cancel page UI (handled by T-12)
 - Admin UI for managing packages
@@ -25,13 +27,13 @@ Create `POST /credits/checkout` endpoint that creates a Stripe Checkout session 
 
 ### Existing Infrastructure (Leverage, Don't Rebuild)
 
-| Component | Location | Status | Usage |
-|-----------|----------|--------|-------|
-| `createCheckoutSession()` | `apps/api/src/lib/stripe/checkout.ts` | Ready | Creates checkout with `price_data` |
-| `getOrCreateCustomer()` | `apps/api/src/lib/stripe/customer.ts` | Ready | Customer management |
-| `creditPackages` table | `packages/db/src/schema/credit-packages.ts` | Done (T-3) | Package source of truth |
-| `requirePhotographer()` middleware | `apps/api/src/middleware/require-photographer.ts` | Ready | Auth enforcement |
-| `GET /credit-packages` | `apps/api/src/routes/credits.ts` | Done (T-8) | Public endpoint |
+| Component                          | Location                                          | Status     | Usage                              |
+| ---------------------------------- | ------------------------------------------------- | ---------- | ---------------------------------- |
+| `createCheckoutSession()`          | `apps/api/src/lib/stripe/checkout.ts`             | Ready      | Creates checkout with `price_data` |
+| `getOrCreateCustomer()`            | `apps/api/src/lib/stripe/customer.ts`             | Ready      | Customer management                |
+| `creditPackages` table             | `packages/db/src/schema/credit-packages.ts`       | Done (T-3) | Package source of truth            |
+| `requirePhotographer()` middleware | `apps/api/src/middleware/require-photographer.ts` | Ready      | Auth enforcement                   |
+| `GET /credit-packages`             | `apps/api/src/routes/credits.ts`                  | Done (T-8) | Public endpoint                    |
 
 ### Implementation Strategy
 
@@ -41,6 +43,7 @@ Create `POST /credits/checkout` endpoint that creates a Stripe Checkout session 
    - Auth: `requirePhotographer()` + `requireConsent()`
 
 2. **Request/Response contract**
+
    ```typescript
    // Request
    POST /credits/checkout
@@ -60,6 +63,7 @@ Create `POST /credits/checkout` endpoint that creates a Stripe Checkout session 
    ```
 
 3. **Validation flow**
+
    ```
    1. Extract packageId from request body
    2. Query credit_packages WHERE id = packageId AND active = true
@@ -144,15 +148,15 @@ metadata: {
 
 ## Failure Modes / Edge Cases
 
-| Scenario | Handling |
-|----------|----------|
-| Invalid UUID for packageId | 400 error with clear message |
-| Package not found | 404 with "Credit package not found" |
-| Package inactive | 404 (same as not found - hide inactive packages) |
-| Stripe API error | 500 with error details, logged |
-| Photographer has no email | Use clerk email from auth context |
-| Photographer has no name | Optional in Stripe, skip |
-| Concurrent checkout requests | Stripe handles idempotency via metadata |
+| Scenario                     | Handling                                         |
+| ---------------------------- | ------------------------------------------------ |
+| Invalid UUID for packageId   | 400 error with clear message                     |
+| Package not found            | 404 with "Credit package not found"              |
+| Package inactive             | 404 (same as not found - hide inactive packages) |
+| Stripe API error             | 500 with error details, logged                   |
+| Photographer has no email    | Use clerk email from auth context                |
+| Photographer has no name     | Optional in Stripe, skip                         |
+| Concurrent checkout requests | Stripe handles idempotency via metadata          |
 
 ## Validation Plan
 
@@ -192,6 +196,7 @@ pnpm dev
 ### Rollback
 
 If critical issues discovered:
+
 1. Revert PR
 2. Deploy revert to staging → production
 3. Any checkout sessions created before rollback will still complete (webhook may fail safely)
@@ -199,6 +204,7 @@ If critical issues discovered:
 ### Flags / Env Vars
 
 No new flags required. Uses existing:
+
 - `STRIPE_SECRET_KEY` (test/live)
 - `STRIPE_WEBHOOK_SECRET` (for T-10)
 
@@ -213,6 +219,7 @@ No new flags required. Uses existing:
 **Future optimization:** Add `stripe_customer_id` column to `photographers` table in follow-up task (store on first checkout).
 
 **Implementation:**
+
 ```typescript
 // In checkout endpoint:
 const customer = await findCustomerByPhotographerId(stripe, photographer.id);
@@ -233,6 +240,7 @@ if (!customer) {
 **Question:** What are the actual frontend URLs for success/cancel redirects?
 
 **Current plan:**
+
 - Success: `/credits/success?session_id={CHECKOUT_SESSION_ID}`
 - Cancel: `/credits/packages`
 

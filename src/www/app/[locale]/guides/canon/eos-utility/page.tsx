@@ -174,7 +174,8 @@ export default async function CanonEosUtilityGuidePage({ params }: Props) {
             </li>
           </ul>
           <p className="text-sm text-muted-foreground">
-            ภาพประกอบในหน้านี้เป็นภาพวาดจำลอง (original) เพื่อให้ทำตามได้ง่าย (ไม่ใช่ภาพจาก Canon manual)
+            ภาพประกอบในหน้านี้เป็นภาพวาดจำลอง (original) เพื่อให้ทำตามได้ง่าย (ไม่ใช่ภาพจาก Canon
+            manual)
           </p>
         </section>
 
@@ -214,7 +215,8 @@ export default async function CanonEosUtilityGuidePage({ params }: Props) {
                 เลือก <InlineCode>Add a device to connect to</InlineCode>
               </li>
               <li>
-                จด/จำ <InlineCode>SSID (network name)</InlineCode> และ <InlineCode>Password</InlineCode> ที่กล้องแสดง
+                จด/จำ <InlineCode>SSID (network name)</InlineCode> และ{' '}
+                <InlineCode>Password</InlineCode> ที่กล้องแสดง
               </li>
             </ol>
             <GuideImage
@@ -254,7 +256,9 @@ export default async function CanonEosUtilityGuidePage({ params }: Props) {
 
           <div className="space-y-3">
             <h3 className="text-base font-semibold">3) ทำในแอป FrameFast iOS</h3>
-            <p className="text-sm text-muted-foreground">กลับเข้าแอปแล้วเริ่มขั้นตอนเชื่อมต่อกล้อง</p>
+            <p className="text-sm text-muted-foreground">
+              กลับเข้าแอปแล้วเริ่มขั้นตอนเชื่อมต่อกล้อง
+            </p>
             <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
               <li>กลับเข้าแอป FrameFast iOS</li>
               <li>เริ่มขั้นตอน “Connect Camera” (หรือขั้นตอนเชื่อมต่อกล้อง)</li>
@@ -295,7 +299,10 @@ export default async function CanonEosUtilityGuidePage({ params }: Props) {
             <div>
               <p className="font-medium text-foreground">เคยจับคู่อุปกรณ์ไว้แล้ว</p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
-                <li>ในกล้อง มองหาหน้าจอแนว “Editing/Deleting Devices for Connections” หรือรีเซ็ตการตั้งค่า Communication/Wi‑Fi แล้วเริ่มใหม่</li>
+                <li>
+                  ในกล้อง มองหาหน้าจอแนว “Editing/Deleting Devices for Connections”
+                  หรือรีเซ็ตการตั้งค่า Communication/Wi‑Fi แล้วเริ่มใหม่
+                </li>
               </ul>
             </div>
           </div>

@@ -121,8 +121,13 @@ export const ftpRouter = new Hono<Env>()
       }
 
       // 5. Check credit balance (fail-fast, no lock)
-      const creditsRemaining = yield* getBalance(db, credential.photographerId)
-        .mapErr((e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }));
+      const creditsRemaining = yield* getBalance(db, credential.photographerId).mapErr(
+        (e): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Database error',
+          cause: e.cause,
+        }),
+      );
 
       if (creditsRemaining < 1) {
         return err<never, HandlerError>({
@@ -206,8 +211,13 @@ export const ftpRouter = new Hono<Env>()
         }
 
         // 2. Check credit balance (fail-fast, no lock)
-        const ftpBalance = yield* getBalance(db, ftpAuth.photographerId)
-          .mapErr((e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }));
+        const ftpBalance = yield* getBalance(db, ftpAuth.photographerId).mapErr(
+          (e): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Database error',
+            cause: e.cause,
+          }),
+        );
 
         if (ftpBalance < 1) {
           return err<never, HandlerError>({

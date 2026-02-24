@@ -10,6 +10,7 @@
 AWS Rekognition provides face detection and indexing for photo search. This doc covers the **implementation details** for integrating Rekognition with Cloudflare Workers, including rate limiting and queue processing.
 
 **Related docs:**
+
 - `05_image_pipeline.md` - Business flow (upload → process → ready)
 - `01_data_schema.md` - `faces` table schema
 - `docs/research/rekognition_collection_pricing.md` - Pricing details
@@ -20,12 +21,14 @@ AWS Rekognition provides face detection and indexing for photo search. This doc 
 ## Configuration
 
 **Region:** `us-west-2` (Oregon)
+
 - 10x throughput: 50 TPS vs 5 TPS in `ap-southeast-1`
 - Latency: +150-200ms (acceptable for <3s search target)
 - Cost: Same pricing, R2 egress to AWS is free
 - PDPA: No data residency requirement in Thailand
 
 **Collection strategy:** One collection per event
+
 - Collection ID: `sabaipics-{event_uuid}`
 - Created on event publish
 - Deleted on event expiry (30 days default)
@@ -39,10 +42,12 @@ AWS Rekognition provides face detection and indexing for photo search. This doc 
 AWS Rekognition `IndexFaces` has a **50 TPS limit** in us-west-2.
 
 **TPS means evenly distributed**, not burst:
+
 - 50 requests spread over 1 second = OK
 - 50 requests fired simultaneously = throttled
 
 **Scenario:** Photographer uploads 500 photos
+
 - Queue delivers batch of 50 messages
 - Worker processes all 50 in parallel
 - 50 simultaneous Rekognition calls = **instant burst**
@@ -51,14 +56,16 @@ AWS Rekognition `IndexFaces` has a **50 TPS limit** in us-west-2.
 ### Why Cloudflare Queues Alone Isn't Enough
 
 Queue config:
+
 ```jsonc
 {
   "max_batch_size": 50,
-  "max_concurrency": 1
+  "max_concurrency": 1,
 }
 ```
 
 This controls **batch delivery**, not **request pacing**:
+
 - Consumer receives 50 messages at once
 - If processed with `Promise.all()` → 50 concurrent API calls
 - No spacing between individual requests
@@ -66,11 +73,13 @@ This controls **batch delivery**, not **request pacing**:
 ### Solution: Durable Object Rate Limiter
 
 Use a Durable Object to:
+
 1. Track time slots for batches
 2. Calculate required delay before processing
 3. Provide pacing interval within batch
 
 **Why Durable Objects work:**
+
 - **Single-threaded execution** - No race conditions
 - **Persistent state** - Survives across requests (within 10s idle timeout)
 - **Per-instance isolation** - One rate limiter for Rekognition
@@ -90,8 +99,8 @@ export class RekognitionRateLimiter extends DurableObject {
   async reserveBatch(batchSize: number): Promise<{ delay: number; intervalMs: number }> {
     const now = Date.now();
     const TPS = 50;
-    const intervalMs = 1000 / TPS;  // 20ms between requests
-    const batchDuration = batchSize * intervalMs;  // 50 items = 1000ms
+    const intervalMs = 1000 / TPS; // 20ms between requests
+    const batchDuration = batchSize * intervalMs; // 50 items = 1000ms
 
     // When can this batch start?
     const delay = Math.max(0, this.lastBatchEndTime - now);
@@ -106,11 +115,11 @@ export class RekognitionRateLimiter extends DurableObject {
 
 **Behavior:**
 
-| Scenario | Result |
-|----------|--------|
-| Cold start (idle >10s) | `delay: 0`, start immediately |
-| Back-to-back batches | Second batch waits for first to finish |
-| 50 items at 50 TPS | 50 × 20ms = 1 second total |
+| Scenario               | Result                                 |
+| ---------------------- | -------------------------------------- |
+| Cold start (idle >10s) | `delay: 0`, start immediately          |
+| Back-to-back batches   | Second batch waits for first to finish |
+| 50 items at 50 TPS     | 50 × 20ms = 1 second total             |
 
 ### Queue Consumer with Explicit Ack/Retry
 
@@ -119,6 +128,7 @@ export class RekognitionRateLimiter extends DurableObject {
 Default queue behavior: If batch fails on message #8, **all 50 messages retry**.
 
 Problems:
+
 - Re-processing already indexed photos
 - Wasted Rekognition API calls ($$)
 - Potential duplicate face records
@@ -141,9 +151,7 @@ interface Env {
 
 export default {
   async queue(batch: MessageBatch<PhotoJob>, env: Env): Promise<void> {
-    const rateLimiter = env.RATE_LIMITER.get(
-      env.RATE_LIMITER.idFromName("rekognition")
-    );
+    const rateLimiter = env.RATE_LIMITER.get(env.RATE_LIMITER.idFromName('rekognition'));
 
     // Reserve time slot for this batch
     const { delay, intervalMs } = await rateLimiter.reserveBatch(batch.messages.length);
@@ -157,7 +165,7 @@ export default {
     for (const msg of batch.messages) {
       try {
         await processPhoto(msg.body, env);
-        msg.ack();  // Success - don't redeliver
+        msg.ack(); // Success - don't redeliver
       } catch (error) {
         if (isThrottlingError(error)) {
           // Rekognition rate limit hit - back off
@@ -171,11 +179,11 @@ export default {
       // Pace requests (20ms = 50 TPS)
       await sleep(intervalMs);
     }
-  }
+  },
 };
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function exponentialBackoff(attempts: number): number {
@@ -184,8 +192,7 @@ function exponentialBackoff(attempts: number): number {
 }
 
 function isThrottlingError(error: unknown): boolean {
-  return error instanceof Error &&
-    error.name === 'ProvisionedThroughputExceededException';
+  return error instanceof Error && error.name === 'ProvisionedThroughputExceededException';
 }
 ```
 
@@ -199,8 +206,8 @@ function isThrottlingError(error: unknown): boolean {
     "producers": [
       {
         "queue": "photo-processing",
-        "binding": "PHOTO_QUEUE"
-      }
+        "binding": "PHOTO_QUEUE",
+      },
     ],
     "consumers": [
       {
@@ -209,19 +216,19 @@ function isThrottlingError(error: unknown): boolean {
         "max_batch_timeout": 5,
         "max_retries": 3,
         "max_concurrency": 1,
-        "dead_letter_queue": "photo-processing-dlq"
-      }
-    ]
+        "dead_letter_queue": "photo-processing-dlq",
+      },
+    ],
   },
 
   "durable_objects": {
     "bindings": [
       {
         "name": "RATE_LIMITER",
-        "class_name": "RekognitionRateLimiter"
-      }
-    ]
-  }
+        "class_name": "RekognitionRateLimiter",
+      },
+    ],
+  },
 }
 ```
 
@@ -237,9 +244,7 @@ async function processPhoto(job: PhotoJob, env: Env): Promise<void> {
   const db = createDb(env.DATABASE_URL);
 
   // 1. Update status
-  await db.update(photos)
-    .set({ status: 'processing' })
-    .where(eq(photos.id, photo_id));
+  await db.update(photos).set({ status: 'processing' }).where(eq(photos.id, photo_id));
 
   // 2. Get image from R2
   const imageBytes = await env.PHOTOS_BUCKET.get(r2_key);
@@ -254,34 +259,38 @@ async function processPhoto(job: PhotoJob, env: Env): Promise<void> {
     },
   });
 
-  const response = await rekognition.send(new IndexFacesCommand({
-    CollectionId: `sabaipics-${event_id}`,
-    Image: { Bytes: await imageBytes.arrayBuffer() },
-    ExternalImageId: photo_id,
-    DetectionAttributes: ['ALL'],
-    MaxFaces: 100,
-    QualityFilter: 'AUTO',
-  }));
+  const response = await rekognition.send(
+    new IndexFacesCommand({
+      CollectionId: `sabaipics-${event_id}`,
+      Image: { Bytes: await imageBytes.arrayBuffer() },
+      ExternalImageId: photo_id,
+      DetectionAttributes: ['ALL'],
+      MaxFaces: 100,
+      QualityFilter: 'AUTO',
+    }),
+  );
 
   // 4. Insert face records
-  const faceRecords = response.FaceRecords?.map(record => ({
-    photo_id,
-    event_id,
-    rekognition_face_id: record.Face?.FaceId,
-    bbox_left: record.Face?.BoundingBox?.Left,
-    bbox_top: record.Face?.BoundingBox?.Top,
-    bbox_width: record.Face?.BoundingBox?.Width,
-    bbox_height: record.Face?.BoundingBox?.Height,
-    confidence: record.Face?.Confidence,
-    // ... all FaceDetail attributes (see 01_data_schema.md)
-  })) ?? [];
+  const faceRecords =
+    response.FaceRecords?.map((record) => ({
+      photo_id,
+      event_id,
+      rekognition_face_id: record.Face?.FaceId,
+      bbox_left: record.Face?.BoundingBox?.Left,
+      bbox_top: record.Face?.BoundingBox?.Top,
+      bbox_width: record.Face?.BoundingBox?.Width,
+      bbox_height: record.Face?.BoundingBox?.Height,
+      confidence: record.Face?.Confidence,
+      // ... all FaceDetail attributes (see 01_data_schema.md)
+    })) ?? [];
 
   if (faceRecords.length > 0) {
     await db.insert(faces).values(faceRecords);
   }
 
   // 5. Update photo status
-  await db.update(photos)
+  await db
+    .update(photos)
     .set({
       status: 'ready',
       face_count: faceRecords.length,
@@ -291,7 +300,8 @@ async function processPhoto(job: PhotoJob, env: Env): Promise<void> {
     .where(eq(photos.id, photo_id));
 
   // 6. Update event stats
-  await db.update(events)
+  await db
+    .update(events)
     .set({
       photo_count: sql`photo_count + 1`,
       face_count: sql`face_count + ${faceRecords.length}`,
@@ -316,17 +326,20 @@ async function createCollection(eventId: string, env: Env): Promise<void> {
     },
   });
 
-  await rekognition.send(new CreateCollectionCommand({
-    CollectionId: `sabaipics-${eventId}`,
-    Tags: {
-      event_id: eventId,
-      created_at: new Date().toISOString(),
-    },
-  }));
+  await rekognition.send(
+    new CreateCollectionCommand({
+      CollectionId: `sabaipics-${eventId}`,
+      Tags: {
+        event_id: eventId,
+        created_at: new Date().toISOString(),
+      },
+    }),
+  );
 
   // Update event record
   const db = createDb(env.DATABASE_URL);
-  await db.update(events)
+  await db
+    .update(events)
     .set({ rekognition_collection_id: `sabaipics-${eventId}` })
     .where(eq(events.id, eventId));
 }
@@ -345,13 +358,16 @@ async function deleteCollection(eventId: string, env: Env): Promise<void> {
   });
 
   // Delete collection (also deletes all face vectors)
-  await rekognition.send(new DeleteCollectionCommand({
-    CollectionId: `sabaipics-${eventId}`,
-  }));
+  await rekognition.send(
+    new DeleteCollectionCommand({
+      CollectionId: `sabaipics-${eventId}`,
+    }),
+  );
 }
 ```
 
 **Cleanup order (important):**
+
 1. Delete Rekognition collection (prevents new searches)
 2. Delete R2 objects (bulk delete by prefix)
 3. Delete face records from DB
@@ -363,19 +379,20 @@ async function deleteCollection(eventId: string, env: Env): Promise<void> {
 
 ### Rekognition Errors
 
-| Error | Handling |
-|-------|----------|
-| `ProvisionedThroughputExceededException` | Retry with exponential backoff |
-| `InvalidImageFormatException` | Mark photo as failed, don't retry |
-| `ImageTooLargeException` | Mark photo as failed, don't retry |
-| `InvalidParameterException` | Mark photo as failed, log for investigation |
-| `ResourceNotFoundException` | Collection doesn't exist, create it |
+| Error                                    | Handling                                    |
+| ---------------------------------------- | ------------------------------------------- |
+| `ProvisionedThroughputExceededException` | Retry with exponential backoff              |
+| `InvalidImageFormatException`            | Mark photo as failed, don't retry           |
+| `ImageTooLargeException`                 | Mark photo as failed, don't retry           |
+| `InvalidParameterException`              | Mark photo as failed, log for investigation |
+| `ResourceNotFoundException`              | Collection doesn't exist, create it         |
 
 ### Dead Letter Queue
 
 Messages that fail after `max_retries` (3) go to `photo-processing-dlq`.
 
 **DLQ handling:**
+
 - Alert on DLQ messages (monitoring)
 - Manual investigation required
 - Common causes: corrupted images, missing R2 objects
@@ -429,12 +446,12 @@ AWS_SECRET_ACCESS_KEY=your-secret
 
 ## Performance Targets
 
-| Metric | Target | Notes |
-|--------|--------|-------|
-| IndexFaces latency | ~500-700ms | Per photo, from us-west-2 |
-| Batch of 50 photos | ~2-3s | With 20ms pacing |
-| Bulk upload (500 photos) | ~15-20s | 10 batches × 50 |
-| SearchFacesByImage | <1s | Single call |
+| Metric                   | Target     | Notes                     |
+| ------------------------ | ---------- | ------------------------- |
+| IndexFaces latency       | ~500-700ms | Per photo, from us-west-2 |
+| Batch of 50 photos       | ~2-3s      | With 20ms pacing          |
+| Bulk upload (500 photos) | ~15-20s    | 10 batches × 50           |
+| SearchFacesByImage       | <1s        | Single call               |
 
 ---
 

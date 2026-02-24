@@ -50,11 +50,21 @@ function LoadingSkeleton() {
     <TableBody>
       {Array.from({ length: 5 }).map((_, i) => (
         <TableRow key={i}>
-          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-32" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-40" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-16" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-5 w-16" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-24" />
+          </TableCell>
         </TableRow>
       ))}
     </TableBody>
@@ -120,12 +130,7 @@ function UsersPage() {
             <AlertCircle className="size-4" />
             <AlertTitle>Failed to load users</AlertTitle>
             <AlertDescription>{error.message}</AlertDescription>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="mt-2"
-              onClick={() => refetch()}
-            >
+            <Button variant="destructive" size="sm" className="mt-2" onClick={() => refetch()}>
               <RefreshCw className="mr-1 size-4" />
               Retry
             </Button>
@@ -178,9 +183,7 @@ function UsersPage() {
                       className="cursor-pointer"
                       onClick={() => navigate(`/users/${user.id}`)}
                     >
-                      <TableCell className="font-medium">
-                        {user.name || 'Unnamed'}
-                      </TableCell>
+                      <TableCell className="font-medium">{user.name || 'Unnamed'}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.balance.toLocaleString()}</TableCell>
                       <TableCell>{getStatusBadge(user)}</TableCell>
@@ -196,11 +199,7 @@ function UsersPage() {
         {/* Load more */}
         {nextCursor && (
           <div className="flex justify-center pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCursor(nextCursor)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setCursor(nextCursor)}>
               Load more
             </Button>
           </div>

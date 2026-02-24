@@ -4,7 +4,6 @@ about: Create a report to help us improve
 title: ''
 labels: ''
 assignees: ''
-
 ---
 
 **Describe the bug**
@@ -20,4 +19,4 @@ output of: gphoto2 --version
 **To Reproduce**
 Steps to reproduce the behavior:
 
-When reproducing with the commandline tool, attach debugout using  --debug --debug-logfile=debug.log   if considered useful.
+When reproducing with the commandline tool, attach debugout using --debug --debug-logfile=debug.log if considered useful.

@@ -115,7 +115,7 @@ describe('SabaiFace API Integration', () => {
             DetectionAttributes: ['ALL'],
             MaxFaces: 100,
           }),
-        }
+        },
       );
 
       expect(response.status).toBe(200);
@@ -147,7 +147,7 @@ describe('SabaiFace API Integration', () => {
             Image: { Bytes: 'invalid-base64!!!' },
             ExternalImageId: 'test-photo-invalid',
           }),
-        }
+        },
       );
 
       expect(response.status).toBeGreaterThanOrEqual(400);
@@ -178,7 +178,7 @@ describe('SabaiFace API Integration', () => {
             MaxFaces: 10,
             FaceMatchThreshold: 80,
           }),
-        }
+        },
       );
 
       expect(response.status).toBe(200);
@@ -210,7 +210,7 @@ describe('SabaiFace API Integration', () => {
             MaxFaces: 10,
             FaceMatchThreshold: 95, // High threshold
           }),
-        }
+        },
       );
 
       expect(response.status).toBe(200);
@@ -236,12 +236,9 @@ describe('SabaiFace API Integration', () => {
       });
 
       // Now delete it
-      const { response, data } = await fetchJSON(
-        `${BASE_URL}/collections/${tempCollection}`,
-        {
-          method: 'DELETE',
-        }
-      );
+      const { response, data } = await fetchJSON(`${BASE_URL}/collections/${tempCollection}`, {
+        method: 'DELETE',
+      });
 
       expect(response.status).toBe(200);
       expect(data.StatusCode).toBe(200);

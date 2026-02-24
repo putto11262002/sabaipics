@@ -10,12 +10,14 @@
 ## Executive Summary
 
 T-10 is a **HIGH RISK** task involving financial transactions. The webhook handler must:
+
 1. Verify Stripe webhook signatures (security)
 2. Prevent double-crediting on duplicate webhooks (idempotency)
 3. Add credits to photographer ledger with FIFO expiry (correctness)
 4. Handle edge cases gracefully (resilience)
 
 **Critical risk areas identified:**
+
 - Double-crediting due to webhook retries
 - Missing idempotency implementation in current handler shell
 - Database transaction boundaries for credit insertion
@@ -30,18 +32,21 @@ T-10 is a **HIGH RISK** task involving financial transactions. The webhook handl
 **Risk:** Stripe sends duplicate `checkout.session.completed` webhooks. Without proper idempotency, a single purchase could result in multiple credit additions.
 
 **Evidence from Stripe docs (in `research/stripe-credit-flow.md`):**
+
 > "Webhook endpoints might occasionally receive the same event more than once. Guard against duplicated event receipts by logging the event IDs you've processed."
 
 **Current state analysis:**
+
 - The `credit_ledger` table has `stripe_session_id` column (indexed) - **good foundation**
 - The current handler in `apps/api/src/handlers/stripe.ts` is a shell with **no idempotency check**
 - The research doc shows the intended pattern but it's not implemented
 
 **Mitigation required:**
+
 ```sql
 -- Check before insert
-SELECT id FROM credit_ledger 
-WHERE stripe_session_id = :session_id 
+SELECT id FROM credit_ledger
+WHERE stripe_session_id = :session_id
 LIMIT 1;
 
 -- If exists, skip processing (return 200 to Stripe)
@@ -54,11 +59,13 @@ LIMIT 1;
 **Risk:** Credits must expire 6 months from purchase. Incorrect calculation could lead to premature expiration or extended validity.
 
 **Evidence from `plan/final.md`:**
+
 > "Credit expiry: `expires_at = NOW() + 6 months`"
 
 **Mitigation:** Use database timestamp arithmetic:
+
 ```typescript
-expires_at = new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000)
+expires_at = new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000);
 // Or SQL: NOW() + INTERVAL '6 months'
 ```
 
@@ -69,6 +76,7 @@ expires_at = new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000)
 **Risk:** If `checkout.session.completed` arrives without expected metadata (`photographer_id`, `credits`, `package_id`), fulfillment fails silently.
 
 **Evidence from T-9 implementation (`credits.ts`):**
+
 ```typescript
 metadata: {
   photographer_id: photographer.id,
@@ -79,6 +87,7 @@ metadata: {
 ```
 
 **Mitigation:**
+
 1. Validate metadata presence before processing
 2. Return 200 to Stripe (prevent retries) but log error for manual reconciliation
 3. Consider alerting (Sentry/PagerDuty) for missing metadata
@@ -92,13 +101,9 @@ metadata: {
 **Status:** Already implemented in `apps/api/src/routes/webhooks/stripe.ts`
 
 **Evidence:**
+
 ```typescript
-const event = await verifyWebhookSignature(
-  stripe,
-  rawBody,
-  signature,
-  c.env.STRIPE_WEBHOOK_SECRET
-);
+const event = await verifyWebhookSignature(stripe, rawBody, signature, c.env.STRIPE_WEBHOOK_SECRET);
 ```
 
 **No additional risk here** - signature verification is in place using `STRIPE_WEBHOOK_SECRET` env var.
@@ -108,6 +113,7 @@ const event = await verifyWebhookSignature(
 **Risk:** An attacker could capture a legitimate webhook and replay it to add credits multiple times.
 
 **Mitigation:** Already handled by:
+
 1. Stripe signature includes timestamp - stale webhooks are rejected
 2. Idempotency check on `stripe_session_id` prevents duplicate processing
 
@@ -116,6 +122,7 @@ const event = await verifyWebhookSignature(
 **Risk:** `STRIPE_WEBHOOK_SECRET` exposed in logs or code.
 
 **Current state:**
+
 - Secret is in `Bindings` type (`apps/api/src/types.ts`)
 - Not hardcoded anywhere in source
 
@@ -130,11 +137,13 @@ const event = await verifyWebhookSignature(
 **Risk:** If credit ledger insert succeeds but subsequent operations fail, the database state could be inconsistent.
 
 **Operations that should be atomic:**
+
 1. Check idempotency (SELECT)
 2. Insert credit_ledger row (INSERT)
 3. Optionally update photographer.stripe_customer_id if not set
 
 **Mitigation:** Use database transaction:
+
 ```typescript
 await db.transaction(async (tx) => {
   // Check idempotency
@@ -142,7 +151,7 @@ await db.transaction(async (tx) => {
     where: eq(creditLedger.stripeSessionId, session.id)
   });
   if (existing) return; // Already processed
-  
+
   // Insert credit
   await tx.insert(creditLedger).values({...});
 });
@@ -155,10 +164,12 @@ await db.transaction(async (tx) => {
 **Risk:** Two webhook deliveries arrive simultaneously for the same session. Both pass the idempotency check before either inserts.
 
 **Mitigation:**
+
 - Add `UNIQUE` constraint on `credit_ledger.stripe_session_id` (already indexed)
 - Database will reject second insert even if check passed
 
 **Current schema analysis (`credit-ledger.ts`):**
+
 ```typescript
 stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
 ```
@@ -174,6 +185,7 @@ stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
 **Risk:** Stripe does not guarantee event delivery order. `payment_intent.succeeded` might arrive before `checkout.session.completed`.
 
 **Evidence from research doc:**
+
 > "Stripe doesn't guarantee the delivery of events in the order that they're generated."
 
 **Mitigation:** The implementation should fulfill on `checkout.session.completed` only (not `payment_intent.succeeded`). The current handler shell already routes these separately.
@@ -183,9 +195,11 @@ stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
 **Risk:** PromptPay (Thai QR payment) is asynchronous. Customer pays after leaving checkout, so `checkout.session.completed` fires with `payment_status: 'unpaid'`.
 
 **Evidence from research doc:**
+
 > "Handle `checkout.session.async_payment_succeeded` event"
 
 **[NEED_DECISION]** For PromptPay, should we:
+
 - A) Fulfill on `checkout.session.completed` if `payment_status === 'paid'` only
 - B) Also listen for `checkout.session.async_payment_succeeded`
 
@@ -196,6 +210,7 @@ stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
 **Risk:** Cloudflare Workers have 30s CPU time limit. Complex DB operations could timeout.
 
 **Mitigation:**
+
 - Current handler is simple (check + insert) - should complete in <1s
 - If needed, queue heavy processing and return 200 immediately
 
@@ -208,6 +223,7 @@ stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
 **Scenario:** Metadata contains `photographer_id` that no longer exists in DB.
 
 **Handling:**
+
 - Log error with full session details
 - Return 200 to Stripe (prevent retries)
 - Alert for manual reconciliation
@@ -218,6 +234,7 @@ stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
 **Scenario:** `credits` metadata is "0" or negative.
 
 **Handling:**
+
 - Validate `credits > 0` before processing
 - Log error, return 200, alert
 
@@ -226,6 +243,7 @@ stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
 **Scenario:** Webhook arrives for a session that was already expired/cancelled.
 
 **Handling:**
+
 - Check `session.payment_status === 'paid'` before fulfilling
 - If not paid, log and skip (no alert needed)
 
@@ -234,6 +252,7 @@ stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
 **Scenario:** Session has non-THB currency (unlikely but possible if Stripe config changes).
 
 **Handling:**
+
 - Log warning but still process (credits are currency-agnostic)
 - Consider adding validation if this becomes an issue
 
@@ -244,6 +263,7 @@ stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
 ### [NEED_DECISION] 6.1 Credit Expiry Calculation
 
 **Question:** Is 6 months defined as:
+
 - A) 180 days exactly
 - B) Calendar months (varies: 28-31 days per month)
 
@@ -256,6 +276,7 @@ stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
 **Question:** Should T-10 also handle `checkout.session.async_payment_succeeded` for PromptPay?
 
 **Options:**
+
 - A) Only `checkout.session.completed` with `payment_status === 'paid'` - simpler, misses async payments
 - B) Also `checkout.session.async_payment_succeeded` - full support, more complexity
 
@@ -266,15 +287,17 @@ stripeSessionId: text("stripe_session_id"), // Nullable, only for purchases
 **Issue:** The `credit_ledger.stripe_session_id` column lacks a UNIQUE constraint, allowing potential race condition duplicates.
 
 **Action Required:** Add migration to add unique constraint:
+
 ```sql
-ALTER TABLE credit_ledger 
-ADD CONSTRAINT credit_ledger_stripe_session_unique 
+ALTER TABLE credit_ledger
+ADD CONSTRAINT credit_ledger_stripe_session_unique
 UNIQUE (stripe_session_id);
 ```
 
 ### [GAP] 6.4 Alerting for Failed Fulfillment
 
 **Issue:** No alerting mechanism defined for:
+
 - Missing metadata in webhook
 - Invalid photographer_id
 - Database errors during fulfillment
@@ -338,13 +361,13 @@ UNIQUE (stripe_session_id);
 
 ## 9. Existing Infrastructure to Leverage
 
-| Component | Location | Status | Usage in T-10 |
-|-----------|----------|--------|---------------|
-| Webhook route | `apps/api/src/routes/webhooks/stripe.ts` | Ready | Routes event to handler |
-| Handler shell | `apps/api/src/handlers/stripe.ts` | Shell | Add fulfillment logic |
-| Signature verify | `apps/api/src/lib/stripe/webhook.ts` | Ready | Already used |
-| Credit ledger schema | `packages/db/src/schema/credit-ledger.ts` | Ready | Insert target |
-| Test fixtures | `apps/api/tests/fixtures/stripe-events.ts` | Ready | `createCheckoutCompletedEvent()` |
+| Component            | Location                                   | Status | Usage in T-10                    |
+| -------------------- | ------------------------------------------ | ------ | -------------------------------- |
+| Webhook route        | `apps/api/src/routes/webhooks/stripe.ts`   | Ready  | Routes event to handler          |
+| Handler shell        | `apps/api/src/handlers/stripe.ts`          | Shell  | Add fulfillment logic            |
+| Signature verify     | `apps/api/src/lib/stripe/webhook.ts`       | Ready  | Already used                     |
+| Credit ledger schema | `packages/db/src/schema/credit-ledger.ts`  | Ready  | Insert target                    |
+| Test fixtures        | `apps/api/tests/fixtures/stripe-events.ts` | Ready  | `createCheckoutCompletedEvent()` |
 
 ---
 

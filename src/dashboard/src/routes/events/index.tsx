@@ -89,7 +89,7 @@ export default function EventsPage() {
           });
           setDeleteEventId(null);
         },
-      }
+      },
     );
   };
 

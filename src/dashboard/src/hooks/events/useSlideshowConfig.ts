@@ -30,8 +30,7 @@ export function useUpdateSlideshowConfig(eventId: string | undefined) {
   const queryClient = useQueryClient();
 
   return useApiMutation<UpdateSlideshowConfigResponse, UpdateSlideshowConfigInput>({
-    apiFn: (config, opts) =>
-      putConfig({ param: { id: eventId! }, json: config }, opts),
+    apiFn: (config, opts) => putConfig({ param: { id: eventId! }, json: config }, opts),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ['events', 'detail', eventId, 'slideshow-config'],

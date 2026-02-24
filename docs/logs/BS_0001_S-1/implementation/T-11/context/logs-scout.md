@@ -15,6 +15,7 @@
 ## Patterns to follow
 
 ### Database & Schema (from T-1, T-9)
+
 - All IDs use native `uuid` type with `gen_random_uuid()` default
 - Use helper builders from `packages/db/src/schema/common.ts`:
   - `timestamptz(name)` for timestamp columns
@@ -25,6 +26,7 @@
 - Foreign keys use `RESTRICT` cascade (prevent accidental deletion)
 
 ### API Routes (from T-2, T-3, T-5, T-7, T-8, T-9)
+
 - Route file structure: `apps/api/src/routes/<domain>.ts`
 - Test file co-located: `apps/api/src/routes/<domain>.test.ts`
 - DB access: Use `getDb(c)` helper from `apps/api/src/lib/db.ts`
@@ -37,23 +39,27 @@
   - Admin endpoints: Use `requireAdmin()` middleware (API key auth)
 
 ### Middleware (from T-2, T-3, T-4)
+
 - Location: `apps/api/src/middleware/<name>.ts`
 - DB injection pattern for webhooks: Add DB middleware before route registration
 - Auth context: Store minimal data in `c.var` (e.g., `PhotographerContext` with id + pdpaConsentAt)
 - Idempotency: Check existence before insert operations
 
 ### Testing (from T-3, T-5, T-8)
+
 - Use Hono `testClient` for type-safe API testing
 - Test coverage: auth checks, happy path, empty state, error cases, idempotency
 - Mock environment for tests with proper env vars
 
 ### Stripe Integration (from T-9)
+
 - Store `stripeCustomerId` in photographers table for reuse
 - Pass metadata to Stripe sessions: `photographer_id`, `package_id`, `package_name`, `credits`
 - Redirect URLs use `CORS_ORIGIN` env var
 - Webhook verification uses `STRIPE_WEBHOOK_SECRET`
 
 ### Webhook Handling (from T-4)
+
 - Log errors but return 200 to prevent retries on bad data
 - Implement idempotency checks (e.g., check existing record before insert)
 - DB injection: Add middleware before webhook routes
@@ -62,18 +68,21 @@
 ## Constraints / carry-forward items
 
 ### [KNOWN_LIMITATION]
+
 - **T-5**: No transaction wrapping for consent record insert + photographer update (acceptable for MVP, both operations are idempotent-safe)
 - **T-6**: PDPA consent copy is placeholder text (needs PM review)
 - **T-6**: No UI tests added (dashboard has no existing test infrastructure)
 - **T-7**: nearestExpiry uses simple MIN of purchase expires_at (not FIFO-aware with actual consumption logic)
 
 ### [ENG_DEBT]
+
 - **T-6**: Add UI tests for consent flow (Vitest + React Testing Library)
 - **T-6**: Add loading skeleton to ConsentGate instead of simple spinner
 - **T-9**: Add unit tests for checkout endpoint
 - **T-9**: T-10: Implement webhook fulfillment handler for `checkout.session.completed`
 
 ### [PM_FOLLOWUP]
+
 - **T-5**: PDPA consent copy needs review before launch
 - **T-6**: Verify Clerk session lifetime is configured for 24h
 - **T-6**: Test LINE in-app browser behavior
@@ -82,6 +91,7 @@
 ## Ops conventions
 
 ### Environment Variables
+
 - `DATABASE_URL` - Postgres connection string (injected via Cloudflare Workers bindings)
 - `ADMIN_API_KEY` - Admin API authentication key (for T-3 admin endpoints)
 - `STRIPE_SECRET_KEY` - Stripe API key (test/live)
@@ -90,12 +100,14 @@
 - `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` - Clerk authentication
 
 ### Migration Workflow
+
 - Schema changes in `packages/db/src/schema/**/*.ts`
 - Generate migration: `pnpm --filter=@sabaipics/db db:generate`
 - Apply migration: `pnpm --filter=@sabaipics/db db:migrate` (or `db:push` for dev)
 - Migrations stored in `packages/db/drizzle/*.sql`
 
 ### Route Registration Order (Critical)
+
 1. `/webhooks/*` - DB injection middleware first, then webhook routes (no auth, no CORS)
 2. `/admin/*` - Admin routes with API key auth (before Clerk)
 3. Public routes (e.g., `/credit-packages`) - No auth required
@@ -103,16 +115,19 @@
 5. Protected routes - Use `requirePhotographer()` and `requireConsent()`
 
 ### Error Shape
+
 - Authentication errors: Use `createAuthError()` from `@sabaipics/auth`
 - Validation errors: Zod automatically formats with path + message
 - Business logic errors: Return JSON with appropriate status code
 
 ### Price/Currency Conventions
+
 - Store prices in satang (smallest unit): `29900 = 299 THB`
 - API returns raw value for frontend to format
 - Stripe: Use `unit_amount` in satang (divide by 100 for THB display)
 
 ### Testing Commands
+
 - Type check: `pnpm check-types`
 - Run tests: `pnpm --filter=@sabaipics/api test`
 - Build all: `pnpm build`

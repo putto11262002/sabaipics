@@ -1,4 +1,5 @@
 # Recommended Implementation Strategy
+
 ## Canon Camera WiFi Integration for SabaiPics Pro
 
 **Last Updated:** 2026-01-09
@@ -33,12 +34,14 @@
 ### What It Provides
 
 ✅ **PTP/IP WiFi communication**
+
 - Connect to camera by IP address
 - Send PTP commands
 - Transfer images
 - Control camera settings
 
 ❌ **What it doesn't have:**
+
 - No automatic discovery (must specify IP manually)
 - No USB support (WiFi only)
 - Requires specifying camera model and port
@@ -48,9 +51,11 @@
 ## Three-Phase Implementation Plan
 
 ### Phase 1: Core Features with Manual IP (Week 1-2)
+
 **No entitlement needed - Start immediately**
 
 #### What to Build:
+
 ```swift
 import GPhoto2Framework
 
@@ -84,6 +89,7 @@ struct DevModeView: View {
 ```
 
 #### Info.plist (Phase 1):
+
 ```xml
 <key>NSCameraUsageDescription</key>
 <string>This app needs to access your camera to transfer photos automatically.</string>
@@ -93,6 +99,7 @@ struct DevModeView: View {
 ```
 
 #### Testing (Phase 1):
+
 - ✅ iOS Simulator (no entitlement needed)
 - ✅ TestFlight with manual IP entry
 - ✅ Verify PTP/IP communication works
@@ -100,17 +107,21 @@ struct DevModeView: View {
 - ✅ Test with multiple camera models
 
 #### Deliverable:
+
 Working app that transfers images when user enters camera IP manually.
 
 ---
 
 ### Phase 2: Submit Entitlement Request (Parallel with Phase 1)
+
 **Start Week 1 - Wait 2-4 weeks for approval**
 
 #### Action:
+
 Use the pre-filled form we created: `apple-entitlement-request-form.md`
 
 #### Timeline:
+
 - Submit: Week 1
 - Wait: 2-4 weeks
 - Approval: Week 3-5
@@ -120,6 +131,7 @@ Use the pre-filled form we created: `apple-entitlement-request-form.md`
 ---
 
 ### Phase 3: Add Automatic Discovery (Week 3-4)
+
 **After entitlement approval**
 
 #### What to Build:
@@ -169,6 +181,7 @@ class CameraService {
 ```
 
 #### Info.plist (Phase 3):
+
 ```xml
 <key>NSCameraUsageDescription</key>
 <string>This app needs to access your camera to transfer photos automatically.</string>
@@ -185,18 +198,21 @@ class CameraService {
 ```
 
 #### Entitlements (Phase 3):
+
 ```xml
 <key>com.apple.developer.networking.multicast</key>
 <true/>
 ```
 
 #### Testing (Phase 3):
+
 - ✅ Physical iOS device (requires entitlement)
 - ✅ Auto-discovery of Canon/Nikon/Sony cameras
 - ✅ Seamless connection without manual IP
 - ✅ TestFlight beta testing
 
 #### Deliverable:
+
 Production-ready app with automatic camera discovery and connection.
 
 ---
@@ -243,6 +259,7 @@ class WiFiProvider: CameraProvider {
 ```
 
 **USB Requirements:**
+
 - No multicast entitlement needed
 - Only needs `NSCameraUsageDescription`
 - Works immediately on physical devices
@@ -279,18 +296,18 @@ class WiFiProvider: CameraProvider {
 
 ## Timeline
 
-| Week | Phase | What | Status |
-|------|-------|------|--------|
-| 1 | Phase 1 | Integrate GPhoto2Framework | No entitlement needed |
-| 1 | Phase 1 | Build manual IP UI | Works in Simulator |
-| 1 | Phase 2 | Submit entitlement request | Parallel |
-| 2 | Phase 1 | Test with real cameras | Manual IP |
-| 2 | Phase 1 | Build image transfer flow | Core features |
-| 2-4 | Phase 2 | Wait for Apple approval | Continue building |
-| 3 | Phase 3 | Implement UPnP/SSDP discovery | After approval |
-| 4 | Phase 3 | Integrate discovery + transfer | Production ready |
-| 4 | Testing | TestFlight beta | Full features |
-| 5+ | Phase 4 | Add USB support (optional) | Enhancement |
+| Week | Phase   | What                           | Status                |
+| ---- | ------- | ------------------------------ | --------------------- |
+| 1    | Phase 1 | Integrate GPhoto2Framework     | No entitlement needed |
+| 1    | Phase 1 | Build manual IP UI             | Works in Simulator    |
+| 1    | Phase 2 | Submit entitlement request     | Parallel              |
+| 2    | Phase 1 | Test with real cameras         | Manual IP             |
+| 2    | Phase 1 | Build image transfer flow      | Core features         |
+| 2-4  | Phase 2 | Wait for Apple approval        | Continue building     |
+| 3    | Phase 3 | Implement UPnP/SSDP discovery  | After approval        |
+| 4    | Phase 3 | Integrate discovery + transfer | Production ready      |
+| 4    | Testing | TestFlight beta                | Full features         |
+| 5+   | Phase 4 | Add USB support (optional)     | Enhancement           |
 
 **Total:** 4-5 weeks to production WiFi app
 
@@ -352,6 +369,7 @@ struct CameraConnectionView: View {
 ### Week 2-4: Wait for Entitlement
 
 **While waiting, you can:**
+
 - ✅ Build complete UI
 - ✅ Test manual IP workflow
 - ✅ Implement image upload to SabaiPics backend
@@ -395,6 +413,7 @@ struct CameraListView: View {
 ### Phase 1: Manual IP Testing
 
 **Test Cases:**
+
 1. ✅ Connect to Canon camera via WiFi (manual IP)
 2. ✅ Connect to Nikon camera via WiFi (manual IP)
 3. ✅ Transfer single image
@@ -403,6 +422,7 @@ struct CameraListView: View {
 6. ✅ Handle network interruptions
 
 **Test Environment:**
+
 - iOS Simulator (initial testing)
 - TestFlight on physical devices
 - Real Canon/Nikon/Sony cameras
@@ -410,6 +430,7 @@ struct CameraListView: View {
 ### Phase 3: Auto-Discovery Testing
 
 **Test Cases:**
+
 1. ✅ Discover Canon cameras automatically
 2. ✅ Discover multiple cameras on network
 3. ✅ Handle permission denial gracefully
@@ -417,6 +438,7 @@ struct CameraListView: View {
 5. ✅ Handle camera power off/on
 
 **Test Environment:**
+
 - Physical iOS device (requires entitlement)
 - Multiple camera brands
 - Different network configurations
@@ -426,6 +448,7 @@ struct CameraListView: View {
 ## Dependencies
 
 ### iOS Frameworks
+
 ```swift
 import GPhoto2Framework      // WiFi PTP/IP communication
 import Network              // UPnP/SSDP discovery (Phase 3)
@@ -434,12 +457,14 @@ import ImageCaptureCore     // Optional: USB support (Phase 4)
 ```
 
 ### External Libraries
+
 - **GPhoto2Framework** - https://github.com/touchbyte/GPhoto2Framework
-  * License: Check repo (likely LGPL)
-  * iOS 8+ support
-  * Canon EOS tested
+  - License: Check repo (likely LGPL)
+  - iOS 8+ support
+  - Canon EOS tested
 
 ### No npm/CocoaPods needed
+
 - Pure Swift implementation
 - Framework-based dependency
 
@@ -448,9 +473,11 @@ import ImageCaptureCore     // Optional: USB support (Phase 4)
 ## Camera Compatibility
 
 ### Tested (by GPhoto2Framework)
+
 - ✅ Canon EOS cameras with WiFi
 
 ### Expected to Work (via libgphoto2)
+
 - ✅ Canon EOS R series (R5, R6, R7, R8)
 - ✅ Canon EOS RP, M series
 - ✅ Nikon Z series (Z9, Z7, Z6, Z5)
@@ -459,6 +486,7 @@ import ImageCaptureCore     // Optional: USB support (Phase 4)
 - ✅ Leica M series
 
 ### To Test During Development
+
 - Your specific camera models
 - Multiple simultaneous connections
 - Various WiFi configurations
@@ -468,9 +496,11 @@ import ImageCaptureCore     // Optional: USB support (Phase 4)
 ## Risks & Mitigations
 
 ### Risk 1: GPhoto2Framework Not Maintained
+
 **Last update:** August 2022 (2.5 years ago)
 
 **Mitigation:**
+
 - ✅ Used in production (PhotoSync app)
 - ✅ Stable, proven technology
 - ✅ Based on libgphoto2 (actively maintained)
@@ -478,18 +508,22 @@ import ImageCaptureCore     // Optional: USB support (Phase 4)
 - ⚠️ Consider updating libgphoto2 version if needed
 
 ### Risk 2: Entitlement Not Approved
+
 **Unlikely but possible**
 
 **Mitigation:**
+
 - ✅ Strong justification already prepared
 - ✅ Manual IP works without entitlement
 - ✅ Can ship USB-only version
 - ✅ Can resubmit with more details
 
 ### Risk 3: Camera Compatibility Issues
+
 **Some cameras may not work**
 
 **Mitigation:**
+
 - ✅ Test with real cameras early
 - ✅ Document supported models
 - ✅ Provide clear requirements to users
@@ -581,12 +615,14 @@ struct ContentView: View {
 ## Success Metrics
 
 ### Phase 1 Success:
+
 - ✅ Can connect to camera with manual IP
 - ✅ Can transfer images successfully
 - ✅ Works with at least 3 camera models
 - ✅ TestFlight beta with 5+ photographers
 
 ### Phase 3 Success:
+
 - ✅ Auto-discovery works on physical devices
 - ✅ No manual IP entry needed
 - ✅ Connection time < 10 seconds
@@ -597,17 +633,20 @@ struct ContentView: View {
 ## Resources
 
 ### Documentation
+
 - GPhoto2Framework: https://github.com/touchbyte/GPhoto2Framework
 - libgphoto2 docs: http://www.gphoto.org/doc/
 - PTP/IP protocol: https://julianschroden.com/post/2023-05-10-pairing-and-initializing-a-ptp-ip-connection-with-a-canon-eos-camera/
 - Apple multicast entitlement: https://developer.apple.com/contact/request/networking-multicast
 
 ### Code Examples
+
 - PhotoSync (uses GPhoto2Framework in production)
 - qDslrDashboard (open source, multi-platform)
 - Cascable Pro (commercial, similar use case)
 
 ### Contact
+
 - GPhoto2Framework author: holtmann@touchbyte.com
 - libgphoto2 mailing list: gphoto-devel@lists.sourceforge.net
 
@@ -626,6 +665,7 @@ struct ContentView: View {
 **Timeline:** 4-5 weeks to production-ready WiFi app
 
 **Advantages:**
+
 - Start immediately (no waiting)
 - Proven technology (PhotoSync uses it)
 - Low risk (manual IP works without entitlement)

@@ -105,34 +105,34 @@ Secrets are managed via **Infisical** (project: `frame-fast-pu-xi`) and **Terraf
 
 ### Terraform-managed secrets (pushed to Worker)
 
-| Secret                         | Source     | Description                          |
-| ------------------------------ | ---------- | ------------------------------------ |
-| `DATABASE_URL`                 | Infisical  | Neon connection string               |
-| `CLERK_SECRET_KEY`             | Infisical  | Clerk backend key                    |
-| `CLERK_PUBLISHABLE_KEY`        | Infisical  | Clerk frontend key                   |
-| `CLERK_JWT_KEY`                | Infisical  | JWT verification                     |
-| `CLERK_WEBHOOK_SIGNING_SECRET` | Infisical  | Webhook validation                   |
-| `AWS_ACCESS_KEY_ID`            | Infisical  | Rekognition access                   |
-| `AWS_SECRET_ACCESS_KEY`        | Infisical  | Rekognition secret                   |
-| `STRIPE_SECRET_KEY`            | Infisical  | Stripe backend key                   |
-| `STRIPE_WEBHOOK_SECRET`        | Infisical  | Webhook validation                   |
-| `R2_ACCESS_KEY_ID`             | Terraform  | R2 S3-compatible access (generated)  |
-| `R2_SECRET_ACCESS_KEY`         | Terraform  | R2 S3-compatible secret (generated)  |
-| `ADMIN_API_KEY`                | Terraform  | Internal admin endpoints (generated) |
-| `FTP_JWT_SECRET`               | Terraform  | FTP token signing key (generated)    |
-| `FTP_PASSWORD_ENCRYPTION_KEY`  | Terraform  | FTP password encryption (generated)  |
-| `DESKTOP_ACCESS_JWT_SECRET`    | Terraform  | Desktop access JWT (generated)       |
-| `DESKTOP_REFRESH_TOKEN_PEPPER` | Terraform  | Desktop refresh hashing (generated)  |
+| Secret                         | Source    | Description                          |
+| ------------------------------ | --------- | ------------------------------------ |
+| `DATABASE_URL`                 | Infisical | Neon connection string               |
+| `CLERK_SECRET_KEY`             | Infisical | Clerk backend key                    |
+| `CLERK_PUBLISHABLE_KEY`        | Infisical | Clerk frontend key                   |
+| `CLERK_JWT_KEY`                | Infisical | JWT verification                     |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | Infisical | Webhook validation                   |
+| `AWS_ACCESS_KEY_ID`            | Infisical | Rekognition access                   |
+| `AWS_SECRET_ACCESS_KEY`        | Infisical | Rekognition secret                   |
+| `STRIPE_SECRET_KEY`            | Infisical | Stripe backend key                   |
+| `STRIPE_WEBHOOK_SECRET`        | Infisical | Webhook validation                   |
+| `R2_ACCESS_KEY_ID`             | Terraform | R2 S3-compatible access (generated)  |
+| `R2_SECRET_ACCESS_KEY`         | Terraform | R2 S3-compatible secret (generated)  |
+| `ADMIN_API_KEY`                | Terraform | Internal admin endpoints (generated) |
+| `FTP_JWT_SECRET`               | Terraform | FTP token signing key (generated)    |
+| `FTP_PASSWORD_ENCRYPTION_KEY`  | Terraform | FTP password encryption (generated)  |
+| `DESKTOP_ACCESS_JWT_SECRET`    | Terraform | Desktop access JWT (generated)       |
+| `DESKTOP_REFRESH_TOKEN_PEPPER` | Terraform | Desktop refresh hashing (generated)  |
 
 ### GitHub secrets (minimal)
 
 Only bootstrap secrets remain in GitHub:
 
-| Secret                    | Environment       | Description                    |
-| ------------------------- | ----------------- | ------------------------------ |
+| Secret                    | Environment        | Description                    |
+| ------------------------- | ------------------ | ------------------------------ |
 | `INFISICAL_CLIENT_ID`     | staging/production | Infisical Machine Identity ID  |
 | `INFISICAL_CLIENT_SECRET` | staging/production | Infisical Machine Identity key |
-| `NEON_API_KEY`             | (repo-level)      | Neon preview branches in CI    |
+| `NEON_API_KEY`            | (repo-level)       | Neon preview branches in CI    |
 
 ### Optional secrets (Infisical)
 

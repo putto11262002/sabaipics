@@ -2,12 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { X, Info, ArrowLeft, ArrowRight } from 'lucide-react';
 
 import { Sheet, SheetContent } from '@/shared/components/ui/sheet';
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/shared/components/ui/drawer';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/shared/components/ui/drawer';
 import { Separator } from '@/shared/components/ui/separator';
 import { Button } from '@/shared/components/ui/button';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
@@ -39,6 +34,12 @@ type ViewerPhoto = {
     dateTimeOriginal?: string;
     gpsLatitude?: number;
     gpsLongitude?: number;
+  } | null;
+  pipelineApplied?: {
+    autoEdit: boolean;
+    autoEditPresetId: string | null;
+    lutId: string | null;
+    lutIntensity: number;
   } | null;
 };
 
@@ -167,11 +168,16 @@ export function PhotoViewerSheet({
               </CarouselContent>
 
               <div className="hidden md:block">
-                <CarouselPrevious variant="secondary" className="left-4 top-1/2 -translate-y-1/2 size-12 [&_svg]:size-6" />
-                <CarouselNext variant="secondary" className="right-4 top-1/2 -translate-y-1/2 size-12 [&_svg]:size-6" />
+                <CarouselPrevious
+                  variant="secondary"
+                  className="left-4 top-1/2 -translate-y-1/2 size-12 [&_svg]:size-6"
+                />
+                <CarouselNext
+                  variant="secondary"
+                  className="right-4 top-1/2 -translate-y-1/2 size-12 [&_svg]:size-6"
+                />
               </div>
             </Carousel>
-
           </div>
 
           <div className="flex items-center justify-between px-4 py-3 md:hidden">
@@ -217,6 +223,33 @@ export function PhotoViewerSheet({
                     <Separator />
                     <MetaRow label="Faces" value={String(current.faceCount ?? 0)} />
                     <Separator />
+                    <MetaRow
+                      label="Auto edit"
+                      value={current.pipelineApplied?.autoEdit ? 'On' : 'Off'}
+                    />
+                    <Separator />
+                    {current.pipelineApplied?.autoEdit ? (
+                      <>
+                        <MetaRow
+                          label="Preset ID"
+                          value={current.pipelineApplied.autoEditPresetId ?? '-'}
+                        />
+                        <Separator />
+                      </>
+                    ) : null}
+                    <MetaRow label="LUT" value={current.pipelineApplied?.lutId ? 'On' : 'Off'} />
+                    <Separator />
+                    {current.pipelineApplied?.lutId ? (
+                      <>
+                        <MetaRow label="LUT ID" value={current.pipelineApplied.lutId} />
+                        <Separator />
+                        <MetaRow
+                          label="LUT intensity"
+                          value={`${current.pipelineApplied.lutIntensity}%`}
+                        />
+                        <Separator />
+                      </>
+                    ) : null}
                     {current.exif ? (
                       <>
                         <MetaRow label="Make" value={current.exif.make ?? '-'} />

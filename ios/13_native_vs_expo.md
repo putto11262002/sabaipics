@@ -1,4 +1,5 @@
 # Native Swift vs Expo - Decision Guide
+
 ## For Canon Camera WiFi Integration App
 
 **Last Updated:** 2026-01-08
@@ -19,6 +20,7 @@
 ### ✅ **Use Native Swift** (Recommended for your use case)
 
 **Why:**
+
 1. iOS-only focus → Swift is the natural choice
 2. C library integration is EASIER in Swift than Expo
 3. Better network control (UDP multicast, TCP sockets)
@@ -32,17 +34,18 @@
 
 ### Category 1: C Library Integration
 
-| Aspect | Native Swift | Expo + Native Module |
-|--------|--------------|---------------------|
-| **Complexity** | ⭐️⭐️ Medium | ⭐️⭐️⭐️⭐️ Complex |
-| **Setup** | Import C files, add bridging header | Create Expo module, wrap in Swift, expose to JS |
-| **Debugging** | Direct in Xcode | Multi-layer: JS → Bridge → Native |
-| **Performance** | Native speed | Native speed (but bridge overhead) |
-| **Learning Curve** | Learn Swift + C interop | Learn Swift + C interop + Expo modules + JS bridge |
+| Aspect             | Native Swift                        | Expo + Native Module                               |
+| ------------------ | ----------------------------------- | -------------------------------------------------- |
+| **Complexity**     | ⭐️⭐️ Medium                         | ⭐️⭐️⭐️⭐️ Complex                                   |
+| **Setup**          | Import C files, add bridging header | Create Expo module, wrap in Swift, expose to JS    |
+| **Debugging**      | Direct in Xcode                     | Multi-layer: JS → Bridge → Native                  |
+| **Performance**    | Native speed                        | Native speed (but bridge overhead)                 |
+| **Learning Curve** | Learn Swift + C interop             | Learn Swift + C interop + Expo modules + JS bridge |
 
 **Example: Import libpict**
 
 **Swift (Simple):**
+
 ```swift
 // Just add C files to Xcode project
 // Create bridging header
@@ -54,6 +57,7 @@ let result = ptp_connect(ipAddress)
 ```
 
 **Expo (Complex):**
+
 ```swift
 // 1. Create Expo module
 // 2. Wrap C functions in Swift
@@ -66,37 +70,37 @@ let result = ptp_connect(ipAddress)
 
 ### Category 2: Network Programming
 
-| Aspect | Native Swift | Expo |
-|--------|--------------|------|
-| **UDP Multicast** | ⭐️⭐️⭐️⭐️⭐️ Full control | ⭐️⭐️⭐️ Possible but needs native module |
-| **TCP Sockets** | ⭐️⭐️⭐️⭐️⭐️ Network framework | ⭐️⭐️⭐️ Need react-native-tcp-socket |
-| **UPnP/SSDP** | ⭐️⭐️⭐️⭐️⭐️ Direct implementation | ⭐️⭐️ Need native module anyway |
-| **Debugging** | Xcode network tools | Harder to debug |
+| Aspect            | Native Swift                     | Expo                                    |
+| ----------------- | -------------------------------- | --------------------------------------- |
+| **UDP Multicast** | ⭐️⭐️⭐️⭐️⭐️ Full control          | ⭐️⭐️⭐️ Possible but needs native module |
+| **TCP Sockets**   | ⭐️⭐️⭐️⭐️⭐️ Network framework     | ⭐️⭐️⭐️ Need react-native-tcp-socket     |
+| **UPnP/SSDP**     | ⭐️⭐️⭐️⭐️⭐️ Direct implementation | ⭐️⭐️ Need native module anyway          |
+| **Debugging**     | Xcode network tools              | Harder to debug                         |
 
 **For network-heavy apps (like yours), native is easier.**
 
 ### Category 3: Development Speed
 
-| Phase | Native Swift | Expo |
-|-------|--------------|------|
-| **Initial Setup** | ⭐️⭐️⭐️⭐️ Quick | ⭐️⭐️⭐️ Quick |
-| **UI Building** | ⭐️⭐️⭐️ SwiftUI | ⭐️⭐️⭐️⭐️⭐️ React Native (faster) |
-| **Network Code** | ⭐️⭐️⭐️⭐️⭐️ Native APIs | ⭐️⭐️ Need wrappers |
-| **C Integration** | ⭐️⭐️⭐️⭐️ Direct | ⭐️⭐️ Complex |
-| **Debugging** | ⭐️⭐️⭐️⭐️⭐️ Xcode | ⭐️⭐️⭐️ Multiple layers |
-| **Hot Reload** | ⭐️⭐️⭐️ Xcode previews | ⭐️⭐️⭐️⭐️⭐️ Instant |
+| Phase             | Native Swift           | Expo                             |
+| ----------------- | ---------------------- | -------------------------------- |
+| **Initial Setup** | ⭐️⭐️⭐️⭐️ Quick         | ⭐️⭐️⭐️ Quick                     |
+| **UI Building**   | ⭐️⭐️⭐️ SwiftUI         | ⭐️⭐️⭐️⭐️⭐️ React Native (faster) |
+| **Network Code**  | ⭐️⭐️⭐️⭐️⭐️ Native APIs | ⭐️⭐️ Need wrappers               |
+| **C Integration** | ⭐️⭐️⭐️⭐️ Direct        | ⭐️⭐️ Complex                     |
+| **Debugging**     | ⭐️⭐️⭐️⭐️⭐️ Xcode       | ⭐️⭐️⭐️ Multiple layers           |
+| **Hot Reload**    | ⭐️⭐️⭐️ Xcode previews  | ⭐️⭐️⭐️⭐️⭐️ Instant               |
 
 **For your app: Native is faster overall** (despite slower UI iteration)
 
 ### Category 4: iOS-Only Focus
 
-| Consideration | Native Swift | Expo |
-|---------------|--------------|------|
-| **iOS APIs** | ⭐️⭐️⭐️⭐️⭐️ Full access | ⭐️⭐️⭐️⭐️ Good (but needs modules) |
-| **Code Reuse** | iOS only | Cross-platform (wasted if not using) |
-| **App Size** | ⭐️⭐️⭐️⭐️⭐️ Smaller | ⭐️⭐️⭐️ Larger (JS engine) |
-| **Performance** | ⭐️⭐️⭐️⭐️⭐️ Best | ⭐️⭐️⭐️⭐️ Excellent |
-| **Future Android** | Rewrite | Add Android module |
+| Consideration      | Native Swift           | Expo                                 |
+| ------------------ | ---------------------- | ------------------------------------ |
+| **iOS APIs**       | ⭐️⭐️⭐️⭐️⭐️ Full access | ⭐️⭐️⭐️⭐️ Good (but needs modules)    |
+| **Code Reuse**     | iOS only               | Cross-platform (wasted if not using) |
+| **App Size**       | ⭐️⭐️⭐️⭐️⭐️ Smaller     | ⭐️⭐️⭐️ Larger (JS engine)            |
+| **Performance**    | ⭐️⭐️⭐️⭐️⭐️ Best        | ⭐️⭐️⭐️⭐️ Excellent                   |
+| **Future Android** | Rewrite                | Add Android module                   |
 
 **Since you're iOS-only: Native Swift advantage**
 
@@ -104,12 +108,12 @@ let result = ptp_connect(ipAddress)
 
 **If you're learning from scratch:**
 
-| Skill | Native Swift | Expo |
-|-------|--------------|------|
-| **Languages** | Swift | JavaScript/TypeScript + Swift (for native modules) |
-| **Frameworks** | SwiftUI/UIKit | React Native + Expo |
-| **C Interop** | Swift-C bridging | Swift-C bridging + JS bridge |
-| **Total Complexity** | ⭐️⭐️⭐️ Medium | ⭐️⭐️⭐️⭐️ High |
+| Skill                | Native Swift     | Expo                                               |
+| -------------------- | ---------------- | -------------------------------------------------- |
+| **Languages**        | Swift            | JavaScript/TypeScript + Swift (for native modules) |
+| **Frameworks**       | SwiftUI/UIKit    | React Native + Expo                                |
+| **C Interop**        | Swift-C bridging | Swift-C bridging + JS bridge                       |
+| **Total Complexity** | ⭐️⭐️⭐️ Medium    | ⭐️⭐️⭐️⭐️ High                                      |
 
 **Learning Swift is easier than learning React Native + Swift + Expo modules**
 
@@ -118,6 +122,7 @@ let result = ptp_connect(ipAddress)
 **How much code for basic camera connection + image transfer?**
 
 **Native Swift:**
+
 ```
 Project Structure:
 ├── Models/
@@ -137,6 +142,7 @@ Total: ~900 lines of Swift + C library
 ```
 
 **Expo:**
+
 ```
 Project Structure:
 ├── App (JavaScript/TypeScript)
@@ -163,6 +169,7 @@ Total: ~1,360 lines (Swift + TypeScript) + bridge complexity
 ## The Verdict for YOUR Case
 
 ### Choose Native Swift If:
+
 - ✅ **iOS-only for now** (your case!)
 - ✅ Network-heavy app with UDP/TCP (your case!)
 - ✅ Need C library integration (your case!)
@@ -171,6 +178,7 @@ Total: ~1,360 lines (Swift + TypeScript) + bridge complexity
 - ✅ Okay with slightly slower UI iteration
 
 ### Choose Expo If:
+
 - ❌ Need Android from day 1
 - ❌ Team knows React Native well
 - ❌ Mostly UI-focused app
@@ -182,6 +190,7 @@ Total: ~1,360 lines (Swift + TypeScript) + bridge complexity
 ## Your Situation Analysis
 
 **Your Requirements:**
+
 1. iOS first ✅ → Swift advantage
 2. Canon camera PTP/IP ✅ → Swift advantage (network APIs)
 3. C library (libpict) ✅ → Swift advantage (simpler integration)
@@ -197,20 +206,21 @@ Total: ~1,360 lines (Swift + TypeScript) + bridge complexity
 
 **Learning Curve:**
 
-| Concept | Difficulty | Time to Learn |
-|---------|-----------|---------------|
-| **Basic Swift syntax** | ⭐️⭐️ Easy | 1-2 days |
-| **SwiftUI basics** | ⭐️⭐️⭐️ Medium | 3-5 days |
-| **Async/await, concurrency** | ⭐️⭐️ Easy (like JS) | 1 day |
-| **Network programming** | ⭐️⭐️⭐️ Medium | 3-4 days |
-| **C interop** | ⭐️⭐️⭐️ Medium | 2-3 days |
-| **SwiftUI + Combine** | ⭐️⭐️⭐️⭐️ Medium-Hard | 1-2 weeks |
+| Concept                      | Difficulty           | Time to Learn |
+| ---------------------------- | -------------------- | ------------- |
+| **Basic Swift syntax**       | ⭐️⭐️ Easy            | 1-2 days      |
+| **SwiftUI basics**           | ⭐️⭐️⭐️ Medium        | 3-5 days      |
+| **Async/await, concurrency** | ⭐️⭐️ Easy (like JS)  | 1 day         |
+| **Network programming**      | ⭐️⭐️⭐️ Medium        | 3-4 days      |
+| **C interop**                | ⭐️⭐️⭐️ Medium        | 2-3 days      |
+| **SwiftUI + Combine**        | ⭐️⭐️⭐️⭐️ Medium-Hard | 1-2 weeks     |
 
 **Total: ~2-3 weeks to be productive**
 
 ### Swift is Actually Nice!
 
 **Similarities to TypeScript:**
+
 ```swift
 // Type safety
 let camera: Camera = Camera()
@@ -241,12 +251,14 @@ cameras.map { camera in
 ### Phase 1: Prototype in Native Swift (Week 1-2)
 
 **Why:**
+
 1. Fastest path to working camera connection
 2. Direct C library integration
 3. Test if PTP/IP works with real Canon camera
 4. Validate entire concept
 
 **Build:**
+
 - Basic SwiftUI app
 - UPnP discovery
 - PTP connection
@@ -258,12 +270,14 @@ cameras.map { camera in
 ### Phase 2: Decide Based on Results (Week 3)
 
 **If prototype works well:**
+
 - ✅ Continue in Swift
 - ✅ Build full UI
 - ✅ Polish UX
 - ✅ Ship iOS app
 
 **If you REALLY need Android:**
+
 - Consider Expo
 - Reuse learnings from Swift prototype
 - Port to React Native + Expo modules
@@ -271,11 +285,13 @@ cameras.map { camera in
 ### Phase 3: Add Android Later (If Needed)
 
 **Option A: Native Android (Kotlin)**
+
 - Similar to Swift approach
 - Reuse same C library
 - Similar architecture
 
 **Option B: Port to Expo**
+
 - Wrap existing Swift code in Expo module
 - Add Android Kotlin module
 - Share JavaScript UI layer
@@ -369,33 +385,28 @@ const CanonPtp = NativeModulesProxy.CanonPtp;
 const emitter = new EventEmitter(CanonPtp);
 
 export function useCameraDiscovery() {
-    const [cameras, setCameras] = useState([]);
+  const [cameras, setCameras] = useState([]);
 
-    useEffect(() => {
-        const subscription = emitter.addListener('onCameraDiscovered', (camera) => {
-            setCameras(prev => [...prev, camera]);
-        });
+  useEffect(() => {
+    const subscription = emitter.addListener('onCameraDiscovered', (camera) => {
+      setCameras((prev) => [...prev, camera]);
+    });
 
-        CanonPtp.discoverCameras();
+    CanonPtp.discoverCameras();
 
-        return () => subscription.remove();
-    }, []);
+    return () => subscription.remove();
+  }, []);
 
-    return cameras;
+  return cameras;
 }
 ```
 
 ```tsx
 // React Native component
 export function CameraList() {
-    const cameras = useCameraDiscovery();
+  const cameras = useCameraDiscovery();
 
-    return (
-        <FlatList
-            data={cameras}
-            renderItem={({ item }) => <Text>{item.name}</Text>}
-        />
-    );
+  return <FlatList data={cameras} renderItem={({ item }) => <Text>{item.name}</Text>} />;
 }
 ```
 
@@ -409,6 +420,7 @@ export function CameraList() {
 ### For Your Specific Case: **Go Native Swift** 🎯
 
 **Reasons:**
+
 1. ✅ iOS-only focus
 2. ✅ Network-heavy app
 3. ✅ C library integration simpler
@@ -419,15 +431,15 @@ export function CameraList() {
 
 **Timeline Comparison:**
 
-| Milestone | Native Swift | Expo |
-|-----------|--------------|------|
-| Project setup | 1 hour | 2 hours |
-| C library integration | 2-3 hours | 1 day (module setup) |
-| UPnP discovery | 1-2 days | 2-3 days (native + JS) |
-| PTP connection | 2-3 days | 3-4 days (wrapping) |
-| Image transfer | 2 days | 2-3 days |
-| UI (basic) | 2-3 days | 1-2 days |
-| **Total MVP** | **~2 weeks** | **~3 weeks** |
+| Milestone             | Native Swift | Expo                   |
+| --------------------- | ------------ | ---------------------- |
+| Project setup         | 1 hour       | 2 hours                |
+| C library integration | 2-3 hours    | 1 day (module setup)   |
+| UPnP discovery        | 1-2 days     | 2-3 days (native + JS) |
+| PTP connection        | 2-3 days     | 3-4 days (wrapping)    |
+| Image transfer        | 2 days       | 2-3 days               |
+| UI (basic)            | 2-3 days     | 1-2 days               |
+| **Total MVP**         | **~2 weeks** | **~3 weeks**           |
 
 **Swift is 30% faster for your use case**
 
@@ -438,28 +450,34 @@ export function CameraList() {
 ### Swift Essentials (1 week)
 
 **Day 1-2: Swift Basics**
+
 - [Swift.org Tour](https://www.swift.org/getting-started/)
 - [100 Days of SwiftUI](https://www.hackingwithswift.com/100/swiftui) - Days 1-15
 
 **Day 3-5: SwiftUI**
+
 - [Apple SwiftUI Tutorials](https://developer.apple.com/tutorials/swiftui)
 - Build simple list/detail app
 
 **Day 6-7: Networking**
+
 - [URLSession Tutorial](https://www.hackingwithswift.com/articles/153/how-to-test-ios-networking-code-the-easy-way)
 - [Network Framework](https://developer.apple.com/documentation/network)
 
 ### Project-Specific (1 week)
 
 **Day 8-10: C Interop**
+
 - [Using Swift with C](https://developer.apple.com/documentation/swift/imported-c-and-objective-c-apis)
 - Integrate libpict
 
 **Day 11-12: UPnP/PTP**
+
 - Study libpict examples
 - Implement basic discovery
 
 **Day 13-14: Integration**
+
 - Connect UI to network layer
 - Test with camera
 
@@ -470,6 +488,7 @@ export function CameraList() {
 ## When to Reconsider Expo
 
 **If any of these change:**
+
 - ❌ Need Android within 1-2 months
 - ❌ Team has strong React Native expertise
 - ❌ App is mostly UI, minimal network code
@@ -496,6 +515,7 @@ Need C library? → YES
 ## Summary
 
 **Your situation:**
+
 - iOS first (Android maybe later)
 - Canon camera WiFi integration
 - PTP/IP protocol (network-heavy)
@@ -504,6 +524,7 @@ Need C library? → YES
 **Best choice: Native Swift**
 
 **Why:**
+
 - Simpler for your use case
 - Faster development
 - Easier debugging
@@ -520,18 +541,21 @@ Need C library? → YES
 ## Action Items
 
 ### This Week
+
 - [ ] Install Xcode
 - [ ] Complete Swift basics tutorial (2-3 days)
 - [ ] Build simple SwiftUI list app (1 day)
 - [ ] Study libpict examples (1 day)
 
 ### Next Week
+
 - [ ] Start camera discovery prototype
 - [ ] Integrate libpict
 - [ ] Test with real Canon camera
 - [ ] Build basic UI
 
 ### Week 3-4
+
 - [ ] Complete core features
 - [ ] Polish UI/UX
 - [ ] TestFlight beta

@@ -5,7 +5,7 @@ import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
 import { useQueryClient } from '@tanstack/react-query';
 
 type DeleteEventResponse = InferResponseType<
-  typeof api.events[':id']['$delete'],
+  (typeof api.events)[':id']['$delete'],
   SuccessStatusCode
 >;
 
@@ -15,8 +15,7 @@ export function useDeleteEvent() {
   const queryClient = useQueryClient();
 
   return useApiMutation<DeleteEventResponse, DeleteEventInput>({
-    apiFn: (input, opts) =>
-      api.events[':id'].$delete({ param: { id: input.eventId } }, opts),
+    apiFn: (input, opts) => api.events[':id'].$delete({ param: { id: input.eventId } }, opts),
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       queryClient.removeQueries({ queryKey: ['events', 'detail', vars.eventId] });

@@ -30,10 +30,10 @@ Issue: #103 | PR review: #102
 
 ## Files
 
-| File | Change |
-|------|--------|
-| `FrameFast/Services/UploadQueueStore.swift` | Added `resetStaleUploadingJobs()` |
-| `FrameFast/Services/UploadManager.swift` | Crash recovery, presign fix, reactive offline, background session |
-| `FrameFast/Services/BackgroundUploadSessionManager.swift` | New — background URLSession wrapper |
-| `FrameFast/FrameFastApp.swift` | AppDelegate adaptor, ScenePhase handling |
-| `FrameFast/Stores/AppCoordinator.swift` | Wire BackgroundUploadSessionManager |
+| File                                                      | Change                                                            |
+| --------------------------------------------------------- | ----------------------------------------------------------------- |
+| `FrameFast/Services/UploadQueueStore.swift`               | Added `resetStaleUploadingJobs()`                                 |
+| `FrameFast/Services/UploadManager.swift`                  | Crash recovery, presign fix, reactive offline, background session |
+| `FrameFast/Services/BackgroundUploadSessionManager.swift` | New — background URLSession wrapper                               |
+| `FrameFast/FrameFastApp.swift`                            | AppDelegate adaptor, ScenePhase handling                          |
+| `FrameFast/Stores/AppCoordinator.swift`                   | Wire BackgroundUploadSessionManager                               |

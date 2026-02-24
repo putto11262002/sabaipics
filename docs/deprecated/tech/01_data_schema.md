@@ -21,15 +21,15 @@
 
 ## Storage Distribution
 
-| Data | Storage | Rationale |
-|------|---------|-----------|
-| Users, Events, Photos metadata | **Postgres (Neon)** | Relational, queryable |
-| Audit logs (deliveries, notifications) | **Postgres (Neon)** | Business data, compliance, reporting |
-| Rate limiting counters (temporary) | **Durable Objects** | Fast in-memory, per-user isolation |
-| Photo files (original, processed, thumb) | **Cloudflare R2** | Object storage, zero egress |
-| Face embeddings | **AWS Rekognition** | 1 collection per event, managed by AWS |
-| Auth & sessions | **Clerk** | Managed service (LINE, Google, Email OTP) |
-| Payment data | **Stripe** | PCI compliant, we store references only |
+| Data                                     | Storage             | Rationale                                 |
+| ---------------------------------------- | ------------------- | ----------------------------------------- |
+| Users, Events, Photos metadata           | **Postgres (Neon)** | Relational, queryable                     |
+| Audit logs (deliveries, notifications)   | **Postgres (Neon)** | Business data, compliance, reporting      |
+| Rate limiting counters (temporary)       | **Durable Objects** | Fast in-memory, per-user isolation        |
+| Photo files (original, processed, thumb) | **Cloudflare R2**   | Object storage, zero egress               |
+| Face embeddings                          | **AWS Rekognition** | 1 collection per event, managed by AWS    |
+| Auth & sessions                          | **Clerk**           | Managed service (LINE, Google, Email OTP) |
+| Payment data                             | **Stripe**          | PCI compliant, we store references only   |
 
 ---
 
@@ -78,6 +78,7 @@ CREATE INDEX idx_photographers_stripe ON photographers(stripe_customer_id);
 ```
 
 **Settings JSON Examples:**
+
 ```json
 {
   "language": "th",
@@ -125,6 +126,7 @@ CREATE INDEX idx_participants_line ON participants(line_user_id) WHERE line_user
 **Note:** Participants are lightweight. We don't store much - just enough to send LINE notifications and track basic analytics.
 
 **Important:** Not all participants need to sign up. Anonymous search is supported:
+
 - Anonymous users can search and view photos without signing in
 - Sign-up only required if they want LINE notifications for their matches
 - `participant_id` is nullable in `search_sessions` to support anonymous searches
@@ -132,21 +134,23 @@ CREATE INDEX idx_participants_line ON participants(line_user_id) WHERE line_user
 **LINE Integration (VERIFIED - all auth via Clerk):**
 
 Two requirements to send photos via LINE push message:
+
 1. **LINE Login (via Clerk)** - We need their `line_user_id`
 2. **OA Friend** - `line_linked` must be TRUE (otherwise push silently fails)
 
-| User State | clerk_user_id | line_user_id | line_linked | Can Send Push? |
-|------------|---------------|--------------|-------------|----------------|
-| Anonymous (no login) | - | - | - | ❌ No |
-| LINE Login only | set | set | FALSE | ❌ No (silent fail) |
-| LINE Login + OA friend | set | set | TRUE | ✅ Yes |
+| User State             | clerk_user_id | line_user_id | line_linked | Can Send Push?      |
+| ---------------------- | ------------- | ------------ | ----------- | ------------------- |
+| Anonymous (no login)   | -             | -            | -           | ❌ No               |
+| LINE Login only        | set           | set          | FALSE       | ❌ No (silent fail) |
+| LINE Login + OA friend | set           | set          | TRUE        | ✅ Yes              |
 
 **Note:** Participants can ONLY sign in via LINE (no Google/Email option), so `line_user_id` is always set when signed in.
 
 **When `line_linked` is updated:**
+
 - On Clerk LINE Login callback: check `friendship_status_changed` query param
 - On follow webhook: set `line_linked = TRUE`
-- On unfollow/block webhook: set `line_linked = FALSE` 
+- On unfollow/block webhook: set `line_linked = FALSE`
 
 ---
 
@@ -215,6 +219,7 @@ CREATE INDEX idx_events_expires ON events(expires_at) WHERE deleted_at IS NULL;
 ```
 
 **Gallery Settings JSON:**
+
 ```json
 {
   "theme": "dark",
@@ -430,15 +435,15 @@ CREATE INDEX idx_faces_eyes_open ON faces(event_id, eyes_open) WHERE eyes_open =
 
 **Face Attributes Stored:**
 
-| Category | Attributes | Use Case |
-|----------|------------|----------|
-| Demographics | age_low/high, gender | Analytics, filtering |
-| Expression | smile, emotion_primary | "Show me smiling photos" |
-| Eyes | eyes_open, eyeglasses, sunglasses | Filter out blinks/occlusions |
-| Face Quality | quality_brightness, quality_sharpness | Auto-filter bad photos |
-| Pose | pitch, roll, yaw | Filter extreme angles |
-| Occlusion | face_occluded | Filter covered faces |
-| Raw Data | emotions_json, landmarks_json | Future features, analytics |
+| Category     | Attributes                            | Use Case                     |
+| ------------ | ------------------------------------- | ---------------------------- |
+| Demographics | age_low/high, gender                  | Analytics, filtering         |
+| Expression   | smile, emotion_primary                | "Show me smiling photos"     |
+| Eyes         | eyes_open, eyeglasses, sunglasses     | Filter out blinks/occlusions |
+| Face Quality | quality_brightness, quality_sharpness | Auto-filter bad photos       |
+| Pose         | pitch, roll, yaw                      | Filter extreme angles        |
+| Occlusion    | face_occluded                         | Filter covered faces         |
+| Raw Data     | emotions_json, landmarks_json         | Future features, analytics   |
 
 **Landmarks (29 points):**
 `eyeLeft`, `eyeRight`, `nose`, `mouthLeft`, `mouthRight`, `leftEyeBrowLeft`, `leftEyeBrowRight`, `leftEyeBrowUp`, `rightEyeBrowLeft`, `rightEyeBrowRight`, `rightEyeBrowUp`, `leftEyeLeft`, `leftEyeRight`, `leftEyeUp`, `leftEyeDown`, `rightEyeLeft`, `rightEyeRight`, `rightEyeUp`, `rightEyeDown`, `noseLeft`, `noseRight`, `mouthUp`, `mouthDown`, `leftPupil`, `rightPupil`, `upperJawlineLeft`, `midJawlineLeft`, `chinBottom`, `midJawlineRight`, `upperJawlineRight`
@@ -447,6 +452,7 @@ CREATE INDEX idx_faces_eyes_open ON faces(event_id, eyes_open) WHERE eyes_open =
 `HAPPY`, `SAD`, `ANGRY`, `CONFUSED`, `DISGUSTED`, `SURPRISED`, `CALM`, `FEAR`, `UNKNOWN`
 
 **Face Claiming Logic:**
+
 - When a signed-in participant searches and gets high-confidence matches (>90%), we set `participant_id` on matched faces
 - This enables "Find all my photos" without re-running Rekognition
 - Low-confidence matches don't get claimed (recorded in `search_results` only)
@@ -508,6 +514,7 @@ CREATE INDEX idx_credit_ledger_created ON credit_ledger(created_at);
 ```
 
 **Credit Source Expiration Rules:**
+
 - `purchase`: 6 months from purchase (per business rules)
 - `bonus` (signup): 1 month
 - `promo`: Variable, set per promo
@@ -539,6 +546,7 @@ GROUP BY photographer_id;
 ```
 
 **When to use this view vs latest ledger entry:**
+
 - **Latest ledger `balance_after`**: Fast check for "do I have enough credits?" (single row lookup)
 - **This view**: Dashboard display, admin panel, reporting (aggregate stats across all transactions)
 
@@ -625,12 +633,12 @@ CREATE INDEX idx_search_sessions_created ON search_sessions(created_at);
 
 Individual matches from a search. **Kept separate from `faces.participant_id` because they serve different purposes:**
 
-| `faces.participant_id` | `search_results` |
-|------------------------|------------------|
+| `faces.participant_id`              | `search_results`                            |
+| ----------------------------------- | ------------------------------------------- |
 | "This face IS you" (identity claim) | "You searched and found this" (session log) |
-| Set on high-confidence matches only | Logs ALL matches regardless of confidence |
-| 1 participant per face | Same face can appear in many sessions |
-| Fast "my photos" lookup | Analytics, caching, action tracking |
+| Set on high-confidence matches only | Logs ALL matches regardless of confidence   |
+| 1 participant per face              | Same face can appear in many sessions       |
+| Fast "my photos" lookup             | Analytics, caching, action tracking         |
 
 ```sql
 CREATE TABLE search_results (
@@ -655,6 +663,7 @@ CREATE INDEX idx_search_results_photo ON search_results(photo_id);
 ```
 
 **AWS Rekognition SearchFacesByImage Response** (researched - see `dev/research/rekognition_embedding_export.md`):
+
 ```json
 {
   "FaceMatches": [
@@ -738,6 +747,7 @@ CREATE INDEX idx_line_notifications_status ON line_notifications(status);
 ```
 
 **Usage:**
+
 - `photographer_id` + `sent_at` index for quota queries: "How many LINE messages sent this month?"
 - `photo_count` for analytics: "Total photos delivered via LINE"
 
@@ -780,29 +790,31 @@ CREATE INDEX idx_consent_records_type ON consent_records(consent_type, consented
 
 **Consent types:**
 
-| Type | When | user_id | event_id | Description |
-|------|------|---------|----------|-------------|
-| `photographer_registration` | Photographer signup | photographer_id | NULL | "I confirm I obtained consent from photographed individuals" |
-| `face_search` | Participant search | participant_id or NULL | event_id | "I consent to facial recognition processing" |
+| Type                        | When                | user_id                | event_id | Description                                                  |
+| --------------------------- | ------------------- | ---------------------- | -------- | ------------------------------------------------------------ |
+| `photographer_registration` | Photographer signup | photographer_id        | NULL     | "I confirm I obtained consent from photographed individuals" |
+| `face_search`               | Participant search  | participant_id or NULL | event_id | "I consent to facial recognition processing"                 |
 
 **Key fields:**
 
-| Field | Purpose |
-|-------|---------|
-| `user_id` | NULL for anonymous participants (tracked via `search_session_id`) |
-| `search_session_id` | Links anonymous consent to specific search session |
-| `privacy_policy_version` | Audit trail for which policy version user consented to |
-| `withdrawn_at` | When user withdrew consent (for data subject rights) |
+| Field                    | Purpose                                                           |
+| ------------------------ | ----------------------------------------------------------------- |
+| `user_id`                | NULL for anonymous participants (tracked via `search_session_id`) |
+| `search_session_id`      | Links anonymous consent to specific search session                |
+| `privacy_policy_version` | Audit trail for which policy version user consented to            |
+| `withdrawn_at`           | When user withdrew consent (for data subject rights)              |
 
 **Retention:** 3 years (PDPA legal requirement for consent records).
 
 **Anonymous participant flow:**
+
 1. Anonymous user searches (no login)
 2. User checks consent box
 3. Create consent_record with `user_id = NULL`, `search_session_id = <session_id>`
 4. If user searches again same event: ask for consent again (can't track them)
 
 **Logged-in participant flow:**
+
 1. Participant logged in with LINE
 2. Check if consent already given for this event: `SELECT WHERE user_id = X AND event_id = Y AND withdrawn_at IS NULL`
 3. If no existing consent: show checkbox
@@ -945,36 +957,36 @@ CREATE TABLE team_members (
 
 ## Query Patterns & Indexes
 
-| Query Pattern | Index |
-|---------------|-------|
-| Get photographer by Clerk ID | `idx_photographers_clerk` |
-| Get events for photographer | `idx_events_photographer` |
-| Get photos for event | `idx_photos_event` |
-| Get faces for photo | `idx_faces_photo` |
-| Get all faces for participant ("my photos") | `idx_faces_participant` |
-| Get credit history | `idx_credit_ledger_photographer` |
-| Find expiring credits | `idx_credit_ledger_expires` |
-| Get search history for event | `idx_search_sessions_event` |
-| Get delivery stats for event | `idx_deliveries_event` |
-| Get delivery count per photo | `idx_deliveries_photo` |
-| Get deliveries by type (download/line) | `idx_deliveries_type` |
-| Check existing consent for user | `idx_consent_records_user` |
-| Get consent records for event | `idx_consent_records_event` |
-| Get consent for search session | `idx_consent_records_session` |
+| Query Pattern                               | Index                            |
+| ------------------------------------------- | -------------------------------- |
+| Get photographer by Clerk ID                | `idx_photographers_clerk`        |
+| Get events for photographer                 | `idx_events_photographer`        |
+| Get photos for event                        | `idx_photos_event`               |
+| Get faces for photo                         | `idx_faces_photo`                |
+| Get all faces for participant ("my photos") | `idx_faces_participant`          |
+| Get credit history                          | `idx_credit_ledger_photographer` |
+| Find expiring credits                       | `idx_credit_ledger_expires`      |
+| Get search history for event                | `idx_search_sessions_event`      |
+| Get delivery stats for event                | `idx_deliveries_event`           |
+| Get delivery count per photo                | `idx_deliveries_photo`           |
+| Get deliveries by type (download/line)      | `idx_deliveries_type`            |
+| Check existing consent for user             | `idx_consent_records_user`       |
+| Get consent records for event               | `idx_consent_records_event`      |
+| Get consent for search session              | `idx_consent_records_session`    |
 
 ---
 
 ## Data Retention
 
-| Data | Retention | Action |
-|------|-----------|--------|
-| Event + Photos | `retention_days` (default 30) | Soft delete, then hard delete after 7 days |
-| Rekognition Collection | Same as event | Delete collection on event expiry |
-| R2 Photo Files | Same as event | Delete objects on event expiry |
-| Search Sessions | 90 days | Archive to cold storage |
-| Consent Records | 3 years | PDPA legal requirement for consent audit trail |
-| Credit Ledger | Forever | Immutable audit trail |
-| Payments | Forever | Legal requirement |
+| Data                   | Retention                     | Action                                         |
+| ---------------------- | ----------------------------- | ---------------------------------------------- |
+| Event + Photos         | `retention_days` (default 30) | Soft delete, then hard delete after 7 days     |
+| Rekognition Collection | Same as event                 | Delete collection on event expiry              |
+| R2 Photo Files         | Same as event                 | Delete objects on event expiry                 |
+| Search Sessions        | 90 days                       | Archive to cold storage                        |
+| Consent Records        | 3 years                       | PDPA legal requirement for consent audit trail |
+| Credit Ledger          | Forever                       | Immutable audit trail                          |
+| Payments               | Forever                       | Legal requirement                              |
 
 ---
 

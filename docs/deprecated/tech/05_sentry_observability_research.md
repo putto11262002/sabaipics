@@ -21,6 +21,7 @@ Sentry provides an official `@sentry/cloudflare` package specifically designed f
 ### 1.2 Installation & Configuration
 
 #### Prerequisites
+
 - Cloudflare Workers or Pages project
 - Sentry account and project
 
@@ -30,12 +31,12 @@ Sentry provides an official `@sentry/cloudflare` package specifically designed f
 // wrangler.jsonc
 {
   "compatibility_flags": [
-    "nodejs_als"  // or "nodejs_compat"
+    "nodejs_als", // or "nodejs_compat"
   ],
   "version_metadata": {
-    "binding": "CF_VERSION_METADATA"
+    "binding": "CF_VERSION_METADATA",
   },
-  "upload_source_maps": true  // Optional but recommended
+  "upload_source_maps": true, // Optional but recommended
 }
 ```
 
@@ -43,26 +44,26 @@ Sentry provides an official `@sentry/cloudflare` package specifically designed f
 
 ```typescript
 // index.ts
-import * as Sentry from "@sentry/cloudflare";
+import * as Sentry from '@sentry/cloudflare';
 
 export default Sentry.withSentry(
   (env: Env) => {
     const { id: versionId } = env.CF_VERSION_METADATA;
 
     return {
-      dsn: "https://[key]@[org].ingest.sentry.io/[project]",
+      dsn: 'https://[key]@[org].ingest.sentry.io/[project]',
       release: versionId,
       sendDefaultPii: true,
-      enableLogs: true,  // Enable log capture
-      tracesSampleRate: 1.0,  // 100% tracing
+      enableLogs: true, // Enable log capture
+      tracesSampleRate: 1.0, // 100% tracing
     };
   },
   {
     async fetch(request, env, ctx) {
       // Your worker logic
-      return new Response("Hello World!");
+      return new Response('Hello World!');
     },
-  }
+  },
 );
 ```
 
@@ -70,11 +71,11 @@ export default Sentry.withSentry(
 
 ```javascript
 // functions/_middleware.js
-import * as Sentry from "@sentry/cloudflare";
+import * as Sentry from '@sentry/cloudflare';
 
 export const onRequest = [
   Sentry.sentryPagesPlugin((context) => ({
-    dsn: "https://[key]@[org].ingest.sentry.io/[project]",
+    dsn: 'https://[key]@[org].ingest.sentry.io/[project]',
     release: context.env.CF_VERSION_METADATA?.id,
     enableLogs: true,
     tracesSampleRate: 1.0,
@@ -116,7 +117,7 @@ As of recent releases, Sentry's JavaScript SDKs include support for the W3C `tra
 // Example configuration (varies by SDK)
 Sentry.init({
   // ...
-  enableW3CTraceContext: true,  // Check SDK docs for exact flag
+  enableW3CTraceContext: true, // Check SDK docs for exact flag
 });
 ```
 
@@ -177,6 +178,7 @@ async queue(batch, env, ctx) {
 ```
 
 **Important:** Sentry does NOT automatically propagate trace context to Cloudflare Queues. This must be done manually by:
+
 1. Extracting trace context in producer
 2. Attaching it to message payload
 3. Recreating span context in consumer
@@ -207,24 +209,22 @@ The following require **manual instrumentation**:
 For database queries, R2 operations, and custom code:
 
 ```typescript
-import * as Sentry from "@sentry/cloudflare";
+import * as Sentry from '@sentry/cloudflare';
 
 // D1 Query Example
 async function getUserById(db: D1Database, userId: string) {
   return await Sentry.startSpan(
     {
-      op: "db.query",
-      name: "SELECT user by ID",
+      op: 'db.query',
+      name: 'SELECT user by ID',
       attributes: {
-        "db.system": "d1",
-        "db.statement": "SELECT * FROM users WHERE id = ?",
-      }
+        'db.system': 'd1',
+        'db.statement': 'SELECT * FROM users WHERE id = ?',
+      },
     },
     async () => {
-      return await db.prepare("SELECT * FROM users WHERE id = ?")
-        .bind(userId)
-        .first();
-    }
+      return await db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+    },
   );
 }
 
@@ -232,17 +232,17 @@ async function getUserById(db: D1Database, userId: string) {
 async function uploadImage(r2: R2Bucket, key: string, data: ArrayBuffer) {
   return await Sentry.startSpan(
     {
-      op: "storage.put",
-      name: "Upload to R2",
+      op: 'storage.put',
+      name: 'Upload to R2',
       attributes: {
-        "storage.system": "r2",
-        "storage.key": key,
-        "storage.size": data.byteLength,
-      }
+        'storage.system': 'r2',
+        'storage.key': key,
+        'storage.size': data.byteLength,
+      },
     },
     async () => {
       return await r2.put(key, data);
-    }
+    },
   );
 }
 
@@ -250,15 +250,15 @@ async function uploadImage(r2: R2Bucket, key: string, data: ArrayBuffer) {
 async function processPayment(amount: number) {
   return await Sentry.startSpan(
     {
-      op: "payment.process",
-      name: "Process Payment",
+      op: 'payment.process',
+      name: 'Process Payment',
       attributes: {
-        "payment.amount": amount,
-      }
+        'payment.amount': amount,
+      },
     },
     async () => {
       // Payment processing logic
-    }
+    },
   );
 }
 ```
@@ -281,6 +281,7 @@ Sentry maintains a list of well-known span operations for better visualization:
 ### 4.1 Cloudflare Workers Native Tracing
 
 **Current Status (Dec 2025):**
+
 - **Open Beta** - Free during beta period
 - **Pricing starts:** January 15, 2026
 - **Automatic instrumentation** for Workers runtime operations
@@ -301,6 +302,7 @@ Sentry maintains a list of well-known span operations for better visualization:
 #### Limitations (as of Dec 2025)
 
 ❌ **No automatic trace context propagation** between:
+
 - Worker → Queue → Consumer
 - Worker → Durable Object
 - Worker → External services
@@ -313,34 +315,37 @@ Sentry maintains a list of well-known span operations for better visualization:
 
 ### 4.2 Feature Comparison
 
-| Feature | Cloudflare Native | Sentry | Grafana Cloud |
-|---------|-------------------|--------|---------------|
-| **Auto-instrumentation** | ✅ Excellent | ⚠️ Basic (fetch only) | ✅ Excellent (via OTLP) |
-| **D1 Query Tracing** | ✅ Automatic | ❌ Manual only | ✅ Automatic |
-| **R2 Operation Tracing** | ✅ Automatic | ❌ Manual only | ✅ Automatic |
-| **KV Operation Tracing** | ✅ Automatic | ❌ Manual only | ✅ Automatic |
-| **Trace Context Propagation** | ❌ Coming soon | ✅ W3C Support | ✅ W3C Support |
-| **Queue Context Propagation** | ❌ Coming soon | ⚠️ Manual only | ✅ Automatic |
-| **Error Linking** | ❌ Separate systems | ✅ Built-in | ⚠️ Via correlation |
-| **Session Replay** | ❌ Not available | ✅ Available | ❌ Not available |
-| **Custom Dashboards** | ⚠️ Limited | ✅ Available | ✅ Excellent |
-| **Alerting** | ⚠️ Basic | ✅ Advanced | ✅ Advanced |
-| **Cost** | $0.05/1M events | Varies (see below) | Free tier generous |
+| Feature                       | Cloudflare Native   | Sentry                | Grafana Cloud           |
+| ----------------------------- | ------------------- | --------------------- | ----------------------- |
+| **Auto-instrumentation**      | ✅ Excellent        | ⚠️ Basic (fetch only) | ✅ Excellent (via OTLP) |
+| **D1 Query Tracing**          | ✅ Automatic        | ❌ Manual only        | ✅ Automatic            |
+| **R2 Operation Tracing**      | ✅ Automatic        | ❌ Manual only        | ✅ Automatic            |
+| **KV Operation Tracing**      | ✅ Automatic        | ❌ Manual only        | ✅ Automatic            |
+| **Trace Context Propagation** | ❌ Coming soon      | ✅ W3C Support        | ✅ W3C Support          |
+| **Queue Context Propagation** | ❌ Coming soon      | ⚠️ Manual only        | ✅ Automatic            |
+| **Error Linking**             | ❌ Separate systems | ✅ Built-in           | ⚠️ Via correlation      |
+| **Session Replay**            | ❌ Not available    | ✅ Available          | ❌ Not available        |
+| **Custom Dashboards**         | ⚠️ Limited          | ✅ Available          | ✅ Excellent            |
+| **Alerting**                  | ⚠️ Basic            | ✅ Advanced           | ✅ Advanced             |
+| **Cost**                      | $0.05/1M events     | Varies (see below)    | Free tier generous      |
 
 ### 4.3 Cost Comparison
 
 #### Cloudflare Workers Tracing
+
 - **Free tier:** Not available (Workers Free plan)
 - **Workers Paid:** 10M events/month included, then $0.05 per 1M events
 - **Pricing starts:** January 15, 2026
 
 #### Sentry
+
 - **Free tier:** Limited events (5K errors + 10K transactions/month for 1 user)
 - **Team plan:** Starting at $26/month (50K+ events)
 - **Scales with:** Event volume, team size, retention period
 - **Typical cost for 100M exceptions (90 days):** ~$30,000
 
 #### Grafana Cloud
+
 - **Free tier (Forever):**
   - 10K Prometheus metrics series
   - 50GB logs
@@ -354,11 +359,11 @@ Sentry maintains a list of well-known span operations for better visualization:
 
 **Scenario:** 10M requests/month, 100% trace sampling
 
-| Platform | Monthly Cost | Notes |
-|----------|--------------|-------|
-| Cloudflare Native | ~$0.50 | 10M events @ $0.05/1M |
-| Grafana Cloud | $0 - $50 | Likely within free tier or low paid tier |
-| Sentry | $80+ | Business plan needed for volume |
+| Platform          | Monthly Cost | Notes                                    |
+| ----------------- | ------------ | ---------------------------------------- |
+| Cloudflare Native | ~$0.50       | 10M events @ $0.05/1M                    |
+| Grafana Cloud     | $0 - $50     | Likely within free tier or low paid tier |
+| Sentry            | $80+         | Business plan needed for volume          |
 
 **Recommendation:** For pure tracing, Cloudflare native + Grafana Cloud is significantly cheaper than Sentry.
 
@@ -367,23 +372,27 @@ Sentry maintains a list of well-known span operations for better visualization:
 ### 5.1 Sentry Advantages
 
 ✅ **Unified Error + Performance Monitoring**
+
 - Single platform for errors, performance, and user context
 - Errors automatically linked to traces
 - Session replay integration
 
 ✅ **Superior Developer Experience**
+
 - Excellent UI for error debugging
 - Release tracking and deployment notifications
 - Issue assignment and workflow management
 - GitHub, Jira, Slack integrations
 
 ✅ **Rich Error Context**
+
 - Stack traces with source maps
 - Breadcrumbs (user actions leading to error)
 - User context, tags, custom data
 - Error fingerprinting and grouping
 
 ✅ **Production-Ready Today**
+
 - Mature, stable platform
 - Trace context propagation works now
 - No beta limitations
@@ -391,21 +400,25 @@ Sentry maintains a list of well-known span operations for better visualization:
 ### 5.2 Grafana Cloud Advantages
 
 ✅ **Better Automatic Instrumentation**
+
 - D1, R2, KV operations auto-traced
 - Queue context propagation automatic
 - More comprehensive out-of-the-box
 
 ✅ **Lower Cost at Scale**
+
 - Generous free tier (50GB traces)
 - More predictable pricing
 - Better for high-volume tracing
 
 ✅ **Open Standards**
+
 - Full OpenTelemetry compatibility
 - Vendor-neutral
 - Works with any OTLP source
 
 ✅ **Superior Observability**
+
 - Logs, traces, metrics unified
 - Powerful querying (LogQL, TraceQL)
 - Grafana dashboards
@@ -414,19 +427,23 @@ Sentry maintains a list of well-known span operations for better visualization:
 ### 5.3 Cloudflare Native Advantages
 
 ✅ **Zero Configuration**
+
 - Built into runtime
 - No SDK installation
 - Automatic instrumentation
 
 ✅ **Lowest Cost**
+
 - Cheapest option for pure tracing
 - No external service fees
 
 ✅ **Best Performance Data**
+
 - Direct access to all runtime metrics
 - CPU time, wall time, memory
 
 ❌ **Current Limitations**
+
 - No trace context propagation (yet)
 - Limited custom instrumentation
 - Can't link to external services
@@ -462,33 +479,33 @@ Sentry maintains a list of well-known span operations for better visualization:
 {
   "compatibility_flags": ["nodejs_als"],
   "version_metadata": {
-    "binding": "CF_VERSION_METADATA"
+    "binding": "CF_VERSION_METADATA",
   },
   "observability": {
     "traces": {
       "enabled": true,
-      "destinations": ["grafana-traces"]
+      "destinations": ["grafana-traces"],
     },
     "logs": {
       "enabled": true,
-      "destinations": ["grafana-logs"]
-    }
-  }
+      "destinations": ["grafana-logs"],
+    },
+  },
 }
 ```
 
 #### Worker Setup
 
 ```typescript
-import * as Sentry from "@sentry/cloudflare";
+import * as Sentry from '@sentry/cloudflare';
 
 export default Sentry.withSentry(
   (env) => ({
     dsn: env.SENTRY_DSN,
     release: env.CF_VERSION_METADATA?.id,
     sendDefaultPii: false,
-    enableLogs: false,  // Logs go to Grafana
-    tracesSampleRate: 0,  // Tracing handled by Cloudflare native
+    enableLogs: false, // Logs go to Grafana
+    tracesSampleRate: 0, // Tracing handled by Cloudflare native
 
     // Add trace ID to Sentry events for correlation
     beforeSend(event, hint) {
@@ -497,17 +514,17 @@ export default Sentry.withSentry(
       if (traceId) {
         event.contexts = {
           ...event.contexts,
-          trace: { trace_id: traceId }
+          trace: { trace_id: traceId },
         };
       }
       return event;
-    }
+    },
   }),
   {
     async fetch(request, env, ctx) {
       // Your application logic
-    }
-  }
+    },
+  },
 );
 ```
 
@@ -522,6 +539,7 @@ Sentry provides **limited** OpenTelemetry integration:
 - But Sentry SDK is **not** based on OpenTelemetry
 
 **OTLP Ingest Endpoint:**
+
 ```
 https://{HOST}/api/{PROJECT_ID}/integration/otlp/v1/traces
 https://{HOST}/api/{PROJECT_ID}/integration/otlp/v1/logs
@@ -538,6 +556,7 @@ Cloudflare Workers native tracing is **OTLP-based**:
 - Follows OpenTelemetry semantic conventions
 
 **Recommended Stack:**
+
 ```
 Cloudflare Workers → OTLP → Grafana Cloud (Tempo/Loki)
 ```
@@ -573,11 +592,13 @@ Cloudflare Workers → OTLP → Grafana Cloud (Tempo/Loki)
 ### 9.1 Phase 1: Start with Hybrid Approach
 
 **Rationale:**
+
 - Get best automatic instrumentation from Cloudflare native
 - Get best error debugging from Sentry
 - Stay within free tiers initially
 
 **Setup:**
+
 1. Enable Cloudflare native OTLP export to Grafana Cloud
 2. Install Sentry for error monitoring only (disable tracing)
 3. Manually add trace IDs to Sentry errors for correlation
@@ -587,12 +608,14 @@ Cloudflare Workers → OTLP → Grafana Cloud (Tempo/Loki)
 ### 9.2 Phase 2: Evaluate After Launch
 
 **Metrics to Track:**
+
 - Error volume and types
 - Trace volume and sampling needs
 - Monthly costs for each platform
 - Developer experience and time saved
 
 **Decision Points:**
+
 - If errors are primary concern → Keep Sentry
 - If observability depth needed → Invest in Grafana Cloud
 - If cost becomes issue → Consider Cloudflare-only approach
@@ -600,6 +623,7 @@ Cloudflare Workers → OTLP → Grafana Cloud (Tempo/Loki)
 ### 9.3 Not Recommended: Sentry for Tracing
 
 **Reasons:**
+
 - Manual instrumentation burden for D1, R2, KV
 - Higher cost than alternatives
 - No better than native Cloudflare + Grafana for pure tracing
@@ -625,18 +649,19 @@ Cloudflare Workers → OTLP → Grafana Cloud (Tempo/Loki)
      - Header: `Authorization: Basic {base64_token}`
 
 4. **Enable in Wrangler Config:**
+
    ```jsonc
    {
      "observability": {
        "traces": {
          "enabled": true,
-         "destinations": ["grafana-traces"]
+         "destinations": ["grafana-traces"],
        },
        "logs": {
          "enabled": true,
-         "destinations": ["grafana-logs"]
-       }
-     }
+         "destinations": ["grafana-logs"],
+       },
+     },
    }
    ```
 
@@ -648,20 +673,22 @@ Cloudflare Workers → OTLP → Grafana Cloud (Tempo/Loki)
 ### 10.2 Sentry Setup (Error Monitoring)
 
 1. **Install SDK:**
+
    ```bash
    pnpm add @sentry/cloudflare
    ```
 
 2. **Initialize in Worker:**
+
    ```typescript
-   import * as Sentry from "@sentry/cloudflare";
+   import * as Sentry from '@sentry/cloudflare';
 
    export default Sentry.withSentry(
      (env) => ({
        dsn: env.SENTRY_DSN,
        release: env.CF_VERSION_METADATA?.id,
        environment: env.ENVIRONMENT,
-       tracesSampleRate: 0,  // Disable tracing
+       tracesSampleRate: 0, // Disable tracing
 
        // Correlation with Grafana traces
        beforeSend(event) {
@@ -670,15 +697,15 @@ Cloudflare Workers → OTLP → Grafana Cloud (Tempo/Loki)
          if (traceId) {
            event.contexts = {
              ...event.contexts,
-             trace: { trace_id: traceId }
+             trace: { trace_id: traceId },
            };
            event.tags = {
              ...event.tags,
-             grafana_trace: `https://your-org.grafana.net/explore?trace=${traceId}`
+             grafana_trace: `https://your-org.grafana.net/explore?trace=${traceId}`,
            };
          }
          return event;
-       }
+       },
      }),
      // Worker handlers...
    );
@@ -703,6 +730,7 @@ Cloudflare Workers → OTLP → Grafana Cloud (Tempo/Loki)
 ---
 
 **Next Steps:**
+
 1. Set up Grafana Cloud free tier account
 2. Configure OTLP destinations in Cloudflare dashboard
 3. Test native tracing with sample Worker

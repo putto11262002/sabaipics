@@ -27,6 +27,7 @@ GET /health
 ```
 
 **Response:**
+
 ```json
 {
   "status": "ok",
@@ -53,6 +54,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "StatusCode": 200,
@@ -62,6 +64,7 @@ Content-Type: application/json
 ```
 
 **Error Responses:**
+
 - `400 InvalidParameterException` - Invalid collection ID
 - `400 ResourceAlreadyExistsException` - Collection already exists
 
@@ -87,6 +90,7 @@ Content-Type: application/json
 ```
 
 **Parameters:**
+
 - `Image.Bytes` (required) - Base64-encoded image
 - `ExternalImageId` (optional) - Your photo ID
 - `MaxFaces` (optional) - Max faces to index (default: 100)
@@ -94,6 +98,7 @@ Content-Type: application/json
 - `QualityFilter` (optional) - `"AUTO"` or `"NONE"`
 
 **Response:**
+
 ```json
 {
   "FaceRecords": [
@@ -140,6 +145,7 @@ Content-Type: application/json
 ```
 
 **Error Responses:**
+
 - `400 InvalidParameterException` - Invalid parameters
 - `400 InvalidImageFormatException` - Invalid image format
 - `404 ResourceNotFoundException` - Collection not found
@@ -164,11 +170,13 @@ Content-Type: application/json
 ```
 
 **Parameters:**
+
 - `Image.Bytes` (required) - Base64-encoded query image
 - `MaxFaces` (optional) - Max results to return (default: 10)
 - `FaceMatchThreshold` (optional) - Min similarity 0-100 (default: 80)
 
 **Response:**
+
 ```json
 {
   "SearchedFaceBoundingBox": {
@@ -199,6 +207,7 @@ Content-Type: application/json
 ```
 
 **Error Responses:**
+
 - `400 InvalidParameterException` - Invalid parameters
 - `400 InvalidImageFormatException` - Invalid image format
 - `404 ResourceNotFoundException` - Collection not found
@@ -214,6 +223,7 @@ DELETE /collections/:id
 ```
 
 **Response:**
+
 ```json
 {
   "StatusCode": 200
@@ -221,6 +231,7 @@ DELETE /collections/:id
 ```
 
 **Error Responses:**
+
 - `404 ResourceNotFoundException` - Collection not found
 
 ---
@@ -238,14 +249,14 @@ All errors follow AWS Rekognition format:
 
 ### Error Types
 
-| Error Type | Status | Description |
-|------------|--------|-------------|
-| `InvalidParameterException` | 400 | Invalid request parameters |
-| `ResourceNotFoundException` | 404 | Collection not found |
-| `ResourceAlreadyExistsException` | 400 | Collection already exists |
-| `InvalidImageFormatException` | 400 | Invalid image format |
-| `ImageTooLargeException` | 400 | Image exceeds size limit |
-| `InternalServerError` | 500 | Internal server error |
+| Error Type                       | Status | Description                |
+| -------------------------------- | ------ | -------------------------- |
+| `InvalidParameterException`      | 400    | Invalid request parameters |
+| `ResourceNotFoundException`      | 404    | Collection not found       |
+| `ResourceAlreadyExistsException` | 400    | Collection already exists  |
+| `InvalidImageFormatException`    | 400    | Invalid image format       |
+| `ImageTooLargeException`         | 400    | Image exceeds size limit   |
+| `InternalServerError`            | 500    | Internal server error      |
 
 ---
 
@@ -254,6 +265,7 @@ All errors follow AWS Rekognition format:
 ### Using cURL
 
 **Create collection:**
+
 ```bash
 curl -X POST http://localhost:3000/collections \
   -H "Content-Type: application/json" \
@@ -261,6 +273,7 @@ curl -X POST http://localhost:3000/collections \
 ```
 
 **Index faces:**
+
 ```bash
 # First, base64 encode your image
 IMAGE_BASE64=$(base64 -i photo.jpg)
@@ -275,6 +288,7 @@ curl -X POST http://localhost:3000/collections/event-123/index-faces \
 ```
 
 **Search faces:**
+
 ```bash
 # Base64 encode query image
 QUERY_BASE64=$(base64 -i query.jpg)
@@ -289,6 +303,7 @@ curl -X POST http://localhost:3000/collections/event-123/search-faces-by-image \
 ```
 
 **Delete collection:**
+
 ```bash
 curl -X DELETE http://localhost:3000/collections/event-123
 ```
@@ -360,6 +375,7 @@ async function searchFaces(collectionId, queryImagePath) {
 See `.env.example` for all configuration options.
 
 **Key environment variables:**
+
 - `PORT` - Server port (default: 3000)
 - `FACE_PROVIDER` - `sabaiface` or `aws`
 - `DATABASE_URL` - PostgreSQL connection string

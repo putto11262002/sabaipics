@@ -8,7 +8,13 @@ const SIZE_CLASS: Record<string, string> = {
   lg: 'size-36',
 };
 
-export function QrRenderer({ block, context }: { block: SlideshowBlock; context: SlideshowContext }) {
+export function QrRenderer({
+  block,
+  context,
+}: {
+  block: SlideshowBlock;
+  context: SlideshowContext;
+}) {
   const props = block.props as QrProps;
   const searchUrl = `${import.meta.env.VITE_EVENT_URL}/participant/events/${context.event.id}/search`;
 

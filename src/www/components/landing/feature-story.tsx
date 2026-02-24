@@ -123,7 +123,7 @@ function useInView(ref: React.RefObject<HTMLElement | null>, options?: Intersect
           setIsInView(true);
         }
       },
-      { threshold: 0, ...options }
+      { threshold: 0, ...options },
     );
 
     observer.observe(element);
@@ -286,7 +286,8 @@ function FaceVariant() {
                   key={`match-${index}`}
                   className="relative aspect-square overflow-hidden rounded-md border backdrop-blur-lg animate-scale-in-slide-up-25"
                   style={{
-                    borderColor: 'color-mix(in oklab, var(--background) 90%, var(--foreground) 10%)',
+                    borderColor:
+                      'color-mix(in oklab, var(--background) 90%, var(--foreground) 10%)',
                     background: 'color-mix(in oklab, var(--background) 46%, transparent)',
                     boxShadow:
                       '0 12px 28px -24px color-mix(in oklab, var(--foreground) 26%, transparent), inset 0 1px 0 color-mix(in oklab, white 55%, transparent), inset 0 -1px 0 color-mix(in oklab, var(--foreground) 6%, transparent)',
@@ -394,7 +395,8 @@ function LineVariant() {
                     <div
                       className="relative aspect-square w-1/4 overflow-hidden rounded-md border backdrop-blur-lg"
                       style={{
-                        borderColor: 'color-mix(in oklab, var(--background) 90%, var(--foreground) 10%)',
+                        borderColor:
+                          'color-mix(in oklab, var(--background) 90%, var(--foreground) 10%)',
                         background: 'color-mix(in oklab, var(--background) 44%, transparent)',
                         boxShadow:
                           '0 12px 28px -24px color-mix(in oklab, var(--foreground) 24%, transparent), inset 0 1px 0 color-mix(in oklab, white 55%, transparent), inset 0 -1px 0 color-mix(in oklab, var(--foreground) 6%, transparent)',
@@ -422,7 +424,6 @@ function LineVariant() {
                   <LogoMark className="h-3.5 w-3.5 text-primary" />
                 </span>
                 <div className="w-full space-y-[2.6%]">
-
                   <div className="grid w-[80%] grid-cols-2 gap-1.5 lg:w-[60%]">
                     {LINE_REPLY_RESULTS.map((_, index) => {
                       if (index >= revealedCount) return null;
@@ -431,7 +432,8 @@ function LineVariant() {
                           key={`line-result-${index}`}
                           className="relative aspect-square overflow-hidden rounded-md border backdrop-blur-lg animate-scale-in-slide-up-20"
                           style={{
-                            borderColor: 'color-mix(in oklab, var(--background) 90%, var(--foreground) 10%)',
+                            borderColor:
+                              'color-mix(in oklab, var(--background) 90%, var(--foreground) 10%)',
                             background: 'color-mix(in oklab, var(--background) 44%, transparent)',
                             boxShadow:
                               '0 12px 28px -24px color-mix(in oklab, var(--foreground) 24%, transparent), inset 0 1px 0 color-mix(in oklab, white 55%, transparent), inset 0 -1px 0 color-mix(in oklab, var(--foreground) 6%, transparent)',
@@ -453,7 +455,6 @@ function LineVariant() {
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
@@ -536,114 +537,138 @@ function DashboardVariant() {
     <div className="relative h-full overflow-hidden">
       <div className="absolute left-[4.8%] top-[7%] h-auto w-[clamp(26rem,128vw,38rem)] aspect-[16/9] origin-top-left overflow-hidden rounded-lg border border-border bg-background shadow-[0_24px_48px_-36px_color-mix(in_oklab,var(--foreground)_38%,transparent)] sm:w-[clamp(30rem,118vw,44rem)] md:w-[clamp(32rem,104vw,48rem)] lg:top-1/2 lg:-translate-y-1/2 lg:w-[clamp(30rem,80vw,46rem)] lg:scale-[0.96] xl:w-[clamp(35rem,84vw,54rem)] xl:scale-100">
         <div className="grid h-full grid-cols-[23%_1fr]">
-        <aside className="border-r border-border/80 bg-card/55 p-2.5">
-          <div className="flex items-center gap-1.5">
-            <LogoMark className="h-[clamp(11px,1.15vw,15px)] w-[clamp(11px,1.15vw,15px)] text-primary" />
-            <span className="text-[clamp(10px,1.1vw,12px)] font-semibold text-foreground">FrameFast</span>
-          </div>
-          <p className="mt-3 text-[clamp(9px,0.95vw,11px)] font-medium text-muted-foreground">Platform</p>
-          <div className="mt-1.5 space-y-1">
-            <div className="flex items-center gap-1.5 rounded-md bg-muted px-1.5 py-1 text-[clamp(9px,0.95vw,11px)] font-medium text-foreground">
-              <LayoutDashboard className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)] text-primary" />
-              Dashboard
+          <aside className="border-r border-border/80 bg-card/55 p-2.5">
+            <div className="flex items-center gap-1.5">
+              <LogoMark className="h-[clamp(11px,1.15vw,15px)] w-[clamp(11px,1.15vw,15px)] text-primary" />
+              <span className="text-[clamp(10px,1.1vw,12px)] font-semibold text-foreground">
+                FrameFast
+              </span>
             </div>
-            <div className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
-              <Calendar className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
-              Events
+            <p className="mt-3 text-[clamp(9px,0.95vw,11px)] font-medium text-muted-foreground">
+              Platform
+            </p>
+            <div className="mt-1.5 space-y-1">
+              <div className="flex items-center gap-1.5 rounded-md bg-muted px-1.5 py-1 text-[clamp(9px,0.95vw,11px)] font-medium text-foreground">
+                <LayoutDashboard className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)] text-primary" />
+                Dashboard
+              </div>
+              <div className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
+                <Calendar className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
+                Events
+              </div>
+              <div className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
+                <SlidersHorizontal className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
+                Studio
+              </div>
+              <div className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
+                <CreditCard className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
+                Credits
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
-              <SlidersHorizontal className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
-              Studio
-            </div>
-            <div className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
-              <CreditCard className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
-              Credits
-            </div>
-          </div>
-        </aside>
+          </aside>
 
-        <main className="min-w-0 p-2.5">
-          <div className="flex items-center justify-between border-b border-border/80 pb-2">
-            <div className="inline-flex items-center gap-1.5">
-              <LayoutDashboard className="h-[clamp(10px,1.05vw,13px)] w-[clamp(10px,1.05vw,13px)] text-muted-foreground" />
-              <span className="text-[clamp(10px,1.1vw,12px)] font-medium text-foreground">Dashboard</span>
-            </div>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[clamp(9px,0.95vw,11px)] font-medium text-primary-foreground"
-            >
-              <CreditCard className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
-              Buy Credits
-            </button>
-          </div>
-
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            <div className="overflow-hidden rounded-md border border-border bg-card">
-              <div className="px-2 py-1.5">
-                <p className="text-[clamp(9px,0.95vw,11px)] text-muted-foreground">Credit Balance</p>
-                <p className="mt-0.5 text-[clamp(15px,2.1vw,24px)] font-semibold leading-none text-foreground">5748 credits</p>
+          <main className="min-w-0 p-2.5">
+            <div className="flex items-center justify-between border-b border-border/80 pb-2">
+              <div className="inline-flex items-center gap-1.5">
+                <LayoutDashboard className="h-[clamp(10px,1.05vw,13px)] w-[clamp(10px,1.05vw,13px)] text-muted-foreground" />
+                <span className="text-[clamp(10px,1.1vw,12px)] font-medium text-foreground">
+                  Dashboard
+                </span>
               </div>
-              <div className="flex items-center justify-between border-t border-border/80 px-2 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
-                <span>1 credit per photo</span>
-                <RefreshCw className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
-              </div>
-            </div>
-            <div className="overflow-hidden rounded-md border border-border bg-card">
-              <div className="px-2 py-1.5">
-                <p className="text-[clamp(9px,0.95vw,11px)] text-muted-foreground">Total Photos</p>
-                <p className="mt-0.5 text-[clamp(15px,2.1vw,24px)] font-semibold leading-none text-foreground">45</p>
-              </div>
-              <div className="flex items-center gap-1 border-t border-border/80 px-2 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
-                <ImageIcon className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
-                Across all events
-              </div>
-            </div>
-            <div className="overflow-hidden rounded-md border border-border bg-card">
-              <div className="px-2 py-1.5">
-                <p className="text-[clamp(9px,0.95vw,11px)] text-muted-foreground">Total Faces</p>
-                <p className="mt-0.5 text-[clamp(15px,2.1vw,24px)] font-semibold leading-none text-foreground">193</p>
-              </div>
-              <div className="flex items-center gap-1 border-t border-border/80 px-2 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
-                <Smile className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
-                Detected and indexed
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-2 flex items-center justify-between">
-            <p className="text-[clamp(11px,1.25vw,15px)] font-semibold text-foreground">Recent Events</p>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-[clamp(9px,0.95vw,11px)] font-medium text-foreground"
-            >
-              <Calendar className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
-              View All Events
-            </button>
-          </div>
-
-          <div className="mt-1 overflow-hidden rounded-md border border-border bg-card">
-            <div className="grid grid-cols-[20px_1.3fr_1fr_1fr_20px] items-center gap-2 border-b border-border px-2 py-1.5 text-[clamp(9px,0.95vw,11px)] font-medium text-muted-foreground">
-              <span className="h-2.5 w-2.5 rounded-[4px] border border-border/90" />
-              <span>Event Name</span>
-              <span>Created</span>
-              <span>Expires</span>
-              <span />
-            </div>
-            {events.map((event) => (
-              <div
-                key={event.name}
-                className="grid grid-cols-[20px_1.3fr_1fr_1fr_20px] items-center gap-2 border-b border-border/70 px-2 py-1.5 last:border-b-0"
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[clamp(9px,0.95vw,11px)] font-medium text-primary-foreground"
               >
-                <span className="h-2.5 w-2.5 rounded-[4px] border border-border/90" />
-                <span className="truncate text-[clamp(10px,1.05vw,12px)] font-medium text-foreground">{event.name}</span>
-                <span className="text-[clamp(10px,1.05vw,12px)] text-muted-foreground">{event.created}</span>
-                <span className="text-[clamp(10px,1.05vw,12px)] text-muted-foreground">{event.expires}</span>
-                <MoreHorizontal className="h-[clamp(10px,1.05vw,13px)] w-[clamp(10px,1.05vw,13px)] text-muted-foreground" />
+                <CreditCard className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
+                Buy Credits
+              </button>
+            </div>
+
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="overflow-hidden rounded-md border border-border bg-card">
+                <div className="px-2 py-1.5">
+                  <p className="text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
+                    Credit Balance
+                  </p>
+                  <p className="mt-0.5 text-[clamp(15px,2.1vw,24px)] font-semibold leading-none text-foreground">
+                    5748 credits
+                  </p>
+                </div>
+                <div className="flex items-center justify-between border-t border-border/80 px-2 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
+                  <span>1 credit per photo</span>
+                  <RefreshCw className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
+                </div>
               </div>
-            ))}
-          </div>
-        </main>
-      </div>
+              <div className="overflow-hidden rounded-md border border-border bg-card">
+                <div className="px-2 py-1.5">
+                  <p className="text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
+                    Total Photos
+                  </p>
+                  <p className="mt-0.5 text-[clamp(15px,2.1vw,24px)] font-semibold leading-none text-foreground">
+                    45
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 border-t border-border/80 px-2 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
+                  <ImageIcon className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
+                  Across all events
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-md border border-border bg-card">
+                <div className="px-2 py-1.5">
+                  <p className="text-[clamp(9px,0.95vw,11px)] text-muted-foreground">Total Faces</p>
+                  <p className="mt-0.5 text-[clamp(15px,2.1vw,24px)] font-semibold leading-none text-foreground">
+                    193
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 border-t border-border/80 px-2 py-1 text-[clamp(9px,0.95vw,11px)] text-muted-foreground">
+                  <Smile className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
+                  Detected and indexed
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-[clamp(11px,1.25vw,15px)] font-semibold text-foreground">
+                Recent Events
+              </p>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-[clamp(9px,0.95vw,11px)] font-medium text-foreground"
+              >
+                <Calendar className="h-[clamp(9px,0.95vw,12px)] w-[clamp(9px,0.95vw,12px)]" />
+                View All Events
+              </button>
+            </div>
+
+            <div className="mt-1 overflow-hidden rounded-md border border-border bg-card">
+              <div className="grid grid-cols-[20px_1.3fr_1fr_1fr_20px] items-center gap-2 border-b border-border px-2 py-1.5 text-[clamp(9px,0.95vw,11px)] font-medium text-muted-foreground">
+                <span className="h-2.5 w-2.5 rounded-[4px] border border-border/90" />
+                <span>Event Name</span>
+                <span>Created</span>
+                <span>Expires</span>
+                <span />
+              </div>
+              {events.map((event) => (
+                <div
+                  key={event.name}
+                  className="grid grid-cols-[20px_1.3fr_1fr_1fr_20px] items-center gap-2 border-b border-border/70 px-2 py-1.5 last:border-b-0"
+                >
+                  <span className="h-2.5 w-2.5 rounded-[4px] border border-border/90" />
+                  <span className="truncate text-[clamp(10px,1.05vw,12px)] font-medium text-foreground">
+                    {event.name}
+                  </span>
+                  <span className="text-[clamp(10px,1.05vw,12px)] text-muted-foreground">
+                    {event.created}
+                  </span>
+                  <span className="text-[clamp(10px,1.05vw,12px)] text-muted-foreground">
+                    {event.expires}
+                  </span>
+                  <MoreHorizontal className="h-[clamp(10px,1.05vw,13px)] w-[clamp(10px,1.05vw,13px)] text-muted-foreground" />
+                </div>
+              ))}
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );
@@ -806,7 +831,10 @@ export function FeatureStory() {
                     {step.id === '01' && (
                       <ul className="mt-4 hidden space-y-2 lg:block">
                         {faceSearchFeatures.map((feature) => (
-                          <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <li
+                            key={feature}
+                            className="flex items-center gap-2 text-sm text-muted-foreground"
+                          >
                             <Check className="h-4 w-4 text-primary" />
                             {feature}
                           </li>
@@ -818,7 +846,10 @@ export function FeatureStory() {
                     {step.id === '03' && (
                       <ul className="mt-4 hidden space-y-2 lg:block">
                         {colorGradingFeatures.map((feature) => (
-                          <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <li
+                            key={feature}
+                            className="flex items-center gap-2 text-sm text-muted-foreground"
+                          >
                             <Check className="h-4 w-4 text-primary" />
                             {feature}
                           </li>

@@ -7,17 +7,17 @@
  * Run: pnpm test:integration
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   createRekognitionClient,
   createCollection,
   deleteCollection,
   indexFaces,
-} from "../src/lib/rekognition";
-import type { RekognitionClient } from "@aws-sdk/client-rekognition";
-import { getFixture } from "./fixtures";
+} from '../src/lib/rekognition';
+import type { RekognitionClient } from '@aws-sdk/client-rekognition';
+import { getFixture } from './fixtures';
 
-describe("AWS Rekognition Integration", () => {
+describe('AWS Rekognition Integration', () => {
   const testEventId = `test-${Date.now()}`;
   let client: RekognitionClient;
 
@@ -25,7 +25,7 @@ describe("AWS Rekognition Integration", () => {
     client = createRekognitionClient({
       AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID!,
       AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY!,
-      AWS_REGION: process.env.AWS_REGION || "us-west-2",
+      AWS_REGION: process.env.AWS_REGION || 'us-west-2',
     });
   });
 
@@ -38,45 +38,28 @@ describe("AWS Rekognition Integration", () => {
     }
   });
 
-  it(
-    "creates collection successfully",
-    async () => {
-      const arn = await createCollection(client, testEventId);
+  it('creates collection successfully', async () => {
+    const arn = await createCollection(client, testEventId);
 
-      expect(arn).toBeDefined();
-      expect(typeof arn).toBe("string");
-      expect(arn).toContain("collection");
-    },
-    30000
-  );
+    expect(arn).toBeDefined();
+    expect(typeof arn).toBe('string');
+    expect(arn).toContain('collection');
+  }, 30000);
 
-  it(
-    "indexes faces from image",
-    async () => {
-      const testImage = await getFixture("aws-rekognition", "1.jpg");
+  it('indexes faces from image', async () => {
+    const testImage = await getFixture('aws-rekognition', '1.jpg');
 
-      const result = await indexFaces(
-        client,
-        testEventId,
-        testImage,
-        "test-photo-001"
-      );
+    const result = await indexFaces(client, testEventId, testImage, 'test-photo-001');
 
-      // Only test integration point - API returns expected structure
-      // Do NOT test face detection accuracy (out of scope)
-      expect(result).toHaveProperty("faceRecords");
-      expect(result).toHaveProperty("unindexedFaces");
-      expect(Array.isArray(result.faceRecords)).toBe(true);
-      expect(Array.isArray(result.unindexedFaces)).toBe(true);
-    },
-    60000
-  );
+    // Only test integration point - API returns expected structure
+    // Do NOT test face detection accuracy (out of scope)
+    expect(result).toHaveProperty('faceRecords');
+    expect(result).toHaveProperty('unindexedFaces');
+    expect(Array.isArray(result.faceRecords)).toBe(true);
+    expect(Array.isArray(result.unindexedFaces)).toBe(true);
+  }, 60000);
 
-  it(
-    "deletes collection successfully",
-    async () => {
-      await expect(deleteCollection(client, testEventId)).resolves.not.toThrow();
-    },
-    30000
-  );
+  it('deletes collection successfully', async () => {
+    await expect(deleteCollection(client, testEventId)).resolves.not.toThrow();
+  }, 30000);
 });

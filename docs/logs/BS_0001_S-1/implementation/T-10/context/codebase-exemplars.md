@@ -11,6 +11,7 @@ Primary Surface: **API** (webhook handler with DB writes)
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/routes/webhooks/stripe.ts`
 
 **What the pattern is:**
+
 - Webhook route that validates signature, parses events, and emits to an event bus
 - Uses typed environment bindings for Stripe secrets
 - Raw body parsing via `c.req.text()` (critical for signature verification)
@@ -47,6 +48,7 @@ case "checkout.session.completed": {
 ```
 
 **Why it matters:**
+
 - T-10 extends the existing `stripe:checkout.completed` handler (currently logging only)
 - The webhook infrastructure is already built - just need to add business logic to the handler
 
@@ -57,6 +59,7 @@ case "checkout.session.completed": {
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/handlers/stripe.ts`
 
 **What the pattern is:**
+
 - Event bus consumer that handles Stripe events with business logic
 - Uses `eventBus.handle<StripeEvents>()` for type-safe event handling
 - Async handlers with structured logging
@@ -68,10 +71,10 @@ case "checkout.session.completed": {
 // Handler registration
 export function registerStripeHandlers(): () => void {
   return eventBus.handle<StripeEvents>({
-    "stripe:checkout.completed": async (event) => {
-      console.log("Session ID:", event.session.id);
-      console.log("Metadata:", JSON.stringify(event.metadata, null, 2));
-      
+    'stripe:checkout.completed': async (event) => {
+      console.log('Session ID:', event.session.id);
+      console.log('Metadata:', JSON.stringify(event.metadata, null, 2));
+
       // TODO: When database is ready:
       // 1. Create payment record
       // 2. Add credits to photographer's ledger
@@ -87,6 +90,7 @@ export function registerStripeHandlers(): () => void {
 ```
 
 **Why it matters:**
+
 - T-10 replaces the TODO comments with actual DB logic
 - The metadata extraction pattern (`photographer_id`, `credits`) is already shown
 - Need to inject DB access into handlers (currently handlers don't have `db`)
@@ -98,6 +102,7 @@ export function registerStripeHandlers(): () => void {
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/routes/consent.ts`
 
 **What the pattern is:**
+
 - Drizzle ORM insert + update in same handler
 - Idempotency check before insert (return 409 if already exists)
 - Uses `.returning()` to get inserted record
@@ -110,7 +115,7 @@ const [consentRecord] = await db
   .insert(consentRecords)
   .values({
     photographerId: photographer.id,
-    consentType: "pdpa",
+    consentType: 'pdpa',
     ipAddress,
   })
   .returning({
@@ -127,6 +132,7 @@ await db
 ```
 
 **Why it matters:**
+
 - T-10 needs to insert into `credit_ledger` with similar pattern
 - Idempotency check using `stripe_session_id` follows same pattern as consent check
 
@@ -138,24 +144,26 @@ await db
 
 ```typescript
 export const creditLedger = pgTable(
-  "credit_ledger",
+  'credit_ledger',
   {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    photographerId: uuid("photographer_id").notNull()
-      .references(() => photographers.id, { onDelete: "restrict" }),
-    amount: integer("amount").notNull(), // Positive for purchase
-    type: text("type", { enum: ["purchase", "upload"] }).notNull(),
-    stripeSessionId: text("stripe_session_id"), // Idempotency key
-    expiresAt: timestamptz("expires_at").notNull(),
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    photographerId: uuid('photographer_id')
+      .notNull()
+      .references(() => photographers.id, { onDelete: 'restrict' }),
+    amount: integer('amount').notNull(), // Positive for purchase
+    type: text('type', { enum: ['purchase', 'upload'] }).notNull(),
+    stripeSessionId: text('stripe_session_id'), // Idempotency key
+    expiresAt: timestamptz('expires_at').notNull(),
     createdAt: createdAtCol(),
   },
-  (table) => [
-    index("credit_ledger_stripe_session_idx").on(table.stripeSessionId),
-  ]
+  (table) => [index('credit_ledger_stripe_session_idx').on(table.stripeSessionId)],
 );
 ```
 
 **Key insights for T-10:**
+
 - Use `stripeSessionId` as idempotency key (check before insert)
 - `expiresAt` should be `NOW + 6 months` per task requirements
 - `type` should be `"purchase"` for webhook-triggered credits
@@ -170,31 +178,32 @@ export const creditLedger = pgTable(
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/tests/stripe.test.ts`
 
 **Pattern:**
+
 - Uses Vitest with `vi.fn()` for mocks
 - Uses test fixtures from `fixtures/stripe-events.ts`
 - Tests handler routing, success/error cases, and idempotency
 
 ```typescript
-describe("Webhook Event Routing", () => {
-  it("routes checkout.session.completed to onCheckoutComplete", async () => {
+describe('Webhook Event Routing', () => {
+  it('routes checkout.session.completed to onCheckoutComplete', async () => {
     const event = createCheckoutCompletedEvent();
     const result = await handleWebhookEvent(event, handlers);
-    
+
     expect(result.success).toBe(true);
-    expect(result.eventType).toBe("checkout.session.completed");
+    expect(result.eventType).toBe('checkout.session.completed');
     expect(mockCheckoutComplete).toHaveBeenCalledOnce();
   });
 
-  it("returns error result when handler throws", async () => {
+  it('returns error result when handler throws', async () => {
     const event = createCheckoutCompletedEvent();
     const errorHandlers = {
-      onCheckoutComplete: vi.fn().mockRejectedValue(new Error("Handler error")),
+      onCheckoutComplete: vi.fn().mockRejectedValue(new Error('Handler error')),
     };
 
     const result = await handleWebhookEvent(event, errorHandlers);
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Handler error");
+    expect(result.error).toBe('Handler error');
   });
 });
 ```
@@ -204,6 +213,7 @@ describe("Webhook Event Routing", () => {
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/routes/consent.test.ts`
 
 **Pattern:**
+
 - Mock DB with chainable methods
 - Use `testClient(app)` for type-safe requests
 - Test both success and idempotency (409) cases
@@ -235,26 +245,27 @@ it("returns 409 when already processed", async () => {
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/tests/fixtures/stripe-events.ts`
 
 **Pattern:**
+
 - Factory functions for each event type
 - `MOCK_IDS` object for consistent test data
 - `createCheckoutCompletedEvent(overrides?)` accepts partial overrides
 
 ```typescript
 export const MOCK_IDS = {
-  customer: "cus_test123456",
-  session: "cs_test_session_123",
-  photographer: "photo_test_123",
+  customer: 'cus_test123456',
+  session: 'cs_test_session_123',
+  photographer: 'photo_test_123',
 };
 
 export function createCheckoutCompletedEvent(
-  overrides?: Partial<Stripe.Checkout.Session>
+  overrides?: Partial<Stripe.Checkout.Session>,
 ): Stripe.Event {
   const session = {
     id: MOCK_IDS.session,
     metadata: {
       photographer_id: MOCK_IDS.photographer,
-      credits: "100",
-      package_name: "starter",
+      credits: '100',
+      package_name: 'starter',
     },
     ...overrides,
   };
@@ -273,8 +284,8 @@ export function createCheckoutCompletedEvent(
 function alreadyProcessedError() {
   return {
     error: {
-      code: "ALREADY_PROCESSED",
-      message: "Credits already added for this session",
+      code: 'ALREADY_PROCESSED',
+      message: 'Credits already added for this session',
     },
   };
 }
@@ -315,9 +326,8 @@ Based on exemplars, T-10 should:
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
+| File                              | Change                                              |
+| --------------------------------- | --------------------------------------------------- |
 | `apps/api/src/handlers/stripe.ts` | Add DB logic to `stripe:checkout.completed` handler |
-| `apps/api/src/events/index.ts` | May need to export DB access pattern |
-| `apps/api/tests/stripe.test.ts` | Add tests for credit insertion |
-
+| `apps/api/src/events/index.ts`    | May need to export DB access pattern                |
+| `apps/api/tests/stripe.test.ts`   | Add tests for credit insertion                      |

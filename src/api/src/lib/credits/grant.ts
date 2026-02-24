@@ -52,17 +52,20 @@ export function grantCredits(
   return ResultAsync.fromPromise(
     (async () => {
       // Step 1: Insert credit_ledger row
-      const [entry] = await tx.insert(creditLedger).values({
-        photographerId,
-        amount,
-        type: 'credit',
-        source,
-        remainingCredits: amount,
-        promoCode,
-        stripeSessionId,
-        appleTransactionId,
-        expiresAt,
-      }).returning({ id: creditLedger.id });
+      const [entry] = await tx
+        .insert(creditLedger)
+        .values({
+          photographerId,
+          amount,
+          type: 'credit',
+          source,
+          remainingCredits: amount,
+          promoCode,
+          stripeSessionId,
+          appleTransactionId,
+          expiresAt,
+        })
+        .returning({ id: creditLedger.id });
 
       // Step 2: Increment denormalized balance on photographer
       await tx

@@ -44,7 +44,10 @@ export function createCollectionsRouter(faceService: FaceService) {
 
       // Use .isOk() / .isErr() pattern for Hono type compatibility
       if (result.isOk()) {
-        console.log('[Collections] Collection created:', { collectionId: CollectionId, arn: result.value });
+        console.log('[Collections] Collection created:', {
+          collectionId: CollectionId,
+          arn: result.value,
+        });
         const response: CreateCollectionResponse = {
           StatusCode: 200,
           CollectionArn: result.value,
@@ -55,7 +58,10 @@ export function createCollectionsRouter(faceService: FaceService) {
 
       // Handle error case
       const err = result.error;
-      console.error('[Collections] Failed to create collection:', { collectionId: CollectionId, error: err.type });
+      console.error('[Collections] Failed to create collection:', {
+        collectionId: CollectionId,
+        error: err.type,
+      });
       const statusCode = errorToHttpStatus(err);
       return c.json(
         {
@@ -65,7 +71,7 @@ export function createCollectionsRouter(faceService: FaceService) {
           retryable: err.retryable,
           throttle: err.throttle,
         },
-        statusCode as StatusCode
+        statusCode as StatusCode,
       );
     } catch (error) {
       console.error('[Collections] Unexpected error creating collection:', error);
@@ -97,7 +103,10 @@ export function createCollectionsRouter(faceService: FaceService) {
 
       // Handle error case
       const err = result.error;
-      console.error('[Collections] Failed to delete collection:', { collectionId, error: err.type });
+      console.error('[Collections] Failed to delete collection:', {
+        collectionId,
+        error: err.type,
+      });
       const statusCode = errorToHttpStatus(err);
       return c.json(
         {
@@ -107,7 +116,7 @@ export function createCollectionsRouter(faceService: FaceService) {
           retryable: err.retryable,
           throttle: err.throttle,
         },
-        statusCode as StatusCode
+        statusCode as StatusCode,
       );
     } catch (error) {
       console.error('[Collections] Unexpected error deleting collection:', error);

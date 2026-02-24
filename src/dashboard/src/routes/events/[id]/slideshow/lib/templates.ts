@@ -37,21 +37,14 @@ function buildClassicCentered(): SlideshowConfig {
     },
     blocks: [
       // Event Name + Subtitle centered
-      createBlockWithChildren(
-        'flex',
-        [
-          createBlock('event-name'),
-          createBlock('subtitle'),
-        ],
-        {
-          direction: 'column',
-          align: 'center',
-          justify: 'center',
-          gap: 'xs',
-          padding: 'none',
-          wrap: false,
-        },
-      ),
+      createBlockWithChildren('flex', [createBlock('event-name'), createBlock('subtitle')], {
+        direction: 'column',
+        align: 'center',
+        justify: 'center',
+        gap: 'xs',
+        padding: 'none',
+        wrap: false,
+      }),
       // Social links (placeholders - will add URL fields to event later)
       createBlockWithChildren(
         'flex',
@@ -88,21 +81,14 @@ function buildClassicPortrait(): SlideshowConfig {
     },
     blocks: [
       // Event Name + Subtitle centered
-      createBlockWithChildren(
-        'flex',
-        [
-          createBlock('event-name'),
-          createBlock('subtitle'),
-        ],
-        {
-          direction: 'column',
-          align: 'center',
-          justify: 'center',
-          gap: 'xs',
-          padding: 'none',
-          wrap: false,
-        },
-      ),
+      createBlockWithChildren('flex', [createBlock('event-name'), createBlock('subtitle')], {
+        direction: 'column',
+        align: 'center',
+        justify: 'center',
+        gap: 'xs',
+        padding: 'none',
+        wrap: false,
+      }),
       // Social links
       createBlockWithChildren(
         'flex',
@@ -139,18 +125,14 @@ function buildMinimal(): SlideshowConfig {
     },
     blocks: [
       // Event Name centered
-      createBlockWithChildren(
-        'flex',
-        [createBlock('event-name')],
-        {
-          direction: 'column',
-          align: 'center',
-          justify: 'center',
-          gap: 'none',
-          padding: 'none',
-          wrap: false,
-        },
-      ),
+      createBlockWithChildren('flex', [createBlock('event-name')], {
+        direction: 'column',
+        align: 'center',
+        justify: 'center',
+        gap: 'none',
+        padding: 'none',
+        wrap: false,
+      }),
       // Social links
       createBlockWithChildren(
         'flex',
@@ -187,18 +169,14 @@ function buildMinimalPortrait(): SlideshowConfig {
     },
     blocks: [
       // Event Name centered
-      createBlockWithChildren(
-        'flex',
-        [createBlock('event-name')],
-        {
-          direction: 'column',
-          align: 'center',
-          justify: 'center',
-          gap: 'none',
-          padding: 'none',
-          wrap: false,
-        },
-      ),
+      createBlockWithChildren('flex', [createBlock('event-name')], {
+        direction: 'column',
+        align: 'center',
+        justify: 'center',
+        gap: 'none',
+        padding: 'none',
+        wrap: false,
+      }),
       // Social links
       createBlockWithChildren(
         'flex',

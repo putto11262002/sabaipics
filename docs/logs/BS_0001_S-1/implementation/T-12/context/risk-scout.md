@@ -34,21 +34,25 @@ None identified. T-12 is a straightforward UI task with well-defined backend API
 ## Coupling / dependencies discovered
 
 ### Direct API dependencies (already implemented)
+
 - **T-8 (Credit Packages API)**: `GET /credits/packages` - DONE (PR #13)
 - **T-9 (Stripe Checkout API)**: `POST /credits/checkout` - DONE (PR #15)
 - **T-10 (Stripe Webhook)**: Fulfillment logic - DONE (PR #17)
 
 ### Indirect dependencies
+
 - **T-7 (Dashboard API)**: Credit balance display on success page - DONE (PR #12)
 - **Auth middleware**: `requirePhotographer()` + `requireConsent()` for checkout endpoint - DONE
 - **Stripe configuration**: Environment variables (STRIPE_SECRET_KEY, CORS_ORIGIN) must be set
 
 ### Shared state
+
 - **React Router**: Navigation between `/credits/packages`, success page, and dashboard
 - **React Query**: Credit balance refresh after purchase (revalidation strategy)
 - **Auth context**: Clerk session token for API calls
 
 ### No hidden coupling found
+
 - Credit package selection is stateless (UI → API with package ID)
 - No shared forms or complex state management needed
 - Success page can fetch checkout session details directly from URL params (`session_id`)
@@ -56,26 +60,32 @@ None identified. T-12 is a straightforward UI task with well-defined backend API
 ## API contract assumptions
 
 ### `GET /credits/packages` (T-8)
+
 **Contract:**
+
 ```typescript
 Response: {
   data: Array<{
-    id: string;           // UUID
-    name: string;         // e.g. "Starter"
-    credits: number;      // e.g. 100
-    priceThb: number;     // in satang (e.g. 29900 = 299 THB)
-  }>
+    id: string; // UUID
+    name: string; // e.g. "Starter"
+    credits: number; // e.g. 100
+    priceThb: number; // in satang (e.g. 29900 = 299 THB)
+  }>;
 }
 ```
+
 **Status:** Implemented and tested (apps/api/src/routes/credits.ts, lines 36-50)
 **Notes:**
+
 - Public endpoint (no auth required)
 - Only returns active packages
 - Sorted by sortOrder ascending
 - Price is in satang (multiply by 100 from THB)
 
 ### `POST /credits/checkout` (T-9)
+
 **Contract:**
+
 ```typescript
 Request: {
   packageId: string;  // UUID from packages list
@@ -94,8 +104,10 @@ Errors:
 - 401: Not authenticated
 - 403: No PDPA consent
 ```
+
 **Status:** Implemented (apps/api/src/routes/credits.ts, lines 61-159)
 **Notes:**
+
 - Requires auth + consent (middleware: requirePhotographer, requireConsent)
 - Creates or retrieves Stripe customer for photographer
 - Checkout session includes metadata: photographer_id, package_id, credits
@@ -103,6 +115,7 @@ Errors:
 - Cancel URL: `{CORS_ORIGIN}/credits/packages`
 
 ### Assumptions validated
+
 1. **Credit packages are stored in database** - YES (credit_packages table exists)
 2. **Checkout API returns URL immediately** - YES (synchronous response)
 3. **Fulfillment happens via webhook** - YES (webhook handler in place, idempotent)
@@ -112,6 +125,7 @@ Errors:
 ## Security considerations
 
 ### Payment security
+
 - **PCI compliance**: Handled entirely by Stripe (no card data touches our system)
 - **Checkout session security**:
   - Session IDs are one-time use
@@ -119,22 +133,26 @@ Errors:
   - Webhook signature verification prevents tampering (line 160-165 in webhooks/stripe.ts)
 
 ### Authorization
+
 - **Checkout endpoint**: Requires `requirePhotographer()` + `requireConsent()` middleware
 - **Package listing**: Public (no auth) - acceptable, prices are not sensitive
 - **Success page**: Should verify session belongs to current photographer (fetch via Stripe API if needed)
 
 ### PII handling
+
 - **Customer data**: Email and name sent to Stripe (already done in T-9)
 - **Metadata**: photographer_id stored in Stripe metadata (acceptable, not displayed to user)
 - **Logging**: Webhook logs payment details - ensure no card numbers logged (verified: only session/customer IDs)
 
 ### CSRF protection
+
 - **API calls**: Bearer token auth (Clerk JWT) prevents CSRF
 - **Stripe redirect**: Stripe handles CSRF for checkout session
 
 ## Edge cases to handle
 
 ### Payment failures
+
 1. **Insufficient funds / Card decline**
    - Stripe shows error inline on checkout page
    - User can retry with different card
@@ -152,6 +170,7 @@ Errors:
    - User can create new session by clicking package again
 
 ### Network errors
+
 1. **Network failure during POST /credits/checkout**
    - Fetch throws error
    - UI should catch and show: "Network error. Please check your connection and try again."
@@ -162,6 +181,7 @@ Errors:
    - No double-charge risk (new session created)
 
 ### Already purchased scenarios
+
 1. **User clicks "Buy Credits" multiple times**
    - Each click creates a new checkout session (expected behavior)
    - Only completed sessions trigger fulfillment
@@ -174,6 +194,7 @@ Errors:
    - Auto-refresh success page every 2-3 seconds until balance updates?
 
 ### Race conditions
+
 1. **User navigates away before webhook arrives**
    - Not a problem: Webhook still processes, credits added
    - Dashboard shows updated balance on next visit
@@ -183,6 +204,7 @@ Errors:
    - React Query cache shared across tabs helps with balance consistency
 
 ### Mobile-specific edge cases
+
 1. **PromptPay flow**: Mobile browser → Banking app → Return to browser
    - Stripe handles redirect back automatically
    - Test on Thai banking apps (SCB, Kbank, Bangkok Bank)
@@ -198,12 +220,14 @@ Errors:
 ## Notes
 
 ### Implementation dependencies (all complete)
+
 - T-8: Credit packages API (GET /credits/packages) - DONE
 - T-9: Stripe checkout API (POST /credits/checkout) - DONE
 - T-10: Stripe webhook fulfillment - DONE
 - Dashboard API: Credit balance display - DONE
 
 ### UI architecture considerations
+
 - **Framework**: React + React Router + TanStack Query (already in use)
 - **Components needed**:
   - Package card component (price, credits, description, "Buy" button)
@@ -213,16 +237,19 @@ Errors:
   - Cancel page (optional, or reuse packages page with message)
 
 ### Existing patterns to follow
+
 - **Auth**: `useApiClient()` hook for authenticated calls (apps/dashboard/src/lib/api.ts)
 - **Data fetching**: TanStack Query hooks (see useDashboardData.ts)
 - **Page layout**: `<PageHeader>` + content grid (see dashboard/index.tsx)
 - **UI components**: shadcn/ui from `@sabaipics/ui/components/*`
 
 ### Environment config assumptions
+
 - `VITE_API_URL`: API base URL (already used in dashboard)
 - `CORS_ORIGIN`: Set in API wrangler.jsonc for success/cancel URLs (verified)
 
 ### Testing considerations (not blocking for implementation)
+
 - **Unit tests**: Package card component, loading/error states
 - **Integration tests**: Full purchase flow (Stripe test mode)
 - **E2E tests**: Redirect to Stripe, return to success page
@@ -235,6 +262,7 @@ Errors:
   - [ ] Test PromptPay test mode (Stripe provides test QR)
 
 ### Post-launch monitoring (out of scope for T-12)
+
 - Monitor checkout session creation errors
 - Monitor webhook fulfillment success rate
 - Track time between purchase and credit balance update
@@ -242,6 +270,7 @@ Errors:
 - A/B test: Embedded checkout vs redirect (future enhancement per research)
 
 ### Known limitations (acceptable for MVP)
+
 1. No package comparison or recommendations ("Most Popular" badge)
 2. No discount codes (Stripe supports this, but not in scope)
 3. No purchase history page (can add later)
@@ -249,20 +278,23 @@ Errors:
 5. No refund UI (admin-only operation for now)
 
 ### Risk assessment summary
-| Risk Category | Level | Mitigation |
-|---------------|-------|------------|
-| Payment security | LOW | Stripe handles all sensitive data |
-| Authorization | LOW | Middleware in place, tested |
-| API availability | MEDIUM | Error handling + retry UX |
-| Network failures | MEDIUM | Clear error messages, retry buttons |
-| Mobile UX | MEDIUM | Test on target devices (Thai market) |
-| Race conditions | LOW | Idempotent webhook, React Query cache |
-| Credit balance sync | LOW | Auto-refetch on window focus |
+
+| Risk Category       | Level  | Mitigation                            |
+| ------------------- | ------ | ------------------------------------- |
+| Payment security    | LOW    | Stripe handles all sensitive data     |
+| Authorization       | LOW    | Middleware in place, tested           |
+| API availability    | MEDIUM | Error handling + retry UX             |
+| Network failures    | MEDIUM | Clear error messages, retry buttons   |
+| Mobile UX           | MEDIUM | Test on target devices (Thai market)  |
+| Race conditions     | LOW    | Idempotent webhook, React Query cache |
+| Credit balance sync | LOW    | Auto-refetch on window focus          |
 
 ### Recommendation
+
 **Proceed with implementation.** All dependencies are complete, API contracts are clear, and risks are manageable with proper error handling. No HI gates required.
 
 **Critical path:**
+
 1. Create `/credits/packages` route
 2. Fetch and display packages (loading/error/success states)
 3. Handle "Buy" button → call checkout API → redirect to Stripe URL

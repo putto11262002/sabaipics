@@ -7,11 +7,13 @@ Date: 2026-01-10
 ## Tech Image / high-level governance
 
 The project uses a symlinked `.claude` directory pointing to `/Users/putsuthisrisinlpa/.tools/product/.claude`, which contains:
+
 - Tech Image structure (index, conventions, primitives, data-ownership, ops-release)
 - Project bindings in `.claude/rules/**` (api.md, ui.md, data.md, etc.)
 - Playbooks and skills (project-independent patterns)
 
 **Gate rubric**:
+
 - GREEN: Fits existing primitives + conventions → proceed
 - YELLOW: Unknown touchpoints but likely fits → discovery tasks needed
 - RED: Requires new primitive/vendor/infra/security model → open ADR first
@@ -21,6 +23,7 @@ The project uses a symlinked `.claude` directory pointing to `/Users/putsuthisri
 ## Project bindings / repo rules
 
 Project bindings exist at `.claude/rules/**` but are mostly placeholders (not yet populated). The actual working conventions are documented in:
+
 - `docs/tech/TECH_STACK.md` (authoritative tech choices)
 - `docs/tech/ARCHITECTURE.md` (component roles and interactions)
 - `docs/tech/ui/index.md` (UI development guidelines)
@@ -28,6 +31,7 @@ Project bindings exist at `.claude/rules/**` but are mostly placeholders (not ye
 ## UI conventions (from docs/tech/ui/index.md)
 
 ### Stack selection
+
 - **UI framework**: React ^19.2.0
 - **Component library**: shadcn/ui (CLI-based component system)
 - **Styling**: Tailwind CSS ^4.1.17 with Tailwind utilities (clsx, tailwind-merge, class-variance-authority)
@@ -37,6 +41,7 @@ Project bindings exist at `.claude/rules/**` but are mostly placeholders (not ye
 - **Data fetching**: @tanstack/react-query ^5.90.12
 
 ### Where to change things (repo mapping)
+
 - **Screens/routes live at**: `apps/dashboard/src/routes/`
 - **Shared components live at**: `packages/ui/src/components/`
 - **Page layout components**: `apps/dashboard/src/components/shell/` (sidebar, nav, page-header)
@@ -44,31 +49,37 @@ Project bindings exist at `.claude/rules/**` but are mostly placeholders (not ye
 - **API utilities**: `apps/dashboard/src/lib/api.ts`
 
 ### Conventions (repo-specific)
+
 From existing dashboard code (`apps/dashboard/src/routes/dashboard/index.tsx`):
 
 **Page structure**:
+
 1. Use `<PageHeader>` component with breadcrumbs and action buttons
 2. Main content in `<div className="flex flex-1 flex-col gap-4 p-4">`
 3. Responsive grid layouts with `md:grid-cols-3` patterns
 
 **Loading states**:
+
 - Use `<Skeleton>` components during initial load
 - Show multiple skeletons to match expected content layout
 - Example: `<Skeleton className="h-32 w-full rounded-xl" />`
 
 **Error states**:
+
 - Use `<Alert variant="destructive">` with AlertCircle icon
 - Include retry button with RefreshCw icon
 - Disable retry button during refetch with `isRefetching` state
 - Show spinner during retry: `{isRefetching ? <Spinner /> : <RefreshCw />}`
 
 **Empty states**:
+
 - Use `<Empty>` component with EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription
 - EmptyMedia variant="icon" with relevant icon (Calendar, CreditCard, etc.)
 
 **Form error display pattern**: Not yet documented (infer from patterns if needed)
 
 **Data fetching pattern**:
+
 - Create custom hooks in `apps/dashboard/src/hooks/<feature>/use<Feature>Data.ts`
 - Use TanStack Query's `useQuery` with:
   - `queryKey: ["feature-name"]`
@@ -80,6 +91,7 @@ From existing dashboard code (`apps/dashboard/src/routes/dashboard/index.tsx`):
 - Type response interfaces in the hook file
 
 **Component patterns**:
+
 - Import shadcn components from `@sabaipics/ui/components/<component-name>`
 - Use Lucide icons for UI elements
 - Apply container queries with `@container/card` pattern
@@ -103,21 +115,25 @@ From existing dashboard code (`apps/dashboard/src/routes/dashboard/index.tsx`):
 ## Component library usage
 
 **Adding new shadcn components**:
+
 ```bash
 pnpm --filter=@sabaipics/ui ui:add <component>
 ```
 
 **Available shadcn components** (already in `packages/ui/src/components/`):
+
 - alert, avatar, breadcrumb, button, card, checkbox, collapsible
 - dialog, dropdown-menu, empty, input, scroll-area, separator
 - sheet, sidebar, skeleton, spinner, tooltip
 
 **Component import pattern**:
+
 ```tsx
-import { ComponentName } from "@sabaipics/ui/components/component-name";
+import { ComponentName } from '@sabaipics/ui/components/component-name';
 ```
 
 **Shadcn documentation locations**:
+
 - Components: `docs/shadcn/components/`
 - Blocks: `docs/shadcn/blocks/`
 - Examples: `docs/shadcn/examples/`
@@ -129,26 +145,27 @@ import { ComponentName } from "@sabaipics/ui/components/component-name";
 1. Create hook file: `apps/dashboard/src/hooks/<feature>/use<Feature>Data.ts`
 
 2. Import dependencies:
+
 ```tsx
-import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../lib/api";
+import { useQuery } from '@tanstack/react-query';
+import { useApiClient } from '../../lib/api';
 ```
 
 3. Define TypeScript interfaces for response data
 
 4. Implement hook:
+
 ```tsx
 export function useFeatureData() {
   const { getToken } = useApiClient();
 
   return useQuery({
-    queryKey: ["feature-name"],
+    queryKey: ['feature-name'],
     queryFn: async () => {
       const token = await getToken();
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/endpoint`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/endpoint`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -163,11 +180,13 @@ export function useFeatureData() {
 ```
 
 5. Use in component:
+
 ```tsx
 const { data, isLoading, error, refetch, isRefetching } = useFeatureData();
 ```
 
 **API client utilities** (from `lib/api.ts`):
+
 - `api`: Base Hono client for unauthenticated requests
 - `useApiClient()`: Hook for authenticated API calls
 - `createAuthClient(token)`: For non-hook contexts
@@ -175,6 +194,7 @@ const { data, isLoading, error, refetch, isRefetching } = useFeatureData();
 ## Architecture context
 
 **Monorepo structure**:
+
 - `apps/api`: Hono API on Cloudflare Workers
 - `apps/dashboard`: Photographer dashboard (Vite + React)
 - `packages/ui`: Shared shadcn/ui components
@@ -184,6 +204,7 @@ const { data, isLoading, error, refetch, isRefetching } = useFeatureData();
 **API endpoint pattern**: All dashboard requests go through Hono API at `VITE_API_URL`
 
 **Authentication flow**:
+
 - Clerk provides session management
 - Dashboard uses `@sabaipics/auth/react` for `useAuth()` hook
 - API validates tokens via `@sabaipics/auth` middleware

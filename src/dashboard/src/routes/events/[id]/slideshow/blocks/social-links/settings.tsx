@@ -36,11 +36,7 @@ export function SocialLinksSettings({
     });
   };
 
-  const updateLink = (
-    index: number,
-    field: 'platform' | 'url',
-    value: string,
-  ) => {
+  const updateLink = (index: number, field: 'platform' | 'url', value: string) => {
     const newLinks = [...props.links];
     newLinks[index] = { ...newLinks[index], [field]: value };
     update({ links: newLinks });
@@ -51,7 +47,10 @@ export function SocialLinksSettings({
       {/* Variant selector */}
       <div className="flex items-center gap-2">
         <Label className="w-20 text-xs">Style</Label>
-        <Select value={props.variant} onValueChange={(v) => update({ variant: v as SocialLinksVariant })}>
+        <Select
+          value={props.variant}
+          onValueChange={(v) => update({ variant: v as SocialLinksVariant })}
+        >
           <SelectTrigger className="h-8 flex-1">
             <SelectValue />
           </SelectTrigger>

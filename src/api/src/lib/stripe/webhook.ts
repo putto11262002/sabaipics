@@ -6,8 +6,8 @@
  * should be implemented in the application layer.
  */
 
-import type Stripe from "stripe";
-import { webCrypto } from "./client";
+import type Stripe from 'stripe';
+import { webCrypto } from './client';
 
 // =============================================================================
 // Types
@@ -86,14 +86,14 @@ export async function verifyWebhookSignature(
   stripe: Stripe,
   rawBody: string,
   signature: string,
-  webhookSecret: string
+  webhookSecret: string,
 ): Promise<Stripe.Event> {
   return stripe.webhooks.constructEventAsync(
     rawBody,
     signature,
     webhookSecret,
     undefined,
-    webCrypto
+    webCrypto,
   );
 }
 
@@ -129,55 +129,41 @@ export async function verifyWebhookSignature(
  */
 export async function handleWebhookEvent(
   event: Stripe.Event,
-  handlers: WebhookHandlers
+  handlers: WebhookHandlers,
 ): Promise<WebhookResult> {
   console.log(`[Stripe Webhook] Processing: ${event.type} (${event.id})`);
 
   try {
     switch (event.type) {
       // Checkout events
-      case "checkout.session.completed":
-        await handlers.onCheckoutComplete?.(
-          event.data.object as Stripe.Checkout.Session
-        );
+      case 'checkout.session.completed':
+        await handlers.onCheckoutComplete?.(event.data.object as Stripe.Checkout.Session);
         break;
 
-      case "checkout.session.expired":
-        await handlers.onCheckoutExpired?.(
-          event.data.object as Stripe.Checkout.Session
-        );
+      case 'checkout.session.expired':
+        await handlers.onCheckoutExpired?.(event.data.object as Stripe.Checkout.Session);
         break;
 
       // Payment Intent events
-      case "payment_intent.succeeded":
-        await handlers.onPaymentSuccess?.(
-          event.data.object as Stripe.PaymentIntent
-        );
+      case 'payment_intent.succeeded':
+        await handlers.onPaymentSuccess?.(event.data.object as Stripe.PaymentIntent);
         break;
 
-      case "payment_intent.payment_failed":
-        await handlers.onPaymentFailed?.(
-          event.data.object as Stripe.PaymentIntent
-        );
+      case 'payment_intent.payment_failed':
+        await handlers.onPaymentFailed?.(event.data.object as Stripe.PaymentIntent);
         break;
 
       // Customer events
-      case "customer.created":
-        await handlers.onCustomerCreated?.(
-          event.data.object as Stripe.Customer
-        );
+      case 'customer.created':
+        await handlers.onCustomerCreated?.(event.data.object as Stripe.Customer);
         break;
 
-      case "customer.updated":
-        await handlers.onCustomerUpdated?.(
-          event.data.object as Stripe.Customer
-        );
+      case 'customer.updated':
+        await handlers.onCustomerUpdated?.(event.data.object as Stripe.Customer);
         break;
 
-      case "customer.deleted":
-        await handlers.onCustomerDeleted?.(
-          event.data.object as unknown as Stripe.DeletedCustomer
-        );
+      case 'customer.deleted':
+        await handlers.onCustomerDeleted?.(event.data.object as unknown as Stripe.DeletedCustomer);
         break;
 
       // Unhandled events
@@ -194,11 +180,8 @@ export async function handleWebhookEvent(
       eventId: event.id,
     };
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    console.error(
-      `[Stripe Webhook] Error processing ${event.type}: ${errorMessage}`
-    );
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[Stripe Webhook] Error processing ${event.type}: ${errorMessage}`);
 
     return {
       success: false,
@@ -219,9 +202,7 @@ export async function handleWebhookEvent(
  * @param session - Stripe Checkout Session
  * @returns Metadata object or empty object
  */
-export function getSessionMetadata(
-  session: Stripe.Checkout.Session
-): Record<string, string> {
+export function getSessionMetadata(session: Stripe.Checkout.Session): Record<string, string> {
   return (session.metadata as Record<string, string>) ?? {};
 }
 
@@ -232,10 +213,10 @@ export function getSessionMetadata(
  * @returns Customer ID string or null
  */
 export function extractCustomerId(
-  obj: Stripe.Checkout.Session | Stripe.PaymentIntent
+  obj: Stripe.Checkout.Session | Stripe.PaymentIntent,
 ): string | null {
   const customer = obj.customer;
   if (!customer) return null;
-  if (typeof customer === "string") return customer;
+  if (typeof customer === 'string') return customer;
   return customer.id;
 }

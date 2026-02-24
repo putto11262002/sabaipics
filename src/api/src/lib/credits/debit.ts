@@ -7,12 +7,7 @@
  */
 
 import type { Transaction } from '@/db';
-import {
-  creditLedger,
-  creditAllocations,
-  photographers,
-  type CreditLedgerSource,
-} from '@/db';
+import { creditLedger, creditAllocations, photographers, type CreditLedgerSource } from '@/db';
 import { eq, and, gt, asc, sql, or, isNull } from 'drizzle-orm';
 import { ResultAsync, ok, err } from 'neverthrow';
 import type { CreditError } from './error';
@@ -60,10 +55,7 @@ export function debitCredits(
         .update(photographers)
         .set({ balance: sql`${photographers.balance} - ${amount}` })
         .where(
-          and(
-            eq(photographers.id, photographerId),
-            sql`${photographers.balance} >= ${amount}`,
-          ),
+          and(eq(photographers.id, photographerId), sql`${photographers.balance} >= ${amount}`),
         )
         .returning({ id: photographers.id });
 
@@ -72,16 +64,19 @@ export function debitCredits(
       }
 
       // Step 2: Insert debit row in credit_ledger
-      const [debitEntry] = await tx.insert(creditLedger).values({
-        photographerId,
-        amount: -amount,
-        type: 'debit',
-        source,
-        operationType,
-        operationId,
-        expiresAt: sql`NOW()`, // debit rows don't expire; placeholder
-        stripeSessionId: null,
-      }).returning({ id: creditLedger.id });
+      const [debitEntry] = await tx
+        .insert(creditLedger)
+        .values({
+          photographerId,
+          amount: -amount,
+          type: 'debit',
+          source,
+          operationType,
+          operationId,
+          expiresAt: sql`NOW()`, // debit rows don't expire; placeholder
+          stripeSessionId: null,
+        })
+        .returning({ id: creditLedger.id });
 
       // Step 3: FIFO allocation loop — consume from oldest credit entries
       let remaining = amount;
@@ -100,10 +95,7 @@ export function debitCredits(
               eq(creditLedger.photographerId, photographerId),
               eq(creditLedger.type, 'credit'),
               gt(creditLedger.remainingCredits, 0),
-              or(
-                isNull(creditLedger.expiresAt),
-                gt(creditLedger.expiresAt, sql`NOW()`),
-              ),
+              or(isNull(creditLedger.expiresAt), gt(creditLedger.expiresAt, sql`NOW()`)),
             ),
           )
           .orderBy(asc(creditLedger.expiresAt), sql`${creditLedger.expiresAt} IS NULL`)
@@ -147,8 +139,6 @@ export function debitCredits(
     })(),
     (cause): CreditError => ({ type: 'database', cause }),
   ).andThen((result) =>
-    result === null
-      ? err({ type: 'insufficient_credits' as const })
-      : ok(result),
+    result === null ? err({ type: 'insufficient_credits' as const }) : ok(result),
   );
 }

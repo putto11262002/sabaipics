@@ -43,7 +43,7 @@ function PopoverSelect({
 
   const selectedLabel = useMemo(
     () => options.find((o) => o.value === value)?.label ?? '',
-    [options, value]
+    [options, value],
   );
 
   return (
@@ -57,7 +57,12 @@ function PopoverSelect({
             aria-expanded={open}
             className="w-full justify-between"
           >
-            <span className={cn('truncate', selectedLabel ? 'text-foreground' : 'text-muted-foreground')}>
+            <span
+              className={cn(
+                'truncate',
+                selectedLabel ? 'text-foreground' : 'text-muted-foreground',
+              )}
+            >
               {selectedLabel || placeholder}
             </span>
             <ChevronsUpDown className="text-muted-foreground size-4 shrink-0" />
@@ -142,7 +147,9 @@ export function CameraGuideEntry() {
               htmlFor={id}
               className={cn(
                 'flex items-center justify-between gap-4 rounded-xl border p-4 transition-colors',
-                checked ? 'border-primary/30 bg-primary/5' : 'border-border bg-background hover:bg-muted/40'
+                checked
+                  ? 'border-primary/30 bg-primary/5'
+                  : 'border-border bg-background hover:bg-muted/40',
               )}
             >
               <div className="min-w-0">

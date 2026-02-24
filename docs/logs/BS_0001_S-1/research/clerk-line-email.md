@@ -21,18 +21,20 @@ LINE OAuth **does not provide email by default**. Email access requires a specia
 
 From [LINE Login documentation](https://developers.line.biz/en/docs/line-login/integrate-line-login/):
 
-| Scope | Profile | ID Token | Display Name | Profile Image | Email |
-|-------|---------|----------|--------------|---------------|-------|
-| `profile` | Yes | - | - | - | - |
-| `profile openid` | Yes | Yes | Yes | Yes | - |
-| `profile openid email` | Yes | Yes | Yes | Yes | Yes (see note) |
-| `openid` | - | Yes | - | - | - |
-| `openid email` | - | Yes | - | - | Yes (see note) |
+| Scope                  | Profile | ID Token | Display Name | Profile Image | Email          |
+| ---------------------- | ------- | -------- | ------------ | ------------- | -------------- |
+| `profile`              | Yes     | -        | -            | -             | -              |
+| `profile openid`       | Yes     | Yes      | Yes          | Yes           | -              |
+| `profile openid email` | Yes     | Yes      | Yes          | Yes           | Yes (see note) |
+| `openid`               | -       | Yes      | -            | -             | -              |
+| `openid email`         | -       | Yes      | -            | -             | Yes (see note) |
 
 **Critical Note from LINE Documentation:**
+
 > "Before you can specify the `email` scope and ask the user for permission to obtain their email address, you must first **submit an application requesting access to users' email addresses**."
 
 Additionally:
+
 - Even with email scope enabled, users can **decline to share their email**
 - The consent screen may not always show for returning users
 - Email is returned in the ID token, not the profile API
@@ -54,6 +56,7 @@ Clerk handles this through its sign-up configuration:
    - Allows you to build a "Continue" page to collect missing data
 
 From [Clerk OAuth documentation](https://clerk.com/docs/guides/development/custom-flows/authentication/oauth-connections):
+
 > "With OAuth flows, it's common for users to try to sign in with an OAuth provider, but they don't have a Clerk account for your app yet. Clerk automatically transfers the flow from the `SignIn` object to the `SignUp` object, which returns the `"missing_requirements"` status and `missingFields` array needed to handle the missing requirements flow."
 
 ### 3. If LINE Doesn't Provide Email, Does Clerk Prompt User to Enter One?
@@ -64,6 +67,7 @@ From [Clerk OAuth documentation](https://clerk.com/docs/guides/development/custo
 - **With custom flows:** You must handle the `missing_requirements` status and render a form to collect the email
 
 The flow works as follows:
+
 1. User clicks "Sign in with LINE"
 2. LINE OAuth completes (possibly without email)
 3. Clerk returns `status: "missing_requirements"` with `missingFields: ["email_address"]`
@@ -76,6 +80,7 @@ The flow works as follows:
 **Recommended Configuration:**
 
 #### Step 1: Clerk Dashboard Settings
+
 ```
 Dashboard > User & Authentication > Email
 - [x] Sign-up with email (Required)
@@ -84,12 +89,14 @@ Dashboard > User & Authentication > Email
 ```
 
 #### Step 2: LINE Developer Console Settings
+
 1. Apply for email permission at [LINE Developers Console](https://developers.line.biz/console/)
 2. Navigate to your LINE Login channel
 3. Under "OpenID Connect" settings, apply for email scope access
 4. Wait for LINE approval (may take several business days)
 
 #### Step 3: Clerk LINE Connection with Custom Credentials
+
 ```
 Dashboard > SSO Connections > LINE
 - Enable "Use custom credentials"
@@ -100,12 +107,14 @@ Dashboard > SSO Connections > LINE
 #### Step 4: Handle Missing Requirements in Code
 
 For Next.js with Clerk prebuilt components, minimal handling needed:
+
 ```tsx
 // The <SignUp /> component handles missing requirements automatically
 <SignUp />
 ```
 
 For custom flows:
+
 ```tsx
 // After OAuth callback
 const { signUp } = useSignUp();
@@ -126,11 +135,11 @@ if (signUp?.status === 'missing_requirements') {
 
 ## Decision Matrix
 
-| Option | Pros | Cons | Recommendation |
-|--------|------|------|----------------|
-| **A: Apply for LINE email + require in Clerk** | Best UX for LINE users who grant permission; Clerk handles fallback automatically | Requires LINE approval; Some users may not grant email permission | **Recommended** |
-| **B: Always collect email manually after LINE OAuth** | No LINE approval needed; Consistent flow | Extra step for all LINE users; Worse UX | Acceptable fallback |
-| **C: Make email optional** | Simplest implementation | Violates US-1 requirement (must have email) | **Not viable** |
+| Option                                                | Pros                                                                              | Cons                                                              | Recommendation      |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------- |
+| **A: Apply for LINE email + require in Clerk**        | Best UX for LINE users who grant permission; Clerk handles fallback automatically | Requires LINE approval; Some users may not grant email permission | **Recommended**     |
+| **B: Always collect email manually after LINE OAuth** | No LINE approval needed; Consistent flow                                          | Extra step for all LINE users; Worse UX                           | Acceptable fallback |
+| **C: Make email optional**                            | Simplest implementation                                                           | Violates US-1 requirement (must have email)                       | **Not viable**      |
 
 ---
 

@@ -7,14 +7,17 @@ PR: pending
 Date: `2026-01-10`
 
 ## Outcome
+
 Successfully implemented `GET /credit-packages` public endpoint that returns active credit packages for purchase.
 
 ## Key code changes
+
 - `apps/api/src/routes/credits.ts` — New public API route file with GET /credit-packages endpoint
 - `apps/api/src/routes/credits.test.ts` — Unit tests covering happy path, empty state, filtering, and response shape
 - `apps/api/src/index.ts` — Registered creditsRouter before Clerk auth middleware to make it public
 
 ## Behavioral notes
+
 - Success path: Returns active packages sorted by sortOrder in { data: [...] } envelope
 - Key failure modes handled:
   - No active packages → Returns { data: [] } (empty array, not an error)
@@ -23,11 +26,13 @@ Successfully implemented `GET /credit-packages` public endpoint that returns act
 - Price unit: Stored in satang (29900 = 299 THB), API returns raw value for frontend to format
 
 ## Ops / rollout
+
 - No flags/env vars required
 - No migrations/run order required (credit_packages table exists from T-1)
 - Prerequisite: Admin should seed at least one active package via T-3 admin API
 
 ## How to validate
+
 - Commands run:
   - `pnpm install` — Installed updated dependencies
   - `pnpm --filter=@sabaipics/api test` — All 45 tests passed (including 5 new credits tests)
@@ -39,9 +44,11 @@ Successfully implemented `GET /credit-packages` public endpoint that returns act
   - Response shape matches { data: [{ id, name, credits, priceThb }] }
 
 ## Follow-ups
+
 - None
 
 ## Test results
+
 ```
 RUN  v3.2.4 /Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent4/apps/api
 

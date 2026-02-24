@@ -1,19 +1,24 @@
 import { useMemo, useState } from 'react';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
 import { Button } from '@/shared/components/ui/button';
-import { Input } from '@/shared/components/ui/input';
-import { Switch } from '@/shared/components/ui/switch';
-import { Slider } from '@/shared/components/ui/slider';
 import { Alert } from '@/shared/components/ui/alert';
 import { Badge } from '@/shared/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/shared/components/ui/dialog';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/shared/components/ui/dropdown-menu';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/shared/components/ui/empty';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,86 +29,132 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/shared/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, SlidersHorizontal, MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'react-router';
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
 import { useAutoEditPresets } from '../../../hooks/studio/useAutoEditPresets';
-import { useCreateAutoEditPreset } from '../../../hooks/studio/useCreateAutoEditPreset';
-import { useUpdateAutoEditPreset } from '../../../hooks/studio/useUpdateAutoEditPreset';
 import { useDeleteAutoEditPreset } from '../../../hooks/studio/useDeleteAutoEditPreset';
+import { DataTable } from '../../../components/events-table/data-table';
+import { DataTableSearch } from '../../../components/events-table/data-table-search';
+import { DataTablePagination } from '../../../components/events-table/data-table-pagination';
 
-type PresetForm = {
-  name: string;
-  contrast: number;
-  brightness: number;
-  saturation: number;
-  sharpness: number;
-  autoContrast: boolean;
-};
-
-const DEFAULT_FORM: PresetForm = {
-  name: '',
-  contrast: 1,
-  brightness: 1,
-  saturation: 1,
-  sharpness: 1,
-  autoContrast: false,
-};
+type AutoEditPresetRow = NonNullable<ReturnType<typeof useAutoEditPresets>['data']>[number];
+const columnHelper = createColumnHelper<AutoEditPresetRow>();
 
 export default function StudioAutoEditPage() {
   const presets = useAutoEditPresets();
-  const createPreset = useCreateAutoEditPreset();
-  const updatePreset = useUpdateAutoEditPreset();
   const deletePreset = useDeleteAutoEditPreset();
-
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState<PresetForm>(DEFAULT_FORM);
 
-  const editingPreset = useMemo(
-    () => (editingId ? ((presets.data ?? []).find((p) => p.id === editingId) ?? null) : null),
-    [editingId, presets.data],
+  const rows = presets.data ?? [];
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('name', {
+        header: 'Name',
+        cell: (info) => <span className="font-medium">{info.getValue()}</span>,
+      }),
+      columnHelper.accessor('isBuiltin', {
+        header: 'Type',
+        cell: (info) =>
+          info.getValue() ? (
+            <Badge variant="outline">Built-in</Badge>
+          ) : (
+            <Badge variant="secondary">Custom</Badge>
+          ),
+      }),
+      columnHelper.display({
+        id: 'settings',
+        header: 'Profile',
+        cell: ({ row }) => (
+          <div className="flex flex-nowrap gap-1 overflow-hidden">
+            <Badge variant="outline" className="text-[10px] whitespace-nowrap">
+              C {row.original.contrast.toFixed(2)}
+            </Badge>
+            <Badge variant="outline" className="text-[10px] whitespace-nowrap">
+              B {row.original.brightness.toFixed(2)}
+            </Badge>
+            <Badge variant="outline" className="text-[10px] whitespace-nowrap">
+              S {row.original.saturation.toFixed(2)}
+            </Badge>
+            <Badge variant="outline" className="text-[10px] whitespace-nowrap">
+              Sh {row.original.sharpness.toFixed(2)}
+            </Badge>
+            <Badge variant="outline" className="text-[10px] whitespace-nowrap">
+              Auto contrast {row.original.autoContrast ? 'On' : 'Off'}
+            </Badge>
+          </div>
+        ),
+      }),
+      columnHelper.accessor('createdAt', {
+        header: 'Created',
+        cell: (info) => (
+          <span className="text-muted-foreground">
+            {new Date(info.getValue()).toLocaleString()}
+          </span>
+        ),
+      }),
+      columnHelper.display({
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => {
+          if (row.original.isBuiltin) return null;
+
+          return (
+            <div className="text-right">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-8 w-8 p-0 text-muted-foreground">
+                    <span className="sr-only">Open menu</span>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[150px]">
+                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuItem asChild>
+                    <Link to={`/studio/auto-edit/${row.original.id}/edit`}>
+                      <Pencil className="mr-2 size-3" />
+                      Edit
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    disabled={deletePreset.isPending}
+                    onClick={() => setDeleteId(row.original.id)}
+                  >
+                    <Trash2 className="mr-2 size-3" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        },
+      }),
+    ],
+    [deletePreset.isPending],
   );
 
-  const openCreate = () => {
-    setEditingId(null);
-    setForm(DEFAULT_FORM);
-    setDialogOpen(true);
-  };
-
-  const openEdit = (id: string) => {
-    const p = (presets.data ?? []).find((item) => item.id === id);
-    if (!p || p.isBuiltin) return;
-    setEditingId(id);
-    setForm({
-      name: p.name,
-      contrast: p.contrast,
-      brightness: p.brightness,
-      saturation: p.saturation,
-      sharpness: p.sharpness,
-      autoContrast: p.autoContrast,
-    });
-    setDialogOpen(true);
-  };
-
-  const save = async () => {
-    try {
-      if (editingPreset) {
-        await updatePreset.mutateAsync({ id: editingPreset.id, ...form });
-        toast.success('Preset updated');
-      } else {
-        await createPreset.mutateAsync(form);
-        toast.success('Preset created');
-      }
-      setDialogOpen(false);
-      setEditingId(null);
-      setForm(DEFAULT_FORM);
-    } catch (e) {
-      toast.error('Failed to save preset', {
-        description: e instanceof Error ? e.message : 'Something went wrong',
-      });
-    }
-  };
+  const table = useReactTable({
+    data: rows,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+  });
 
   const onDelete = async () => {
     if (!deleteId) return;
@@ -128,108 +179,55 @@ export default function StudioAutoEditPage() {
           { label: 'Auto Edit' },
         ]}
       >
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="mr-1 size-4" />
-          New preset
+        <Button size="sm" asChild>
+          <Link to="/studio/auto-edit/new">
+            <Plus className="mr-1 size-4" />
+            New preset
+          </Link>
         </Button>
       </SidebarPageHeader>
 
-      <div className="space-y-3 p-4">
-        {presets.isError && <Alert variant="destructive">Failed to load auto-edit presets.</Alert>}
-
-        {(presets.data ?? []).map((preset) => (
-          <div key={preset.id} className="rounded-lg border p-3">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium">{preset.name}</p>
-                  {preset.isBuiltin && <Badge variant="outline">Built-in</Badge>}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  C {preset.contrast.toFixed(2)} | B {preset.brightness.toFixed(2)} | S{' '}
-                  {preset.saturation.toFixed(2)} | Sh {preset.sharpness.toFixed(2)} | AutoContrast{' '}
-                  {preset.autoContrast ? 'On' : 'Off'}
-                </p>
-              </div>
-
-              {!preset.isBuiltin && (
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openEdit(preset.id)}>
-                    <Pencil className="mr-1 size-3" />
-                    Edit
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => setDeleteId(preset.id)}>
-                    <Trash2 className="mr-1 size-3" />
-                    Delete
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingPreset ? 'Edit preset' : 'Create preset'}</DialogTitle>
-            <DialogDescription>Configure fine-grained auto-edit values.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-xs">Name</p>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-              />
-            </div>
-
-            {(
-              [
-                ['contrast', 'Contrast'],
-                ['brightness', 'Brightness'],
-                ['saturation', 'Saturation'],
-                ['sharpness', 'Sharpness'],
-              ] as const
-            ).map(([key, label]) => (
-              <div key={key} className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span>{label}</span>
-                  <span>{form[key].toFixed(2)}</span>
-                </div>
-                <Slider
-                  value={[form[key]]}
-                  min={0.5}
-                  max={2.0}
-                  step={0.01}
-                  onValueChange={(v) => setForm((prev) => ({ ...prev, [key]: v[0] ?? 1 }))}
-                />
+      <div className="flex flex-1 flex-col gap-4 p-4">
+        {presets.isLoading && (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 border-b px-2 py-3">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-8 w-24" />
               </div>
             ))}
-
-            <div className="flex items-center justify-between">
-              <p className="text-xs">Auto contrast</p>
-              <Switch
-                checked={form.autoContrast}
-                onCheckedChange={(v) => setForm((prev) => ({ ...prev, autoContrast: v }))}
-              />
-            </div>
           </div>
+        )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={save}
-              disabled={!form.name.trim() || createPreset.isPending || updatePreset.isPending}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {presets.isError ? (
+          <Alert variant="destructive">Failed to load auto-edit presets.</Alert>
+        ) : null}
+
+        {!presets.isLoading && !presets.isError && rows.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <SlidersHorizontal className="size-8" />
+              </EmptyMedia>
+              <EmptyTitle>No auto-edit presets yet</EmptyTitle>
+              <EmptyDescription>
+                Create your first preset to reuse your style quickly.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : null}
+
+        {!presets.isLoading && !presets.isError && rows.length > 0 ? (
+          <div className="space-y-4">
+            <DataTableSearch table={table} column="name" placeholder="Filter by preset name..." />
+            <DataTable table={table} emptyMessage="No presets found." />
+            <DataTablePagination table={table} showSelectedCount={false} />
+          </div>
+        ) : null}
+      </div>
 
       <AlertDialog open={deleteId != null} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>

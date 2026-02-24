@@ -2,7 +2,13 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Field, FieldContent, FieldGroup, FieldLabel, FieldError } from '@/shared/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldGroup,
+  FieldLabel,
+  FieldError,
+} from '@/shared/components/ui/field';
 import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
 import { Separator } from '@/shared/components/ui/separator';
 import {
@@ -17,14 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
-import {
-  Copy,
-  ExternalLink,
-  Download,
-  Upload,
-  X,
-  Image as ImageIcon,
-} from 'lucide-react';
+import { Copy, ExternalLink, Download, Upload, X, Image as ImageIcon } from 'lucide-react';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router';
@@ -40,7 +39,6 @@ import { useDeleteLogo } from '../../../../hooks/events/useDeleteLogo';
 import { updateEventFormSchema, type UpdateEventFormData } from '../../../../lib/event-form-schema';
 import { Spinner } from '@/shared/components/ui/spinner';
 import { toast } from 'sonner';
-
 
 const ALLOWED_LOGO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_LOGO_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -291,7 +289,9 @@ export default function EventDetailsTab() {
                     >
                       <div className="flex flex-col">
                         <span className="font-medium">Small</span>
-                        <span className="text-xs text-muted-foreground">256px - Mobile sharing</span>
+                        <span className="text-xs text-muted-foreground">
+                          256px - Mobile sharing
+                        </span>
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -317,7 +317,9 @@ export default function EventDetailsTab() {
                     >
                       <div className="flex flex-col">
                         <span className="font-medium">Large</span>
-                        <span className="text-xs text-muted-foreground">1200px - Print quality</span>
+                        <span className="text-xs text-muted-foreground">
+                          1200px - Print quality
+                        </span>
                       </div>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -387,55 +389,55 @@ export default function EventDetailsTab() {
           <Field orientation="responsive">
             <FieldLabel>Logo</FieldLabel>
             <FieldContent>
-            {logoPreviewUrl ? (
-              <div className="relative flex aspect-square w-48 items-center justify-center rounded-lg border bg-muted">
-                <img
-                  src={logoPreviewUrl}
-                  alt="Event logo"
-                  className="h-full w-full object-contain"
-                />
-                {logoLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/60">
-                    <Spinner className="size-8 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="flex aspect-square w-48 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors hover:border-border hover:bg-muted"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={logoLoading}
-              >
-                {logoLoading ? (
-                  <Spinner className="mb-2 size-8 text-muted-foreground" />
-                ) : (
-                  <ImageIcon className="mb-2 size-8 text-muted-foreground" />
-                )}
-                <p className="text-sm font-medium">Upload logo</p>
-                <p className="text-xs text-muted-foreground">JPEG, PNG, WebP · Max 5MB</p>
-                <p className="text-xs text-muted-foreground">Recommended 512×512px</p>
-              </button>
-            )}
+              {logoPreviewUrl ? (
+                <div className="relative flex aspect-square w-48 items-center justify-center rounded-lg border bg-muted">
+                  <img
+                    src={logoPreviewUrl}
+                    alt="Event logo"
+                    className="h-full w-full object-contain"
+                  />
+                  {logoLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/60">
+                      <Spinner className="size-8 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="flex aspect-square w-48 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors hover:border-border hover:bg-muted"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={logoLoading}
+                >
+                  {logoLoading ? (
+                    <Spinner className="mb-2 size-8 text-muted-foreground" />
+                  ) : (
+                    <ImageIcon className="mb-2 size-8 text-muted-foreground" />
+                  )}
+                  <p className="text-sm font-medium">Upload logo</p>
+                  <p className="text-xs text-muted-foreground">JPEG, PNG, WebP · Max 5MB</p>
+                  <p className="text-xs text-muted-foreground">Recommended 512×512px</p>
+                </button>
+              )}
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileSelect(file);
-                e.target.value = '';
-              }}
-            />
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileSelect(file);
+                  e.target.value = '';
+                }}
+              />
 
-            {uploadError && (
-              <Alert variant="destructive" className="mt-3">
-                <AlertTitle>Upload error</AlertTitle>
-                <AlertDescription>{uploadError}</AlertDescription>
-              </Alert>
-            )}
+              {uploadError && (
+                <Alert variant="destructive" className="mt-3">
+                  <AlertTitle>Upload error</AlertTitle>
+                  <AlertDescription>{uploadError}</AlertDescription>
+                </Alert>
+              )}
             </FieldContent>
           </Field>
         </FieldGroup>

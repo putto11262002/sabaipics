@@ -12,6 +12,7 @@
 **File:** `/apps/api/src/routes/consent.ts`
 
 **Pattern:**
+
 - Uses `requirePhotographer()` middleware for Clerk-based auth
 - Accesses authenticated photographer via `c.var.photographer`
 - Uses `c.var.db()` for database access
@@ -19,11 +20,11 @@
 - Returns success data wrapped in `{ data: ... }`
 
 ```typescript
-import { Hono } from "hono";
-import { eq } from "drizzle-orm";
-import { consentRecords, photographers } from "@sabaipics/db";
-import { requirePhotographer, type PhotographerVariables } from "../middleware";
-import type { Bindings } from "../types";
+import { Hono } from 'hono';
+import { eq } from 'drizzle-orm';
+import { consentRecords, photographers } from '@sabaipics/db';
+import { requirePhotographer, type PhotographerVariables } from '../middleware';
+import type { Bindings } from '../types';
 
 type Env = {
   Bindings: Bindings;
@@ -34,21 +35,20 @@ type Env = {
 function alreadyConsentedError() {
   return {
     error: {
-      code: "ALREADY_CONSENTED",
-      message: "PDPA consent already recorded",
+      code: 'ALREADY_CONSENTED',
+      message: 'PDPA consent already recorded',
     },
   };
 }
 
-export const consentRouter = new Hono<Env>()
-  .post("/", requirePhotographer(), async (c) => {
-    const photographer = c.var.photographer;  // From middleware
-    const db = c.var.db();
-    
-    // Business logic...
-    
-    return c.json({ data: consentRecord }, 201);
-  });
+export const consentRouter = new Hono<Env>().post('/', requirePhotographer(), async (c) => {
+  const photographer = c.var.photographer; // From middleware
+  const db = c.var.db();
+
+  // Business logic...
+
+  return c.json({ data: consentRecord }, 201);
+});
 ```
 
 **Why it matters:** This is the exact pattern T-7 should follow for authenticated photographer routes. The `requirePhotographer()` middleware handles auth and populates `photographer` context.
@@ -60,6 +60,7 @@ export const consentRouter = new Hono<Env>()
 **File:** `/apps/api/src/routes/admin/credit-packages.ts`
 
 **Pattern:**
+
 - Zod schemas for request validation
 - Uses `zValidator("json", schema)` and `zValidator("param", schema)`
 - GET/POST/PATCH CRUD operations
@@ -118,7 +119,7 @@ export const adminCreditPackagesRouter = new Hono<Env>()
     return c.json({ data: created }, 201);
   })
   // PATCH /:id - Update
-  .patch("/:id", requireAdmin(), 
+  .patch("/:id", requireAdmin(),
     zValidator("json", updatePackageSchema),
     zValidator("param", z.object({ id: z.string().uuid() })),
     async (c) => {
@@ -143,6 +144,7 @@ export const adminCreditPackagesRouter = new Hono<Env>()
 **File:** `/apps/api/src/middleware/require-photographer.ts`
 
 **Pattern:**
+
 - Factory function returning `MiddlewareHandler`
 - Checks Clerk auth from `c.get("auth")`
 - Looks up photographer in DB by `clerkId`
@@ -150,13 +152,13 @@ export const adminCreditPackagesRouter = new Hono<Env>()
 - Sets photographer context for downstream handlers
 
 ```typescript
-import type { MiddlewareHandler } from "hono";
-import { eq } from "drizzle-orm";
-import { photographers } from "@sabaipics/db";
-import { createAuthError } from "@sabaipics/auth/errors";
-import type { AuthVariables } from "@sabaipics/auth/types";
+import type { MiddlewareHandler } from 'hono';
+import { eq } from 'drizzle-orm';
+import { photographers } from '@sabaipics/db';
+import { createAuthError } from '@sabaipics/auth/errors';
+import type { AuthVariables } from '@sabaipics/auth/types';
 
-export type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
+export type PhotographerContext = Pick<Photographer, 'id' | 'pdpaConsentAt'>;
 
 export type PhotographerVariables = AuthVariables & {
   db: () => Database;
@@ -165,9 +167,9 @@ export type PhotographerVariables = AuthVariables & {
 
 export function requirePhotographer(): MiddlewareHandler<Env> {
   return async (c, next) => {
-    const auth = c.get("auth");
+    const auth = c.get('auth');
     if (!auth) {
-      return c.json(createAuthError("UNAUTHENTICATED", "..."), 401);
+      return c.json(createAuthError('UNAUTHENTICATED', '...'), 401);
     }
 
     const db = c.var.db();
@@ -178,10 +180,10 @@ export function requirePhotographer(): MiddlewareHandler<Env> {
       .limit(1);
 
     if (!row) {
-      return c.json(createAuthError("FORBIDDEN", "..."), 403);
+      return c.json(createAuthError('FORBIDDEN', '...'), 403);
     }
 
-    c.set("photographer", row);
+    c.set('photographer', row);
     return next();
   };
 }
@@ -196,6 +198,7 @@ export function requirePhotographer(): MiddlewareHandler<Env> {
 ### File: `/apps/api/src/routes/consent.test.ts`
 
 **Pattern:**
+
 - Uses Vitest with `describe/it/expect`
 - Uses Hono's `testClient` for type-safe API testing
 - Creates mock DB with chainable methods
@@ -235,7 +238,7 @@ function createTestApp(options: {
   hasAuth?: boolean;
 }) {
   const { mockDb = createMockDb(), photographer = {...}, hasAuth = true } = options;
-  
+
   const app = new Hono<Env>()
     .use("/*", (c, next) => {
       if (hasAuth) c.set("auth", {...});
@@ -246,7 +249,7 @@ function createTestApp(options: {
       return next();
     })
     .route("/consent", consentRouter);
-    
+
   return { app, mockDb };
 }
 
@@ -297,13 +300,13 @@ All API errors follow this shape:
 ### Auth Errors (from @sabaipics/auth/errors)
 
 ```typescript
-import { createAuthError } from "@sabaipics/auth/errors";
+import { createAuthError } from '@sabaipics/auth/errors';
 
 // 401 - Not authenticated
-c.json(createAuthError("UNAUTHENTICATED", "Authentication required"), 401);
+c.json(createAuthError('UNAUTHENTICATED', 'Authentication required'), 401);
 
 // 403 - Forbidden (authenticated but not authorized)
-c.json(createAuthError("FORBIDDEN", "Not allowed"), 403);
+c.json(createAuthError('FORBIDDEN', 'Not allowed'), 403);
 ```
 
 ### Domain Errors (inline helpers)
@@ -311,21 +314,21 @@ c.json(createAuthError("FORBIDDEN", "Not allowed"), 403);
 ```typescript
 // 404 - Not found
 function notFoundError(message: string) {
-  return { error: { code: "NOT_FOUND", message } };
+  return { error: { code: 'NOT_FOUND', message } };
 }
-return c.json(notFoundError("Event not found"), 404);
+return c.json(notFoundError('Event not found'), 404);
 
 // 409 - Conflict
 function alreadyExistsError() {
-  return { error: { code: "ALREADY_EXISTS", message: "Resource already exists" } };
+  return { error: { code: 'ALREADY_EXISTS', message: 'Resource already exists' } };
 }
 return c.json(alreadyExistsError(), 409);
 
 // 400 - Validation error
 function validationError(message: string, details?: z.ZodIssue[]) {
-  return { error: { code: "VALIDATION_ERROR", message, ...(details && { details }) } };
+  return { error: { code: 'VALIDATION_ERROR', message, ...(details && { details }) } };
 }
-return c.json(validationError("Invalid input", zodResult.error.issues), 400);
+return c.json(validationError('Invalid input', zodResult.error.issues), 400);
 ```
 
 ### Success Response Shape
@@ -350,12 +353,13 @@ return c.json(validationError("Invalid input", zodResult.error.issues), 400);
 ### DO NOT:
 
 1. **Break the Hono chain** - Always use method chaining for type inference:
+
    ```typescript
    // BAD
    const router = new Hono();
    router.get("/", ...);
    router.post("/", ...);
-   
+
    // GOOD
    const router = new Hono()
      .get("/", ...)
@@ -363,30 +367,32 @@ return c.json(validationError("Invalid input", zodResult.error.issues), 400);
    ```
 
 2. **Throw untyped errors** - Always return structured error responses:
+
    ```typescript
    // BAD
-   throw new Error("Not found");
-   
+   throw new Error('Not found');
+
    // GOOD
-   return c.json(notFoundError("Event not found"), 404);
+   return c.json(notFoundError('Event not found'), 404);
    ```
 
 3. **Skip ownership checks** - Dashboard routes must filter by photographer:
+
    ```typescript
    // BAD - returns all events
    const events = await db.select().from(events);
-   
+
    // GOOD - scoped to photographer
-   const events = await db.select().from(events)
-     .where(eq(events.photographerId, photographer.id));
+   const events = await db.select().from(events).where(eq(events.photographerId, photographer.id));
    ```
 
 4. **Forget validation on mutations** - Always validate input:
+
    ```typescript
    // BAD
    .post("/", async (c) => {
      const data = await c.req.json();  // Unvalidated!
-   
+
    // GOOD
    .post("/", zValidator("json", createEventSchema), async (c) => {
      const data = c.req.valid("json");  // Typed and validated
@@ -410,10 +416,10 @@ Routes are registered in `/apps/api/src/index.ts`:
 // In index.ts - add new routes to the chain
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
   // ... existing middleware and routes ...
-  .route("/consent", consentRouter)
-  .route("/dashboard/events", dashboardEventsRouter);  // NEW
+  .route('/consent', consentRouter)
+  .route('/dashboard/events', dashboardEventsRouter); // NEW
 
-export type AppType = typeof app;  // Exports types for RPC client
+export type AppType = typeof app; // Exports types for RPC client
 ```
 
 **Note:** Dashboard routes should be placed AFTER `createClerkAuth()` middleware to get auth context.
@@ -454,8 +460,8 @@ const [updated] = await db
   .where(
     and(
       eq(events.id, id),
-      eq(events.photographerId, photographer.id)  // Ownership check!
-    )
+      eq(events.photographerId, photographer.id), // Ownership check!
+    ),
   )
   .returning();
 ```

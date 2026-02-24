@@ -44,11 +44,7 @@ export const uploadPhotoSchema = z.object({
 // Participant Search Schemas
 // =============================================================================
 
-const ALLOWED_SEARCH_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-] as const;
+const ALLOWED_SEARCH_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 const MAX_SELFIE_SIZE = 5 * 1024 * 1024; // 5 MB
 
@@ -56,12 +52,10 @@ export const participantSearchSchema = z.object({
   selfie: z
     .instanceof(File)
     .refine((f) => f.size > 0, 'File cannot be empty')
+    .refine((f) => f.size <= MAX_SELFIE_SIZE, `File size must be less than 5 MB`)
     .refine(
-      (f) => f.size <= MAX_SELFIE_SIZE,
-      `File size must be less than 5 MB`,
-    )
-    .refine(
-      (f) => ALLOWED_SEARCH_MIME_TYPES.includes(f.type as (typeof ALLOWED_SEARCH_MIME_TYPES)[number]),
+      (f) =>
+        ALLOWED_SEARCH_MIME_TYPES.includes(f.type as (typeof ALLOWED_SEARCH_MIME_TYPES)[number]),
       `File type must be one of: ${ALLOWED_SEARCH_MIME_TYPES.join(', ')}`,
     ),
   consentAccepted: z.literal(true, {

@@ -92,22 +92,12 @@ export function imageToCanvas(img: CanvasImage): canvas.Canvas {
  */
 export function cropImage(
   img: CanvasImage,
-  box: { x: number; y: number; width: number; height: number }
+  box: { x: number; y: number; width: number; height: number },
 ): canvas.Canvas {
   const cvs = new Canvas(box.width, box.height);
   const ctx = cvs.getContext('2d');
 
-  ctx.drawImage(
-    img as any,
-    box.x,
-    box.y,
-    box.width,
-    box.height,
-    0,
-    0,
-    box.width,
-    box.height
-  );
+  ctx.drawImage(img as any, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height);
 
   return cvs;
 }

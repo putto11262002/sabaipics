@@ -158,20 +158,21 @@ Integration tests will skip gracefully if test images are not available.
 
 ## Comparison with AWS Rekognition
 
-| Feature | AWS Rekognition | SabaiFace |
-|---------|----------------|-----------|
-| Face Detection | ✅ | ✅ |
-| Face Search | ✅ | ✅ |
-| Landmarks | ✅ | ✅ (68-point) |
-| Age/Gender | ✅ | ✅ |
-| Cost | $1.50/1k images | Self-hosted |
-| Accuracy | 99%+ | 99.38% (LFW benchmark) |
-| Latency | ~100ms | ~200ms |
-| Control | Limited | Full control |
+| Feature        | AWS Rekognition | SabaiFace              |
+| -------------- | --------------- | ---------------------- |
+| Face Detection | ✅              | ✅                     |
+| Face Search    | ✅              | ✅                     |
+| Landmarks      | ✅              | ✅ (68-point)          |
+| Age/Gender     | ✅              | ✅                     |
+| Cost           | $1.50/1k images | Self-hosted            |
+| Accuracy       | 99%+            | 99.38% (LFW benchmark) |
+| Latency        | ~100ms          | ~200ms                 |
+| Control        | Limited         | Full control           |
 
 ## Development Status
 
 **Completed:**
+
 - ✅ Postgres + pgvector integration
 - ✅ VectorStore abstraction with PostgresVectorStore implementation
 - ✅ Database schema with vector descriptors and HNSW index
@@ -181,6 +182,7 @@ Integration tests will skip gracefully if test images are not available.
 - ✅ Integration tests
 
 **Next:**
+
 - HTTP API layer (Hono)
 - Docker containerization
 - Production deployment

@@ -16,8 +16,7 @@ export function useRedeemGiftCode() {
   const queryClient = useQueryClient();
 
   return useApiMutation<RedeemResponse, RedeemGiftCodeInput>({
-    apiFn: (input, opts) =>
-      api['credit-packages'].redeem.$post({ json: input }, opts),
+    apiFn: (input, opts) => api['credit-packages'].redeem.$post({ json: input }, opts),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['credits'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });

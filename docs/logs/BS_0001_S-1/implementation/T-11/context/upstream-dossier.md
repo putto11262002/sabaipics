@@ -25,13 +25,14 @@
 
 **US-3: Dashboard display (plan section lines 227-243)**
 
-| Step | Surface | Action |
-|------|---------|--------|
-| 1 | UI | Dashboard loads |
-| 2 | API | `GET /dashboard` |
-| 3 | UI | Show credit balance, event list, CTAs |
+| Step | Surface | Action                                |
+| ---- | ------- | ------------------------------------- |
+| 1    | UI      | Dashboard loads                       |
+| 2    | API     | `GET /dashboard`                      |
+| 3    | UI      | Show credit balance, event list, CTAs |
 
 **API Contract (final.md lines 236-243):**
+
 ```
 GET /dashboard
 Response: {
@@ -48,13 +49,14 @@ Response: {
 ### API/DB contracts
 
 **API endpoint (T-7):**
+
 - `GET /dashboard` — Returns credit balance (FIFO unexpired sum query), events list (sorted by createdAt desc), and stats (totalPhotos, totalFaces).
 - Authentication: Requires `requirePhotographer` middleware (T-2).
 - Response shape:
   ```typescript
   {
-    credits: { 
-      balance: number, 
+    credits: {
+      balance: number,
       nearestExpiry?: string // ISO date of first expiring credit batch
     },
     events: Array<{
@@ -72,6 +74,7 @@ Response: {
   ```
 
 **DB schema (final.md lines 178-186):**
+
 - `photographers` table (primary entity)
 - `credit_ledger` table (for balance calculation with FIFO expiry)
 - `events` table (for event list)
@@ -79,12 +82,14 @@ Response: {
 - `faces` table (for face counts)
 
 **Credit ledger mechanics (final.md lines 131-173):**
+
 - Append-only ledger with FIFO expiry inheritance
 - Balance = SUM(amount) WHERE expires_at > NOW()
 - Deductions inherit expiry from oldest unexpired purchase
 - Important: `nearestExpiry` shows when the oldest unexpired credit batch expires (6-month window from purchase)
 
 **Routing:**
+
 - Dashboard is at `/dashboard` (already defined in `apps/dashboard/src/App.tsx` per surface-map.md line 28).
 - "Buy Credits" button must link to `/credits/packages` (T-12 responsibility, but navigation contract here).
 - "Create Event" button opens modal (NOT navigation; modal component in T-11 scope).
@@ -92,31 +97,37 @@ Response: {
 ### Key risks/constraints
 
 **Performance (acceptance criteria):**
+
 - <2s p95 load time required
 - Empty state must render fast (no data fetching delays)
 - Event list may grow large over time → pagination consideration [NEED_DECISION: is pagination needed for events list?]
 
 **Dependencies:**
+
 - T-7 must be complete and deployed (Dashboard API returns correct shape)
 - T-2 must be complete (requirePhotographer middleware for auth)
 - T-1 must be complete (DB schema for credit_ledger, events, photos, faces)
 
 **UI framework constraints (surface-map.md):**
+
 - Stack: Vite + React (existing `apps/dashboard`)
 - Component library: shadcn/ui (use `pnpm --filter=@sabaipics/ui ui:add <component>`)
 - Current state: `routes/dashboard/index.tsx` is test page placeholder, needs full replacement
 
 **Empty state UX (plan line 289):**
+
 - Must handle new photographers with 0 credits, 0 events gracefully
 - Should guide user toward first action (buy credits OR create event with existing credits)
 
 **Error handling [GAP]:**
+
 - Plan doesn't specify error states for API failures
 - [NEED_DECISION: retry logic? offline state? error boundaries?]
 
 ## ADR / Research links
 
 **Research: CF Images Thumbnails** (`docs/logs/BS_0001_S-1/research/cf-images-thumbnails.md`)
+
 - **Relevance:** Dashboard shows event list with photo counts. If thumbnails are shown in event cards, T-11 needs to use CF Images URL pattern.
 - **Key decision:** URL-based transformations recommended for thumbnails (Option A).
 - **Contract:** Thumbnail URLs follow pattern `/cdn-cgi/image/width=200,fit=cover,format=auto/photos.sabaipics.com/{r2_key}`.
@@ -126,6 +137,7 @@ Response: {
 **No specific ADRs found** — all architectural decisions are captured in final plan (decisions table, lines 19-42).
 
 **Key decisions affecting T-11:**
+
 - Decision #1: Session timeout 24 hours (affects dashboard session persistence)
 - Decision #9: Credit expiration 6 months (affects nearestExpiry display logic)
 - Decision #11: Credit packages UI on dedicated page (affects "Buy Credits" link target)
@@ -137,6 +149,7 @@ Response: {
 **Slice:** `d999677d-0b51-4b3b-b163-eec36a5bdde3` (S-1: Photographer Onboarding & Photo Upload)
 
 **Stories:**
+
 - **US-3:** Photographer dashboard showing stats, credits, events
   - Dashboard displays credit balance (with expiry warning per Decision #9)
   - Dashboard lists events with photo/face counts
@@ -144,6 +157,7 @@ Response: {
   - Empty state for new photographers
 
 **Workflow context [NEED_VALIDATION]:**
+
 - Upstream PM docs not fully available in this execution root.
 - Task references "US-3" but detailed user story text not in final.md.
 - Workflow steps inferred from plan section (Phase 2, lines 227-243).
@@ -151,6 +165,7 @@ Response: {
 ## Implied contracts
 
 ### Navigation contracts
+
 - **Route:** `/dashboard` (primary landing after login per plan success path line 444)
 - **Outbound links:**
   - "Buy Credits" → `/credits/packages` (T-12 responsibility, link contract here)
@@ -158,6 +173,7 @@ Response: {
   - Individual event cards → [GAP: link target? `/events/:id`? Defer to T-15?]
 
 ### Component contracts
+
 - **Dashboard layout:**
   - Credit balance widget (shows `balance` + `nearestExpiry` warning)
   - Event list/grid (shows name, photoCount, faceCount, createdAt)
@@ -169,12 +185,14 @@ Response: {
   - [NEED_DECISION: does modal close on success? refresh events list? optimistic update?]
 
 ### Data contracts (from T-7 API)
+
 - **credits.balance:** number (integer, ≥ 0)
 - **credits.nearestExpiry:** string | undefined (ISO date string if any credits exist and haven't expired yet)
 - **events:** Array (may be empty for new users)
 - **stats.totalPhotos, stats.totalFaces:** numbers (may be 0)
 
 ### UI state contracts [NEED_VALIDATION]
+
 - Loading state: dashboard waits for `GET /dashboard` response
 - Error state: [GAP: plan doesn't specify error UI]
 - Empty state: events.length === 0 → show onboarding CTA
@@ -209,6 +227,7 @@ Response: {
 **Dependency chain validation:** All direct dependencies marked done. T-11 is unblocked.
 
 **Upstream tasks in Phase 2:**
+
 - T-8 (Credit Packages API): ✅ Done (PR #13)
 - T-9 (Stripe Checkout API): ✅ Done (PR #15)
 - T-10 (Stripe Webhook): ❌ Not done (tasks.md line 250)
