@@ -58,13 +58,11 @@ locals {
     FTP_JWT_SECRET               = local.infisical["FTP_JWT_SECRET"].value
     DESKTOP_ACCESS_JWT_SECRET    = local.infisical["DESKTOP_ACCESS_JWT_SECRET"].value
     DESKTOP_REFRESH_TOKEN_PEPPER = local.infisical["DESKTOP_REFRESH_TOKEN_PEPPER"].value
-  }
-
-  # Optional secrets (only include if present in Infisical)
-  optional_keys = ["LINE_CHANNEL_SECRET", "LINE_CHANNEL_ACCESS_TOKEN"]
-  optional_secrets = {
-    for k in local.optional_keys : k => local.infisical[k].value
-    if contains(keys(local.infisical), k)
+    ADMIN_API_KEY                = local.infisical["ADMIN_API_KEY"].value
+    LINE_CHANNEL_SECRET          = local.infisical["LINE_CHANNEL_SECRET"].value
+    LINE_CHANNEL_ACCESS_TOKEN    = local.infisical["LINE_CHANNEL_ACCESS_TOKEN"].value
+    LINE_LOGIN_CHANNEL_ID        = local.infisical["LINE_LOGIN_CHANNEL_ID"].value
+    LINE_LOGIN_CHANNEL_SECRET    = local.infisical["LINE_LOGIN_CHANNEL_SECRET"].value
   }
 
   # Terraform-generated secrets (only R2 credentials — safe to regenerate)
@@ -73,7 +71,7 @@ locals {
     R2_SECRET_ACCESS_KEY = module.r2_token.secret
   }
 
-  all_secrets = merge(local.external_secrets, local.optional_secrets, local.generated_secrets)
+  all_secrets = merge(local.external_secrets, local.generated_secrets)
 }
 
 # Push each secret via Cloudflare Workers Secrets REST API.
