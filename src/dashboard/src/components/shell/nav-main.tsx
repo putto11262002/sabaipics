@@ -1,5 +1,6 @@
 import { type LucideIcon } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
+
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -33,18 +34,17 @@ export function NavMain({
       <SidebarMenu>
         {items.map((item) => {
           const isActive = location.pathname.startsWith(item.url);
+          const hasChildren = item.items?.length;
 
-          return (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
-                <Link to={item.url}>
+          if (hasChildren) {
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton tooltip={item.title} isActive={isActive}>
                   <item.icon />
                   <span>{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-              {item.items?.length ? (
+                </SidebarMenuButton>
                 <SidebarMenuSub>
-                  {item.items.map((subItem) => (
+                  {item.items?.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
                       <SidebarMenuSubButton
                         asChild
@@ -57,7 +57,18 @@ export function NavMain({
                     </SidebarMenuSubItem>
                   ))}
                 </SidebarMenuSub>
-              ) : null}
+              </SidebarMenuItem>
+            );
+          }
+
+          return (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
+                <Link to={item.url}>
+                  <item.icon />
+                  <span>{item.title}</span>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           );
         })}
