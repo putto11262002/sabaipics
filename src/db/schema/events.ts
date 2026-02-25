@@ -67,7 +67,6 @@ export const events = pgTable(
     startDate: timestamptz('start_date'),
     endDate: timestamptz('end_date'),
     qrCodeR2Key: text('qr_code_r2_key'), // R2 key for generated QR PNG
-    rekognitionCollectionId: text('rekognition_collection_id'), // Nullable, created on first upload
     slideshowConfig: jsonb('slideshow_config').$type<SlideshowConfig>(), // Nullable: Slideshow configuration (theme + blocks)
     logoR2Key: text('logo_r2_key'), // Nullable: R2 key for event logo (used in slideshow)
     settings: jsonb('settings').$type<EventSettings>(), // Nullable: Flexible per-event settings (typed at app level)
