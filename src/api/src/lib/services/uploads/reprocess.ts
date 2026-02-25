@@ -1,5 +1,5 @@
 import { createDb, uploadIntents } from '@/db';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, type SQL } from 'drizzle-orm';
 import type { Bindings } from '../../../types';
 import type { R2EventMessage } from '../../../types/r2-event';
 
@@ -17,6 +17,38 @@ export async function reprocessInsufficientCredits(
   env: Bindings,
   photographerId: string,
 ): Promise<{ requeued: number; cleaned: number; failed: number }> {
+  return reprocessInsufficientCreditsIntents(env, photographerId, []);
+}
+
+export async function reprocessInsufficientCreditsForEvent(
+  env: Bindings,
+  photographerId: string,
+  eventId: string,
+): Promise<{ found: number; requeued: number; cleaned: number; failed: number }> {
+  const result = await reprocessInsufficientCreditsIntents(env, photographerId, [
+    eq(uploadIntents.eventId, eventId),
+  ]);
+  return { found: result.found, requeued: result.requeued, cleaned: result.cleaned, failed: result.failed };
+}
+
+export async function reprocessInsufficientCreditsForIntent(
+  env: Bindings,
+  photographerId: string,
+  eventId: string,
+  intentId: string,
+): Promise<{ found: number; requeued: number; cleaned: number; failed: number }> {
+  const result = await reprocessInsufficientCreditsIntents(env, photographerId, [
+    eq(uploadIntents.eventId, eventId),
+    eq(uploadIntents.id, intentId),
+  ]);
+  return { found: result.found, requeued: result.requeued, cleaned: result.cleaned, failed: result.failed };
+}
+
+async function reprocessInsufficientCreditsIntents(
+  env: Bindings,
+  photographerId: string,
+  extraConditions: SQL[],
+): Promise<{ found: number; requeued: number; cleaned: number; failed: number }> {
   const db = createDb(env.DATABASE_URL);
 
   const intents = await db
@@ -32,11 +64,12 @@ export async function reprocessInsufficientCredits(
         eq(uploadIntents.status, 'failed'),
         eq(uploadIntents.retryable, true),
         eq(uploadIntents.errorCode, 'insufficient_credits'),
+        ...extraConditions,
       ),
     );
 
   if (intents.length === 0) {
-    return { requeued: 0, cleaned: 0, failed: 0 };
+    return { found: 0, requeued: 0, cleaned: 0, failed: 0 };
   }
 
   console.log(
@@ -105,5 +138,5 @@ export async function reprocessInsufficientCredits(
     failed,
   });
 
-  return { requeued, cleaned, failed };
+  return { found: intents.length, requeued, cleaned, failed };
 }

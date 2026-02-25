@@ -49,6 +49,7 @@ export function useRecentUploads(eventId: string | undefined, limit = 10) {
   return {
     data: query.data?.data ?? [],
     isLoading: query.isLoading,
+    refetch: query.refetch,
     hasNextPage: query.data?.pagination.hasMore ?? false,
     hasPreviousPage: cursorHistory.length > 0,
     goToNextPage,
