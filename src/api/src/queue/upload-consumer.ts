@@ -41,6 +41,7 @@ import { extractExif } from '../lib/images/exif';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 import { processWithModal, isModalConfigured, type ModalProcessOptions } from '../lib/modal-client';
 import { generatePresignedGetUrl, generatePresignedPutUrl } from '../lib/r2/presign';
+import { capturePostHogEvent } from '../lib/posthog';
 
 // wrangler.api.jsonc sets max_retries: 1 as a crash safety net.
 // The consumer itself never calls message.retry() — the idempotency guard
@@ -1011,6 +1012,31 @@ async function processUpload(
         },
       });
     });
+
+    // PostHog: track photo processing completion (fire-and-forget)
+    const pipelineLabel = pipelineApplied
+      ? pipelineApplied.autoEdit && pipelineApplied.lutId
+        ? 'both'
+        : pipelineApplied.autoEdit
+          ? 'auto_edit'
+          : 'lut'
+      : 'none';
+
+    capturePostHogEvent(env.POSTHOG_API_KEY, {
+      distinctId: intent.photographerId,
+      event: 'photo_processed',
+      properties: {
+        event_id: intent.eventId,
+        source: intent.source ?? 'web',
+        width,
+        height,
+        file_size: fileSize,
+        pipeline_applied: pipelineLabel,
+        auto_edit_preset_id: pipelineApplied?.autoEditPresetId ?? null,
+        lut_id: pipelineApplied?.lutId ?? null,
+        success: true,
+      },
+    }).catch(() => {}); // best-effort, errors already logged inside
 
     console.log(`[upload-consumer] Completed: ${photo.id}`);
     return ok(undefined);

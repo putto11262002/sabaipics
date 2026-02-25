@@ -25,6 +25,7 @@ import { createExtractor, searchByFace, type RecognitionError } from '../../lib/
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { createZip } from 'littlezipper';
 import { slideshowPhotosQuerySchema } from '../events/slideshow-schema';
+import { capturePostHogEvent } from '../../lib/posthog';
 
 // =============================================================================
 // Schemas
@@ -307,6 +308,14 @@ export const participantRouter = new Hono<Env>()
             (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
           );
 
+          c.executionCtx.waitUntil(
+            capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+              distinctId: `search_${searchId}`,
+              event: 'search_completed',
+              properties: { event_id: eventId, match_count: 0, has_matches: false },
+            }),
+          );
+
           return ok({
             searchId,
             photos: [],
@@ -345,7 +354,20 @@ export const participantRouter = new Hono<Env>()
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 
-        // Step 11: Generate photo URLs
+        // Step 11: Track search completion
+        c.executionCtx.waitUntil(
+          capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+            distinctId: `search_${searchId}`,
+            event: 'search_completed',
+            properties: {
+              event_id: eventId,
+              match_count: photoRecords.length,
+              has_matches: photoRecords.length > 0,
+            },
+          }),
+        );
+
+        // Step 12: Generate photo URLs
         const isDev = c.env.NODE_ENV === 'development';
         const responsePhotos = photoRecords.map((photo) => ({
           photoId: photo.id,
@@ -431,6 +453,18 @@ export const participantRouter = new Hono<Env>()
         }
 
         const downloadUrl = generateDownloadUrl(photo.r2Key, c.env.PHOTO_R2_BASE_URL);
+
+        c.executionCtx.waitUntil(
+          capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+            distinctId: `participant_${eventId}`,
+            event: 'photos_delivered',
+            properties: {
+              event_id: eventId,
+              delivery_method: 'download',
+              photo_count: 1,
+            },
+          }),
+        );
 
         return ok({ redirectUrl: downloadUrl });
       })
@@ -527,6 +561,18 @@ export const participantRouter = new Hono<Env>()
             code: 'INTERNAL_ERROR',
             message: 'Failed to create zip file',
             cause: e,
+          }),
+        );
+
+        c.executionCtx.waitUntil(
+          capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+            distinctId: `participant_${eventId}`,
+            event: 'photos_delivered',
+            properties: {
+              event_id: eventId,
+              delivery_method: 'download',
+              photo_count: photoRows.length,
+            },
           }),
         );
 
