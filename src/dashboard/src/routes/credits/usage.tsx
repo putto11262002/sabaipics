@@ -60,6 +60,7 @@ const columns = [
       const source = info.getValue();
       const labels: Record<string, string> = {
         upload: 'Photo Upload',
+        image_enhancement: 'Image Enhancement',
         admin_adjustment: 'Admin',
       };
       return <Badge variant="secondary">{labels[source] ?? source}</Badge>;
