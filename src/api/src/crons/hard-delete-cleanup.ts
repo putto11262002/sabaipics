@@ -12,7 +12,7 @@ interface HardDeleteCleanupResult {
  * Hard Delete Cleanup (PERMANENT DELETE):
  * 1. Query soft-deleted events older than grace period (default: 30 days)
  * 2. Permanently delete events and all related data:
- *    - Database records (face_embeddings cascade, faces, photos, searches, uploads, ftp, events)
+ *    - Database records (face_embeddings cascade with photos, photos, searches, uploads, ftp, events)
  *    - R2 objects (photos, logos, QR codes, selfies)
  * 3. Process in batches to avoid timeouts
  *

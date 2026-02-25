@@ -55,7 +55,6 @@ const mockEvent = {
   startDate: null,
   endDate: null,
   qrCodeR2Key: 'qr/ABC123.png',
-  rekognitionCollectionId: null,
   expiresAt: '2026-02-10T00:00:00Z',
   createdAt: '2026-01-10T00:00:00Z',
 };
@@ -248,7 +247,6 @@ describe('POST /events - Success', () => {
     if ('data' in body) {
       expect(body.data.name).toBe('Test Event');
       expect(body.data.qrCodeUrl).toBeNull();
-      expect(body.data.rekognitionCollectionId).toBeNull();
     } else {
       throw new Error('Expected data response');
     }

@@ -2,13 +2,12 @@
  * Photo Processing Queue Consumer (v2)
  *
  * Handles photo-processing queue messages:
- * - Fetches image from R2
- * - Extracts face embeddings via InsightFace /extract endpoint
- * - Stores embeddings in pgvector via Drizzle
+ * - Sends R2 public URL to InsightFace /extract endpoint (Modal fetches directly)
+ * - Stores face embeddings in pgvector via Drizzle
  * - Updates photo status
  *
- * No AWS collections, no Durable Object rate limiter, no paced intervals.
- * The extraction service is self-hosted with no TPS limits.
+ * No AWS collections, no R2 fetch in Worker, no TPS pacing.
+ * The extraction service is self-hosted on Modal with no TPS limits.
  */
 
 import * as Sentry from '@sentry/cloudflare';
@@ -25,10 +24,10 @@ import {
   type RecognitionError,
   type ExtractionResult,
 } from '../lib/recognition';
-import { createDb, createDbTx, type Database } from '@/db';
+import { createDb, createDbTx } from '@/db';
 import { photos } from '@/db';
 import { eq } from 'drizzle-orm';
-import { ResultAsync, ok, safeTry, type Result } from 'neverthrow';
+import { ResultAsync, type Result } from 'neverthrow';
 
 // Must match wrangler.api.jsonc consumer max_retries setting.
 // CF Workers: attempts starts at 1, so last attempt = MAX_RETRIES + 1.
@@ -42,7 +41,6 @@ const MAX_RETRIES = 1;
  * Photo processing error — discriminated union for this layer.
  */
 export type PhotoProcessingError =
-  | { type: 'not_found'; resource: 'r2_image'; key: string }
   | { type: 'database'; operation: string; cause: unknown }
   | { type: 'recognition'; cause: RecognitionError };
 
@@ -164,26 +162,8 @@ function persistAndUpdatePhoto(
 // =============================================================================
 
 /**
- * Fetch image from R2.
- */
-function fetchImageFromR2(
-  env: Bindings,
-  r2Key: string,
-): ResultAsync<R2ObjectBody, PhotoProcessingError> {
-  return ResultAsync.fromPromise(
-    env.PHOTOS_BUCKET.get(r2Key),
-    (): PhotoProcessingError => ({ type: 'not_found', resource: 'r2_image', key: r2Key }),
-  ).andThen((object) =>
-    object
-      ? ok(object)
-      : ResultAsync.fromSafePromise<R2ObjectBody, PhotoProcessingError>(
-          Promise.reject({ type: 'not_found', resource: 'r2_image', key: r2Key }),
-        ),
-  );
-}
-
-/**
- * Process a single photo: fetch from R2 → extract faces → return embeddings.
+ * Process a single photo: send R2 public URL to extraction service.
+ * Modal fetches the image directly from R2 — no need to load bytes into Worker memory.
  */
 function processPhoto(
   env: Bindings,
@@ -191,36 +171,27 @@ function processPhoto(
 ): ResultAsync<ExtractionResult, PhotoProcessingError> {
   const job = message.body;
   const extractor = createExtractor({ endpoint: env.RECOGNITION_ENDPOINT });
+  const imageUrl = `${env.PHOTO_R2_BASE_URL}/${job.r2_key}`;
 
-  return safeTry(async function* () {
-    // Step 1: Fetch image from R2
-    const object = yield* fetchImageFromR2(env, job.r2_key);
+  return extractor
+    .extractFacesFromUrl(imageUrl)
+    .mapErr((e): PhotoProcessingError => ({ type: 'recognition', cause: e }))
+    .mapErr((error) => {
+      const logData: Record<string, unknown> = {
+        photoId: job.photo_id,
+        eventId: job.event_id,
+        errorType: error.type,
+      };
 
-    // Step 2: Get image bytes
-    const imageBytes = await object.arrayBuffer();
+      if (error.type === 'recognition') {
+        logData.recognitionErrorType = error.cause.type;
+        logData.retryable = error.cause.retryable;
+        logData.throttle = error.cause.throttle;
+      }
 
-    // Step 3: Extract faces via InsightFace
-    const extractResult = yield* extractor
-      .extractFaces(imageBytes)
-      .mapErr((e): PhotoProcessingError => ({ type: 'recognition', cause: e }));
-
-    return ok(extractResult);
-  }).mapErr((error) => {
-    const logData: Record<string, unknown> = {
-      photoId: job.photo_id,
-      eventId: job.event_id,
-      errorType: error.type,
-    };
-
-    if (error.type === 'recognition') {
-      logData.recognitionErrorType = error.cause.type;
-      logData.retryable = error.cause.retryable;
-      logData.throttle = error.cause.throttle;
-    }
-
-    console.error(`[Queue] Photo processing failed`, logData);
-    return error;
-  });
+      console.error(`[Queue] Photo processing failed`, logData);
+      return error;
+    });
 }
 
 // =============================================================================
@@ -230,14 +201,12 @@ function processPhoto(
 function getProcessingErrorName(error: PhotoProcessingError): string {
   if (error.type === 'recognition') return getErrorName(error.cause);
   if (error.type === 'database') return 'DatabaseError';
-  if (error.type === 'not_found') return 'NotFoundError';
   return 'UnknownError';
 }
 
 function isRetryableProcessingError(error: PhotoProcessingError): boolean {
   if (error.type === 'recognition') return isRetryable(error.cause);
   if (error.type === 'database') return true;
-  if (error.type === 'not_found') return false;
   return false;
 }
 
@@ -314,8 +283,6 @@ export async function queue(
           extra.recognitionErrorType = error.cause.type;
           extra.retryable = error.cause.retryable;
           extra.throttle = error.cause.throttle;
-        } else if (error.type === 'not_found') {
-          extra.key = error.key;
         } else if (error.type === 'database') {
           extra.operation = error.operation;
         }

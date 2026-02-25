@@ -28,7 +28,7 @@ DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 
 # Face Recognition Service (self-hosted InsightFace)
 # URL of the /extract endpoint
-RECOGNITION_ENDPOINT=http://localhost:8087
+RECOGNITION_ENDPOINT=http://localhost:8082
 
 # Stripe Secret Key (get from Stripe Dashboard → Developers → API Keys)
 # Use TEST mode keys for development (sk_test_xxx)

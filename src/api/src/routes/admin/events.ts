@@ -379,7 +379,6 @@ export const adminEventsRouter = new Hono<Env>()
       console.log('[Admin/Events] Hard delete complete', {
         eventId: id,
         db: {
-          faces: d.database.faces,
           photos: d.database.photos,
           searches: d.database.participantSearches,
           uploads: d.database.uploadIntents,
@@ -451,14 +450,13 @@ export const adminEventsRouter = new Hono<Env>()
       const failedCount = results.length - deletedCount;
       const totals = results.reduce(
         (acc, r) => {
-          acc.faces += r.deleted.database.faces;
           acc.photos += r.deleted.database.photos;
           acc.searches += r.deleted.database.participantSearches;
           acc.uploads += r.deleted.database.uploadIntents;
           acc.r2Objects += r.deleted.r2Objects;
           return acc;
         },
-        { faces: 0, photos: 0, searches: 0, uploads: 0, r2Objects: 0 },
+        { photos: 0, searches: 0, uploads: 0, r2Objects: 0 },
       );
 
       console.log('[Admin/Events] Empty trash complete', {

@@ -28,6 +28,8 @@
     "deploy:www": "cd src/www && opennextjs-cloudflare build && opennextjs-cloudflare deploy --env production",
     "deploy:admin:prod": "pnpm build:admin --mode production && wrangler deploy --env production -c wrangler.admin.jsonc",
     "deploy:sabaiface": "fly deploy . -c src/sabaiface/fly.toml",
+    "dev:recognition": "cd infra/recognition && uv run uvicorn main:app --reload --port 8082",
+    "deploy:recognition": "modal deploy infra/recognition/modal_app.py",
     "db:generate": "drizzle-kit generate --config src/db/drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config src/db/drizzle.config.ts",
     "db:push": "drizzle-kit push --config src/db/drizzle.config.ts",

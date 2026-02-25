@@ -1,20 +1,21 @@
 /**
  * Face Search — pgvector Similarity Search
  *
- * Queries the face_embeddings table using cosine distance (<=>).
+ * Queries the face_embeddings table using cosine distance.
  * Groups results by photo, keeps max similarity per photo.
  */
 
 import { ResultAsync } from 'neverthrow';
-import { sql } from 'drizzle-orm';
+import { cosineDistance, sql, desc, eq, and, isNull } from 'drizzle-orm';
+import { faceEmbeddings, photos } from '@/db';
 import type { Database } from '@/db';
 import type { SearchOptions, PhotoMatch, RecognitionError } from './types';
 
 /**
  * Search for photos containing faces similar to the query embedding.
  *
- * Uses pgvector's cosine distance operator (<=>):
- *   cosine_similarity = 1 - (embedding <=> query_vector)
+ * Uses Drizzle's cosineDistance() helper (maps to pgvector's <=> operator):
+ *   cosine_similarity = 1 - cosineDistance(embedding, query)
  *
  * Filters: event_id, photo status='indexed', not deleted.
  * Groups by photo_id, keeps max similarity per photo.
@@ -30,29 +31,29 @@ export function searchByFace(
     minSimilarity = 0.8,
   } = options;
 
-  // Format embedding as pgvector literal
-  const vectorLiteral = `[${embedding.join(',')}]`;
+  const distance = cosineDistance(faceEmbeddings.embedding, embedding);
+  const similarity = sql<number>`1 - (${distance})`;
 
   return ResultAsync.fromPromise(
-    db.execute<{
-      photo_id: string;
-      similarity: number;
-      face_count: number;
-    }>(sql`
-      SELECT
-        fe.photo_id,
-        MAX(1 - (fe.embedding <=> ${vectorLiteral}::vector)) AS similarity,
-        COUNT(*)::int AS face_count
-      FROM face_embeddings fe
-      JOIN photos p ON p.id = fe.photo_id
-      WHERE p.event_id = ${eventId}
-        AND p.status = 'indexed'
-        AND p.deleted_at IS NULL
-      GROUP BY fe.photo_id
-      HAVING MAX(1 - (fe.embedding <=> ${vectorLiteral}::vector)) >= ${minSimilarity}
-      ORDER BY similarity DESC
-      LIMIT ${maxResults}
-    `),
+    db
+      .select({
+        photoId: faceEmbeddings.photoId,
+        similarity: sql<number>`MAX(${similarity})`,
+        faceCount: sql<number>`COUNT(*)::int`,
+      })
+      .from(faceEmbeddings)
+      .innerJoin(photos, eq(photos.id, faceEmbeddings.photoId))
+      .where(
+        and(
+          eq(photos.eventId, eventId),
+          eq(photos.status, 'indexed'),
+          isNull(photos.deletedAt),
+        ),
+      )
+      .groupBy(faceEmbeddings.photoId)
+      .having(sql`MAX(${similarity}) >= ${minSimilarity}`)
+      .orderBy(desc(sql`MAX(${similarity})`))
+      .limit(maxResults),
     (cause): RecognitionError => ({
       type: 'database',
       operation: 'search_by_face',
@@ -60,11 +61,11 @@ export function searchByFace(
       throttle: false,
       cause,
     }),
-  ).map((result) =>
-    result.rows.map((row) => ({
-      photoId: row.photo_id,
+  ).map((rows) =>
+    rows.map((row) => ({
+      photoId: row.photoId,
       similarity: Number(row.similarity),
-      faceCount: Number(row.face_count),
+      faceCount: Number(row.faceCount),
     })),
   );
 }
