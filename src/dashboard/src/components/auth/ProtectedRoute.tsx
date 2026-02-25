@@ -1,10 +1,24 @@
-import { useAuth } from '@/auth/react';
+import { useEffect, useRef } from 'react';
+import posthog from 'posthog-js';
+import { useAuth, useUser } from '@/auth/react';
 import { Navigate, useLocation } from 'react-router';
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const { user } = useUser();
   const location = useLocation();
+  const identified = useRef(false);
+
+  useEffect(() => {
+    if (isSignedIn && userId && user && !identified.current) {
+      posthog.identify(userId, {
+        email: user.emailAddresses[0]?.emailAddress,
+        name: user.fullName,
+      });
+      identified.current = true;
+    }
+  }, [isSignedIn, userId, user]);
 
   if (!isLoaded) {
     return (
