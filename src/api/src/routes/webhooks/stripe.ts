@@ -33,6 +33,7 @@ import type { StripeEvents } from '../../lib/stripe/events';
 import { safeHandler } from '../../lib/safe-handler';
 import type { HandlerError } from '../../lib/error';
 import { reprocessInsufficientCredits } from '../../lib/services/uploads/reprocess';
+import { capturePostHogEvent } from '../../lib/posthog';
 
 /**
  * Environment bindings for Stripe webhook
@@ -40,6 +41,7 @@ import { reprocessInsufficientCredits } from '../../lib/services/uploads/reproce
 type StripeWebhookBindings = {
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
+  POSTHOG_API_KEY: string;
   // Needed for reprocessing insufficient_credits intents after credit top-up
   DATABASE_URL: string;
   PHOTOS_BUCKET: R2Bucket;
@@ -291,6 +293,22 @@ export const stripeWebhookRouter = new Hono<{
                 photographerId,
                 error: err instanceof Error ? err.message : String(err),
               });
+            }),
+          );
+        }
+
+        // Track credit purchase in PostHog
+        const clerkUserId = metadata.clerk_user_id;
+        if (clerkUserId) {
+          c.executionCtx.waitUntil(
+            capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+              distinctId: clerkUserId,
+              event: 'credit_purchased',
+              properties: {
+                credits: parseInt(metadata.credits, 10),
+                amount_thb: session.amount_total ? session.amount_total / 100 : 0,
+                currency: session.currency,
+              },
             }),
           );
         }

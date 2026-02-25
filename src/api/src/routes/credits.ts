@@ -409,6 +409,7 @@ export const creditsRouter = new Hono<Env>()
           cancelUrl,
           metadata: {
             photographer_id: photographer.id,
+            clerk_user_id: c.get('auth')!.userId,
             credits: discount.creditAmount.toString(), // Webhook expects 'credits' key
             original_amount: discount.originalAmount.toString(),
             discount_percent: discount.discountPercent.toString(),

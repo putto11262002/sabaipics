@@ -26,6 +26,7 @@ import { safeHandler } from '../../lib/safe-handler';
 import { generatePresignedPutUrl } from '../../lib/r2/presign';
 import { createFtpCredentialsWithRetry } from '../../lib/ftp/credentials';
 import { hardDeleteEvents } from '../../lib/services/events/hard-delete';
+import { capturePostHogEvent } from '../../lib/posthog';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -516,6 +517,14 @@ export const eventsRouter = new Hono<Env>()
               });
             })(),
             (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+          );
+
+          c.executionCtx.waitUntil(
+            capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+              distinctId: c.get('auth')!.userId,
+              event: 'event_created',
+              properties: { event_id: created.id },
+            }),
           );
 
           return ok({

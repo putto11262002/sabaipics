@@ -28,6 +28,7 @@ import { getMonthlyUsage } from '../../lib/line/allowance';
 import { events, photographers } from '@/db';
 import { eq } from 'drizzle-orm';
 import type { PhotographerSettings } from '@/db/schema/photographers';
+import { capturePostHogEvent } from '../../lib/posthog';
 
 // =============================================================================
 // Schemas
@@ -261,6 +262,20 @@ export const lineParticipantRouter = new Hono<Env>()
         cfZone: c.env.CF_ZONE,
         isDev: c.env.NODE_ENV === 'development',
       }).mapErr(mapDeliveryError);
+
+      c.executionCtx.waitUntil(
+        capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+          distinctId: `line_${lineUserId}`,
+          event: 'photos_delivered',
+          properties: {
+            event_id: eventId,
+            delivery_method: 'line',
+            photo_count: result.photoCount,
+            message_count: result.messageCount,
+            status: result.status,
+          },
+        }),
+      );
 
       return ok(result);
     })

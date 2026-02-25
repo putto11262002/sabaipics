@@ -19,6 +19,7 @@ import { generatePresignedPutUrl } from '../lib/r2/presign';
 import { getBalance } from '../lib/credits';
 import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
+import { capturePostHogEvent } from '../lib/posthog';
 
 // =============================================================================
 // Constants
@@ -179,7 +180,21 @@ export const uploadsRouter = new Hono<Env>()
         (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
       );
 
-      // 6. Return presigned URL details
+      // 6. Track upload event
+      c.executionCtx.waitUntil(
+        capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+          distinctId: c.get('auth')!.userId,
+          event: 'photo_uploaded',
+          properties: {
+            event_id: eventId,
+            source: source ?? 'web',
+            content_type: contentType,
+            content_length: contentLength,
+          },
+        }),
+      );
+
+      // 7. Return presigned URL details
       return ok({
         uploadId: intent.id,
         putUrl: presignResult.url,
