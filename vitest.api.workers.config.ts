@@ -18,7 +18,7 @@ export default defineWorkersConfig({
         wrangler: {
           configPath: './wrangler.api.jsonc',
         },
-        main: './src/api/src/durable-objects/rate-limiter.ts',
+        main: './src/api/tests/workers-entry.ts',
         isolatedStorage: true,
       },
     },

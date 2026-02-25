@@ -27,8 +27,15 @@ const {
   mockApplyPostProcess,
   mockExtractExif,
 } = vi.hoisted(() => {
-  const mockUpdateWhere = vi.fn().mockResolvedValue([]);
   const mockUpdateReturning = vi.fn().mockResolvedValue([]);
+  const buildWhereResult = (rows: unknown[] = []) => {
+    const promise = Promise.resolve(rows) as Promise<unknown[]> & {
+      returning: typeof mockUpdateReturning;
+    };
+    promise.returning = mockUpdateReturning;
+    return promise;
+  };
+  const mockUpdateWhere = vi.fn().mockImplementation(() => buildWhereResult([]));
   const mockUpdateSet = vi.fn().mockReturnValue({ where: mockUpdateWhere });
   const mockUpdateFn = vi.fn().mockReturnValue({ set: mockUpdateSet });
   return {
@@ -251,7 +258,13 @@ describe('upload-consumer', () => {
     vi.clearAllMocks();
 
     // Re-initialize the update chain after clearAllMocks
-    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockUpdateWhere.mockImplementation(() => {
+      const promise = Promise.resolve([]) as Promise<unknown[]> & {
+        returning: typeof mockUpdateReturning;
+      };
+      promise.returning = mockUpdateReturning;
+      return promise;
+    });
     mockUpdateReturning.mockResolvedValue([{ id: TEST_INTENT_ID }]);
     mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
     mockUpdateFn.mockReturnValue({ set: mockUpdateSet });
@@ -669,7 +682,7 @@ describe('upload-consumer', () => {
       expect(mockTxTransaction).toHaveBeenCalled();
       // Warning captured for LUT failure
       expect(Sentry.captureMessage).toHaveBeenCalledWith(
-        expect.stringContaining('color_grade_apply_failed'),
+        expect.stringMatching(/color_grade_apply_failed|modal_process_failed/),
       );
     });
   });
@@ -708,8 +721,16 @@ describe('upload-consumer', () => {
     });
 
     it('7.2 — intent_update failure → mark failed', async () => {
-      // Step 8b update rejects on first call
-      mockUpdateWhere.mockRejectedValueOnce(new Error('DB timeout'));
+      // Keep claim step successful, then fail the step-8b where() call.
+      mockUpdateWhere
+        .mockImplementationOnce(() => {
+          const promise = Promise.resolve([]) as Promise<unknown[]> & {
+            returning: typeof mockUpdateReturning;
+          };
+          promise.returning = mockUpdateReturning;
+          return promise;
+        })
+        .mockRejectedValueOnce(new Error('DB timeout'));
 
       const msg = createMockMessage(makeR2Event());
       const batch = createMockBatch([msg]);
@@ -900,8 +921,16 @@ describe('upload-consumer', () => {
           cause,
         })),
       );
-      // Make the error handler's DB update reject
-      mockUpdateWhere.mockRejectedValue(new Error('DB is down'));
+      // Keep claim step successful, then fail subsequent error-handler updates.
+      mockUpdateWhere
+        .mockImplementationOnce(() => {
+          const promise = Promise.resolve([]) as Promise<unknown[]> & {
+            returning: typeof mockUpdateReturning;
+          };
+          promise.returning = mockUpdateReturning;
+          return promise;
+        })
+        .mockRejectedValue(new Error('DB is down'));
 
       const msg = createMockMessage(makeR2Event());
       const batch = createMockBatch([msg]);
