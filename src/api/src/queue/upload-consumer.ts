@@ -979,6 +979,7 @@ async function processUpload(
             const surchargeDebitResult = await debitCreditsIfNotExists(tx, {
               photographerId: intent.photographerId,
               amount: 1,
+              source: 'image_enhancement',
               operationType: AUTO_EDIT_SURCHARGE_OPERATION_TYPE,
               operationId: intent.id,
             });

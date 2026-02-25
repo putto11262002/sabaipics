@@ -13,6 +13,7 @@ export const creditLedgerSources = [
   'gift',
   'discount',
   'upload',
+  'image_enhancement',
   'refund',
   'admin_adjustment',
   'apple_purchase',
