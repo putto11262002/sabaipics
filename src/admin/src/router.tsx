@@ -46,6 +46,10 @@ export const router = createBrowserRouter([
         lazy: () => import('./routes/feedback/[id]'),
       },
       {
+        path: '/marketing',
+        lazy: () => import('./routes/marketing'),
+      },
+      {
         path: '/settings',
         lazy: () => import('./routes/settings'),
       },
