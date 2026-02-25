@@ -20,6 +20,10 @@ import { getBalance } from '../lib/credits';
 import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 import { capturePostHogEvent } from '../lib/posthog';
+import {
+  reprocessInsufficientCreditsForEvent,
+  reprocessInsufficientCreditsForIntent,
+} from '../lib/services/uploads/reprocess';
 
 // =============================================================================
 // Constants
@@ -73,6 +77,15 @@ const listIntentsQuerySchema = z.object({
     .min(1, 'Limit must be at least 1')
     .max(50, 'Limit cannot exceed 50')
     .default(10),
+});
+
+const retryIntentParamsSchema = z.object({
+  eventId: z.string().uuid('Invalid event ID format'),
+  uploadId: z.string().uuid('Invalid upload ID format'),
+});
+
+const retryAllParamsSchema = z.object({
+  eventId: z.string().uuid('Invalid event ID format'),
 });
 
 // =============================================================================
@@ -434,6 +447,7 @@ export const uploadsRouter = new Hono<Env>()
               source: uploadIntents.source,
               errorCode: uploadIntents.errorCode,
               errorMessage: uploadIntents.errorMessage,
+              retryable: uploadIntents.retryable,
               createdAt: uploadIntents.createdAt,
               completedAt: uploadIntents.completedAt,
               photoId: photos.id,
@@ -468,6 +482,7 @@ export const uploadsRouter = new Hono<Env>()
           source: row.source,
           errorCode: row.errorCode,
           errorMessage: row.errorMessage,
+          retryable: row.retryable ?? false,
           createdAt: new Date(row.createdAt).toISOString(),
           completedAt: row.completedAt ? new Date(row.completedAt).toISOString() : null,
           photo: row.photoId
@@ -489,6 +504,106 @@ export const uploadsRouter = new Hono<Env>()
         .orTee((e) => e.cause && console.error('[uploads/events] error:', e.cause))
         .match(
           (result) => c.json(result),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // =========================================================================
+  // POST /uploads/events/:eventId/:uploadId/retry - Retry one retryable upload intent
+  // =========================================================================
+  .post(
+    '/events/:eventId/:uploadId/retry',
+    requirePhotographer(),
+    zValidator('param', retryIntentParamsSchema),
+    async (c) => {
+      return safeTry(async function* () {
+        const photographer = c.var.photographer;
+        const db = c.var.db();
+        const { eventId, uploadId } = c.req.valid('param');
+
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: activeEvents.id })
+            .from(activeEvents)
+            .where(
+              and(
+                eq(activeEvents.id, eventId),
+                eq(activeEvents.photographerId, photographer.id),
+              ),
+            )
+            .limit(1),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const result = yield* ResultAsync.fromPromise(
+          reprocessInsufficientCreditsForIntent(c.env, photographer.id, eventId, uploadId),
+          (e): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Failed to retry upload intent',
+            cause: e,
+          }),
+        );
+
+        return ok(result);
+      })
+        .orTee((e) => e.cause && console.error('[uploads/events/:eventId/:uploadId/retry]', e.cause))
+        .match(
+          (data) => c.json({ data }),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // =========================================================================
+  // POST /uploads/events/:eventId/retry-all - Retry all retryable upload intents
+  // =========================================================================
+  .post(
+    '/events/:eventId/retry-all',
+    requirePhotographer(),
+    zValidator('param', retryAllParamsSchema),
+    async (c) => {
+      return safeTry(async function* () {
+        const photographer = c.var.photographer;
+        const db = c.var.db();
+        const { eventId } = c.req.valid('param');
+
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: activeEvents.id })
+            .from(activeEvents)
+            .where(
+              and(
+                eq(activeEvents.id, eventId),
+                eq(activeEvents.photographerId, photographer.id),
+              ),
+            )
+            .limit(1),
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const result = yield* ResultAsync.fromPromise(
+          reprocessInsufficientCreditsForEvent(c.env, photographer.id, eventId),
+          (e): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Failed to retry upload intents',
+            cause: e,
+          }),
+        );
+
+        return ok(result);
+      })
+        .orTee((e) => e.cause && console.error('[uploads/events/:eventId/retry-all]', e.cause))
+        .match(
+          (data) => c.json({ data }),
           (e) => apiError(c, e),
         );
     },
