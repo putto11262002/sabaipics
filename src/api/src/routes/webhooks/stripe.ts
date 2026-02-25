@@ -294,30 +294,38 @@ export const stripeWebhookRouter = new Hono<{
         // Best-effort: reprocess any insufficient_credits intents for this photographer
         const photographerId = metadata.photographer_id;
         if (photographerId) {
-          c.executionCtx.waitUntil(
-            reprocessInsufficientCredits(c.env as any, photographerId).catch((err) => {
-              console.error('[Stripe Webhook] Reprocess failed', {
-                photographerId,
-                error: err instanceof Error ? err.message : String(err),
-              });
-            }),
-          );
+          try {
+            c.executionCtx.waitUntil(
+              reprocessInsufficientCredits(c.env as any, photographerId).catch((err) => {
+                console.error('[Stripe Webhook] Reprocess failed', {
+                  photographerId,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              }),
+            );
+          } catch {
+            // Hono unit tests do not always provide ExecutionContext.
+          }
         }
 
         // Track credit purchase in PostHog
         const clerkUserId = metadata.clerk_user_id;
         if (clerkUserId) {
-          c.executionCtx.waitUntil(
-            capturePostHogEvent(c.env.POSTHOG_API_KEY, {
-              distinctId: clerkUserId,
-              event: 'credit_purchased',
-              properties: {
-                credits: parseInt(metadata.credits, 10),
-                amount_thb: session.amount_total ? session.amount_total / 100 : 0,
-                currency: session.currency,
-              },
-            }),
-          );
+          try {
+            c.executionCtx.waitUntil(
+              capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+                distinctId: clerkUserId,
+                event: 'credit_purchased',
+                properties: {
+                  credits: parseInt(metadata.credits, 10),
+                  amount_thb: session.amount_total ? session.amount_total / 100 : 0,
+                  currency: session.currency,
+                },
+              }),
+            );
+          } catch {
+            // Hono unit tests do not always provide ExecutionContext.
+          }
         }
 
         // Emit event for logging/analytics (not for fulfillment)

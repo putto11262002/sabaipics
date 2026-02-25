@@ -519,13 +519,17 @@ export const eventsRouter = new Hono<Env>()
             (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
           );
 
-          c.executionCtx.waitUntil(
-            capturePostHogEvent(c.env.POSTHOG_API_KEY, {
-              distinctId: c.get('auth')!.userId,
-              event: 'event_created',
-              properties: { event_id: created.id },
-            }),
-          );
+          try {
+            c.executionCtx.waitUntil(
+              capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+                distinctId: c.get('auth')!.userId,
+                event: 'event_created',
+                properties: { event_id: created.id },
+              }),
+            );
+          } catch {
+            // Hono unit tests do not always provide ExecutionContext.
+          }
 
           return ok({
             id: created.id,
