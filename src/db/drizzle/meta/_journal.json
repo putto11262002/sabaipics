@@ -218,13 +218,6 @@
       "when": 1771998233867,
       "tag": "0030_adorable_silver_samurai",
       "breakpoints": true
-    },
-    {
-      "idx": 31,
-      "version": "7",
-      "when": 1772010000000,
-      "tag": "0031_credit_debit_operation_unique",
-      "breakpoints": true
     }
   ]
 }
