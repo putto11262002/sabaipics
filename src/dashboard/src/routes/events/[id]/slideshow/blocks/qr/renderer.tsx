@@ -16,7 +16,7 @@ export function QrRenderer({
   context: SlideshowContext;
 }) {
   const props = block.props as QrProps;
-  const searchUrl = `${import.meta.env.VITE_EVENT_URL}/participant/events/${context.event.id}/search`;
+  const searchUrl = `${import.meta.env.VITE_EVENT_URL}/${context.event.id}/search`;
 
   // Editor mode - show placeholder
   if (!context.liveMode) {

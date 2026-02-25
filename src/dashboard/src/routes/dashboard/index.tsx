@@ -109,7 +109,7 @@ export function DashboardPage() {
   };
 
   const handleCopyLink = (eventId: string) => {
-    const searchUrl = `${import.meta.env.VITE_EVENT_URL}/participant/events/${eventId}/search`;
+    const searchUrl = `${import.meta.env.VITE_EVENT_URL}/${eventId}/search`;
     copyToClipboard(searchUrl);
   };
 

@@ -44,7 +44,7 @@ export default function EventDetailLayout() {
   const [hardDeleteDialogOpen, setHardDeleteDialogOpen] = useState(false);
 
   const handleCopyLink = (eventId: string) => {
-    const searchUrl = `${import.meta.env.VITE_EVENT_URL}/participant/events/${eventId}/search`;
+    const searchUrl = `${import.meta.env.VITE_EVENT_URL}/${eventId}/search`;
     copyToClipboard(searchUrl);
   };
 
