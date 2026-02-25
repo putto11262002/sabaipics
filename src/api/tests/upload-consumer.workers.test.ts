@@ -19,6 +19,7 @@ const {
   mockFindFirstIntent,
   mockFindFirstPhotoLut,
   mockUpdateWhere,
+  mockUpdateReturning,
   mockUpdateSet,
   mockUpdateFn,
   mockTxTransaction,
@@ -27,12 +28,14 @@ const {
   mockExtractExif,
 } = vi.hoisted(() => {
   const mockUpdateWhere = vi.fn().mockResolvedValue([]);
+  const mockUpdateReturning = vi.fn().mockResolvedValue([]);
   const mockUpdateSet = vi.fn().mockReturnValue({ where: mockUpdateWhere });
   const mockUpdateFn = vi.fn().mockReturnValue({ set: mockUpdateSet });
   return {
     mockFindFirstIntent: vi.fn(),
     mockFindFirstPhotoLut: vi.fn(),
     mockUpdateWhere,
+    mockUpdateReturning,
     mockUpdateSet,
     mockUpdateFn,
     mockTxTransaction: vi.fn(),
@@ -248,7 +251,8 @@ describe('upload-consumer', () => {
     vi.clearAllMocks();
 
     // Re-initialize the update chain after clearAllMocks
-    mockUpdateWhere.mockResolvedValue([]);
+    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockUpdateReturning.mockResolvedValue([{ id: TEST_INTENT_ID }]);
     mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
     mockUpdateFn.mockReturnValue({ set: mockUpdateSet });
 
@@ -372,6 +376,30 @@ describe('upload-consumer', () => {
       await queue(batch, env as any, {} as ExecutionContext);
 
       expect(headSpy).toHaveBeenCalled();
+    });
+
+    it('2.5 — skips processing intent (already claimed)', async () => {
+      mockFindFirstIntent.mockResolvedValue(makePendingIntent({ status: 'processing' }));
+      const headSpy = vi.spyOn(env.PHOTOS_BUCKET, 'head');
+      const msg = createMockMessage(makeR2Event());
+      const batch = createMockBatch([msg]);
+
+      await queue(batch, env as any, {} as ExecutionContext);
+
+      expect(msg.ack).toHaveBeenCalled();
+      expect(headSpy).not.toHaveBeenCalled();
+    });
+
+    it('2.6 — claim race returns no rows and skips before HEAD', async () => {
+      mockUpdateReturning.mockResolvedValueOnce([]);
+      const headSpy = vi.spyOn(env.PHOTOS_BUCKET, 'head');
+      const msg = createMockMessage(makeR2Event());
+      const batch = createMockBatch([msg]);
+
+      await queue(batch, env as any, {} as ExecutionContext);
+
+      expect(msg.ack).toHaveBeenCalled();
+      expect(headSpy).not.toHaveBeenCalled();
     });
   });
 
