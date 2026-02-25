@@ -32,6 +32,7 @@
     "CF_ACCESS_TEAM_DOMAIN": "https://framefast.cloudflareaccess.com",
     "CF_ACCESS_AUD": "505392355047ad894d5d55809c271e356dcfb45ba1123ed5ede28daf543e58d7",
     "RECOGNITION_ENDPOINT": "http://localhost:8082",
+    "POSTHOG_API_KEY": "",
   },
 
   // R2 bucket for photo storage
@@ -182,6 +183,7 @@
         "CF_ACCESS_TEAM_DOMAIN": "https://framefast.cloudflareaccess.com",
         "CF_ACCESS_AUD": "505392355047ad894d5d55809c271e356dcfb45ba1123ed5ede28daf543e58d7",
         "RECOGNITION_ENDPOINT": "https://putto11262002--framefast-recognition-serve.modal.run",
+        "POSTHOG_API_KEY": "",
       },
       "routes": [
         {
@@ -328,6 +330,7 @@
         "CF_ACCESS_TEAM_DOMAIN": "https://framefast.cloudflareaccess.com",
         "CF_ACCESS_AUD": "505392355047ad894d5d55809c271e356dcfb45ba1123ed5ede28daf543e58d7",
         "RECOGNITION_ENDPOINT": "https://putto11262002--framefast-recognition-serve.modal.run",
+        "POSTHOG_API_KEY": "",
       },
       "routes": [
         {
