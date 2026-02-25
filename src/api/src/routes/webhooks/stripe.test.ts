@@ -20,11 +20,16 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Hono } from 'hono';
 import { createDb, createDbTx } from '@/db';
-import { photographers, creditLedger } from '@/db';
+import { photographers } from '@/db';
 import { eq } from 'drizzle-orm';
 import { stripeWebhookRouter } from './stripe';
 import { randomUUID } from 'crypto';
 import type { Bindings } from '../../types';
+import {
+  deleteLedgerEntriesByPhotographer,
+  getPurchaseFulfillmentBySession,
+  getStripeLedgerEntriesBySession,
+} from '../../lib/credits';
 
 // =============================================================================
 // Test Setup
@@ -57,7 +62,12 @@ async function createTestPhotographer() {
  */
 async function cleanupTestData() {
   const db = createDb(process.env.DATABASE_URL!);
-  await db.delete(creditLedger).where(eq(creditLedger.photographerId, TEST_PHOTOGRAPHER_ID));
+  await deleteLedgerEntriesByPhotographer(db, TEST_PHOTOGRAPHER_ID).match(
+    () => undefined,
+    (error) => {
+      throw new Error(`credit cleanup failed: ${error.type}`);
+    },
+  );
   await db.delete(photographers).where(eq(photographers.id, TEST_PHOTOGRAPHER_ID));
 }
 
@@ -154,17 +164,20 @@ describeDb('POST /webhooks/stripe - Framework-Level (Hono Router)', () => {
       // Verify DB state - credit ledger entry created atomically
       const db = createDb(process.env.DATABASE_URL!);
 
-      const [credit] = await db
-        .select()
-        .from(creditLedger)
-        .where(eq(creditLedger.stripeSessionId, TEST_STRIPE_SESSION_ID))
-        .limit(1);
+      const credit = await getPurchaseFulfillmentBySession(
+        db,
+        TEST_PHOTOGRAPHER_ID,
+        TEST_STRIPE_SESSION_ID,
+      ).match(
+        (value) => value,
+        (error) => {
+          throw new Error(`query purchase fulfillment failed: ${error.type}`);
+        },
+      );
 
       expect(credit).toBeDefined();
-      expect(credit?.photographerId).toBe(TEST_PHOTOGRAPHER_ID);
-      expect(credit?.amount).toBe(10);
-      expect(credit?.type).toBe('credit');
-      expect(credit?.stripeSessionId).toBe(TEST_STRIPE_SESSION_ID);
+      expect(credit?.credits).toBe(10);
+      expect(credit?.expiresAt).toBeDefined();
 
       console.log(`✓ Stripe webhook transaction works in framework-level test`);
     } else {
@@ -240,10 +253,12 @@ describeDb('POST /webhooks/stripe - Framework-Level (Hono Router)', () => {
       // Verify only ONE credit entry exists (idempotency)
       const db = createDb(process.env.DATABASE_URL!);
 
-      const credits = await db
-        .select()
-        .from(creditLedger)
-        .where(eq(creditLedger.stripeSessionId, TEST_STRIPE_SESSION_ID));
+      const credits = await getStripeLedgerEntriesBySession(db, TEST_STRIPE_SESSION_ID).match(
+        (value) => value,
+        (error) => {
+          throw new Error(`query stripe ledger entries failed: ${error.type}`);
+        },
+      );
 
       expect(credits.length).toBe(1); // Not 2!
       expect(credits[0].amount).toBe(10);
