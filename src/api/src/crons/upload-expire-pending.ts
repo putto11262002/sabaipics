@@ -1,13 +1,13 @@
 import { createDb, uploadIntents } from '@/db';
-import { and, eq, lt } from 'drizzle-orm';
+import { and, eq, lt, or } from 'drizzle-orm';
 import type { Bindings } from '../types';
 
 const BATCH_SIZE = 100;
 
 /**
- * Transitions stale pending upload intents to `expired` after 7 days.
+ * Transitions stale pending/processing upload intents to `expired` after 7 days.
  * Covers two stuck scenarios:
- *   (a) Worker crash — error handler never ran, intent stuck in `pending`
+ *   (a) Worker crash — error handler never ran, intent stuck in `pending` or `processing`
  *   (b) Client got presign but never uploaded — no R2 event fired
  *
  * Uses `createdAt` (not `expiresAt`) because clients can re-presign a pending
@@ -29,7 +29,10 @@ export async function expireStalePendingIntents(env: Bindings): Promise<void> {
     .select({ id: uploadIntents.id })
     .from(uploadIntents)
     .where(
-      and(eq(uploadIntents.status, 'pending'), lt(uploadIntents.createdAt, cutoff.toISOString())),
+      and(
+        or(eq(uploadIntents.status, 'pending'), eq(uploadIntents.status, 'processing')),
+        lt(uploadIntents.createdAt, cutoff.toISOString()),
+      ),
     )
     .limit(BATCH_SIZE);
 
@@ -43,12 +46,17 @@ export async function expireStalePendingIntents(env: Bindings): Promise<void> {
 
   for (const intent of intents) {
     try {
-      // Compare-and-set: only expire if still pending (prevents overwriting
+      // Compare-and-set: only expire if still pending/processing (prevents overwriting
       // a concurrent completed/failed transition from the upload consumer).
       await db
         .update(uploadIntents)
         .set({ status: 'expired' })
-        .where(and(eq(uploadIntents.id, intent.id), eq(uploadIntents.status, 'pending')));
+        .where(
+          and(
+            eq(uploadIntents.id, intent.id),
+            or(eq(uploadIntents.status, 'pending'), eq(uploadIntents.status, 'processing')),
+          ),
+        );
 
       expired++;
     } catch (error) {

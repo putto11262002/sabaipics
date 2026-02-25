@@ -41,7 +41,6 @@ import { extractExif } from '../lib/images/exif';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 import { processWithModal, isModalConfigured, type ModalProcessOptions } from '../lib/modal-client';
 import { generatePresignedGetUrl, generatePresignedPutUrl } from '../lib/r2/presign';
-import { capturePostHogEvent } from '../lib/posthog';
 
 // wrangler.api.jsonc sets max_retries: 1 as a crash safety net.
 // The consumer itself never calls message.retry() — the idempotency guard
@@ -259,6 +258,7 @@ async function processUpload(
     // Idempotency guard: skip if already terminal (handles crash redelivery + duplicate R2 events)
     if (
       intent.status === 'completed' ||
+      intent.status === 'processing' ||
       intent.status === 'failed' ||
       intent.status === 'expired'
     ) {
@@ -275,6 +275,25 @@ async function processUpload(
       fileSize: intent.contentLength,
       contentType: intent.contentType,
     };
+
+    // Atomic claim: only one worker may transition pending -> processing.
+    const claimRows = yield* ResultAsync.fromPromise(
+      db
+        .update(uploadIntents)
+        .set({ status: 'processing', errorCode: null, errorMessage: null })
+        .where(and(eq(uploadIntents.id, intent.id), eq(uploadIntents.status, 'pending')))
+        .returning({ id: uploadIntents.id }),
+      (cause): UploadProcessingError => ({
+        type: 'database',
+        operation: 'claim_intent',
+        cause,
+      }),
+    );
+
+    if (claimRows.length === 0) {
+      console.log(`[upload-consumer] Intent already claimed by another worker: ${intent.id}`);
+      return ok(undefined);
+    }
 
     // Step 2: Check if intent expired
     if (new Date(intent.expiresAt) < new Date(event.eventTime)) {
@@ -948,7 +967,7 @@ async function processUpload(
             photographerId: intent.photographerId,
             amount: 1,
             operationType: BASE_UPLOAD_OPERATION_TYPE,
-            operationId: photoId,
+            operationId: intent.id,
           });
 
           if (baseDebitResult.isErr()) {
@@ -961,7 +980,7 @@ async function processUpload(
               photographerId: intent.photographerId,
               amount: 1,
               operationType: AUTO_EDIT_SURCHARGE_OPERATION_TYPE,
-              operationId: photoId,
+              operationId: intent.id,
             });
 
             if (surchargeDebitResult.isErr()) {
@@ -1053,31 +1072,6 @@ async function processUpload(
         },
       });
     });
-
-    // PostHog: track photo processing completion (fire-and-forget)
-    const pipelineLabel = pipelineApplied
-      ? pipelineApplied.autoEdit && pipelineApplied.lutId
-        ? 'both'
-        : pipelineApplied.autoEdit
-          ? 'auto_edit'
-          : 'lut'
-      : 'none';
-
-    capturePostHogEvent(env.POSTHOG_API_KEY, {
-      distinctId: intent.photographerId,
-      event: 'photo_processed',
-      properties: {
-        event_id: intent.eventId,
-        source: intent.source ?? 'web',
-        width,
-        height,
-        file_size: fileSize,
-        pipeline_applied: pipelineLabel,
-        auto_edit_preset_id: pipelineApplied?.autoEditPresetId ?? null,
-        lut_id: pipelineApplied?.lutId ?? null,
-        success: true,
-      },
-    }).catch(() => {}); // best-effort, errors already logged inside
 
     console.log(`[upload-consumer] Completed: ${photo.id}`);
     return ok(undefined);

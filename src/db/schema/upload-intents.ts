@@ -7,6 +7,7 @@ import { photographers } from './photographers';
 // Status enum for upload intent lifecycle
 export const uploadIntentStatuses = [
   'pending', // presign issued, waiting for upload or being processed
+  'processing', // claimed by worker and currently in processing pipeline
   'completed', // photo created successfully
   'failed', // validation failed, object deleted
   'expired', // presign expired, never uploaded
