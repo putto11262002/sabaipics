@@ -12,6 +12,7 @@ export { getBalance, getNextExpiry, recomputeBalanceCache } from './balance';
 export {
   getPurchaseFulfillmentBySession,
   getUsageChart,
+  getUsageBySource,
   getLineDeliveryCreditsSpent,
   getStripeLedgerEntryBySession,
   getStripeLedgerEntriesBySession,
@@ -22,6 +23,7 @@ export {
   getAdminCreditEntries,
   type PurchaseFulfillment,
   type UsageChartPoint,
+  type UsageBySourcePoint,
   type AdminCreditTotals,
   type AdminCreditEntriesResult,
 } from './queries';

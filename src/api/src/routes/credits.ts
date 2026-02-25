@@ -15,7 +15,7 @@ import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../lib/error';
 import { calculateTieredDiscount, getDiscountTiers } from '../lib/pricing/discounts';
 import { topUpSchema } from '../lib/pricing/validation';
-import { getCreditHistory, getPurchaseFulfillmentBySession, getUsageChart } from '../lib/credits';
+import { getCreditHistory, getPurchaseFulfillmentBySession, getUsageChart, getUsageBySource } from '../lib/credits';
 import { grantCredits } from '../lib/credits/grant';
 
 /**
@@ -539,6 +539,33 @@ export const creditsRouter = new Hono<Env>()
       sinceDate.setDate(sinceDate.getDate() - days);
 
       const rows = yield* getUsageChart(db, photographer.id, sinceDate.toISOString()).mapErr(
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
+      );
+
+      return ok(rows);
+    })
+      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
+  })
+  /**
+   * GET /credit-packages/usage/by-source?days=30
+   *
+   * Returns daily debit amounts grouped by source for stacked bar chart.
+   * Requires authenticated photographer.
+   */
+  .get('/usage/by-source', requirePhotographer(), async (c) => {
+    return safeTry(async function* () {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+
+      const days = Math.min(90, Math.max(1, parseInt(c.req.query('days') || '30', 10)));
+      const sinceDate = new Date();
+      sinceDate.setDate(sinceDate.getDate() - days);
+
+      const rows = yield* getUsageBySource(db, photographer.id, sinceDate.toISOString()).mapErr(
         (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
       );
 

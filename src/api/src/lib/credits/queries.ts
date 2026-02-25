@@ -16,6 +16,12 @@ export interface UsageChartPoint {
   credits: number;
 }
 
+export interface UsageBySourcePoint {
+  date: string;
+  source: string;
+  credits: number;
+}
+
 export interface AdminCreditTotals {
   totalCredits: number;
   totalDebits: number;
@@ -75,6 +81,35 @@ export function getUsageChart(
         ),
       )
       .groupBy(sql`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`)
+      .orderBy(sql`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`),
+    (cause): CreditError => ({ type: 'database', cause }),
+  );
+}
+
+export function getUsageBySource(
+  db: Db,
+  photographerId: string,
+  sinceIso: string,
+): ResultAsync<UsageBySourcePoint[], CreditError> {
+  return ResultAsync.fromPromise(
+    db
+      .select({
+        date: sql<string>`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`,
+        source: creditLedger.source,
+        credits: sql<number>`coalesce(sum(abs(${creditLedger.amount})), 0)::int`,
+      })
+      .from(creditLedger)
+      .where(
+        and(
+          eq(creditLedger.photographerId, photographerId),
+          eq(creditLedger.type, 'debit'),
+          gte(creditLedger.createdAt, sinceIso),
+        ),
+      )
+      .groupBy(
+        sql`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`,
+        creditLedger.source,
+      )
       .orderBy(sql`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`),
     (cause): CreditError => ({ type: 'database', cause }),
   );
