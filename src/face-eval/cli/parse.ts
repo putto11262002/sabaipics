@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 
-export type ProviderName = 'sabaiface' | 'aws';
+export type ProviderName = 'sabaiface' | 'aws' | 'modal';
 
 export interface RunCommand {
   command: 'run';
@@ -99,7 +99,7 @@ export function parseCli(argv: string[]): ParsedCli {
 
   const [provider, ...runRest] = rest;
 
-  if (provider !== 'sabaiface' && provider !== 'aws') {
+  if (provider !== 'sabaiface' && provider !== 'aws' && provider !== 'modal') {
     return { type: 'help', message: `Unknown provider: ${provider ?? ''}` };
   }
 
@@ -137,7 +137,7 @@ export function parseCli(argv: string[]): ParsedCli {
     ),
   ).sort((a, b) => a - b);
 
-  const minSimilarityDefault = provider === 'aws' ? 0.94 : 0.4;
+  const minSimilarityDefault = provider === 'aws' ? 0.94 : 0.4; // sabaiface + modal use 0.4
   const minSimilarity = values['min-similarity']
     ? clamp01(Number.parseFloat(values['min-similarity']))
     : undefined;

@@ -117,21 +117,15 @@
     ],
   },
 
-  // Durable Objects
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "AWS_REKOGNITION_RATE_LIMITER",
-        "class_name": "RekognitionRateLimiter",
-      },
-    ],
-  },
-
-  // DO migrations
+  // DO migrations (v2 deletes the old RekognitionRateLimiter)
   "migrations": [
     {
       "tag": "v1",
       "new_classes": ["RekognitionRateLimiter"],
+    },
+    {
+      "tag": "v2",
+      "deleted_classes": ["RekognitionRateLimiter"],
     },
   ],
 
@@ -152,13 +146,11 @@
         "simple": { "limit": 30, "period": 60 },
       },
       {
-        // AWS Rekognition SearchFacesByImage quota enforcement (20 TPS globally)
-        // Note: IndexFaces + SearchFacesByImage share 50 TPS in us-west-2
-        // Allocation: 30 TPS for IndexFaces (DO), 20 TPS for SearchFaces (this limiter)
+        // Face search rate limiting (self-hosted, no AWS quota constraints)
         "name": "SEARCH_RATE_LIMITER",
         "type": "ratelimit",
         "namespace_id": "1002",
-        "simple": { "limit": 200, "period": 10 }, // 200 req/10s = 20 TPS
+        "simple": { "limit": 200, "period": 10 },
       },
     ],
   },
@@ -269,14 +261,6 @@
           },
         ],
       },
-      "durable_objects": {
-        "bindings": [
-          {
-            "name": "AWS_REKOGNITION_RATE_LIMITER",
-            "class_name": "RekognitionRateLimiter",
-          },
-        ],
-      },
       "unsafe": {
         "bindings": [
           {
@@ -293,13 +277,11 @@
             "simple": { "limit": 30, "period": 60 },
           },
           {
-            // AWS Rekognition SearchFacesByImage quota enforcement (20 TPS globally)
-            // Note: IndexFaces + SearchFacesByImage share 50 TPS in us-west-2
-            // Allocation: 30 TPS for IndexFaces (DO), 20 TPS for SearchFaces (this limiter)
+            // Face search rate limiting (self-hosted, no AWS quota constraints)
             "name": "SEARCH_RATE_LIMITER",
             "type": "ratelimit",
             "namespace_id": "1002",
-            "simple": { "limit": 200, "period": 10 }, // 200 req/10s = 20 TPS
+            "simple": { "limit": 200, "period": 10 },
           },
         ],
       },
@@ -424,14 +406,6 @@
           },
         ],
       },
-      "durable_objects": {
-        "bindings": [
-          {
-            "name": "AWS_REKOGNITION_RATE_LIMITER",
-            "class_name": "RekognitionRateLimiter",
-          },
-        ],
-      },
       "unsafe": {
         "bindings": [
           {
@@ -448,13 +422,11 @@
             "simple": { "limit": 30, "period": 60 },
           },
           {
-            // AWS Rekognition SearchFacesByImage quota enforcement (20 TPS globally)
-            // Note: IndexFaces + SearchFacesByImage share 50 TPS in us-west-2
-            // Allocation: 30 TPS for IndexFaces (DO), 20 TPS for SearchFaces (this limiter)
+            // Face search rate limiting (self-hosted, no AWS quota constraints)
             "name": "SEARCH_RATE_LIMITER",
             "type": "ratelimit",
             "namespace_id": "1002",
-            "simple": { "limit": 200, "period": 10 }, // 200 req/10s = 20 TPS
+            "simple": { "limit": 200, "period": 10 },
           },
         ],
       },

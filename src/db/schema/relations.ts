@@ -5,6 +5,7 @@ import { creditAllocations } from './credit-allocations';
 import { events } from './events';
 import { photos } from './photos';
 import { faces } from './faces';
+import { faceEmbeddings } from './face-embeddings';
 import { consentRecords } from './consent-records';
 import { participantSearches } from './participant-searches';
 import { giftCodes, giftCodeRedemptions } from './gift-codes';
@@ -70,12 +71,21 @@ export const photosRelations = relations(photos, ({ one, many }) => ({
     references: [events.id],
   }),
   faces: many(faces),
+  faceEmbeddings: many(faceEmbeddings),
 }));
 
-// Face relations
+// Face relations (legacy — kept for rollback safety)
 export const facesRelations = relations(faces, ({ one }) => ({
   photo: one(photos, {
     fields: [faces.photoId],
+    references: [photos.id],
+  }),
+}));
+
+// Face embedding relations (v2 — pgvector)
+export const faceEmbeddingsRelations = relations(faceEmbeddings, ({ one }) => ({
+  photo: one(photos, {
+    fields: [faceEmbeddings.photoId],
     references: [photos.id],
   }),
 }));

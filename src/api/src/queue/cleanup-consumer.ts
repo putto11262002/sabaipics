@@ -3,23 +3,17 @@
  *
  * Handles rekognition-cleanup queue messages:
  * - Soft-delete photos (set deletedAt)
- * - Delete face recognition collection
- * - Clear rekognitionCollectionId from event
  *
- * Idempotent: ResourceNotFoundException treated as success.
+ * Face embeddings are cascade-deleted when photos are hard-deleted
+ * (ON DELETE CASCADE on face_embeddings.photo_id FK).
+ * No external service calls needed.
  */
 
 import type { CleanupJob } from '../types/cleanup-job';
 import type { Bindings } from '../types';
 import { createDb, events, photos } from '@/db';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import {
-  createFaceProvider,
-  isResourceNotFoundError,
-  getBackoffDelay,
-  getThrottleBackoffDelay,
-  type FaceServiceError,
-} from '../lib/rekognition';
+import { getBackoffDelay } from '../utils/backoff';
 import { ResultAsync, ok, err, safeTry } from 'neverthrow';
 
 // =============================================================================
@@ -28,8 +22,7 @@ import { ResultAsync, ok, err, safeTry } from 'neverthrow';
 
 type CleanupError =
   | { type: 'event_not_found'; eventId: string }
-  | { type: 'database'; operation: string; cause: unknown }
-  | { type: 'face_service'; retryable: boolean; throttle: boolean; cause: FaceServiceError };
+  | { type: 'database'; operation: string; cause: unknown };
 
 // =============================================================================
 // Queue Handler
@@ -41,7 +34,6 @@ export async function queue(batch: MessageBatch<CleanupJob>, env: Bindings): Pro
   console.log('[Cleanup] Batch start', { size: batch.messages.length });
 
   const db = createDb(env.DATABASE_URL);
-  const provider = createFaceProvider(env);
 
   for (const message of batch.messages) {
     const { event_id } = message.body;
@@ -52,7 +44,6 @@ export async function queue(batch: MessageBatch<CleanupJob>, env: Bindings): Pro
         db
           .select({
             hasPhotosNotDeleted: sql<boolean>`EXISTS(SELECT 1 FROM ${photos} WHERE ${photos.eventId} = ${event_id} AND ${photos.deletedAt} IS NULL)`,
-            collectionId: events.rekognitionCollectionId,
           })
           .from(events)
           .where(eq(events.id, event_id))
@@ -64,7 +55,6 @@ export async function queue(batch: MessageBatch<CleanupJob>, env: Bindings): Pro
       );
 
       let photosDeleted = 0;
-      let collectionDeleted = false;
 
       // 2. Soft-delete photos if any remain
       if (state.hasPhotosNotDeleted) {
@@ -79,39 +69,7 @@ export async function queue(batch: MessageBatch<CleanupJob>, env: Bindings): Pro
         );
       }
 
-      // 3. Delete collection + clear DB reference
-      if (state.collectionId) {
-        collectionDeleted = yield* provider
-          .deleteCollection(event_id)
-          .map(() => true)
-          .orElse((faceErr) => {
-            // Handle ResourceNotFoundException (already deleted) - treat as success
-            if (faceErr.type === 'provider_failed' && faceErr.provider === 'aws') {
-              const awsErr = faceErr as Extract<FaceServiceError, { provider: 'aws' }>;
-              if (isResourceNotFoundError(awsErr.errorName)) {
-                return ok(false);
-              }
-            }
-            return err<boolean, CleanupError>({
-              type: 'face_service',
-              retryable: faceErr.retryable,
-              throttle: faceErr.throttle,
-              cause: faceErr,
-            });
-          })
-          .andThen((deleted) =>
-            ResultAsync.fromPromise(
-              db
-                .update(events)
-                .set({ rekognitionCollectionId: null })
-                .where(eq(events.id, event_id))
-                .then(() => deleted),
-              (cause): CleanupError => ({ type: 'database', operation: 'clear_collection', cause }),
-            ),
-          );
-      }
-
-      return ok({ eventId: event_id, photosDeleted, collectionDeleted });
+      return ok({ eventId: event_id, photosDeleted });
     })
       .orTee((e) => console.error('[Cleanup] Failed:', { eventId: event_id, error: e }))
       .match(
@@ -120,10 +78,7 @@ export async function queue(batch: MessageBatch<CleanupJob>, env: Bindings): Pro
           message.ack();
         },
         (error) => {
-          const { retryable, throttle } =
-            error.type === 'face_service'
-              ? error
-              : { retryable: error.type === 'database', throttle: false };
+          const retryable = error.type === 'database';
 
           if (!retryable) {
             message.ack();
@@ -131,9 +86,7 @@ export async function queue(batch: MessageBatch<CleanupJob>, env: Bindings): Pro
           }
 
           message.retry({
-            delaySeconds: throttle
-              ? getThrottleBackoffDelay(message.attempts)
-              : getBackoffDelay(message.attempts),
+            delaySeconds: getBackoffDelay(message.attempts),
           });
         },
       );
