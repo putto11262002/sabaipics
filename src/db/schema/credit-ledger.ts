@@ -1,4 +1,4 @@
-import { pgTable, text, integer, index, uuid, unique, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, index, uuid, unique } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { timestamptz, createdAtCol } from './common';
 import { photographers } from './photographers';
@@ -51,13 +51,6 @@ export const creditLedger = pgTable(
     index('credit_ledger_apple_transaction_idx').on(table.appleTransactionId),
     // Unique constraint for idempotency - prevents duplicate Apple IAP credit grants
     unique('credit_ledger_apple_transaction_unique').on(table.appleTransactionId),
-    // Prevent duplicate debit operations for the same upload/surcharge operation tuple.
-    uniqueIndex('credit_ledger_debit_operation_unique').on(
-      table.photographerId,
-      table.type,
-      table.operationType,
-      table.operationId,
-    ),
   ],
 );
 
