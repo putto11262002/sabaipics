@@ -70,7 +70,14 @@ export function grantCredits(
       // Step 2: Increment denormalized balance on photographer
       await tx
         .update(photographers)
-        .set({ balance: sql`${photographers.balance} + ${amount}` })
+        .set({
+          balance: sql`${photographers.balance} + ${amount}`,
+          balanceInvalidateAt: sql`CASE
+            WHEN ${photographers.balanceInvalidateAt} IS NULL THEN ${expiresAt}::timestamptz
+            WHEN ${photographers.balanceInvalidateAt} > ${expiresAt}::timestamptz THEN ${expiresAt}::timestamptz
+            ELSE ${photographers.balanceInvalidateAt}
+          END`,
+        })
         .where(eq(photographers.id, photographerId));
 
       return { ledgerEntryId: entry.id };

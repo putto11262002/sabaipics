@@ -2,6 +2,7 @@ import type { Bindings } from '../types';
 import { cleanupExpiredEvents } from './cleanup';
 import { hardDeleteCleanup } from './hard-delete-cleanup';
 import { photographerCleanup } from './photographer-cleanup';
+import { reconcileStaleCreditBalances } from './credit-balance-reconcile';
 import { cleanupCompletedOriginals } from './upload-clean-completed-originals';
 import { cleanupNonRetryableFailed } from './upload-clean-failed';
 import { cleanupStaleRetryable } from './upload-clean-stale-retryable';
@@ -42,6 +43,9 @@ export async function scheduled(
       break;
     case '30 23 * * *': // 6:30 AM Bangkok time (UTC+7) - Expire stale pending intents (7 days)
       ctx.waitUntil(expireStalePendingIntents(env));
+      break;
+    case '40 23 * * *': // 6:40 AM Bangkok time (UTC+7) - Reconcile stale credit balances
+      ctx.waitUntil(reconcileStaleCreditBalances(env));
       break;
     default:
       console.warn('[Cron] Unknown cron schedule', {

@@ -15,13 +15,14 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, and, desc, sql, gte } from 'drizzle-orm';
-import { lineDeliveries, creditLedger, photographers, events } from '@/db';
+import { lineDeliveries, photographers, events } from '@/db';
 import { requirePhotographer } from '../middleware';
 import type { Env } from '../types';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { safeHandler } from '../lib/safe-handler';
 import { apiError, type HandlerError } from '../lib/error';
 import { getMonthlyUsage } from '../lib/line/allowance';
+import { getLineDeliveryCreditsSpent } from '../lib/credits';
 import type { PhotographerSettings } from '@/db/schema/photographers';
 
 // =============================================================================
@@ -73,22 +74,12 @@ export const lineDeliveryRouter = new Hono<Env>()
         (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
       );
 
-      // Credits spent on LINE delivery this month
-      const [creditStats] = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            creditsSpent: sql<number>`coalesce(sum(abs(${creditLedger.amount})), 0)::int`,
-          })
-          .from(creditLedger)
-          .where(
-            and(
-              eq(creditLedger.photographerId, photographer.id),
-              eq(creditLedger.type, 'debit'),
-              eq(creditLedger.source, 'line_delivery'),
-              gte(creditLedger.createdAt, startOfMonth.toISOString()),
-            ),
-          ),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      const creditsSpent = yield* getLineDeliveryCreditsSpent(
+        db,
+        photographer.id,
+        startOfMonth.toISOString(),
+      ).mapErr(
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
       );
 
       return ok({
@@ -97,7 +88,7 @@ export const lineDeliveryRouter = new Hono<Env>()
           deliveryCount: monthStats?.deliveryCount ?? 0,
           photoCount: monthStats?.photoCount ?? 0,
           messageCount: monthStats?.messageCount ?? 0,
-          creditsSpent: creditStats?.creditsSpent ?? 0,
+          creditsSpent,
         },
       });
     }, c);

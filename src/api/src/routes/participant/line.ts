@@ -25,6 +25,7 @@ import {
 import { deliverPhotosViaLine, type DeliveryError } from '../../lib/line/delivery';
 import { createLineClient } from '../../lib/line/client';
 import { getMonthlyUsage } from '../../lib/line/allowance';
+import { getBalance } from '../../lib/credits';
 import { events, photographers } from '@/db';
 import { eq } from 'drizzle-orm';
 import type { PhotographerSettings } from '@/db/schema/photographers';
@@ -105,15 +106,18 @@ export const lineParticipantRouter = new Hono<Env>()
         return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
       }
 
-      // Look up photographer settings + balance
+      // Look up photographer settings
       const [photographer] = await db
         .select({
           settings: photographers.settings,
-          balance: photographers.balance,
         })
         .from(photographers)
         .where(eq(photographers.id, event.photographerId))
         .limit(1);
+
+      const balance = yield* getBalance(db, event.photographerId).mapErr(
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
+      );
 
       const lineSettings = (photographer?.settings as PhotographerSettings | null)?.lineSettings;
       const overageEnabled = lineSettings?.overageEnabled ?? false;
@@ -128,7 +132,7 @@ export const lineParticipantRouter = new Hono<Env>()
       if (usage.remaining <= 0) {
         if (!overageEnabled) {
           available = false;
-        } else if ((photographer?.balance ?? 0) <= 0) {
+        } else if (balance <= 0) {
           available = false;
         }
       }

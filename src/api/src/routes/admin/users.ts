@@ -1,13 +1,14 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { eq, desc, sql, and, isNull, isNotNull, ilike, or, lt } from 'drizzle-orm';
-import { photographers, creditLedger, events, photos } from '@/db';
+import { photographers, events, photos } from '@/db';
 import { requireAdmin } from '../../middleware';
 import { zValidator } from '@hono/zod-validator';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { createClerkClient } from '@clerk/backend';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
+import { getAdminCreditEntries, getAdminCreditTotals, getBalancesForPhotographers } from '../../lib/credits';
 
 // =============================================================================
 // Validation Schemas
@@ -79,7 +80,6 @@ export const adminUsersRouter = new Hono<Env>()
             clerkId: photographers.clerkId,
             email: photographers.email,
             name: photographers.name,
-            balance: photographers.balance,
             bannedAt: photographers.bannedAt,
             deletedAt: photographers.deletedAt,
             createdAt: photographers.createdAt,
@@ -93,9 +93,21 @@ export const adminUsersRouter = new Hono<Env>()
 
       const hasMore = rows.length > limit;
       const data = hasMore ? rows.slice(0, limit) : rows;
+      const balances = yield* getBalancesForPhotographers(
+        db,
+        data.map((row) => row.id),
+      ).mapErr(
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
+      );
       const nextCursor = hasMore ? data[data.length - 1].createdAt : null;
 
-      return ok({ data, nextCursor });
+      return ok({
+        data: data.map((row) => ({
+          ...row,
+          balance: balances.get(row.id) ?? 0,
+        })),
+        nextCursor,
+      });
     })
       .orTee((e) => e.cause && console.error('[Admin]', e.code, e.cause))
       .match(
@@ -121,21 +133,8 @@ export const adminUsersRouter = new Hono<Env>()
       }
 
       // Get aggregated stats
-      const [creditStats] = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            totalCredits:
-              sql<number>`coalesce(sum(case when ${creditLedger.amount} > 0 then ${creditLedger.amount} else 0 end), 0)`.mapWith(
-                Number,
-              ),
-            totalDebits:
-              sql<number>`coalesce(sum(case when ${creditLedger.amount} < 0 then ${creditLedger.amount} else 0 end), 0)`.mapWith(
-                Number,
-              ),
-          })
-          .from(creditLedger)
-          .where(eq(creditLedger.photographerId, id)),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      const creditStats = yield* getAdminCreditTotals(db, id).mapErr(
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
       );
 
       const [eventStats] = yield* ResultAsync.fromPromise(
@@ -162,8 +161,8 @@ export const adminUsersRouter = new Hono<Env>()
       return ok({
         user,
         stats: {
-          totalCredits: creditStats?.totalCredits ?? 0,
-          totalDebits: creditStats?.totalDebits ?? 0,
+          totalCredits: creditStats.totalCredits,
+          totalDebits: creditStats.totalDebits,
           totalEvents: eventStats?.totalEvents ?? 0,
           totalPhotos: photoStats?.totalPhotos ?? 0,
         },
@@ -202,26 +201,10 @@ export const adminUsersRouter = new Hono<Env>()
           return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'User not found' });
         }
 
-        const conditions = [eq(creditLedger.photographerId, id)];
-        if (cursor) {
-          conditions.push(lt(creditLedger.createdAt, cursor));
-        }
-
-        const rows = yield* ResultAsync.fromPromise(
-          db
-            .select()
-            .from(creditLedger)
-            .where(and(...conditions))
-            .orderBy(desc(creditLedger.createdAt))
-            .limit(limit + 1),
-          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        const result = yield* getAdminCreditEntries(db, id, limit, cursor).mapErr(
+          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
         );
-
-        const hasMore = rows.length > limit;
-        const data = hasMore ? rows.slice(0, limit) : rows;
-        const nextCursor = hasMore ? data[data.length - 1].createdAt : null;
-
-        return ok({ data, nextCursor });
+        return ok({ data: result.rows, nextCursor: result.nextCursor });
       })
         .orTee((e) => e.cause && console.error('[Admin]', e.code, e.cause))
         .match(
