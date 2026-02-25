@@ -18,9 +18,12 @@
 import { Hono } from 'hono';
 import type Stripe from 'stripe';
 import { addMonths } from 'date-fns';
-import { creditLedger, promoCodeUsage, type Database, type DatabaseTx } from '@/db';
-import { eq } from 'drizzle-orm';
-import { grantCredits } from '../../lib/credits';
+import { promoCodeUsage, type Database, type DatabaseTx } from '@/db';
+import {
+  grantCredits,
+  getStripeLedgerEntryBySession,
+  setStripeLedgerReceiptUrl,
+} from '../../lib/credits';
 import { ResultAsync, ok, err } from 'neverthrow';
 import {
   createStripeClient,
@@ -111,13 +114,14 @@ export async function fulfillCheckout(
   try {
     await dbTx.transaction(async (tx) => {
       // Check if session already processed (idempotency)
-      const existing = await tx
-        .select()
-        .from(creditLedger)
-        .where(eq(creditLedger.stripeSessionId, session.id))
-        .limit(1);
+      const existing = await getStripeLedgerEntryBySession(tx, session.id).match(
+        (value) => value,
+        (error) => {
+          throw error.cause ?? error;
+        },
+      );
 
-      if (existing.length > 0) {
+      if (existing) {
         console.log(`[Stripe Fulfillment] Duplicate webhook ignored for session: ${session.id}`);
         return; // Exit transaction without inserting
       }
@@ -159,13 +163,14 @@ export async function fulfillCheckout(
     });
 
     // Check if actually fulfilled or skipped (duplicate)
-    const existing = await dbTx
-      .select()
-      .from(creditLedger)
-      .where(eq(creditLedger.stripeSessionId, session.id))
-      .limit(1);
+    const existing = await getStripeLedgerEntryBySession(dbTx, session.id).match(
+      (value) => value,
+      (error) => {
+        throw error.cause ?? error;
+      },
+    );
 
-    if (existing.length > 0) {
+    if (existing) {
       // Best-effort: fetch and store Stripe receipt URL
       if (stripe && session.payment_intent) {
         try {
@@ -179,10 +184,12 @@ export async function fulfillCheckout(
           const charge = pi.latest_charge;
           const receiptUrl = charge && typeof charge === 'object' ? charge.receipt_url : null;
           if (receiptUrl) {
-            await dbTx
-              .update(creditLedger)
-              .set({ stripeReceiptUrl: receiptUrl })
-              .where(eq(creditLedger.id, existing[0].id));
+            await setStripeLedgerReceiptUrl(dbTx, existing.id, receiptUrl).match(
+              () => undefined,
+              (error) => {
+                throw error.cause ?? error;
+              },
+            );
           }
         } catch (receiptErr) {
           console.warn(

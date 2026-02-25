@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { eq, and, desc, sql, gte } from 'drizzle-orm';
-import { photographers, creditLedger, promoCodeUsage, giftCodes, giftCodeRedemptions } from '@/db';
+import { eq, and, desc, sql } from 'drizzle-orm';
+import { photographers, promoCodeUsage, giftCodes, giftCodeRedemptions } from '@/db';
 import { requirePhotographer } from '../middleware';
 import { zValidator } from '@hono/zod-validator';
 import type { Env } from '../types';
@@ -15,7 +15,7 @@ import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../lib/error';
 import { calculateTieredDiscount, getDiscountTiers } from '../lib/pricing/discounts';
 import { topUpSchema } from '../lib/pricing/validation';
-import { getCreditHistory } from '../lib/credits';
+import { getCreditHistory, getPurchaseFulfillmentBySession, getUsageChart } from '../lib/credits';
 import { grantCredits } from '../lib/credits/grant';
 
 /**
@@ -461,24 +461,12 @@ export const creditsRouter = new Hono<Env>()
         return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'sessionId is required' });
       }
 
-      // Query credit_ledger by stripeSessionId AND photographerId (security)
-      const [purchase] = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            credits: creditLedger.amount,
-            expiresAt: creditLedger.expiresAt,
-          })
-          .from(creditLedger)
-          .where(
-            and(
-              eq(creditLedger.stripeSessionId, sessionId),
-              eq(creditLedger.photographerId, photographer.id),
-              eq(creditLedger.type, 'credit'),
-              eq(creditLedger.source, 'purchase'),
-            ),
-          )
-          .limit(1),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      const purchase = yield* getPurchaseFulfillmentBySession(
+        db,
+        photographer.id,
+        sessionId,
+      ).mapErr(
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
       );
 
       if (!purchase) {
@@ -550,23 +538,8 @@ export const creditsRouter = new Hono<Env>()
       const sinceDate = new Date();
       sinceDate.setDate(sinceDate.getDate() - days);
 
-      const rows = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            date: sql<string>`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`,
-            credits: sql<number>`coalesce(sum(abs(${creditLedger.amount})), 0)::int`,
-          })
-          .from(creditLedger)
-          .where(
-            and(
-              eq(creditLedger.photographerId, photographer.id),
-              eq(creditLedger.type, 'debit'),
-              gte(creditLedger.createdAt, sinceDate.toISOString()),
-            ),
-          )
-          .groupBy(sql`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`)
-          .orderBy(sql`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      const rows = yield* getUsageChart(db, photographer.id, sinceDate.toISOString()).mapErr(
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
       );
 
       return ok(rows);
