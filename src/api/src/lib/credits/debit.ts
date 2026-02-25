@@ -30,6 +30,11 @@ export interface DebitResult {
   allocations: DebitAllocation[];
 }
 
+export interface DebitIfNotExistsResult {
+  debited: boolean;
+  debitResult: DebitResult | null;
+}
+
 /**
  * Debit credits from a photographer's balance within an existing transaction.
  *
@@ -140,5 +145,85 @@ export function debitCredits(
     (cause): CreditError => ({ type: 'database', cause }),
   ).andThen((result) =>
     result === null ? err({ type: 'insufficient_credits' as const }) : ok(result),
+  );
+}
+
+interface DebitCreditsIfNotExistsOptions {
+  debitFn?: (tx: Transaction, params: DebitCreditsParams) => ResultAsync<DebitResult, CreditError>;
+}
+
+function isUniqueConstraintViolation(cause: unknown): boolean {
+  if (!cause || typeof cause !== 'object') return false;
+  return 'code' in cause && cause.code === '23505';
+}
+
+/**
+ * Debit credits idempotently using operation tuple identity.
+ *
+ * If a debit already exists for (photographerId, operationType, operationId),
+ * returns { debited: false } without charging again.
+ */
+export function debitCreditsIfNotExists(
+  tx: Transaction,
+  params: DebitCreditsParams,
+  options?: DebitCreditsIfNotExistsOptions,
+): ResultAsync<DebitIfNotExistsResult, CreditError> {
+  const debitFn = options?.debitFn ?? debitCredits;
+
+  return ResultAsync.fromPromise(
+    (async () => {
+      const [existingDebit] = await tx
+        .select({ id: creditLedger.id })
+        .from(creditLedger)
+        .where(
+          and(
+            eq(creditLedger.photographerId, params.photographerId),
+            eq(creditLedger.type, 'debit'),
+            eq(creditLedger.operationType, params.operationType),
+            eq(creditLedger.operationId, params.operationId),
+          ),
+        )
+        .limit(1);
+
+      if (existingDebit) {
+        return { debited: false, debitResult: null };
+      }
+
+      try {
+        const debitResult = await debitFn(tx, params).match(
+          (value) => value,
+          (error) => {
+            throw error;
+          },
+        );
+        return { debited: true, debitResult };
+      } catch (cause) {
+        if (
+          cause &&
+          typeof cause === 'object' &&
+          'type' in cause &&
+          cause.type === 'database' &&
+          isUniqueConstraintViolation((cause as { cause?: unknown }).cause)
+        ) {
+          return { debited: false, debitResult: null };
+        }
+        throw cause;
+      }
+    })(),
+    (cause): CreditError => {
+      if (cause && typeof cause === 'object' && 'type' in cause) {
+        const maybeCreditError = cause as Partial<CreditError>;
+        if (maybeCreditError.type === 'insufficient_credits') {
+          return { type: 'insufficient_credits' };
+        }
+        if (maybeCreditError.type === 'database') {
+          return {
+            type: 'database',
+            cause: (cause as { cause?: unknown }).cause ?? cause,
+          };
+        }
+      }
+      return { type: 'database', cause };
+    },
   );
 }

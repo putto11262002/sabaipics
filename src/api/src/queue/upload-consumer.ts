@@ -26,7 +26,7 @@ import {
   type EventSettings,
 } from '@/db';
 import { eq, and, or, sql } from 'drizzle-orm';
-import { debitCredits } from '../lib/credits';
+import { debitCreditsIfNotExists } from '../lib/credits';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
 import {
   parseCubeLut,
@@ -52,6 +52,8 @@ import { generatePresignedGetUrl, generatePresignedPutUrl } from '../lib/r2/pres
 const MAX_PIXELS = 25_000_000;
 // R2 presign TTL for Modal processing.
 const MODAL_R2_PRESIGN_TTL_SECONDS = 300;
+const BASE_UPLOAD_OPERATION_TYPE = 'image_upload';
+const AUTO_EDIT_SURCHARGE_OPERATION_TYPE = 'image_upload_auto_edit_surcharge';
 
 /**
  * Generate R2 keys for original and processed photos.
@@ -154,6 +156,13 @@ function unknownToString(cause: unknown): string {
   }
 }
 
+function shouldChargeAutoEditSurcharge(operationsApplied: string[]): boolean {
+  return operationsApplied.some((operation) => {
+    const normalized = operation.toLowerCase();
+    return normalized === 'auto_edit' || normalized === 'lut';
+  });
+}
+
 // =============================================================================
 // Sentry Helpers
 // =============================================================================
@@ -249,6 +258,7 @@ async function processUpload(
     // Idempotency guard: skip if already terminal (handles crash redelivery + duplicate R2 events)
     if (
       intent.status === 'completed' ||
+      intent.status === 'processing' ||
       intent.status === 'failed' ||
       intent.status === 'expired'
     ) {
@@ -265,6 +275,25 @@ async function processUpload(
       fileSize: intent.contentLength,
       contentType: intent.contentType,
     };
+
+    // Atomic claim: only one worker may transition pending -> processing.
+    const claimRows = yield* ResultAsync.fromPromise(
+      db
+        .update(uploadIntents)
+        .set({ status: 'processing', errorCode: null, errorMessage: null })
+        .where(and(eq(uploadIntents.id, intent.id), eq(uploadIntents.status, 'pending')))
+        .returning({ id: uploadIntents.id }),
+      (cause): UploadProcessingError => ({
+        type: 'database',
+        operation: 'claim_intent',
+        cause,
+      }),
+    );
+
+    if (claimRows.length === 0) {
+      console.log(`[upload-consumer] Intent already claimed by another worker: ${intent.id}`);
+      return ok(undefined);
+    }
 
     // Step 2: Check if intent expired
     if (new Date(intent.expiresAt) < new Date(event.eventTime)) {
@@ -678,6 +707,7 @@ async function processUpload(
     } | null = null;
     let processedR2Key: string | null = null;
     let processedSize: number | null = null;
+    let shouldDebitAutoEditSurcharge = false;
 
     const modalConfigured = isModalConfigured(env);
     const shouldUseModal = modalConfigured;
@@ -902,6 +932,15 @@ async function processUpload(
         exifData = modalResult.value.exif ?? null;
         width = modalResult.value.width;
         height = modalResult.value.height;
+        shouldDebitAutoEditSurcharge = shouldChargeAutoEditSurcharge(
+          modalResult.value.operationsApplied,
+        );
+        console.log('[upload-consumer] Auto-edit surcharge decision', {
+          intentId: intent.id,
+          eventId: intent.eventId,
+          shouldDebitAutoEditSurcharge,
+          operationsApplied: modalResult.value.operationsApplied,
+        });
         pipelineApplied = {
           autoEdit: colorGrade.autoEdit,
           autoEditPresetId: colorGrade.autoEditPresetId,
@@ -923,16 +962,38 @@ async function processUpload(
     const photo = yield* ResultAsync.fromPromise(
       Sentry.startSpan({ name: 'upload.transaction', op: 'db.transaction' }, () =>
         dbTx.transaction(async (tx) => {
-          // Steps 10a-10e: Debit credit via FIFO allocation
-          const debitResult = await debitCredits(tx, {
+          // Steps 10a-10e: Debit base upload credit via FIFO allocation
+          const baseDebitResult = await debitCreditsIfNotExists(tx, {
             photographerId: intent.photographerId,
             amount: 1,
-            operationType: 'image_upload',
-            operationId: photoId,
+            operationType: BASE_UPLOAD_OPERATION_TYPE,
+            operationId: intent.id,
           });
 
-          if (debitResult.isErr()) {
-            throw debitResult.error;
+          if (baseDebitResult.isErr()) {
+            throw baseDebitResult.error;
+          }
+
+          // Charge a second credit only when Modal actually applied auto_edit or LUT.
+          if (shouldDebitAutoEditSurcharge) {
+            const surchargeDebitResult = await debitCreditsIfNotExists(tx, {
+              photographerId: intent.photographerId,
+              amount: 1,
+              operationType: AUTO_EDIT_SURCHARGE_OPERATION_TYPE,
+              operationId: intent.id,
+            });
+
+            if (surchargeDebitResult.isErr()) {
+              throw surchargeDebitResult.error;
+            }
+
+            if (surchargeDebitResult.value.debited) {
+              console.log('[upload-consumer] Auto-edit surcharge debited', {
+                intentId: intent.id,
+                eventId: intent.eventId,
+                photoId,
+              });
+            }
           }
 
           // Create photo record
