@@ -109,13 +109,15 @@ function parseExtractionResponse(data: ExtractResponse): ExtractionResult {
 
 export interface ExtractorConfig {
   endpoint: string;
+  modalKey: string;
+  modalSecret: string;
 }
 
 /**
  * Create a face extractor that calls the Python /extract endpoint.
  */
 export function createExtractor(config: ExtractorConfig): FaceExtractor {
-  const endpoint = config.endpoint;
+  const { endpoint, modalKey, modalSecret } = config;
 
   /**
    * Shared fetch + parse logic for both input modes.
@@ -125,7 +127,11 @@ export function createExtractor(config: ExtractorConfig): FaceExtractor {
       const response = yield* ResultAsync.fromPromise(
         fetch(`${endpoint}/extract`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Modal-Key': modalKey,
+            'Modal-Secret': modalSecret,
+          },
           body: JSON.stringify(body),
         }),
         networkError,
