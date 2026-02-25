@@ -123,6 +123,19 @@ export function getStripeLedgerEntryBySession(
   );
 }
 
+export function getStripeLedgerEntriesBySession(
+  db: Db,
+  sessionId: string,
+): ResultAsync<Array<{ id: string; amount: number }>, CreditError> {
+  return ResultAsync.fromPromise(
+    db
+      .select({ id: creditLedger.id, amount: creditLedger.amount })
+      .from(creditLedger)
+      .where(eq(creditLedger.stripeSessionId, sessionId)),
+    (cause): CreditError => ({ type: 'database', cause }),
+  );
+}
+
 export function setStripeLedgerReceiptUrl(
   db: Db,
   ledgerEntryId: string,
@@ -158,6 +171,20 @@ export function getBalancesForPhotographers(
 
       return new Map(rows.map((row) => [row.id, row.balance]));
     })(),
+    (cause): CreditError => ({ type: 'database', cause }),
+  );
+}
+
+export function deleteLedgerEntriesByPhotographer(
+  db: Db,
+  photographerId: string,
+): ResultAsync<number, CreditError> {
+  return ResultAsync.fromPromise(
+    db
+      .delete(creditLedger)
+      .where(eq(creditLedger.photographerId, photographerId))
+      .returning()
+      .then((rows) => rows.length),
     (cause): CreditError => ({ type: 'database', cause }),
   );
 }

@@ -22,6 +22,7 @@ type Db = Database | DatabaseTx | Transaction;
 export function recomputeBalanceCache(
   db: Db,
   photographerId: string,
+  expectedInvalidateAt?: string | null,
 ): ResultAsync<{ balance: number; invalidateAt: string | null }, CreditError> {
   return ResultAsync.fromPromise(
     (async () => {
@@ -43,13 +44,37 @@ export function recomputeBalanceCache(
       const balance = aggregate?.balance ?? 0;
       const invalidateAt = aggregate?.invalidateAt ?? null;
 
-      await db
+      const updateResult = await db
         .update(photographers)
         .set({
           balance,
           balanceInvalidateAt: invalidateAt,
         })
-        .where(eq(photographers.id, photographerId));
+        .where(
+          expectedInvalidateAt === undefined
+            ? eq(photographers.id, photographerId)
+            : and(
+                eq(photographers.id, photographerId),
+                sql`${photographers.balanceInvalidateAt} IS NOT DISTINCT FROM ${expectedInvalidateAt}::timestamptz`,
+              ),
+        )
+        .returning();
+
+      if (expectedInvalidateAt !== undefined && updateResult.length === 0) {
+        const [freshRow] = await db
+          .select({
+            balance: photographers.balance,
+            balanceInvalidateAt: photographers.balanceInvalidateAt,
+          })
+          .from(photographers)
+          .where(eq(photographers.id, photographerId))
+          .limit(1);
+
+        return {
+          balance: freshRow?.balance ?? balance,
+          invalidateAt: freshRow?.balanceInvalidateAt ?? invalidateAt,
+        };
+      }
 
       console.log('[Credits] balance_recompute', {
         photographerId,
@@ -88,7 +113,7 @@ export function getBalance(db: Db, photographerId: string): ResultAsync<number, 
       const nowMs = Date.now();
       const invalidateAtMs = row.balanceInvalidateAt ? new Date(row.balanceInvalidateAt).getTime() : null;
 
-      if (invalidateAtMs !== null && invalidateAtMs > nowMs) {
+      if (invalidateAtMs === null || invalidateAtMs > nowMs) {
         console.log('[Credits] balance_cache_hit', {
           photographerId,
           balance: row.balance,
@@ -97,7 +122,7 @@ export function getBalance(db: Db, photographerId: string): ResultAsync<number, 
         return row.balance;
       }
 
-      const recomputed = await recomputeBalanceCache(db, photographerId).match(
+      const recomputed = await recomputeBalanceCache(db, photographerId, row.balanceInvalidateAt).match(
         (value) => value,
         (error) => {
           throw error;
