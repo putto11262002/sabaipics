@@ -19,7 +19,6 @@ import EventPhotosTab from './routes/events/[id]/photos';
 import EventColorTab from './routes/events/[id]/color';
 import EventFtpTab from './routes/events/[id]/ftp';
 import EventSlideshowTab from './routes/events/[id]/slideshow';
-import SlideshowPreviewPage from './routes/events/[id]/slideshow/preview';
 import StudioLutsPage from './routes/studio/luts';
 import StudioLutPreviewPage from './routes/studio/luts/preview';
 import LineDeliveryPage from './routes/line-delivery';
@@ -47,15 +46,6 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <EventSlideshowTab />
-      </ProtectedRoute>
-    ),
-  },
-  // Slideshow preview (auth required, no sidebar)
-  {
-    path: '/events/:id/slideshow-preview',
-    element: (
-      <ProtectedRoute>
-        <SlideshowPreviewPage />
       </ProtectedRoute>
     ),
   },

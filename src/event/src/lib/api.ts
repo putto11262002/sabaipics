@@ -145,3 +145,68 @@ export async function deliverViaLine(
   const result = (await response.json()) as { data: LineDeliveryResult };
   return result.data;
 }
+
+// =============================================================================
+// Slideshow
+// =============================================================================
+
+export interface SlideshowData {
+  event: {
+    name: string;
+    subtitle: string | null;
+    logoUrl: string | null;
+  };
+  config: {
+    template: string;
+    primaryColor: string;
+    background: string;
+  };
+  stats: {
+    photoCount: number;
+    searchCount: number;
+  };
+}
+
+export interface SlideshowPhoto {
+  id: string;
+  previewUrl: string;
+  width: number;
+  height: number;
+}
+
+export interface SlideshowPhotosResponse {
+  data: SlideshowPhoto[];
+  pagination: {
+    nextCursor: string | null;
+    hasMore: boolean;
+  };
+}
+
+export async function getSlideshowData(eventId: string): Promise<SlideshowData> {
+  const response = await fetch(`${API_URL}/participant/events/${eventId}/slideshow`);
+
+  if (!response.ok) {
+    const error = (await response.json()) as ApiError;
+    throw new Error(error.error?.code || 'UNKNOWN_ERROR');
+  }
+
+  const result = (await response.json()) as { data: SlideshowData };
+  return result.data;
+}
+
+export async function getSlideshowPhotos(
+  eventId: string,
+  limit: number = 10,
+): Promise<SlideshowPhotosResponse> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  const response = await fetch(
+    `${API_URL}/participant/events/${eventId}/photos?${params.toString()}`,
+  );
+
+  if (!response.ok) {
+    const error = (await response.json()) as ApiError;
+    throw new Error(error.error?.code || 'UNKNOWN_ERROR');
+  }
+
+  return (await response.json()) as SlideshowPhotosResponse;
+}

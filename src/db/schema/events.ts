@@ -39,6 +39,13 @@ export interface EventSettings {
     lutIntensity: number;
     includeLuminance: boolean;
   };
+  theme?: {
+    primary: string;
+    background: string;
+  };
+  slideshow?: {
+    template: string;
+  };
 }
 
 /**
