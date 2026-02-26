@@ -1,17 +1,14 @@
 // FrameFast Release configuration
 
 // Clerk
-// CLERK_PUBLISHABLE_KEY = pk_live_Y2xlcmsuZnJhbWVmYXN0LmlvJA
-CLERK_PUBLISHABLE_KEY = pk_test_cmljaC1wdWctNjQuY2xlcmsuYWNjb3VudHMuZGV2JA
+CLERK_PUBLISHABLE_KEY = pk_live_Y2xlcmsuZnJhbWVmYXN0LmlvJA
 
 // Entitlements
 CODE_SIGN_ENTITLEMENTS = FrameFast/FrameFast.Release.entitlements
 
 // API Configuration
-// API_BASE_URL = https:/$()/api.framefast.io
-API_BASE_URL = https:/$()/api-staging.framefast.io
-// EVENT_FRONTEND_URL = https:/$()/event.framefast.io
-EVENT_FRONTEND_URL = https:/$()/event-staging.framefast.io
+API_BASE_URL = https:/$()/api.framefast.io
+EVENT_FRONTEND_URL = https:/$()/event.framefast.io
 
 // Local developer overrides (gitignored)
 #include? "Studio.Local.xcconfig"
