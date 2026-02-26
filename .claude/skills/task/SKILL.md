@@ -34,6 +34,19 @@ Every task takes **one type** + **one area** (if applicable).
 
 `area:auth` · `area:events` · `area:photos` · `area:face-reco` · `area:billing` · `area:dashboard` · `area:api` · `area:mobile`
 
+## Task Schema
+
+| Field | Required | Notes |
+|---|---|---|
+| Name | **Required** | See title rules below |
+| Status | **Required** | Default: `Backlog` |
+| Priority | **Required** | Be honest — most things are `Medium` |
+| Tags | **Required** | At least one type label; add area label if applicable |
+| Assignee | Optional | Only set if clear ownership exists now |
+| Project | Optional | Set if this belongs to a group of related work |
+| Parent Task | Optional | Only for sub-tasks |
+| Due Date | Optional | Only set if there is a real deadline |
+
 ## Writing Style
 
 High signal, low noise. Every sentence earns its place.
