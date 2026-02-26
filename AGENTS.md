@@ -16,6 +16,12 @@ This is a rule/conventional file for FrameFast - an Event photo distribution pla
 - Use shadcn CLI for components: `pnpm dlx shadcn@latest add <component> --path src/ui/components/ui`
 - `.claude/rules/vc-workflow.md` — Read before any branch, commit, push, or PR operation. Use Graphite (`gt`) stacked PRs, not raw git/gh.
 
+## Task Management
+
+1. Tasks and projects are tracked in Notion: **FrameFast > Tasks** and **FrameFast > Projects**
+2. When working with tasks, strictly conform to `.claude/skills/task/SKILL.md`
+3. Never write tasks — always ask the user first
+
 ## Product Documentation
 
 - Product decisions, ideas, and discussions are tracked in Notion:
