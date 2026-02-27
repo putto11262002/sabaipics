@@ -218,6 +218,13 @@
       "when": 1771998233867,
       "tag": "0030_adorable_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1772172482998,
+      "tag": "0031_legal_korg",
+      "breakpoints": true
     }
   ]
 }
