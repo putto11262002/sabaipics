@@ -940,10 +940,10 @@ export function FeatureStory() {
             style={{ zIndex: index + 1 }}
           >
             <div className="mx-auto h-[80svh] w-full">
-              <div className="relative z-10 h-full overflow-hidden rounded-3xl">
-                <div className="relative flex h-full flex-col gap-6 lg:flex-row">
+              <div className="relative z-10 h-full overflow-hidden">
+                <div className="relative flex h-full flex-col lg:flex-row">
                   <div
-                    className="flex min-h-0 min-w-0 shrink-0 flex-col py-5 sm:py-7 lg:h-full lg:flex-1 lg:py-9"
+                    className="flex min-h-0 min-w-0 shrink-0 flex-col py-6 sm:py-8 lg:h-full lg:flex-1 lg:py-9 lg:pr-9"
                     style={{
                       background: 'color-mix(in oklab, var(--muted) 30%, var(--background))',
                     }}
