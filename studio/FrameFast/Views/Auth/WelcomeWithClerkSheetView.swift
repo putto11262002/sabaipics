@@ -74,7 +74,8 @@ struct WelcomeWithClerkSheetView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                
+                .frame(maxWidth: .infinity)
+
                 // Secondary: Sign up (ghost style)
                 Button("Create an account") {
                     authMode = .signUp
