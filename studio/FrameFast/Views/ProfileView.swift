@@ -16,6 +16,7 @@ struct ProfileView: View {
     @Environment(\.clerk) private var clerk
     @EnvironmentObject private var connectivityStore: ConnectivityStore
     @State private var showAccountPortal = false
+    @State private var showFeedback = false
     @State private var legalURL: URL?
     @State private var signOutError: Error?
     @State private var showSignOutError = false
@@ -57,6 +58,20 @@ struct ProfileView: View {
                         profileRowLabel(
                             title: "Manage Account",
                             systemImage: connectivityStore.isOnline ? "person.crop.circle" : "wifi.slash",
+                            foreground: Color.primary,
+                            showsChevron: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                                        .disabled(!connectivityStore.isOnline)
+                    .opacity(connectivityStore.isOnline ? 1 : 0.5)
+
+                    Button {
+                        showFeedback = true
+                    } label: {
+                        profileRowLabel(
+                            title: "Send Feedback",
+                            systemImage: connectivityStore.isOnline ? "bubble.left.and.exclamationmark.bubble.right" : "wifi.slash",
                             foreground: Color.primary,
                             showsChevron: true
                         )
@@ -132,6 +147,9 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showAccountPortal) {
                 UserProfileView()
+            }
+            .sheet(isPresented: $showFeedback) {
+                FeedbackView()
             }
             .sheet(item: $legalURL) { url in
                 SafariView(url: url)
