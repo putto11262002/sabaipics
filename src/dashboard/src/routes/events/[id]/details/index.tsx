@@ -330,23 +330,34 @@ export default function EventDetailsTab() {
           <Field>
             <FieldLabel>Slideshow link</FieldLabel>
             <InputGroup>
-              <InputGroupInput readOnly placeholder="Coming soon" />
+              <InputGroupInput
+                readOnly
+                value={`${import.meta.env.VITE_EVENT_URL}/${event.id}/slideshow`}
+              />
               <InputGroupAddon align="inline-end">
                 <InputGroupButton
                   aria-label="Copy slideshow link"
                   title="Copy slideshow link"
                   size="icon-xs"
-                  disabled
+                  onClick={() =>
+                    copyToClipboard(`${import.meta.env.VITE_EVENT_URL}/${event.id}/slideshow`)
+                  }
                 >
                   <Copy />
                 </InputGroupButton>
                 <InputGroupButton
+                  asChild
                   size="icon-xs"
                   aria-label="Open slideshow link"
                   title="Open slideshow link"
-                  disabled
                 >
-                  <ExternalLink />
+                  <a
+                    href={`${import.meta.env.VITE_EVENT_URL}/${event.id}/slideshow`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink />
+                  </a>
                 </InputGroupButton>
               </InputGroupAddon>
             </InputGroup>

@@ -18,13 +18,14 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, and, inArray, isNull, desc, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { activeEvents, photos, participantSearches, DEFAULT_SLIDESHOW_CONFIG, events, feedback, feedbackCategories } from '@/db';
+import { activeEvents, photos, participantSearches, events, feedback, feedbackCategories, type EventSettings } from '@/db';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
 import { createExtractor, searchByFace, type RecognitionError } from '../../lib/recognition';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { createZip } from 'littlezipper';
 import { slideshowPhotosQuerySchema } from '../events/slideshow-schema';
+import { slideshowSettingsSchema } from '../events/slideshow-settings-schema';
 import { capturePostHogEvent } from '../../lib/posthog';
 
 // =============================================================================
@@ -607,14 +608,14 @@ export const participantRouter = new Hono<Env>()
       const db = c.var.db();
       const { eventId } = c.req.valid('param');
 
-      // Fetch event with slideshow config and logo
+      // Fetch event with settings and logo
       const [result] = yield* ResultAsync.fromPromise(
         db
           .select({
             name: activeEvents.name,
             subtitle: activeEvents.subtitle,
             logoR2Key: activeEvents.logoR2Key,
-            slideshowConfig: activeEvents.slideshowConfig,
+            settings: activeEvents.settings,
             photoCount: sql<number>`(
               SELECT COUNT(*)::int
               FROM ${photos}
@@ -641,8 +642,24 @@ export const participantRouter = new Hono<Env>()
       // Generate logo URL if logo exists
       const logoUrl = result.logoR2Key ? `${c.env.PHOTO_R2_BASE_URL}/${result.logoR2Key}` : null;
 
-      // Use default config if none set
-      const config = result.slideshowConfig ?? DEFAULT_SLIDESHOW_CONFIG;
+      // Extract settings with defaults
+      const settings = (result.settings ?? {}) as EventSettings;
+
+      // Validate settings at API boundary - use defaults if invalid
+      const rawConfig = {
+        template: settings?.slideshow?.template ?? 'carousel',
+        primaryColor: settings?.theme?.primary ?? '#ff6320',
+        background: settings?.theme?.background ?? '#fdfdfd',
+      };
+
+      const parseResult = slideshowSettingsSchema.safeParse(rawConfig);
+      const config = parseResult.success
+        ? parseResult.data
+        : {
+            template: 'carousel' as const,
+            primaryColor: '#ff6320',
+            background: '#fdfdfd',
+          };
 
       return ok({
         event: {

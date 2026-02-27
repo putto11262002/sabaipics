@@ -1,3 +1,5 @@
+// @ts-nocheck
+// Archived code - kept for reference only, not actively maintained
 import { useParams, useSearchParams } from 'react-router';
 import { useState, useEffect, useCallback, useId } from 'react';
 import {

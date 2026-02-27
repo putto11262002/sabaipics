@@ -19,6 +19,7 @@ import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './s
 import { slideshowConfigSchema } from './slideshow-schema';
 import { logoPresignSchema, logoStatusQuerySchema } from './logo-schema';
 import { eventColorGradeSchema } from './color-grade-schema';
+import { slideshowSettingsSchema } from './slideshow-settings-schema';
 import { eventImagePipelineSchema } from './image-pipeline-schema';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../../lib/error';
@@ -295,6 +296,131 @@ export const eventsRouter = new Hono<Env>()
         });
       })
         .orTee((e) => e.cause && console.error('[Events] PUT /:id/color-grade', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // GET /events/:id/slideshow-settings - Get event slideshow settings (template + theme)
+  .get(
+    '/:id/slideshow-settings',
+    requirePhotographer(),
+    zValidator('param', eventParamsSchema),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id } = c.req.valid('param');
+
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: activeEvents.id, settings: activeEvents.settings })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const settings = (event.settings ?? null) as EventSettings | null;
+
+        // Validate settings at API boundary - use defaults if invalid
+        const rawConfig = {
+          template: settings?.slideshow?.template ?? 'carousel',
+          primaryColor: settings?.theme?.primary ?? '#ff6320',
+          background: settings?.theme?.background ?? '#fdfdfd',
+        };
+
+        const parseResult = slideshowSettingsSchema.safeParse(rawConfig);
+        const config = parseResult.success
+          ? parseResult.data
+          : {
+              template: 'carousel' as const,
+              primaryColor: '#ff6320',
+              background: '#fdfdfd',
+            };
+
+        return ok({ data: config });
+      })
+        .orTee((e) => e.cause && console.error('[Events] GET /:id/slideshow-settings', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // PUT /events/:id/slideshow-settings - Update event slideshow settings
+  .put(
+    '/:id/slideshow-settings',
+    requirePhotographer(),
+    zValidator('param', eventParamsSchema),
+    zValidator('json', slideshowSettingsSchema),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id } = c.req.valid('param');
+      const body = c.req.valid('json');
+
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: activeEvents.id, settings: activeEvents.settings })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const prev = (event.settings ?? null) as EventSettings | null;
+        const next: EventSettings = {
+          ...(prev ?? {}),
+          theme: {
+            primary: body.primaryColor,
+            background: body.background,
+          },
+          slideshow: {
+            template: body.template,
+          },
+        };
+
+        const [updated] = yield* ResultAsync.fromPromise(
+          db
+            .update(events)
+            .set({ settings: next })
+            .where(
+              and(
+                eq(events.id, id),
+                eq(events.photographerId, photographer.id),
+                isNull(events.deletedAt),
+              ),
+            )
+            .returning({ settings: events.settings }),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!updated) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        return ok({
+          data: {
+            template: updated.settings?.slideshow?.template ?? 'carousel',
+            primaryColor: updated.settings?.theme?.primary ?? '#ff6320',
+            background: updated.settings?.theme?.background ?? '#fdfdfd',
+          },
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] PUT /:id/slideshow-settings', e.code, e.cause))
         .match(
           (data) => c.json(data),
           (e) => apiError(c, e),

@@ -9,6 +9,7 @@ import 'react-photo-album/rows.css';
 import { shouldRetry } from '@/shared/lib/api-error';
 import { getPostHogApiKey, POSTHOG_CONFIG } from '@/shared/lib/posthog';
 import { router } from './router';
+import { EventThemeProvider } from './components/EventThemeProvider';
 
 const phKey = getPostHogApiKey();
 if (phKey) {
@@ -33,8 +34,10 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-      <Toaster position="bottom-right" />
+      <EventThemeProvider>
+        <RouterProvider router={router} />
+        <Toaster position="bottom-right" />
+      </EventThemeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );
