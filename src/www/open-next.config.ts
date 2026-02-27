@@ -7,6 +7,9 @@ export default {
     // This serves pre-rendered pages from the assets binding at the edge
     // https://opennext.js.org/cloudflare/caching
     incrementalCache: staticAssetsIncrementalCache,
+    // Enable Cloudflare Cache API to cache responses at the edge
+    // This reduces TTFB by serving static pages from CF edge instead of worker
+    enableCacheInterception: true,
   }),
   buildCommand: 'cd ../.. && pnpm build:www',
 };
