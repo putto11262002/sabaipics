@@ -20,6 +20,9 @@ struct ProfileView: View {
     @State private var legalURL: URL?
     @State private var signOutError: Error?
     @State private var showSignOutError = false
+    @State private var showDeleteConfirmation = false
+    @State private var deleteError: Error?
+    @State private var showDeleteError = false
 
     var body: some View {
         NavigationStack {
@@ -98,7 +101,21 @@ struct ProfileView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                                        .disabled(!connectivityStore.isOnline)
+                    .disabled(!connectivityStore.isOnline)
+                    .opacity(connectivityStore.isOnline ? 1 : 0.5)
+
+                    Button {
+                        showDeleteConfirmation = true
+                    } label: {
+                        profileRowLabel(
+                            title: "Delete Account",
+                            systemImage: "person.crop.circle.badge.minus",
+                            foreground: Color.red,
+                            showsChevron: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!connectivityStore.isOnline)
                     .opacity(connectivityStore.isOnline ? 1 : 0.5)
                 }
 
@@ -159,6 +176,30 @@ struct ProfileView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(signOutError?.localizedDescription ?? "An unexpected error occurred. Please try again.")
+            }
+            .confirmationDialog(
+                "Delete Account",
+                isPresented: $showDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Account", role: .destructive) {
+                    Task {
+                        do {
+                            try await clerk.user?.delete()
+                        } catch {
+                            deleteError = error
+                            showDeleteError = true
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure? This will permanently delete your account and all associated data. This action cannot be undone.")
+            }
+            .alert("Delete Account Failed", isPresented: $showDeleteError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteError?.localizedDescription ?? "An unexpected error occurred. Please try again.")
             }
         }
     }
