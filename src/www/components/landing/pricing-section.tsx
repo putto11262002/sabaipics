@@ -447,17 +447,11 @@ export async function PricingSection() {
             <article className="flex min-h-[360px] flex-col border-t border-border/70 p-6 sm:p-7 lg:col-span-3 lg:border-l lg:border-t-0">
               <div className="flex h-full flex-col">
                 <p className="text-lg font-medium tracking-tight text-foreground sm:text-xl">
-                  {t('creditEquivalence')}
+                  Storage & limits
                 </p>
 
                 <div className="grid h-28 place-items-center py-2">
-                  <div className="flex w-full items-center justify-between">
-                    <CreditCoin />
-
-                    <ArrowRightLeft className="size-5 text-muted-foreground/80" />
-
-                    <PhotoPrint />
-                  </div>
+                  <PhotoPrint />
                 </div>
 
                 <div className="mt-auto divide-y divide-border/80">
@@ -517,7 +511,159 @@ export async function PricingSection() {
           </div>
         </div>
 
-        <div className="mt-3 rounded-2xl bg-card/72 px-5 py-4 text-center backdrop-blur-xl shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_85%,transparent),0_24px_60px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
+        {/* Credit Usage Breakdown */}
+        <div className="mt-6 overflow-hidden rounded-3xl bg-card/72 backdrop-blur-xl shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_85%,transparent),0_24px_60px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
+          <div className="p-6 sm:p-8">
+            <h3 className="text-xl font-semibold tracking-tight sm:text-2xl">Credit usage</h3>
+            <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+              Credits are consumed based on features you use
+            </p>
+
+            <div className="mt-6 grid grid-cols-1 divide-y divide-border/70 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+              {/* Image Upload */}
+              <div className="flex flex-col items-center gap-4 py-5 text-center lg:px-6">
+                <div
+                  className="relative h-[52px] w-[52px] shrink-0"
+                  style={{ perspective: '240px' }}
+                  aria-hidden="true"
+                >
+                  <div
+                    className="relative h-full w-full rounded-lg border border-primary/20 backdrop-blur-md"
+                    style={{
+                      transformStyle: 'preserve-3d',
+                      transform: 'rotateX(12deg) rotateY(-18deg) rotateZ(4deg)',
+                      background:
+                        'linear-gradient(145deg, color-mix(in oklab, var(--primary) 18%, transparent) 0%, color-mix(in oklab, var(--primary) 6%, transparent) 100%)',
+                      boxShadow: `
+                        inset 2px 2px 4px color-mix(in oklab, var(--primary-end) 25%, transparent),
+                        inset -1px -1px 3px color-mix(in oklab, var(--primary) 12%, transparent),
+                        3px 5px 10px color-mix(in oklab, var(--foreground) 18%, transparent)
+                      `,
+                    }}
+                  >
+                    <div className="flex h-full items-center justify-center">
+                      <svg
+                        className="h-6 w-6"
+                        fill="none"
+                        stroke="var(--primary)"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-base font-semibold text-foreground">Image upload</h4>
+                  <p className="mt-1 text-base text-foreground">
+                    1 credit per image uploaded
+                  </p>
+                </div>
+              </div>
+
+              {/* Image Enhancement */}
+              <div className="flex flex-col items-center gap-4 py-5 text-center lg:px-6">
+                <div
+                  className="relative h-[52px] w-[52px] shrink-0"
+                  style={{ perspective: '240px' }}
+                  aria-hidden="true"
+                >
+                  <div
+                    className="relative h-full w-full rounded-lg border border-primary/20 backdrop-blur-md"
+                    style={{
+                      transformStyle: 'preserve-3d',
+                      transform: 'rotateX(12deg) rotateY(-18deg) rotateZ(4deg)',
+                      background:
+                        'linear-gradient(145deg, color-mix(in oklab, var(--primary) 18%, transparent) 0%, color-mix(in oklab, var(--primary) 6%, transparent) 100%)',
+                      boxShadow: `
+                        inset 2px 2px 4px color-mix(in oklab, var(--primary-end) 25%, transparent),
+                        inset -1px -1px 3px color-mix(in oklab, var(--primary) 12%, transparent),
+                        3px 5px 10px color-mix(in oklab, var(--foreground) 18%, transparent)
+                      `,
+                    }}
+                  >
+                    <div className="flex h-full items-center justify-center">
+                      <svg
+                        className="h-6 w-6"
+                        fill="none"
+                        stroke="var(--primary)"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-base font-semibold text-foreground">
+                    Image enhancement
+                  </h4>
+                  <p className="mt-1 text-base text-foreground">
+                    +1 credit per image with auto-edit or LUT
+                  </p>
+                </div>
+              </div>
+
+              {/* LINE Delivery */}
+              <div className="flex flex-col items-center gap-4 py-5 text-center lg:px-6">
+                <div
+                  className="relative h-[52px] w-[52px] shrink-0"
+                  style={{ perspective: '240px' }}
+                  aria-hidden="true"
+                >
+                  <div
+                    className="relative h-full w-full rounded-lg border border-primary/20 backdrop-blur-md"
+                    style={{
+                      transformStyle: 'preserve-3d',
+                      transform: 'rotateX(12deg) rotateY(-18deg) rotateZ(4deg)',
+                      background:
+                        'linear-gradient(145deg, color-mix(in oklab, var(--primary) 18%, transparent) 0%, color-mix(in oklab, var(--primary) 6%, transparent) 100%)',
+                      boxShadow: `
+                        inset 2px 2px 4px color-mix(in oklab, var(--primary-end) 25%, transparent),
+                        inset -1px -1px 3px color-mix(in oklab, var(--primary) 12%, transparent),
+                        3px 5px 10px color-mix(in oklab, var(--foreground) 18%, transparent)
+                      `,
+                    }}
+                  >
+                    <div className="flex h-full items-center justify-center">
+                      <svg
+                        className="h-6 w-6"
+                        fill="none"
+                        stroke="var(--primary)"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-base font-semibold text-foreground">LINE delivery</h4>
+                  <p className="mt-1 text-base text-foreground">
+                    100 free per month, then 1 credit per message
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl bg-card/72 px-5 py-4 text-center backdrop-blur-xl shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_85%,transparent),0_24px_60px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
           <a
             href="mailto:sales@framefast.io"
             className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"

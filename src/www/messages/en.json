@@ -40,9 +40,9 @@
       "cta": "Start free trial"
     },
     "colorGrading": {
-      "label": "Auto color grading",
-      "title": "Your signature look, on every photo.",
-      "description": "Upload a LUT once. Every photo gets your color grade automatically, no manual editing, consistent results.",
+      "label": "Image processing",
+      "title": "Automatic enhancement and color grading.",
+      "description": "Apply auto-edits and custom LUTs during upload for consistent results.",
       "features": {
         "upload": "Upload your own LUT or generate from a reference image",
         "automatic": "Applied automatically during processing",

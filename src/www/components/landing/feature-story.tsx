@@ -8,9 +8,11 @@ import {
   Image as ImageIcon,
   LayoutDashboard,
   MoreHorizontal,
+  Palette,
   RefreshCw,
   SlidersHorizontal,
   Smile,
+  Sparkles,
   User,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -107,6 +109,18 @@ const animationStyles = `
   .animate-color-wipe {
     animation: colorWipe 4.2s ease-in-out infinite;
   }
+
+  /* Circle slide down animation */
+  @keyframes slideDown {
+    from { top: 0%; }
+    to { top: 100%; }
+  }
+
+  /* Circle slide down but stop at edge */
+  @keyframes slideDownStop {
+    from { top: 0%; }
+    to { top: calc(100% - 8px); }
+  }
 `;
 
 // Hook to replace Framer's useInView
@@ -186,9 +200,9 @@ function FaceVariant() {
       setPhase(1);
       setRevealedCount(0);
 
-      const analyseAt = 980;
-      const searchAt = 1880;
-      const revealStartAt = 2480;
+      const analyseAt = 500;
+      const searchAt = 1000;
+      const revealStartAt = 1500;
 
       schedule(() => setPhase(2), analyseAt);
       schedule(() => setPhase(3), searchAt);
@@ -258,7 +272,7 @@ function FaceVariant() {
                 <span
                   className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${dotClass}`}
                 >
-                  {isDone ? '✓' : stepNumber}
+                  {isDone ? <Check className="h-3 w-3" /> : stepNumber}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-semibold text-foreground sm:text-[13px]">
@@ -288,20 +302,15 @@ function FaceVariant() {
                   style={{
                     borderColor:
                       'color-mix(in oklab, var(--background) 90%, var(--foreground) 10%)',
-                    background: 'color-mix(in oklab, var(--background) 46%, transparent)',
+                    background:
+                      'radial-gradient(88% 76% at 24% 28%, color-mix(in oklab, var(--primary-end) 38%, transparent) 0%, transparent 70%), radial-gradient(84% 74% at 78% 70%, color-mix(in oklab, var(--primary) 38%, transparent) 0%, transparent 72%), linear-gradient(160deg, color-mix(in oklab, var(--primary-end) 26%, transparent) 0%, color-mix(in oklab, var(--primary) 30%, transparent) 58%, color-mix(in oklab, var(--primary-end) 18%, transparent) 100%)',
                     boxShadow:
                       '0 12px 28px -24px color-mix(in oklab, var(--foreground) 26%, transparent), inset 0 1px 0 color-mix(in oklab, white 55%, transparent), inset 0 -1px 0 color-mix(in oklab, var(--foreground) 6%, transparent)',
                   }}
                 >
-                  <div
-                    className="absolute inset-x-0 top-0 h-1/2 opacity-80"
-                    style={{
-                      background:
-                        'linear-gradient(180deg, color-mix(in oklab, white 52%, transparent) 0%, transparent 100%)',
-                    }}
-                  />
-                  <div className="absolute right-2 top-2 rounded-full border border-border bg-background/80 px-1.5 py-0.5 text-[9px] font-semibold text-foreground/80">
-                    ✓ {confidence}%
+                  <div className="absolute right-2 top-2 flex items-center gap-0.5 rounded-full border border-border bg-background/80 px-1.5 py-0.5 text-[9px] font-semibold text-foreground/80">
+                    <Check className="h-2.5 w-2.5" />
+                    {confidence}%
                   </div>
                 </div>
               );
@@ -370,18 +379,10 @@ function LineVariant() {
 
   return (
     <div ref={ref} className="relative flex h-full items-start justify-center px-[1.8%] pt-[16%]">
-      <div className="relative h-auto w-[clamp(14rem,56vw,17rem)] aspect-[9/19.5] overflow-hidden rounded-[2.3rem] border border-border/70 shadow-[0_30px_54px_-38px_color-mix(in_oklab,var(--foreground)_40%,transparent)] backdrop-blur-xl sm:w-[clamp(15rem,46vw,18rem)] lg:w-[clamp(16.8rem,35.7vw,20rem)]">
-        <div
-          className="absolute inset-[1.8%] rounded-[2rem] border border-border/70"
-          style={{
-            boxShadow:
-              'inset 0 1px 0 color-mix(in oklab, white 60%, transparent), inset 0 -1px 0 color-mix(in oklab, var(--foreground) 8%, transparent)',
-          }}
-          aria-hidden="true"
-        />
-        <div className="pointer-events-none absolute left-1/2 top-[3.2%] h-[3.4%] w-[34%] -translate-x-1/2 rounded-full border border-border/70 bg-background/40 backdrop-blur-sm" />
+      <div className="relative h-auto w-[clamp(14rem,56vw,17rem)] aspect-[9/19.5] overflow-hidden rounded-[2.3rem] border border-border bg-card sm:w-[clamp(15rem,46vw,18rem)] lg:w-[clamp(16.8rem,35.7vw,20rem)]">
+        <div className="pointer-events-none absolute left-1/2 top-[3.2%] h-[3.4%] w-[34%] -translate-x-1/2 rounded-full border border-border" />
 
-        <div className="absolute inset-[4.2%] rounded-[1.75rem] px-1 pb-[4.6%] pt-[9.8%]">
+        <div className="absolute inset-[4.2%] rounded-[1.75rem] px-1 pb-[4.6%] pt-[14%]">
           <div key={`line-${cycleKey}`} className="space-y-6">
             {phase >= 1 && (
               <div className="flex items-start justify-end gap-[2.4%] animate-fade-in-slide-up-22">
@@ -434,19 +435,12 @@ function LineVariant() {
                           style={{
                             borderColor:
                               'color-mix(in oklab, var(--background) 90%, var(--foreground) 10%)',
-                            background: 'color-mix(in oklab, var(--background) 44%, transparent)',
+                            background:
+                              'radial-gradient(88% 76% at 24% 28%, color-mix(in oklab, var(--primary-end) 38%, transparent) 0%, transparent 70%), radial-gradient(84% 74% at 78% 70%, color-mix(in oklab, var(--primary) 38%, transparent) 0%, transparent 72%), linear-gradient(160deg, color-mix(in oklab, var(--primary-end) 26%, transparent) 0%, color-mix(in oklab, var(--primary) 30%, transparent) 58%, color-mix(in oklab, var(--primary-end) 18%, transparent) 100%)',
                             boxShadow:
                               '0 12px 28px -24px color-mix(in oklab, var(--foreground) 24%, transparent), inset 0 1px 0 color-mix(in oklab, white 55%, transparent), inset 0 -1px 0 color-mix(in oklab, var(--foreground) 6%, transparent)',
                           }}
-                        >
-                          <div
-                            className="absolute inset-x-0 top-0 h-1/2 opacity-80"
-                            style={{
-                              background:
-                                'linear-gradient(180deg, color-mix(in oklab, white 52%, transparent) 0%, transparent 100%)',
-                            }}
-                          />
-                        </div>
+                        />
                       );
                     })}
                   </div>
@@ -461,58 +455,195 @@ function LineVariant() {
 }
 
 function ColorVariant() {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { rootMargin: '-100px' });
+  const [hasStarted, setHasStarted] = useState(false);
+  const [phase, setPhase] = useState(0);
+  const [activePreset, setActivePreset] = useState(0);
+  const [activeLut, setActiveLut] = useState(0);
+
+  const presets = ['Warm', 'Cool', 'Vibrant', 'Film', 'Portrait', 'High Contrast', 'Soft'];
+  const luts = [
+    'Warm_Tones.cube',
+    'Cool_Blue.cube',
+    'Vintage_Film.cube',
+    'Cinematic.cube',
+    'Portrait_Soft.cube',
+    'Moody_Dark.cube',
+  ];
+
+  useEffect(() => {
+    if (isInView && !hasStarted) {
+      setHasStarted(true);
+    }
+  }, [isInView, hasStarted]);
+
+  useEffect(() => {
+    if (!hasStarted) return;
+
+    const runCycle = () => {
+      setPhase(0);
+      setTimeout(() => setPhase(1), 500); // line 1
+      setTimeout(() => setPhase(2), 1300); // line 2
+      setTimeout(() => setPhase(3), 2100); // line 3
+      setTimeout(() => setPhase(4), 2900); // complete
+    };
+
+    runCycle();
+    const cycleInterval = setInterval(runCycle, 4500);
+    const presetInterval = setInterval(() => {
+      setActivePreset((prev) => (prev + 1) % presets.length);
+    }, 1200);
+    const lutInterval = setInterval(() => {
+      setActiveLut((prev) => (prev + 1) % luts.length);
+    }, 1400);
+
+    return () => {
+      clearInterval(cycleInterval);
+      clearInterval(presetInterval);
+      clearInterval(lutInterval);
+    };
+  }, [hasStarted, presets.length, luts.length]);
+
   return (
-    <div className="relative flex h-full flex-col overflow-hidden px-[4.8%] pb-[4.8%] pt-[5.2%]">
-      {/* Decorative controls - not interactive, just illustration */}
-      <div className="z-20 flex shrink-0 flex-col gap-2.5" aria-hidden="true" inert>
-        <div className="flex flex-row items-center justify-between gap-3 rounded-xl border border-border/65 bg-card px-4 py-3 shadow-[0_18px_38px_-28px_color-mix(in_oklab,var(--foreground)_45%,transparent),inset_0_1px_0_color-mix(in_oklab,white_58%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_10%,transparent)]">
-          <span className="text-xs font-medium text-foreground">LUT strength</span>
-          <div className="w-[52%] min-w-[8rem]">
-            <Slider defaultValue={[72]} max={100} step={1} variant="primary" />
-          </div>
-        </div>
-
-        <div className="flex flex-row items-center justify-between gap-3 rounded-xl border border-border/65 bg-card px-4 py-3 shadow-[0_18px_38px_-28px_color-mix(in_oklab,var(--foreground)_45%,transparent),inset_0_1px_0_color-mix(in_oklab,white_58%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_10%,transparent)]">
-          <span className="text-xs font-medium text-foreground">Warmth bias</span>
-          <div className="w-[52%] min-w-[8rem]">
-            <Slider defaultValue={[58]} max={100} step={1} variant="primary" />
-          </div>
-        </div>
-
-        <div className="flex flex-row items-center justify-between gap-3 rounded-xl border border-border/65 bg-card px-4 py-3 shadow-[0_18px_38px_-28px_color-mix(in_oklab,var(--foreground)_45%,transparent),inset_0_1px_0_color-mix(in_oklab,white_58%,transparent),inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_10%,transparent)]">
-          <span className="text-xs font-medium text-foreground">Skin tone protect</span>
-          <div className="flex w-[52%] min-w-[8rem] items-center justify-end">
-            <Switch defaultChecked variant="primary" />
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 min-h-0 flex-1 sm:mt-5">
-        <div className="grid h-full grid-cols-3 content-start gap-2 sm:gap-2.5">
-          {Array.from({ length: 6 }).map((_, index) => (
+    <div ref={ref} className="relative flex h-full flex-col items-center justify-center px-[4.8%] py-[5.2%]">
+      <div className="relative flex w-full max-w-[85%] flex-col items-center">
+        {/* Input - Background variations */}
+        <div className="w-full">
+          <div
+            className="relative mx-auto aspect-square w-2/5 overflow-hidden rounded-md border border-border"
+            style={{
+              background:
+                'linear-gradient(180deg, color-mix(in oklab, var(--background) 90%, var(--foreground) 10%) 0%, color-mix(in oklab, var(--background) 95%, var(--foreground) 5%) 100%)',
+            }}
+          >
+            {/* Sun - background variation */}
             <div
-              key={`grade-tile-${index}`}
-              className="relative aspect-square overflow-hidden rounded-md border border-border/75 shadow-[0_10px_24px_-20px_color-mix(in_oklab,var(--foreground)_40%,transparent)]"
+              className="absolute right-[18%] top-[18%] h-[16%] w-[16%] rounded-full"
+              style={{
+                background:
+                  'radial-gradient(circle, color-mix(in oklab, var(--background) 80%, var(--foreground) 20%) 0%, transparent 70%)',
+              }}
+            />
+            {/* Mountains - background variations */}
+            <svg
+              className="absolute bottom-0 left-0 h-full w-full"
+              viewBox="0 0 44 36"
+              preserveAspectRatio="none"
             >
-              <div
-                className="absolute inset-0"
-                style={{
-                  background:
-                    'radial-gradient(86% 78% at 20% 22%, color-mix(in oklab, var(--foreground) 14%, transparent) 0%, transparent 72%), linear-gradient(156deg, color-mix(in oklab, var(--background) 84%, transparent) 0%, color-mix(in oklab, var(--foreground) 7%, transparent) 100%)',
-                }}
+              <path
+                d="M0 36 L0 22 Q8 14 15 20 Q22 26 28 18 Q36 8 44 16 L44 36 Z"
+                fill="color-mix(in oklab, var(--background) 85%, var(--foreground) 15%)"
               />
+              <path
+                d="M0 36 L0 28 Q10 20 18 26 Q26 32 32 22 Q40 12 44 24 L44 36 Z"
+                fill="color-mix(in oklab, var(--background) 80%, var(--foreground) 20%)"
+              />
+            </svg>
+          </div>
+        </div>
 
-              <div className="absolute inset-y-0 left-0 overflow-hidden animate-color-wipe">
-                <div
-                  className="h-full w-[120%]"
-                  style={{
-                    background:
-                      'radial-gradient(88% 76% at 24% 28%, color-mix(in oklab, var(--primary-end) 38%, transparent) 0%, transparent 70%), radial-gradient(84% 74% at 78% 70%, color-mix(in oklab, var(--primary) 38%, transparent) 0%, transparent 72%), linear-gradient(160deg, color-mix(in oklab, var(--primary-end) 26%, transparent) 0%, color-mix(in oklab, var(--primary) 30%, transparent) 58%, color-mix(in oklab, var(--primary-end) 18%, transparent) 100%)',
-                  }}
-                />
-              </div>
-            </div>
-          ))}
+        {/* Connecting line 1 */}
+        <div className="relative h-8 w-px">
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(180deg, color-mix(in oklab, var(--background) 85%, var(--foreground) 15%) 0%, var(--primary) 100%)',
+            }}
+          />
+          {phase === 1 && (
+            <div className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 animate-[slideDown_800ms_ease-out_forwards] rounded-full bg-primary shadow-[0_0_8px_2px_var(--primary)]" />
+          )}
+        </div>
+
+        {/* Auto-Edit */}
+        <div className="mx-auto w-3/4 rounded-lg border border-border bg-card px-4 py-3">
+          <div className="flex items-center justify-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" />
+            <span className="text-xs font-medium text-foreground sm:text-sm">Auto-Edit</span>
+          </div>
+          <span
+            key={activePreset}
+            className="mt-1 block text-center text-[10px] text-primary animate-fade-in-slide-up-22 sm:text-xs"
+          >
+            {presets[activePreset]}
+          </span>
+        </div>
+
+        {/* Connecting line 2 */}
+        <div className="relative h-8 w-px">
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(180deg, var(--primary) 0%, var(--primary) 100%)',
+            }}
+          />
+          {phase === 2 && (
+            <div className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 animate-[slideDown_800ms_ease-out_forwards] rounded-full bg-primary shadow-[0_0_8px_2px_var(--primary)]" />
+          )}
+        </div>
+
+        {/* LUT */}
+        <div className="mx-auto w-3/4 rounded-lg border border-border bg-card px-4 py-3">
+          <div className="flex items-center justify-center gap-2">
+            <Palette className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" />
+            <span className="text-xs font-medium text-foreground sm:text-sm">LUT</span>
+          </div>
+          <span
+            key={activeLut}
+            className="mt-1 block text-center text-[10px] text-primary animate-fade-in-slide-up-22 sm:text-xs"
+          >
+            {luts[activeLut]}
+          </span>
+        </div>
+
+        {/* Connecting line 3 */}
+        <div className="relative h-8 w-px">
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(180deg, var(--primary) 0%, var(--primary) 100%)',
+            }}
+          />
+          {phase === 3 && (
+            <div className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 animate-[slideDownStop_800ms_ease-out_forwards] rounded-full bg-primary shadow-[0_0_8px_2px_var(--primary)]" />
+          )}
+        </div>
+
+        {/* Output - Enhanced image with gradient */}
+        <div className="w-full">
+          <div
+            className="relative mx-auto aspect-square w-2/5 overflow-hidden rounded-md border border-border"
+            style={{
+              background:
+                'linear-gradient(180deg, color-mix(in oklab, var(--primary-end) 40%, transparent) 0%, color-mix(in oklab, var(--primary-end) 20%, transparent) 100%)',
+            }}
+          >
+            {/* Sun - gradient */}
+            <div
+              className="absolute right-[18%] top-[18%] h-[16%] w-[16%] rounded-full"
+              style={{
+                background:
+                  'radial-gradient(circle, color-mix(in oklab, var(--primary-end) 60%, transparent) 0%, transparent 70%)',
+              }}
+            />
+            {/* Mountains - gradient */}
+            <svg
+              className="absolute bottom-0 left-0 h-full w-full"
+              viewBox="0 0 44 36"
+              preserveAspectRatio="none"
+            >
+              <path
+                d="M0 36 L0 22 Q8 14 15 20 Q22 26 28 18 Q36 8 44 16 L44 36 Z"
+                fill="color-mix(in oklab, var(--primary) 30%, transparent)"
+              />
+              <path
+                d="M0 36 L0 28 Q10 20 18 26 Q26 32 32 22 Q40 12 44 24 L44 36 Z"
+                fill="color-mix(in oklab, var(--primary) 40%, transparent)"
+              />
+            </svg>
+          </div>
         </div>
       </div>
     </div>
@@ -705,9 +836,9 @@ const steps: Step[] = [
   },
   {
     id: '03',
-    label: 'Auto color grading',
-    title: 'Apply your look automatically.',
-    description: 'Pick a Studio LUT per event and apply it during processing.',
+    label: 'Image processing',
+    title: 'Automatic enhancement and color grading.',
+    description: 'Apply auto-edits and custom LUTs during upload for consistent results.',
     ctaLabel: 'Start free trial',
     pageGradient: STACKED_PRIMARY_END_GRADIENT,
     gradientBase: DEFAULT_GRADIENT_BASE,
@@ -809,13 +940,15 @@ export function FeatureStory() {
             style={{ zIndex: index + 1 }}
           >
             <div className="mx-auto h-[80svh] w-full">
-              <div className="relative z-10 h-full overflow-hidden rounded-3xl border border-border/90 bg-card shadow-[0_24px_62px_-42px_color-mix(in_oklab,var(--foreground)_36%,transparent)]">
-                <div className="relative flex h-full flex-col lg:flex-row">
-                  <div className="flex min-h-0 min-w-0 shrink-0 flex-col p-5 sm:p-7 lg:h-full lg:flex-1 lg:p-9">
+              <div className="relative z-10 h-full overflow-hidden rounded-3xl">
+                <div className="relative flex h-full flex-col gap-6 lg:flex-row">
+                  <div
+                    className="flex min-h-0 min-w-0 shrink-0 flex-col py-5 sm:py-7 lg:h-full lg:flex-1 lg:py-9"
+                    style={{
+                      background: 'color-mix(in oklab, var(--muted) 30%, var(--background))',
+                    }}
+                  >
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                      <span className="rounded-full border border-border bg-background px-2 py-1 text-xs">
-                        {step.id} / 04
-                      </span>
                       <span className="font-medium text-foreground">{step.label}</span>
                     </div>
 
@@ -856,32 +989,14 @@ export function FeatureStory() {
                         ))}
                       </ul>
                     )}
-
-                    <a
-                      href="https://app.framefast.io/sign-up"
-                      className="mt-6 inline-flex w-fit items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-muted/50 lg:mt-auto"
-                    >
-                      {step.ctaLabel}
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                    </a>
                   </div>
 
-                  <div className="relative min-h-0 flex-1 overflow-hidden lg:min-w-0">
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        backgroundColor: 'var(--card)',
-                        backgroundImage: step.gradientBase,
-                      }}
-                      aria-hidden="true"
-                    />
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        background: step.gradientRadial,
-                      }}
-                      aria-hidden="true"
-                    />
+                  <div
+                    className="relative min-h-0 flex-1 overflow-hidden rounded-3xl lg:min-w-0"
+                    style={{
+                      background: 'var(--muted)',
+                    }}
+                  >
                     <div
                       className={
                         step.id === '04'
