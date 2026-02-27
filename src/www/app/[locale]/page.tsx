@@ -90,7 +90,7 @@ export default async function Page({ params }: Props) {
   setRequestLocale(locale);
 
   return (
-    <div className="bg-muted/30">
+    <div className="bg-background">
       <SoftwareApplicationJsonLd />
       <SiteNav />
       <main>

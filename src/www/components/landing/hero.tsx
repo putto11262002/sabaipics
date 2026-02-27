@@ -20,16 +20,10 @@ export function LandingHero() {
   const isThai = locale === 'th';
 
   return (
-    <section className="pb-14 pt-8 sm:pb-20 sm:pt-10 bg-muted/30">
+    <section className="pb-20 pt-8 sm:pb-28 sm:pt-10 bg-muted/30">
+      <div className="h-14 md:h-20" aria-hidden="true" />
       <div className="mx-auto w-[min(100vw-2rem,1700px)] sm:w-[min(100vw-2.75rem,1700px)] lg:w-[min(100vw-3.25rem,1700px)]">
-        <div className="relative overflow-hidden rounded-b-[2rem] bg-muted/30">
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background: HERO_GRADIENT_EXPERIMENT,
-            }}
-            aria-hidden="true"
-          />
+        <div className="relative overflow-hidden rounded-b-[2rem]">
           <div className="relative mx-auto max-w-5xl px-4 pb-12 pt-12 text-center sm:pb-16 sm:pt-16">
             <div className="flex justify-center">
               <Badge variant="secondary" className="text-xs font-medium tracking-wide">
@@ -68,7 +62,7 @@ export function LandingHero() {
             </div>
           </div>
 
-          <div className="relative mx-auto mt-4 max-w-[340px] px-3 pb-6 sm:mt-6 sm:max-w-[780px] sm:px-6 sm:pb-8 lg:max-w-[720px]">
+          <div className="relative mx-auto mt-12 max-w-[340px] px-3 pb-12 sm:mt-16 sm:max-w-[780px] sm:px-6 sm:pb-16 lg:max-w-[720px]">
             <HeroEventStage className="mx-auto" />
           </div>
         </div>

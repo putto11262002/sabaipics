@@ -51,8 +51,7 @@ function UploadMethodVisual({ kind }: { kind: UploadMethodKind }) {
     ];
 
     return (
-      <div className="relative h-full overflow-hidden rounded-xl border border-border/80 bg-[linear-gradient(180deg,white_20%,color-mix(in_oklab,var(--primary-end)_14%,white)_58%,color-mix(in_oklab,var(--primary)_22%,white)_100%)] px-3 pt-3">
-        <div className="absolute inset-x-0 bottom-0 h-[60%] bg-[radial-gradient(120%_95%_at_50%_100%,color-mix(in_oklab,var(--primary)_28%,white),transparent_72%)]" />
+      <div className="relative h-full overflow-hidden rounded-xl border border-border/80 bg-muted px-3 pt-3">
 
         <div className="pointer-events-none absolute bottom-[18px] right-[36px] z-20 flex flex-col-reverse items-end gap-1.5">
           {popStatuses.map((item, index) => (
@@ -131,8 +130,7 @@ function UploadMethodVisual({ kind }: { kind: UploadMethodKind }) {
 
   if (kind === 'web') {
     return (
-      <div className="relative h-full overflow-hidden rounded-xl border border-border/80 bg-[linear-gradient(180deg,white_20%,color-mix(in_oklab,var(--primary-end)_14%,white)_58%,color-mix(in_oklab,var(--primary)_22%,white)_100%)] px-3 py-3">
-        <div className="absolute inset-x-0 bottom-0 h-[60%] bg-[radial-gradient(120%_95%_at_50%_100%,color-mix(in_oklab,var(--primary)_28%,white),transparent_72%)]" />
+      <div className="relative h-full overflow-hidden rounded-xl border border-border/80 bg-muted px-3 py-3">
         <div className="relative z-10 mt-10 rounded-lg border border-border/80 bg-card/85">
           <div className="flex items-center gap-1.5 border-b border-border/80 px-2 py-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-border" />
@@ -277,8 +275,7 @@ function UploadMethodVisual({ kind }: { kind: UploadMethodKind }) {
    * This is intentionally documented before we try the absolute-anchor rewrite.
    */
   return (
-    <div className="relative h-full overflow-hidden rounded-xl border border-border/80 bg-[linear-gradient(180deg,white_20%,color-mix(in_oklab,var(--primary-end)_14%,white)_58%,color-mix(in_oklab,var(--primary)_22%,white)_100%)] px-3 py-3">
-      <div className="absolute inset-x-0 bottom-0 h-[60%] bg-[radial-gradient(120%_95%_at_50%_100%,color-mix(in_oklab,var(--primary)_28%,white),transparent_72%)]" />
+    <div className="relative h-full overflow-hidden rounded-xl border border-border/80 bg-muted px-3 py-3">
 
       <div className="absolute inset-0 z-[12] grid -translate-x-3 grid-cols-2 items-stretch">
         <div className="flex h-full items-center justify-center">
@@ -310,16 +307,16 @@ function UploadMethodCard({
   const compatibilityHref = `/${locale}/compatibility`;
 
   return (
-    <article className="grid h-full grid-rows-[248px_1fr] overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[0_20px_40px_-36px_color-mix(in_oklab,var(--foreground)_36%,transparent)]">
+    <article className="grid grid-rows-[248px_auto]">
       <UploadMethodVisual kind={kind} />
 
-      <div className="mt-4 flex min-h-0 flex-1 flex-col">
+      <div className="mt-4 flex flex-col">
         <h3 className="text-sm font-semibold tracking-tight">{t(`methods.${kind}.title`)}</h3>
-        <p className="mt-2 min-h-[3.5rem] text-sm leading-5 text-muted-foreground">
+        <p className="mt-2 text-sm leading-5 text-muted-foreground">
           {t(`methods.${kind}.description`)}
         </p>
         {kind === 'ios' && (
-          <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
+          <div className="flex flex-wrap items-center gap-2 pt-3">
             <a
               href="#ios-app"
               className="inline-flex w-fit items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/55"
@@ -336,7 +333,7 @@ function UploadMethodCard({
           </div>
         )}
         {kind === 'web' && (
-          <div className="mt-auto pt-3">
+          <div className="pt-3">
             <a
               href="#pricing"
               className="inline-flex w-fit items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/55"
@@ -346,7 +343,7 @@ function UploadMethodCard({
           </div>
         )}
         {kind === 'desktop' && (
-          <div className="mt-auto pt-3">
+          <div className="pt-3">
             <a
               href="#desktop-app"
               className="inline-flex w-fit items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/55"
@@ -371,7 +368,7 @@ function UploadMethodCardMobile({
   const compatibilityHref = `/${locale}/compatibility`;
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[0_20px_40px_-36px_color-mix(in_oklab,var(--foreground)_36%,transparent)]">
+    <article>
       <div className="h-[220px]">
         <UploadMethodVisual kind={kind} />
       </div>
@@ -639,7 +636,7 @@ export function UploadWaySection() {
             </div> */}
           </div>
 
-          <div className="grid gap-3 md:hidden">
+          <div className="grid gap-6 md:hidden">
             {UPLOAD_METHOD_KINDS.map((kind) => (
               <UploadMethodCardMobile key={kind} kind={kind} t={t} />
             ))}

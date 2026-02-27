@@ -30,8 +30,6 @@ export function SiteNav() {
 
   return (
     <>
-      <div className="h-14 md:h-20 bg-muted/30" aria-hidden="true" />
-
       <header className="pointer-events-none fixed inset-x-0 top-0 z-50">
         <div className="pointer-events-auto mx-auto mt-2 w-full max-w-7xl px-4 md:mt-5">
           <div
