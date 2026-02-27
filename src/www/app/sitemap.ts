@@ -3,6 +3,7 @@ import { MetadataRoute } from 'next';
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = 'https://framefast.io';
   const locales = ['en', 'th'];
+  const defaultLocale = 'en';
 
   const staticPages = [
     { path: '', priority: 1, changeFrequency: 'weekly' as const },
@@ -24,17 +25,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const allPages = [...staticPages, ...guidePages];
 
   return locales.flatMap((locale) =>
-    allPages.map((page) => ({
-      url: `${baseUrl}/${locale}${page.path}`,
-      lastModified: new Date(),
-      changeFrequency: page.changeFrequency,
-      priority: page.priority,
-      alternates: {
-        languages: {
-          en: `${baseUrl}/en${page.path}`,
-          th: `${baseUrl}/th${page.path}`,
+    allPages.map((page) => {
+      // For default locale (en), don't add prefix. For others (th), add prefix.
+      const localePath = locale === defaultLocale ? page.path : `/${locale}${page.path}`;
+
+      return {
+        url: `${baseUrl}${localePath}`,
+        lastModified: new Date(),
+        changeFrequency: page.changeFrequency,
+        priority: page.priority,
+        alternates: {
+          languages: {
+            en: `${baseUrl}${page.path}`,
+            th: `${baseUrl}/th${page.path}`,
+          },
         },
-      },
-    }))
+      };
+    })
   );
 }
