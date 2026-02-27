@@ -19,11 +19,28 @@ import {
 	uploadIntents,
 	logoUploadIntents,
 	ftpCredentials,
+	feedback,
 } from '@/db';
 import { eq, inArray } from 'drizzle-orm';
 import { ResultAsync, okAsync, errAsync } from 'neverthrow';
 import type { EventServiceError } from '../error';
-import { databaseError, storageFailed } from '../error';
+import { customError, databaseError, storageFailed } from '../error';
+
+export const EVENT_RELATION_STRATEGIES = {
+	direct: {
+		photos: 'delete',
+		participant_searches: 'delete',
+		upload_intents: 'delete',
+		logo_upload_intents: 'delete',
+		ftp_credentials: 'delete',
+		line_deliveries: 'set_null_via_fk',
+		feedback: 'set_null_soft_reference',
+	},
+	transitive: {
+		face_embeddings: 'delete_via_photo_cascade',
+		line_deliveries: 'set_null_via_fk_from_participant_searches',
+	},
+} as const;
 
 export interface HardDeleteResult {
 	success: boolean;
@@ -104,7 +121,8 @@ export function hardDeleteEvents(
 						// ONE transaction for database operations + R2 key collection
 						db.transaction(async (tx) => {
 							// Step 1: Collect R2 keys INSIDE transaction (prevents race condition)
-							const [eventPhotos, eventSearches, eventData] = await Promise.all([
+							const [eventPhotos, eventSearches, eventUploads, eventLogoUploads, eventData] =
+								await Promise.all([
 								tx
 									.select({ r2Key: photos.r2Key, id: photos.id })
 									.from(photos)
@@ -114,6 +132,16 @@ export function hardDeleteEvents(
 									.select({ selfieR2Key: participantSearches.selfieR2Key })
 									.from(participantSearches)
 									.where(eq(participantSearches.eventId, eventId)),
+
+								tx
+									.select({ r2Key: uploadIntents.r2Key })
+									.from(uploadIntents)
+									.where(eq(uploadIntents.eventId, eventId)),
+
+								tx
+									.select({ r2Key: logoUploadIntents.r2Key })
+									.from(logoUploadIntents)
+									.where(eq(logoUploadIntents.eventId, eventId)),
 
 								tx
 									.select({
@@ -127,15 +155,25 @@ export function hardDeleteEvents(
 							]);
 
 							// Collect all R2 keys (filter out nulls)
-							const r2Keys = [
-								eventData?.logoR2Key,
-								eventData?.qrCodeR2Key,
-								...eventPhotos.map((p) => p.r2Key),
-								...eventSearches.map((s) => s.selfieR2Key),
-							].filter((key): key is string => Boolean(key));
+							const r2Keys = Array.from(
+								new Set(
+									[
+										eventData?.logoR2Key,
+										eventData?.qrCodeR2Key,
+										...eventPhotos.map((p) => p.r2Key),
+										...eventSearches.map((s) => s.selfieR2Key),
+										...eventUploads.map((u) => u.r2Key),
+										...eventLogoUploads.map((u) => u.r2Key),
+									].filter((key): key is string => Boolean(key))
+								)
+							);
 
 							// Step 2: Delete from database in dependency order
 							// face_embeddings cascade-delete with photos (ON DELETE CASCADE)
+							await tx
+								.update(feedback)
+								.set({ eventId: null })
+								.where(eq(feedback.eventId, eventId));
 
 							const photosDeleted = await tx
 								.delete(photos)
@@ -179,7 +217,7 @@ export function hardDeleteEvents(
 								r2Keys,
 							};
 						}),
-						(error) => databaseError('hard_delete', error, { eventId })
+						(error) => mapHardDeleteDatabaseError(error, eventId)
 					)
 						.andThen(({ dbCounts, r2Keys }) =>
 							// Step 3: Delete R2 objects (best effort - don't fail if R2 delete fails)
@@ -287,4 +325,48 @@ export function hardDeleteEvents(
 			(error) => databaseError('batch_delete', error, { eventId: eventIds[0] || 'batch' })
 		)
 	);
+}
+
+function mapHardDeleteDatabaseError(error: unknown, eventId: string): EventServiceError {
+	const pgError = findPostgresError(error);
+	if (pgError?.code === '23503') {
+		const relation = pgError.table ? `table ${pgError.table}` : 'a dependent table';
+		const constraint = pgError.constraint ? ` (${pgError.constraint})` : '';
+		return customError(
+			'FK_CONSTRAINT_BLOCKS_DELETE',
+			`Hard delete blocked by ${relation}${constraint}`,
+			false,
+			{ eventId }
+		);
+	}
+	return databaseError('hard_delete', error, { eventId });
+}
+
+function findPostgresError(
+	error: unknown
+): { code?: string; constraint?: string; table?: string; detail?: string } | null {
+	const candidates: unknown[] = [error];
+	if (error && typeof error === 'object' && 'cause' in error) {
+		candidates.push((error as { cause?: unknown }).cause);
+	}
+
+	for (const candidate of candidates) {
+		if (!candidate || typeof candidate !== 'object') continue;
+		const pg = candidate as {
+			code?: unknown;
+			constraint?: unknown;
+			table?: unknown;
+			detail?: unknown;
+		};
+		if (typeof pg.code === 'string') {
+			return {
+				code: pg.code,
+				constraint: typeof pg.constraint === 'string' ? pg.constraint : undefined,
+				table: typeof pg.table === 'string' ? pg.table : undefined,
+				detail: typeof pg.detail === 'string' ? pg.detail : undefined,
+			};
+		}
+	}
+
+	return null;
 }

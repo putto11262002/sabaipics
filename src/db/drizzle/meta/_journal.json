@@ -225,6 +225,13 @@
       "when": 1772172482998,
       "tag": "0031_legal_korg",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1772174875252,
+      "tag": "0032_clammy_james_howlett",
+      "breakpoints": true
     }
   ]
 }
