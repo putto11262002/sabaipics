@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { cn } from '@/shared/utils/ui';
 
 import event1 from '@/assets/hero/event1.webp';
+import { HardwareButton, HardwareDial } from './camera-hardware-ui';
 
 export function HeroEventStageShell({ className }: { className?: string }) {
   const metrics = {
@@ -150,41 +151,6 @@ function ControlPanel() {
           <HardwareButton />
         </div>
       </div>
-    </div>
-  );
-}
-
-function HardwareButton() {
-  return (
-    <div
-      className="relative rounded-full border border-foreground lg:border-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.74),inset_0_-1px_0_rgba(255,255,255,0.24)]"
-      style={{
-        width: 'clamp(1.55rem, 3vw, 2.55rem)',
-        height: 'clamp(1.55rem, 3vw, 2.55rem)',
-      }}
-      aria-hidden="true"
-    >
-      <div className="absolute rounded-full border border-foreground lg:border-2" style={{ inset: '18%' }} />
-    </div>
-  );
-}
-
-function HardwareDial() {
-  return (
-    <div
-      className="relative rounded-full border border-foreground lg:border-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.74),inset_0_-1px_0_rgba(255,255,255,0.24)]"
-      style={{
-        width: 'clamp(2.55rem, 5vw, 4.55rem)',
-        height: 'clamp(2.55rem, 5vw, 4.55rem)',
-      }}
-      aria-hidden="true"
-    >
-      <div className="absolute rounded-full border border-foreground lg:border-2" style={{ inset: '12%' }} />
-      <div
-        className="absolute rounded-full border border-foreground lg:border-2"
-        style={{ inset: '32%', background: 'rgba(255,255,255,0.26)' }}
-      />
-      <div className="absolute left-1/2 top-1.5 h-2 w-px -translate-x-1/2 rounded-full bg-primary/25" />
     </div>
   );
 }
