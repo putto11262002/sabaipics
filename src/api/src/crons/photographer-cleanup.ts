@@ -1,31 +1,54 @@
-import { createDbTx, photographers, events, consentRecords, uploadIntents } from '@/db';
-import { and, lt, isNotNull, eq } from 'drizzle-orm';
+import {
+	createDbTx,
+	photographers,
+	events,
+	uploadIntents,
+	logoUploadIntents,
+	ftpCredentials,
+	lineDeliveries,
+	photoLuts,
+	feedback,
+} from '@/db';
+import { and, lt, isNotNull, isNull, eq } from 'drizzle-orm';
 import type { Bindings } from '../types';
 import { hardDeleteEvents } from '../lib/services/events/hard-delete';
 import { createStripeClient } from '../lib/stripe/client';
-import { deleteAllCredits } from '../lib/credits';
 
 interface PhotographerCleanupResult {
-	photographersHardDeleted: number;
+	photographersProcessed: number;
 	photographerIds: string[];
 	eventsDeleted: number;
 }
 
 /**
- * Photographer Hard Delete Cleanup (PERMANENT DELETE):
+ * Photographer Data Cleanup (Content Deletion, Audit Retention):
+ *
+ * This cron job cleans up personal/operational data for deleted photographers
+ * while retaining financial and compliance records for audit purposes.
+ *
+ * RETAINED (for audit/compliance):
+ * - photographers record (soft-deleted, serves as anchor)
+ * - creditLedger (financial audit trail)
+ * - creditAllocations (linked to ledger)
+ * - consentRecords (PDPA compliance)
+ * - promoCodeUsage (marketing analytics)
+ * - giftCodeRedemptions (gift code history)
+ *
+ * DELETED (personal/operational data):
+ * - events + photos + R2 objects + faceEmbeddings
+ * - uploadIntents, logoUploadIntents
+ * - ftpCredentials
+ * - lineDeliveries
+ * - photoLuts
+ * - feedback
+ * - Stripe customer (external service)
+ *
+ * Process:
  * 1. Query soft-deleted photographers older than grace period (default: 30 days)
- * 2. For each photographer, permanently delete:
- *    - All their events (using hardDeleteEvents - includes R2)
- *    - Credit ledger entries
- *    - Consent records
- *    - Upload intents
- *    - Stripe customer (if exists)
- *    - Photographer record
+ * 2. For each photographer, delete their content data
  * 3. Process in batches to avoid timeouts
  *
  * Runs daily at 5 AM Bangkok time (10 PM UTC)
- *
- * WARNING: This is irreversible. Photographers and their events are permanently deleted after the grace period.
  */
 export async function photographerCleanup(env: Bindings): Promise<PhotographerCleanupResult> {
 	const startTime = Date.now();
@@ -53,28 +76,29 @@ export async function photographerCleanup(env: Bindings): Promise<PhotographerCl
 		.where(
 			and(
 				isNotNull(photographers.deletedAt),
-				lt(photographers.deletedAt, cutoffDate.toISOString())
+				lt(photographers.deletedAt, cutoffDate.toISOString()),
+				isNull(photographers.cleanedAt) // Only get not-yet-cleaned photographers
 			)
 		)
 		.limit(batchSize);
 
 	if (candidates.length === 0) {
-		console.log('[PhotographerCleanup] No photographers to hard-delete');
+		console.log('[PhotographerCleanup] No photographers to clean up');
 		return {
-			photographersHardDeleted: 0,
+			photographersProcessed: 0,
 			photographerIds: [],
 			eventsDeleted: 0,
 		};
 	}
 
-	console.log('[PhotographerCleanup] Found candidates for hard deletion', {
+	console.log('[PhotographerCleanup] Found candidates for cleanup', {
 		count: candidates.length,
 		photographerIds: candidates.map((p) => p.id),
 	});
 
 	const stripe = env.STRIPE_SECRET_KEY ? createStripeClient(env) : null;
 
-	const photographersDeleted: string[] = [];
+	const photographersProcessed: string[] = [];
 	let totalEventsDeleted = 0;
 
 	for (const photographer of candidates) {
@@ -134,35 +158,70 @@ export async function photographerCleanup(env: Bindings): Promise<PhotographerCl
 				);
 			}
 
-			// Step 3: Delete photographer dependencies and record (in transaction)
+			// Step 3: Delete operational data (NOT financial/consent records)
 			await db.transaction(async (tx) => {
-				const creditDeletedCount = await deleteAllCredits(tx, photographer.id)
-					.match(
-						(count) => count,
-						(e) => { throw e.cause ?? new Error(`Credit cleanup failed: ${e.type}`); },
-					);
-
-				const consentDeleted = await tx
-					.delete(consentRecords)
-					.where(eq(consentRecords.photographerId, photographer.id))
-					.returning({ id: consentRecords.id });
-
+				// Delete upload intents
 				const uploadsDeleted = await tx
 					.delete(uploadIntents)
 					.where(eq(uploadIntents.photographerId, photographer.id))
 					.returning({ id: uploadIntents.id });
 
-				await tx.delete(photographers).where(eq(photographers.id, photographer.id));
+				// Delete logo upload intents
+				const logoUploadsDeleted = await tx
+					.delete(logoUploadIntents)
+					.where(eq(logoUploadIntents.photographerId, photographer.id))
+					.returning({ id: logoUploadIntents.id });
 
-				console.log('[PhotographerCleanup] Photographer dependencies deleted', {
+				// Delete FTP credentials
+				const ftpDeleted = await tx
+					.delete(ftpCredentials)
+					.where(eq(ftpCredentials.photographerId, photographer.id))
+					.returning({ id: ftpCredentials.id });
+
+				// Delete LINE deliveries
+				const lineDeliveriesDeleted = await tx
+					.delete(lineDeliveries)
+					.where(eq(lineDeliveries.photographerId, photographer.id))
+					.returning({ id: lineDeliveries.id });
+
+				// Delete photo LUTs
+				const lutsDeleted = await tx
+					.delete(photoLuts)
+					.where(eq(photoLuts.photographerId, photographer.id))
+					.returning({ id: photoLuts.id });
+
+				// Delete feedback
+				const feedbackDeleted = await tx
+					.delete(feedback)
+					.where(eq(feedback.photographerId, photographer.id))
+					.returning({ id: feedback.id });
+
+				// Mark photographer as cleaned (prevents re-processing)
+				await tx
+					.update(photographers)
+					.set({ cleanedAt: new Date().toISOString() })
+					.where(eq(photographers.id, photographer.id));
+
+				console.log('[PhotographerCleanup] Operational data deleted', {
 					photographerId: photographer.id,
-					creditLedger: creditDeletedCount,
-					consentRecords: consentDeleted.length,
 					uploadIntents: uploadsDeleted.length,
+					logoUploadIntents: logoUploadsDeleted.length,
+					ftpCredentials: ftpDeleted.length,
+					lineDeliveries: lineDeliveriesDeleted.length,
+					photoLuts: lutsDeleted.length,
+					feedback: feedbackDeleted.length,
 				});
+
+				// Note: We intentionally do NOT delete:
+				// - photographers record (kept as audit anchor)
+				// - creditLedger (financial audit trail)
+				// - creditAllocations (linked to ledger)
+				// - consentRecords (PDPA compliance)
+				// - promoCodeUsage (marketing analytics)
+				// - giftCodeRedemptions (gift code history)
 			});
 
-			// Step 4: Cancel Stripe customer (outside transaction, best effort)
+			// Step 4: Delete Stripe customer (external service, best effort)
 			if (stripe && photographer.stripeCustomerId) {
 				try {
 					await stripe.customers.del(photographer.stripeCustomerId);
@@ -179,13 +238,13 @@ export async function photographerCleanup(env: Bindings): Promise<PhotographerCl
 				}
 			}
 
-			photographersDeleted.push(photographer.id);
-			console.log('[PhotographerCleanup] Photographer hard deleted', {
+			photographersProcessed.push(photographer.id);
+			console.log('[PhotographerCleanup] Photographer content cleaned up (record retained)', {
 				photographerId: photographer.id,
 				clerkId: photographer.clerkId,
 			});
 		} catch (error) {
-			console.error('[PhotographerCleanup] Photographer deletion failed', {
+			console.error('[PhotographerCleanup] Photographer cleanup failed', {
 				photographerId: photographer.id,
 				error: error instanceof Error ? error.message : String(error),
 			});
@@ -194,15 +253,15 @@ export async function photographerCleanup(env: Bindings): Promise<PhotographerCl
 
 	const duration = Date.now() - startTime;
 	console.log('[PhotographerCleanup] Cron completed', {
-		photographersHardDeleted: photographersDeleted.length,
-		photographerIds: photographersDeleted,
+		photographersProcessed: photographersProcessed.length,
+		photographerIds: photographersProcessed,
 		eventsDeleted: totalEventsDeleted,
 		durationMs: duration,
 	});
 
 	return {
-		photographersHardDeleted: photographersDeleted.length,
-		photographerIds: photographersDeleted,
+		photographersProcessed: photographersProcessed.length,
+		photographerIds: photographersProcessed,
 		eventsDeleted: totalEventsDeleted,
 	};
 }

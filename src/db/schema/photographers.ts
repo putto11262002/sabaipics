@@ -27,6 +27,7 @@ export const photographers = pgTable(
     settings: jsonb('settings').$type<PhotographerSettings>(),
     bannedAt: timestamptz('banned_at'), // null = not banned, set = account suspended
     deletedAt: timestamptz('deleted_at'), // null = active, set = soft deleted
+    cleanedAt: timestamptz('cleaned_at'), // null = not cleaned, set = content cleanup completed
     createdAt: createdAtCol(),
   },
   (table) => [
@@ -35,6 +36,7 @@ export const photographers = pgTable(
     index('photographers_balance_invalidate_at_idx').on(table.balanceInvalidateAt),
     index('photographers_banned_at_idx').on(table.bannedAt),
     index('photographers_deleted_at_idx').on(table.deletedAt),
+    index('photographers_cleaned_at_idx').on(table.cleanedAt),
   ],
 );
 
