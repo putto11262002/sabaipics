@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { LandingHero } from '@/components/landing/hero';
 import { SiteNav } from '@/components/site-nav';
 import { SoftwareApplicationJsonLd } from '@/components/seo/json-ld';
+import { IosAppHorizontalScroll } from '@/components/landing/ios-app-horizontal-scroll-wrapper';
 
 const PAGE_METADATA = {
   en: {
@@ -68,10 +69,6 @@ const PricingSection = dynamic(
   () => import('@/components/landing/pricing-section').then((mod) => mod.PricingSection),
   { ssr: true, loading: () => <SectionSkeleton /> },
 );
-const IosAppSection = dynamic(
-  () => import('@/components/landing/ios-app-section').then((mod) => mod.IosAppSection),
-  { ssr: true, loading: () => <SectionSkeleton /> },
-);
 const FaqSection = dynamic(
   () => import('@/components/landing/faq-section').then((mod) => mod.FaqSection),
   { ssr: true, loading: () => <SectionSkeleton /> },
@@ -98,7 +95,7 @@ export default async function Page({ params }: Props) {
         <FeatureStory />
         <UploadWaySection />
         <PricingSection />
-        <IosAppSection />
+        <IosAppHorizontalScroll />
         <FaqSection />
       </main>
       <Footer />
