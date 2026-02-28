@@ -132,7 +132,6 @@ struct CaptureSessionSheetView: View {
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
-        .tint(.red)
         .disabled(isDisconnecting)
         .padding(.horizontal, 16)
         .padding(.top, 10)
