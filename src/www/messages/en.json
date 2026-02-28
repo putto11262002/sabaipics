@@ -62,6 +62,24 @@
     "title": "Capture, sync, and deliver from your pocket.",
     "description": "Import from camera, monitor upload status, and keep event delivery moving while you are still on-site."
   },
+  "IosAppPanels": {
+    "panel1": {
+      "title": "Manage Multiple Events",
+      "description": "Track upload progress across all your events. See what's in the queue, monitor uploads, and switch between active sessions from one dashboard."
+    },
+    "panel2": {
+      "title": "Connect Your Camera",
+      "description": "Support for Canon, Nikon, and Sony WiFi-enabled cameras. Choose your brand and connect wirelessly in seconds."
+    },
+    "panel3": {
+      "title": "Pair Once, Upload Forever",
+      "description": "Quick wireless pairing with your camera. Once connected, photos automatically transfer in the background while you shoot."
+    },
+    "panel4": {
+      "title": "Photos Sync in Real-Time",
+      "description": "Watch your photos upload automatically as you capture them. No cables, no manual export—just shoot and they're instantly available for guests to find."
+    }
+  },
   "Faq": {
     "title": "Frequently asked questions",
     "subtitle": "Privacy, attendee flow, and credit-based delivery.",
@@ -113,6 +131,7 @@
     "subtitle": "<highlight>Pay as you go</highlight> after your free credits are used.",
     "cta": "Start free trial",
     "creditEquivalence": "1 credit = 1 image",
+    "storageLimits": "Storage & limits",
     "uploadRequirements": "Upload requirements",
     "uploadFormats": "JPEG, PNG, WebP · 10 MB",
     "imageRetention": "Image retention",
@@ -120,6 +139,14 @@
     "creditExpiration": "Credit expiration",
     "creditExpirationValue": "Paid top-up credits: 6 months",
     "topupTiers": "Top-up tiers",
+    "creditUsageTitle": "Credit usage",
+    "creditUsageDescription": "Credits are consumed based on features you use",
+    "imageUploadTitle": "Image upload",
+    "imageUploadCost": "1 credit per image uploaded",
+    "imageEnhancementTitle": "Image enhancement",
+    "imageEnhancementCost": "+1 credit per image with auto-edit or LUT",
+    "lineDeliveryTitle": "LINE delivery",
+    "lineDeliveryCost": "100 free per month, then 1 credit per message",
     "salesCta": "Need high-volume event pricing? Contact sales"
   },
   "UploadWay": {

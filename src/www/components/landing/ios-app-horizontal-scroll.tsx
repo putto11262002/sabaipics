@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import ios0 from '@/assets/ios-screenshots/ios-0.webp';
 import ios1 from '@/assets/ios-screenshots/ios-1.webp';
@@ -13,34 +14,18 @@ const SCROLL_HEIGHT_PER_PANEL = 100;
 
 type Panel = {
   screenshot: typeof ios0;
-  title: string;
-  description: string;
+  key: 'panel1' | 'panel2' | 'panel3' | 'panel4';
 };
 
-const panels: Panel[] = [
-  {
-    screenshot: ios0,
-    title: 'Connect Your Camera',
-    description: 'Wirelessly connect to Canon, Nikon, or Sony cameras and automatically sync photos in the background.',
-  },
-  {
-    screenshot: ios1,
-    title: 'Real-Time Upload',
-    description: 'Photos transfer seamlessly while you shoot. No cables, no manual export.',
-  },
-  {
-    screenshot: ios2,
-    title: 'Monitor Progress',
-    description: 'Track upload status and manage multiple events from your iPhone.',
-  },
-  {
-    screenshot: ios3,
-    title: 'Ready to Share',
-    description: 'Photos are instantly available for guests to find via face search.',
-  },
+const panelScreenshots: Panel[] = [
+  { screenshot: ios0, key: 'panel1' },
+  { screenshot: ios1, key: 'panel2' },
+  { screenshot: ios2, key: 'panel3' },
+  { screenshot: ios3, key: 'panel4' },
 ];
 
 export function IosAppHorizontalScroll() {
+  const t = useTranslations('IosAppPanels');
   const containerRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
 
@@ -70,96 +55,127 @@ export function IosAppHorizontalScroll() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Calculate horizontal translation
-  // progress 0 = first panel, progress 1 = last panel
-  const totalPanels = panels.length;
-  const translateX = -progress * (totalPanels - 1) * 100; // Move through panels
+  // Calculate which panel is active and opacity for each
+  const totalPanels = panelScreenshots.length;
+  const getPanelOpacity = (index: number) => {
+    const panelProgress = progress * (totalPanels - 1);
+    const distance = Math.abs(panelProgress - index);
+
+    // Each screenshot stays at 100% for a range, then fades
+    const plateauRange = 0.4; // Stay at 100% within this distance
+    const fadeRange = 0.3; // Fade over this distance
+
+    if (distance < plateauRange) return 1;
+    if (distance > plateauRange + fadeRange) return 0;
+    return 1 - ((distance - plateauRange) / fadeRange);
+  };
+
+  const firstPanel = panelScreenshots[0];
 
   return (
     <div
       ref={containerRef}
-      className="relative"
+      className="bg-muted/30 py-16 sm:py-20"
       style={{
-        height: `${SCROLL_HEIGHT_PER_PANEL * totalPanels}vh`,
+        height: typeof window !== 'undefined' && window.innerWidth >= 1024
+          ? `${SCROLL_HEIGHT_PER_PANEL * totalPanels}vh`
+          : 'auto',
       }}
     >
-      <div className="sticky top-0 h-screen overflow-hidden">
-        <div className="relative h-full bg-muted/30">
-          {/* Gradient background */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                'radial-gradient(120% 88% at 12% 92%, color-mix(in oklab, var(--primary-end) 28%, transparent) 0%, transparent 64%), radial-gradient(118% 82% at 88% 86%, color-mix(in oklab, var(--primary) 28%, transparent) 0%, transparent 64%)',
-            }}
-          />
+      {/* Content */}
+      <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 lg:grid-cols-2 lg:gap-14">
+        {/* Copy - left column */}
+        <div>
+          {/* Mobile: show only first panel */}
+          <div className="lg:hidden text-center">
+            <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+              {t(`${firstPanel.key}.title`)}
+            </h2>
+            <p className="mt-4 mx-auto max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+              {t(`${firstPanel.key}.description`)}
+            </p>
+          </div>
 
-          {/* Horizontal sliding content */}
-          <div
-            className="absolute inset-0 flex transition-transform duration-100 ease-out"
-            style={{
-              transform: `translateX(${translateX}%)`,
-              width: `${totalPanels * 100}%`,
-            }}
-          >
-            {panels.map((panel, index) => (
-              <div
-                key={index}
-                className="flex h-full w-full shrink-0 items-center"
-                style={{ width: `${100 / totalPanels}%` }}
-              >
-                <div className="mx-auto grid w-full max-w-7xl items-center gap-10 px-4 lg:grid-cols-2 lg:gap-14">
-                  {/* Copy - left column */}
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      iOS app
-                    </p>
-                    <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-                      {panel.title}
-                    </h2>
-                    <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-                      {panel.description}
-                    </p>
+          {/* Desktop: show all panels with scroll behavior */}
+          <div className="hidden lg:block">
+            {panelScreenshots.map((panel, index) => (
+              <div key={panel.key} className="flex min-h-screen items-center justify-center py-16 sm:py-20">
+                <div>
+                  <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+                    {t(`${panel.key}.title`)}
+                  </h2>
+                  <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+                    {t(`${panel.key}.description`)}
+                  </p>
 
-                    {/* App Store badge - show only on last panel */}
-                    {index === panels.length - 1 && (
-                      <div className="mt-7">
-                        <a
-                          href="https://apps.apple.com/app/id0000000000"
-                          aria-label="Download on the App Store"
-                          className="inline-flex w-fit transition-opacity hover:opacity-90"
-                        >
-                          <Image
-                            src="/badges/app-store-en.svg"
-                            alt="Download on the App Store"
-                            width={162}
-                            height={48}
-                            className="h-11 w-auto"
-                          />
-                        </a>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* iPhone mockup - right column */}
-                  <div aria-hidden="true">
-                    <div className="mx-auto w-full max-w-[360px] rounded-[2.4rem] border border-border/60 bg-[linear-gradient(165deg,color-mix(in_oklab,var(--primary)_12%,transparent)_0%,color-mix(in_oklab,var(--primary)_4%,transparent)_58%,color-mix(in_oklab,var(--primary)_8%,transparent)_100%)] p-3 shadow-[0_26px_64px_-46px_color-mix(in_oklab,var(--foreground)_22%,transparent)] lg:ml-auto">
-                      <div className="relative aspect-[9/19] overflow-hidden rounded-[1.8rem] border border-border/50 bg-background">
+                  {/* App Store badge - show only on last panel */}
+                  {index === panelScreenshots.length - 1 && (
+                    <div className="mt-7">
+                      <a
+                        href="https://apps.apple.com/app/id0000000000"
+                        aria-label="Download on the App Store"
+                        className="inline-flex w-fit transition-opacity hover:opacity-90"
+                      >
                         <Image
-                          src={panel.screenshot}
-                          alt={`${panel.title} screenshot`}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 360px, 400px"
+                          src="/badges/app-store-en.svg"
+                          alt="Download on the App Store"
+                          width={162}
+                          height={48}
+                          className="h-11 w-auto"
                         />
-                        <div className="absolute inset-x-[30%] top-2 z-10 h-1 rounded-full bg-foreground/20" />
-                      </div>
+                      </a>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* iPhone mockup - right column */}
+        <div className="lg:sticky lg:top-0 lg:flex lg:h-screen lg:items-center" aria-hidden="true">
+          <div className="mx-auto w-full max-w-[280px] rounded-[2.4rem] border border-border/60 bg-muted p-3 shadow-[0_26px_64px_-46px_color-mix(in_oklab,var(--foreground)_22%,transparent)] lg:ml-auto">
+            <div className="relative aspect-[9/19] overflow-hidden rounded-[1.8rem] border border-border/50 bg-background">
+              {/* Mobile: show only first screenshot */}
+              <Image
+                src={firstPanel.screenshot}
+                alt={t(`${firstPanel.key}.title`)}
+                fill
+                className="object-cover lg:hidden"
+                sizes="280px"
+              />
+
+              {/* Desktop: all screenshots with fade transitions */}
+              {panelScreenshots.map((panel, index) => (
+                <Image
+                  key={panel.key}
+                  src={panel.screenshot}
+                  alt={t(`${panel.key}.title`)}
+                  fill
+                  className="hidden object-cover transition-opacity duration-500 ease-out lg:block"
+                  style={{ opacity: getPanelOpacity(index) }}
+                  sizes="280px"
+                />
+              ))}
+              <div className="absolute inset-x-[30%] top-2 z-10 h-1 rounded-full bg-foreground/20" />
+            </div>
+          </div>
+
+          {/* Download badge - mobile only, below screen */}
+          <div className="mt-7 flex justify-center lg:hidden">
+            <a
+              href="https://apps.apple.com/app/id0000000000"
+              aria-label="Download on the App Store"
+              className="inline-flex w-fit transition-opacity hover:opacity-90"
+            >
+              <Image
+                src="/badges/app-store-en.svg"
+                alt="Download on the App Store"
+                width={162}
+                height={48}
+                className="h-11 w-auto"
+              />
+            </a>
           </div>
         </div>
       </div>
