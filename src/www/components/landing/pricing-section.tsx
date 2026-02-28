@@ -447,7 +447,7 @@ export async function PricingSection() {
             <article className="flex min-h-[360px] flex-col border-t border-border/70 p-6 sm:p-7 lg:col-span-3 lg:border-l lg:border-t-0">
               <div className="flex h-full flex-col">
                 <p className="text-lg font-medium tracking-tight text-foreground sm:text-xl">
-                  Storage & limits
+                  {t('storageLimits')}
                 </p>
 
                 <div className="grid h-28 place-items-center py-2">
@@ -514,9 +514,9 @@ export async function PricingSection() {
         {/* Credit Usage Breakdown */}
         <div className="mt-6 overflow-hidden rounded-3xl bg-card/72 backdrop-blur-xl shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_85%,transparent),0_24px_60px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
           <div className="p-6 sm:p-8">
-            <h3 className="text-xl font-semibold tracking-tight sm:text-2xl">Credit usage</h3>
+            <h3 className="text-xl font-semibold tracking-tight sm:text-2xl">{t('creditUsageTitle')}</h3>
             <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-              Credits are consumed based on features you use
+              {t('creditUsageDescription')}
             </p>
 
             <div className="mt-6 grid grid-cols-1 divide-y divide-border/70 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
@@ -559,9 +559,9 @@ export async function PricingSection() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-base font-semibold text-foreground">Image upload</h4>
+                  <h4 className="text-base font-semibold text-foreground">{t('imageUploadTitle')}</h4>
                   <p className="mt-1 text-base text-foreground">
-                    1 credit per image uploaded
+                    {t('imageUploadCost')}
                   </p>
                 </div>
               </div>
@@ -606,10 +606,10 @@ export async function PricingSection() {
                 </div>
                 <div>
                   <h4 className="text-base font-semibold text-foreground">
-                    Image enhancement
+                    {t('imageEnhancementTitle')}
                   </h4>
                   <p className="mt-1 text-base text-foreground">
-                    +1 credit per image with auto-edit or LUT
+                    {t('imageEnhancementCost')}
                   </p>
                 </div>
               </div>
@@ -653,9 +653,9 @@ export async function PricingSection() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-base font-semibold text-foreground">LINE delivery</h4>
+                  <h4 className="text-base font-semibold text-foreground">{t('lineDeliveryTitle')}</h4>
                   <p className="mt-1 text-base text-foreground">
-                    100 free per month, then 1 credit per message
+                    {t('lineDeliveryCost')}
                   </p>
                 </div>
               </div>
