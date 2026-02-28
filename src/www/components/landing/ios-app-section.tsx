@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { getLocale, getTranslations } from 'next-intl/server';
+import iosAppScreenshot from '@/assets/ios-app-screenshot.webp';
 
 export async function IosAppSection() {
   const locale = await getLocale();
@@ -52,20 +53,15 @@ export async function IosAppSection() {
 
             <div className="order-1 lg:order-2" aria-hidden="true">
               <div className="mx-auto w-full max-w-[360px] rounded-[2.4rem] border border-border/60 bg-[linear-gradient(165deg,color-mix(in_oklab,var(--primary)_12%,transparent)_0%,color-mix(in_oklab,var(--primary)_4%,transparent)_58%,color-mix(in_oklab,var(--primary)_8%,transparent)_100%)] p-3 shadow-[0_26px_64px_-46px_color-mix(in_oklab,var(--foreground)_22%,transparent)] lg:ml-auto">
-                <div className="relative aspect-[9/19] overflow-hidden rounded-[1.8rem] border border-border/50 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--primary)_8%,var(--card))_0%,color-mix(in_oklab,var(--primary)_4%,var(--card))_100%)]">
-                  <div className="absolute inset-x-[30%] top-2 h-1 rounded-full bg-border/60" />
-                  <div className="absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_100%,color-mix(in_oklab,var(--primary)_22%,transparent)_0%,transparent_72%)]" />
-
-                  <div className="absolute left-4 right-4 top-10 space-y-3">
-                    <div className="h-3 w-24 rounded-full bg-border/50" />
-                    <div className="h-3 w-36 rounded-full bg-border/30" />
-                  </div>
-
-                  <div className="absolute inset-x-4 bottom-6 rounded-2xl border border-border/40 bg-background/60 px-4 py-5 backdrop-blur-md">
-                    <p className="text-center text-xs font-medium tracking-wide text-muted-foreground">
-                      App screenshot placeholder
-                    </p>
-                  </div>
+                <div className="relative aspect-[9/19] overflow-hidden rounded-[1.8rem] border border-border/50 bg-background">
+                  <Image
+                    src={iosAppScreenshot}
+                    alt="FrameFast iOS app screenshot"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 360px, 400px"
+                  />
+                  <div className="absolute inset-x-[30%] top-2 z-10 h-1 rounded-full bg-foreground/20" />
                 </div>
               </div>
             </div>
