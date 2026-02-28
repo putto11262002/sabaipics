@@ -38,31 +38,48 @@ struct CaptureStatusBarView: View {
 
             Spacer(minLength: 10)
 
-            Button {
-                onDisconnect()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .padding(8)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.red)
-            .accessibilityLabel("Disconnect")
+            disconnectButton
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(
-            Color(uiColor: .secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-        )
-        .shadow(color: Color.primary.opacity(0.08), radius: 10, x: 0, y: 4)
+        .background(statusBarBackground)
+        .conditionalShadow()
         .contentShape(Rectangle())
         .onTapGesture {
             onOpen()
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    // MARK: - Disconnect Button
+
+    @ViewBuilder
+    private var disconnectButton: some View {
+        Button {
+            onDisconnect()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 12, weight: .semibold))
+                .padding(8)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.red)
+        .accessibilityLabel("Disconnect")
+    }
+
+    // MARK: - Background
+
+    @ViewBuilder
+    private var statusBarBackground: some View {
+        if #available(iOS 26.0, *) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.clear)
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
+        } else {
+            Color(uiColor: .secondarySystemGroupedBackground)
+        }
     }
 
     private var subtitleText: String {
@@ -124,6 +141,20 @@ private struct SyncRingOverlay: View {
             .rotationEffect(.degrees(isRotating ? 360 : 0))
             .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isRotating)
             .onAppear { isRotating = true }
+    }
+}
+
+// MARK: - Conditional Shadow Extension
+
+extension View {
+    /// Applies shadow only on iOS < 26. Liquid Glass handles its own depth on iOS 26+.
+    @ViewBuilder
+    func conditionalShadow() -> some View {
+        if #available(iOS 26.0, *) {
+            self
+        } else {
+            self.shadow(color: Color.primary.opacity(0.08), radius: 10, x: 0, y: 4)
+        }
     }
 }
 

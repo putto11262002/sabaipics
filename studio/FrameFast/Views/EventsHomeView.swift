@@ -101,29 +101,23 @@ struct EventsHomeView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
-                UploadStatsCardsRow(
-                    pendingJobs: uploadStatusStore.summary.inFlight,
-                    uploadedLast7Days: uploadedLast7Days
-                )
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-
-                Group {
-                    if viewModel.isFirstLoad && viewModel.events.isEmpty {
-                        skeletonListView
-                    } else if let error = viewModel.error, viewModel.events.isEmpty {
-                        if connectivityStore.state.isOffline {
-                            offlineEmptyStateView
-                        } else {
-                            errorView(error: error)
-                        }
-                    } else if viewModel.events.isEmpty {
-                        emptyStateView
+            Group {
+                if viewModel.isFirstLoad && viewModel.events.isEmpty {
+                    skeletonListView
+                } else if let error = viewModel.error, viewModel.events.isEmpty {
+                    if connectivityStore.state.isOffline {
+                        offlineEmptyStateView
                     } else {
-                        eventsList
+                        errorView(error: error)
                     }
+                } else if viewModel.events.isEmpty {
+                    emptyStateView
+                } else {
+                    eventsList
                 }
+            }
+            .refreshable {
+                await viewModel.refreshEvents()
             }
             #if os(iOS)
             .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
@@ -167,6 +161,16 @@ struct EventsHomeView: View {
     private var skeletonListView: some View {
         List {
             Section {
+                UploadStatsCardsRow(
+                    pendingJobs: 0,
+                    uploadedLast7Days: 0
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+                .redacted(reason: .placeholder)
+            }
+
+            Section {
                 ForEach(Event.placeholders) { event in
                     SkeletonEventRow(title: event.name)
                 }
@@ -184,6 +188,15 @@ struct EventsHomeView: View {
     private var eventsList: some View {
         List {
             Section {
+                UploadStatsCardsRow(
+                    pendingJobs: uploadStatusStore.summary.inFlight,
+                    uploadedLast7Days: uploadedLast7Days
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+            }
+
+            Section {
                 ForEach(viewModel.events) { event in
                     UploadEventStatusRow(
                         title: event.name,
@@ -196,66 +209,103 @@ struct EventsHomeView: View {
                     .foregroundStyle(Color.secondary)
             }
         }
-        .refreshable {
-            await viewModel.refreshEvents()
-        }
     }
 
     // MARK: - Empty State
 
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "calendar")
-                .font(.system(size: 60))
-                .foregroundStyle(Color.secondary)
+        List {
+            Section {
+                UploadStatsCardsRow(
+                    pendingJobs: uploadStatusStore.summary.inFlight,
+                    uploadedLast7Days: uploadedLast7Days
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+            }
 
-            Text("No events yet")
-                .font(.headline)
-                .foregroundStyle(Color.primary)
+            Section {
+                VStack(spacing: 16) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 60))
+                        .foregroundStyle(Color.secondary)
 
-            Text("Your events will appear here once created")
-                .font(.subheadline)
-                .foregroundStyle(Color.secondary)
-                .multilineTextAlignment(.center)
+                    Text("No events yet")
+                        .font(.headline)
+                        .foregroundStyle(Color.primary)
+
+                    Text("Your events will appear here once created")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+            }
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var offlineEmptyStateView: some View {
-        OfflineEventsPlaceholderView()
+        List {
+            Section {
+                UploadStatsCardsRow(
+                    pendingJobs: uploadStatusStore.summary.inFlight,
+                    uploadedLast7Days: uploadedLast7Days
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+            }
+
+            Section {
+                OfflineEventsPlaceholderView()
+                    .listRowBackground(Color.clear)
+            }
+        }
     }
 
     // MARK: - Error State
 
     @ViewBuilder
     private func errorView(error: Error) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.red)
-
-            Text("Error Loading Events")
-                .font(.headline)
-                .foregroundStyle(Color.primary)
-
-            Text(error.localizedDescription)
-                .font(.subheadline)
-                .foregroundStyle(Color.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-
-            Button {
-                Task {
-                    await viewModel.loadEvents()
-                }
-            } label: {
-                Text("Retry")
+        List {
+            Section {
+                UploadStatsCardsRow(
+                    pendingJobs: uploadStatusStore.summary.inFlight,
+                    uploadedLast7Days: uploadedLast7Days
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
             }
-            .buttonStyle(.bordered)
+
+            Section {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 48))
+                        .foregroundStyle(Color.red)
+
+                    Text("Error Loading Events")
+                        .font(.headline)
+                        .foregroundStyle(Color.primary)
+
+                    Text(error.localizedDescription)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+
+                    Button {
+                        Task {
+                            await viewModel.loadEvents()
+                        }
+                    } label: {
+                        Text("Retry")
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+            }
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
 }

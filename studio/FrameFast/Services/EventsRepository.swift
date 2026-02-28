@@ -6,7 +6,7 @@ actor EventsRepository {
     private let swr: StaleWhileRevalidate
     private let baseURL: String
 
-    private static let ttl: TimeInterval = 300            // 5 minutes
+    private static let ttl: TimeInterval = 30             // 30 seconds
     private static let networkTimeout: TimeInterval = 8   // 8 seconds
 
     init(baseURL: String) {
