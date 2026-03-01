@@ -47,15 +47,6 @@ export const th = {
     lineSelectHint: 'เลือกรูปก่อนกดรับทาง LINE',
     lineRedirecting: 'กำลังเปิด LINE...',
   },
-  lineCallback: {
-    delivering: 'กำลังส่งรูปทาง LINE...',
-    success: (count: number) => `ส่ง ${count} รูปไปยัง LINE แล้ว!`,
-    successHint: 'ตรวจสอบข้อความ LINE ของคุณ',
-    error: 'ส่งรูปไม่สำเร็จ',
-    notFriend: 'กรุณาเพิ่มบัญชี LINE Official เป็นเพื่อนก่อน',
-    retry: 'ลองอีกครั้ง',
-    backToResults: 'กลับไปหน้าผลลัพธ์',
-  },
   empty: {
     title: 'ไม่พบรูปที่ตรงกัน',
     description: 'เราไม่พบรูปที่ตรงกับใบหน้าของคุณในงานนี้ ลองถ่ายเซลฟี่ใหม่ หรือติดต่อช่างภาพ',
@@ -94,5 +85,17 @@ export const th = {
   },
   common: {
     back: 'กลับ',
+  },
+  lineCallback: {
+    delivering: 'กำลังส่งรูปทาง LINE...',
+    success: (count: number) => `ส่ง ${count} รูปไปยัง LINE แล้ว!`,
+    successHint: 'ตรวจสอบข้อความ LINE ของคุณ',
+    backToResults: 'กลับไปหน้าผลลัพธ์',
+    notFriend: 'กรุณาเพิ่ม LINE Official Account เป็นเพื่อน',
+    notFriendHint: 'เพิ่มเพื่อนแล้ว? กำลังตรวจสอบอัตโนมัติ...',
+    checkingFriend: 'กำลังตรวจสอบสถานะ...',
+    error: 'ส่งรูปไม่สำเร็จ',
+    retry: 'ลองอีกครั้ง',
+    sessionExpired: 'หมดเวลาเซสชัน กรุณาเริ่มใหม่อีกครั้ง',
   },
 };

@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, index, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, index, uuid, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { timestamptz, createdAtCol } from "./common";
 import { photographers } from "./photographers";
@@ -41,7 +41,7 @@ export const lineDeliveries = pgTable(
   (table) => [
     index("line_deliveries_photographer_id_idx").on(table.photographerId),
     index("line_deliveries_event_id_idx").on(table.eventId),
-    index("line_deliveries_search_id_idx").on(table.searchId),
+    uniqueIndex("line_deliveries_search_id_unique_idx").on(table.searchId),
     index("line_deliveries_photographer_created_idx").on(
       table.photographerId,
       table.createdAt
