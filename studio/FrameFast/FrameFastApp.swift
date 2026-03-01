@@ -137,6 +137,24 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             let uploadManager = UploadManager(baseURL: baseURL, connectivity: connectivity, backgroundSession: bgSession)
 
             await uploadManager.drainOnce()
+
+            // Run retention cleanup (no coordinator available in headless relaunch)
+            let fileService = SpoolFileService()
+            let cleanupStore = UploadQueueStore(dbURL: UploadManager.defaultDBURL())
+            let now = Date().timeIntervalSince1970
+            let completedCutoff = now - SpoolRetentionConfig.completedRetention
+            let failedCutoff = now - SpoolRetentionConfig.terminalFailedRetention
+
+            for (state, cutoff) in [(UploadJobState.completed, completedCutoff), (.terminalFailed, failedCutoff)] {
+                if let jobs = try? await cleanupStore.fetchExpiredJobs(state: state, updatedBefore: cutoff), !jobs.isEmpty {
+                    let urls = jobs.compactMap { URL(string: $0.localFileURL) }
+                    await fileService.deleteFiles(at: urls)
+                    try? await cleanupStore.deleteJobs(ids: jobs.map(\.id))
+                    print("[AppDelegate] BG cleanup: removed \(jobs.count) expired \(state.rawValue) jobs")
+                }
+            }
+            await fileService.removeEmptyEventDirectories()
+
             await scheduleBackgroundDrainIfNeeded(uploadManager: uploadManager)
             task.setTaskCompleted(success: !Task.isCancelled)
         }
