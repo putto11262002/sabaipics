@@ -25,6 +25,7 @@ export const lineDeliveries = pgTable(
       .references(() => photographers.id, { onDelete: "restrict" }),
     eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
     searchId: uuid("search_id").references(() => participantSearches.id, { onDelete: "set null" }),
+    photoIds: uuid("photo_ids").array(),
     lineUserId: text("line_user_id").notNull(),
     messageCount: integer("message_count").notNull().default(0),
     photoCount: integer("photo_count").notNull().default(0),

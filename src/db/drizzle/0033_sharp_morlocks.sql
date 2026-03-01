@@ -1,0 +1,1 @@
+ALTER TABLE "line_deliveries" ADD COLUMN "photo_ids" uuid[];
