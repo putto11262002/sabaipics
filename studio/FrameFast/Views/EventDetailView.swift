@@ -36,6 +36,9 @@ struct EventDetailView: View {
     // Upload stats
     @State private var uploadSummary: UploadManager.EventSummary?
 
+    // Local photos
+    @State private var localPhotoCount: Int = 0
+
     private let repository: EventsRepository
 
     init(eventId: String) {
@@ -98,6 +101,21 @@ struct EventDetailView: View {
         List {
             Section("Upload Activity") {
                 uploadActivitySection
+            }
+
+            Section("Local Photos") {
+                NavigationLink {
+                    SpoolGalleryView(eventId: eventId, fileService: coordinator.fileService)
+                } label: {
+                    HStack {
+                        Label("Photo Gallery", systemImage: "photo.on.rectangle.angled")
+                            .font(.body)
+                        Spacer()
+                        Text("\(localPhotoCount)")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.secondary)
+                    }
+                }
             }
 
             Section("Details") {
@@ -371,12 +389,14 @@ struct EventDetailView: View {
         async let pipelineFetch: ImagePipelineResponse? = {
             try? await repository.fetchImagePipeline(eventId: eventId)
         }()
+        async let photoCountFetch = coordinator.fileService.photoCount(eventId: eventId)
         async let minimumDelay: () = Task.sleep(nanoseconds: 300_000_000)
 
         do {
             let eventResult = try await eventFetch
             let ftpResult = await ftpFetch
             let pipelineResult = await pipelineFetch
+            let photoCountResult = await photoCountFetch
             try? await minimumDelay
 
             event = eventResult.value.data
@@ -389,6 +409,7 @@ struct EventDetailView: View {
             }
 
             pipelineSettings = pipelineResult?.data
+            localPhotoCount = photoCountResult
         } catch {
             try? await minimumDelay
             print("[EventDetail Error] Failed to load event \(eventId): \(error.localizedDescription)")
@@ -401,8 +422,10 @@ struct EventDetailView: View {
     private func uploadLoop() async {
         while !Task.isCancelled {
             let summary = await coordinator.uploadManager.eventSummaries(eventIds: [eventId])
+            let count = await coordinator.fileService.photoCount(eventId: eventId)
             await MainActor.run {
                 self.uploadSummary = summary[eventId]
+                self.localPhotoCount = count
             }
             try? await Task.sleep(nanoseconds: 1_500_000_000)
         }
@@ -621,6 +644,16 @@ private struct EventDetailSkeletonPreview: View {
                 .listRowBackground(Color.clear)
             }
 
+            Section("Local Photos") {
+                HStack {
+                    Label("Photo Gallery", systemImage: "photo.on.rectangle.angled")
+                    Spacer()
+                    Text("0")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondary)
+                }
+            }
+
             Section("Details") {
                 LabeledContent("Name", value: "Loading Event Name")
                 LabeledContent("Subtitle", value: "Loading subtitle")
@@ -671,6 +704,16 @@ private struct EventDetailFullPreview: View {
                 }
                 .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                 .listRowBackground(Color.clear)
+            }
+
+            Section("Local Photos") {
+                HStack {
+                    Label("Photo Gallery", systemImage: "photo.on.rectangle.angled")
+                    Spacer()
+                    Text("128")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondary)
+                }
             }
 
             Section("Details") {
@@ -743,6 +786,16 @@ private struct EventDetailMinimalPreview: View {
                 }
                 .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                 .listRowBackground(Color.clear)
+            }
+
+            Section("Local Photos") {
+                HStack {
+                    Label("Photo Gallery", systemImage: "photo.on.rectangle.angled")
+                    Spacer()
+                    Text("0")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondary)
+                }
             }
 
             Section("Details") {
