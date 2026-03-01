@@ -21,7 +21,6 @@ export function LandingHero() {
 
   return (
     <section className="pb-20 pt-8 sm:pb-28 sm:pt-10 bg-muted/30">
-      <div className="h-14 md:h-20" aria-hidden="true" />
       <div className="mx-auto w-[min(100vw-2rem,1700px)] sm:w-[min(100vw-2.75rem,1700px)] lg:w-[min(100vw-3.25rem,1700px)]">
         <div className="relative overflow-hidden rounded-b-[2rem]">
           <div className="relative mx-auto max-w-5xl px-4 pb-12 pt-12 text-center sm:pb-16 sm:pt-16">

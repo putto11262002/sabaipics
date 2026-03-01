@@ -1,5 +1,6 @@
 import { ArrowRight, ArrowRightLeft } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
+import { SectionContainer } from './section-container';
 
 type TierRow = {
   amount: string;
@@ -410,7 +411,7 @@ export async function PricingSection() {
 
   return (
     <section id="pricing" className="scroll-mt-24 bg-muted/30">
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:py-20">
+      <SectionContainer className="py-16 sm:py-20">
         <div className="overflow-hidden rounded-3xl bg-card/72 backdrop-blur-xl shadow-[inset_0_1px_0_color-mix(in_oklab,var(--background)_85%,transparent),0_24px_60px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
           <div className="grid lg:grid-cols-12">
             <article className="relative flex min-h-[360px] flex-col justify-between p-6 sm:p-8 lg:col-span-6">
@@ -672,7 +673,7 @@ export async function PricingSection() {
             <ArrowRight className="h-4 w-4" />
           </a>
         </div>
-      </div>
+      </SectionContainer>
     </section>
   );
 }
