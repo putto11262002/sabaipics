@@ -129,6 +129,50 @@ actor SpoolFileService {
         }
     }
 
+    // MARK: - Listing
+
+    func listPhotos(eventId: String) -> [Item] {
+        let dir = eventDirectory(eventId: eventId)
+        guard fileManager.fileExists(atPath: dir.path) else { return [] }
+
+        do {
+            let contents = try fileManager.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey, .creationDateKey],
+                options: [.skipsHiddenFiles]
+            )
+
+            return contents.compactMap { url -> Item? in
+                guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .creationDateKey]),
+                      values.isRegularFile == true else { return nil }
+
+                return Item(
+                    id: UUID(),
+                    url: url,
+                    filename: url.lastPathComponent,
+                    createdAt: values.creationDate ?? Date.distantPast,
+                    bytes: values.fileSize ?? 0
+                )
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+        } catch {
+            print("[SpoolFileService] Failed to list photos for event \(eventId): \(error)")
+            return []
+        }
+    }
+
+    func photoCount(eventId: String) -> Int {
+        let dir = eventDirectory(eventId: eventId)
+        guard fileManager.fileExists(atPath: dir.path) else { return 0 }
+
+        do {
+            let contents = try fileManager.contentsOfDirectory(atPath: dir.path)
+            return contents.filter { !$0.hasPrefix(".") }.count
+        } catch {
+            return 0
+        }
+    }
+
     // MARK: - Stats
 
     func diskUsage() -> Int64 {
