@@ -311,17 +311,17 @@ struct CameraConnectFlow<Setup: View>: View {
 
     private func acceptSelection(camera: DiscoveredCamera, allCameras: [DiscoveredCamera]) async {
         guard let session = camera.extractSession() else {
-            await MainActor.run { errorMessage = "No camera session found." }
+            await MainActor.run { errorMessage = String(localized: "No camera session found.") }
             return
         }
 
         guard session.connected else {
-            await MainActor.run { errorMessage = "Camera session is not connected yet." }
+            await MainActor.run { errorMessage = String(localized: "Camera session is not connected yet.") }
             return
         }
 
         guard let eventId = selectedEventId, let eventName = selectedEventName else {
-            await MainActor.run { errorMessage = "No event selected." }
+            await MainActor.run { errorMessage = String(localized: "No event selected.") }
             return
         }
 

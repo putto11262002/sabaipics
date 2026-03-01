@@ -78,7 +78,7 @@ struct MainTabView: View {
         }
         .sheet(isPresented: $captureSessionStore.isDetailsPresented) {
             CaptureSessionSheetView(
-                cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
+                cameraName: captureSessionStore.activeCamera?.name ?? String(localized: "Camera"),
                 eventName: coordinator.selectedEventName,
                 startedAt: captureSessionStore.stats.startedAt,
                 downloadsCount: captureSessionStore.stats.downloadsCount,
@@ -143,7 +143,7 @@ struct MainTabView: View {
         if captureSessionStore.state != .idle {
             CaptureStatusBarView(
                 status: statusForBar,
-                cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
+                cameraName: captureSessionStore.activeCamera?.name ?? String(localized: "Camera"),
                 eventName: coordinator.selectedEventName,
                 isSyncing: isSyncing,
                 onOpen: {

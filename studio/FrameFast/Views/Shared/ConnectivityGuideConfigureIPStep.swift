@@ -130,7 +130,7 @@ struct ConnectivityGuideConfigureIPStep: View {
 
     // MARK: - Typing Row
 
-    private func typingRow(label: String, text: String, isActive: Bool) -> some View {
+    private func typingRow(label: LocalizedStringKey, text: String, isActive: Bool) -> some View {
         HStack {
             Text(label)
             Spacer()

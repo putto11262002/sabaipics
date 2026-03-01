@@ -79,11 +79,11 @@ struct CameraDiscoveryView: View {
             case .error(let kind):
                 if kind == .localNetworkDenied {
                     CameraDiscoveryLocalNetworkDeniedView(
-                        title: "Allow Local Network access",
-                        message: "FrameFast Studio needs Local Network access to discover and connect to cameras on your WiFi network.",
+                        title: String(localized: "Allow Local Network access"),
+                        message: String(localized: "FrameFast Studio needs Local Network access to discover and connect to cameras on your WiFi network."),
                         bullets: [
-                            "If you see a permission prompt, tap Allow",
-                            "If you previously denied, enable it in Settings → Privacy & Security → Local Network"
+                            String(localized: "If you see a permission prompt, tap Allow"),
+                            String(localized: "If you previously denied, enable it in Settings → Privacy & Security → Local Network")
                         ],
                         onRetry: {
                             Task { await viewModel.retry(preferredIP: preferredIP) }
@@ -91,8 +91,8 @@ struct CameraDiscoveryView: View {
                     )
                 } else {
                     CameraDiscoveryNotFoundView(
-                        title: "Connection failed",
-                        message: "Unable to connect to camera. Check your connection and try again.",
+                        title: String(localized: "Connection failed"),
+                        message: String(localized: "Unable to connect to camera. Check your connection and try again."),
                         bullets: [],
                         iconSystemName: "exclamationmark.triangle",
                         onRetry: {
@@ -102,13 +102,13 @@ struct CameraDiscoveryView: View {
                 }
             case .scanning:
                 CameraDiscoveryScanningView(
-                    title: "Looking for cameras...",
-                    message: "Scanning your network for available cameras."
+                    title: String(localized: "Looking for cameras..."),
+                    message: String(localized: "Scanning your network for available cameras.")
                 )
             case .needsNetworkHelp:
                 CameraDiscoveryNetworkHelpView(
-                    title: "Not connected to camera WiFi",
-                    message: "Go to Settings › WiFi and connect to your camera's network, then try again.",
+                    title: String(localized: "Not connected to camera WiFi"),
+                    message: String(localized: "Go to Settings › WiFi and connect to your camera's network, then try again."),
                     bullets: [],
                     onRetry: {
                         Task { await viewModel.retry(preferredIP: preferredIP) }
@@ -162,12 +162,12 @@ struct CameraDiscoveryView: View {
 
     private var navigationTitleText: String {
         switch viewModel.state {
-        case .scanning: return "Looking for cameras…"
-        case .found: return "Connect camera"
-        case .timedOut: return "No camera found"
+        case .scanning: return String(localized: "Looking for cameras…")
+        case .found: return String(localized: "Connect camera")
+        case .timedOut: return String(localized: "No camera found")
         case .error(let kind):
-            return kind == .localNetworkDenied ? "Allow Local Network access" : "Connection failed"
-        case .needsNetworkHelp: return "No WiFi"
+            return kind == .localNetworkDenied ? String(localized: "Allow Local Network access") : String(localized: "Connection failed")
+        case .needsNetworkHelp: return String(localized: "No WiFi")
         }
     }
 
