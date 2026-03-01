@@ -14,6 +14,7 @@ import UIKit
 
 struct ProfileView: View {
     @Environment(\.clerk) private var clerk
+    @EnvironmentObject private var coordinator: AppCoordinator
     @EnvironmentObject private var connectivityStore: ConnectivityStore
     @State private var showAccountPortal = false
     @State private var showFeedback = false
@@ -52,6 +53,23 @@ struct ProfileView: View {
                         Text("Not signed in")
                             .foregroundStyle(.secondary)
                                                 }
+                }
+
+                Section("Storage") {
+                    NavigationLink {
+                        StorageSummaryView(
+                            uploadQueueStore: coordinator.uploadQueueStore,
+                            fileService: coordinator.fileService,
+                            coordinator: coordinator
+                        )
+                    } label: {
+                        profileRowLabel(
+                            title: "Local Storage",
+                            systemImage: "internaldrive",
+                            foreground: Color.primary,
+                            showsChevron: false
+                        )
+                    }
                 }
 
                 Section {

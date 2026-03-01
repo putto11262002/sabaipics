@@ -42,6 +42,13 @@ struct UploadJobRecord: Sendable {
     let lastError: String?
 }
 
+struct StorageSummary: Sendable {
+    let totalBytes: Int64, totalFiles: Int
+    let completedBytes: Int64, completedFiles: Int
+    let pendingBytes: Int64, pendingFiles: Int
+    let failedBytes: Int64, failedFiles: Int
+}
+
 /// Minimal durable queue store backed by SQLite.
 actor UploadQueueStore {
     private let dbURL: URL
@@ -514,6 +521,151 @@ actor UploadQueueStore {
             }
         }
         return result
+    }
+
+    // MARK: - Cleanup Queries
+
+    /// Fetch jobs in a terminal state (`completed` or `terminalFailed`) updated before `cutoff`.
+    func fetchExpiredJobs(state: UploadJobState, updatedBefore cutoff: TimeInterval, limit: Int = 500) throws -> [UploadJobRecord] {
+        try openAndMigrateIfNeeded()
+
+        let sql = """
+        SELECT
+          id, created_at, updated_at, next_attempt_at, attempts, state,
+          event_id, local_file_url, filename, content_type, content_length,
+          upload_id, put_url, object_key, expires_at, required_headers_json,
+          last_error
+        FROM upload_jobs
+        WHERE state = ?
+          AND updated_at < ?
+        ORDER BY updated_at ASC
+        LIMIT ?;
+        """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, state.rawValue, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_double(stmt, 2, cutoff)
+        sqlite3_bind_int(stmt, 3, Int32(limit))
+
+        var result: [UploadJobRecord] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            result.append(try readJob(stmt: stmt))
+        }
+        return result
+    }
+
+    /// Fetch all jobs in a given state (no time filter).
+    func fetchAllJobs(state: UploadJobState) throws -> [UploadJobRecord] {
+        try openAndMigrateIfNeeded()
+
+        let sql = """
+        SELECT
+          id, created_at, updated_at, next_attempt_at, attempts, state,
+          event_id, local_file_url, filename, content_type, content_length,
+          upload_id, put_url, object_key, expires_at, required_headers_json,
+          last_error
+        FROM upload_jobs
+        WHERE state = ?
+        ORDER BY updated_at ASC;
+        """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, state.rawValue, -1, SQLITE_TRANSIENT)
+
+        var result: [UploadJobRecord] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            result.append(try readJob(stmt: stmt))
+        }
+        return result
+    }
+
+    /// Batch delete jobs by IDs.
+    func deleteJobs(ids: [String]) throws {
+        guard !ids.isEmpty else { return }
+        try openAndMigrateIfNeeded()
+
+        let placeholders = ids.map { _ in "?" }.joined(separator: ",")
+        let sql = "DELETE FROM upload_jobs WHERE id IN (\(placeholders));"
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        for (i, id) in ids.enumerated() {
+            sqlite3_bind_text(stmt, Int32(i + 1), id, -1, SQLITE_TRANSIENT)
+        }
+
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw UploadQueueStoreError.stepFailed(message: lastErrorMessage())
+        }
+    }
+
+    /// Aggregate bytes and file counts by state for storage summary.
+    func fetchStorageSummary() throws -> StorageSummary {
+        try openAndMigrateIfNeeded()
+
+        let sql = """
+        SELECT state, COUNT(*), COALESCE(SUM(content_length), 0)
+        FROM upload_jobs
+        GROUP BY state;
+        """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        var completedBytes: Int64 = 0, completedFiles = 0
+        var pendingBytes: Int64 = 0, pendingFiles = 0
+        var failedBytes: Int64 = 0, failedFiles = 0
+
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let stateC = sqlite3_column_text(stmt, 0) else { continue }
+            let stateRaw = String(cString: stateC)
+            let count = Int(sqlite3_column_int(stmt, 1))
+            let bytes = sqlite3_column_int64(stmt, 2)
+
+            switch UploadJobState(rawValue: stateRaw) {
+            case .completed:
+                completedFiles += count
+                completedBytes += bytes
+            case .terminalFailed:
+                failedFiles += count
+                failedBytes += bytes
+            case .queued, .presigned, .uploading, .uploaded, .awaitingCompletion, .failed:
+                pendingFiles += count
+                pendingBytes += bytes
+            case nil:
+                break
+            }
+        }
+
+        let totalFiles = completedFiles + pendingFiles + failedFiles
+        let totalBytes = completedBytes + pendingBytes + failedBytes
+
+        return StorageSummary(
+            totalBytes: totalBytes,
+            totalFiles: totalFiles,
+            completedBytes: completedBytes,
+            completedFiles: completedFiles,
+            pendingBytes: pendingBytes,
+            pendingFiles: pendingFiles,
+            failedBytes: failedBytes,
+            failedFiles: failedFiles
+        )
     }
 
     // MARK: - Internals

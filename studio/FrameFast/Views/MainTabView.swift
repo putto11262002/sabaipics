@@ -45,7 +45,9 @@ struct MainTabView: View {
         .onAppear {
             captureSessionStore.configure(
                 uploadManager: coordinator.uploadManager,
-                eventIdProvider: { await MainActor.run { coordinator.selectedEventId } }
+                fileService: coordinator.fileService,
+                eventIdProvider: { await MainActor.run { coordinator.selectedEventId } },
+                eventIdSync: { coordinator.selectedEventId }
             )
         }
         .onChange(of: scenePhase) { _, newPhase in

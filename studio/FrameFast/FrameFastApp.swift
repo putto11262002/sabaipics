@@ -38,6 +38,7 @@ struct FrameFastApp: App {
                         Task { try? await clerk.load() }
                         Task { await coordinator.uploadManager.resume() }
                         coordinator.uploadStatusStore.start()
+                        coordinator.runThrottledCleanup()
                         if clerk.user != nil {
                             coordinator.creditsStore.start()
                         }
@@ -117,6 +118,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             let coordinator = await MainActor.run { AppDelegate.sharedCoordinator }
             if let coordinator {
                 await coordinator.uploadManager.drainOnce()
+                await coordinator.runCleanup()
                 await coordinator.scheduleBackgroundDrainIfNeeded()
                 task.setTaskCompleted(success: !Task.isCancelled)
                 return

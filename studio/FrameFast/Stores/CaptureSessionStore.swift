@@ -42,12 +42,21 @@ final class CaptureSessionStore: ObservableObject {
     private var controller: CaptureSessionController?
 
     private var uploadManager: UploadManager?
+    private var fileService: SpoolFileService?
     private var eventIdProvider: (() async -> String?)?
+    private var eventIdSync: (() -> String?)?
     private var pendingCamera: ActiveCamera?
 
-    func configure(uploadManager: UploadManager, eventIdProvider: @escaping () async -> String?) {
+    func configure(
+        uploadManager: UploadManager,
+        fileService: SpoolFileService,
+        eventIdProvider: @escaping () async -> String?,
+        eventIdSync: @escaping () -> String?
+    ) {
         self.uploadManager = uploadManager
+        self.fileService = fileService
         self.eventIdProvider = eventIdProvider
+        self.eventIdSync = eventIdSync
     }
 
     func start(activeCamera: ActiveCamera) {
@@ -57,7 +66,10 @@ final class CaptureSessionStore: ObservableObject {
         self.activeCamera = activeCamera
         self.recentDownloads = []
 
-        controller = CaptureSessionController(activeCamera: activeCamera) { ui in
+        let eventId = eventIdSync?() ?? SpoolFileService.unassignedEventId
+        let svc = fileService ?? SpoolFileService()
+
+        controller = CaptureSessionController(activeCamera: activeCamera, fileService: svc, eventId: eventId) { ui in
             var sinks: [AnyCaptureEventSink] = []
             if let uploadManager, let eventIdProvider {
                 sinks.append(
