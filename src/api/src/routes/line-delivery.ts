@@ -113,7 +113,7 @@ export const lineDeliveryRouter = new Hono<Env>()
           db
             .select({
               id: lineDeliveries.id,
-              eventName: events.name,
+              eventName: sql<string>`coalesce(${events.name}, 'Deleted event')`,
               lineUserId: lineDeliveries.lineUserId,
               photoCount: lineDeliveries.photoCount,
               messageCount: lineDeliveries.messageCount,
