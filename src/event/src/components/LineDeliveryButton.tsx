@@ -1,13 +1,17 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/shared/components/ui/button';
-import { getLineAuthUrl, type SearchResult } from '../lib/api';
+import { Spinner } from '@/shared/components/ui/spinner';
+import { type SearchResult } from '../lib/api';
 import { th } from '../lib/i18n';
+import { useLineAuthUrl } from '@/shared/hooks/rq/line/use-line-auth-url';
+import { usePendingLineDelivery } from '@/shared/hooks/rq/line/use-pending-line-delivery';
 
 interface LineDeliveryButtonProps {
   eventId: string;
   searchId: string;
   searchResult: SearchResult;
+  selectedIds: Set<string>;
 }
 
 const LINE_GREEN = '#06C755';
@@ -20,16 +24,27 @@ function LineIcon({ className }: { className?: string }) {
   );
 }
 
-export function LineDeliveryButton({ eventId, searchId, searchResult }: LineDeliveryButtonProps) {
+export function LineDeliveryButton({ eventId, searchId, searchResult, selectedIds }: LineDeliveryButtonProps) {
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const hasSelection = selectedIds.size > 0;
+  const { mutateAsync: getAuthUrl } = useLineAuthUrl();
+  const { mutateAsync: createPending } = usePendingLineDelivery();
 
   const handleClick = useCallback(async () => {
+    if (!hasSelection) {
+      toast.warning(th.results.lineSelectHint);
+      return;
+    }
+
     setIsRedirecting(true);
     try {
-      // Store search result for the callback page to use
-      sessionStorage.setItem('line_search_result', JSON.stringify(searchResult));
+      const photoIds = Array.from(selectedIds);
 
-      const authUrl = await getLineAuthUrl(eventId, searchId);
+      // 1. Create pending delivery record on server
+      await createPending({ eventId, searchId, photoIds });
+
+      // 2. Get auth URL and redirect
+      const authUrl = await getAuthUrl({ eventId, searchId });
       window.location.href = authUrl;
     } catch {
       toast.error('ไม่สามารถเชื่อมต่อ LINE ได้', {
@@ -37,23 +52,20 @@ export function LineDeliveryButton({ eventId, searchId, searchResult }: LineDeli
       });
       setIsRedirecting(false);
     }
-  }, [eventId, searchId, searchResult]);
+  }, [eventId, searchId, selectedIds, hasSelection, createPending, getAuthUrl]);
 
   return (
     <Button
-      size="lg"
-      className="w-full text-white"
+      size="icon"
+      className="size-12 rounded-full shadow-lg text-white opacity-100"
       style={{ backgroundColor: LINE_GREEN }}
       onClick={handleClick}
-      disabled={isRedirecting}
+      disabled={isRedirecting || !hasSelection}
     >
       {isRedirecting ? (
-        th.results.lineRedirecting
+        <Spinner className="size-5" />
       ) : (
-        <>
-          <LineIcon className="mr-1 size-5" />
-          {th.results.lineButton}
-        </>
+        <LineIcon className="size-5" />
       )}
     </Button>
   );

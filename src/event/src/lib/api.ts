@@ -122,6 +122,23 @@ export async function getLineAuthUrl(eventId: string, searchId: string): Promise
   return result.data.authUrl;
 }
 
+export async function createPendingLineDelivery(
+  eventId: string,
+  searchId: string,
+  photoIds: string[],
+): Promise<void> {
+  const response = await fetch(`${API_URL}/participant/line/pending`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventId, searchId, photoIds }),
+  });
+
+  if (!response.ok) {
+    const error = (await response.json()) as ApiError;
+    throw new Error(error.error?.code || 'UNKNOWN_ERROR');
+  }
+}
+
 export async function deliverViaLine(
   eventId: string,
   searchId: string,

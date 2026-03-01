@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { CheckCircle2, XCircle, Loader2, UserPlus } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
-import { deliverViaLine, type LineDeliveryResult } from '../../lib/api';
+import { type LineDeliveryResult } from '../../lib/api';
 import { th } from '../../lib/i18n';
+import { useDeliverViaLine } from '@/shared/hooks/rq/line/use-deliver-via-line';
 
 type CallbackState = 'delivering' | 'success' | 'error' | 'not_friend';
 
@@ -18,6 +19,8 @@ export function LineCallbackPage() {
   const searchId = searchParams.get('searchId');
   const status = searchParams.get('status');
   const deliveryCalled = useRef(false);
+
+  const { mutateAsync: deliverPhotos } = useDeliverViaLine();
 
   useEffect(() => {
     if (deliveryCalled.current) return;
@@ -39,8 +42,8 @@ export function LineCallbackPage() {
       return;
     }
 
-    // Deliver photos
-    deliverViaLine(eventId, searchId, lineUserId)
+    // Deliver photos - photoIds are looked up from the pending delivery record on the server
+    deliverPhotos({ eventId, searchId, lineUserId })
       .then((deliveryResult) => {
         setResult(deliveryResult);
         setState('success');
@@ -49,12 +52,12 @@ export function LineCallbackPage() {
         setState('error');
         setErrorMessage(err.message || 'ส่งรูปไม่สำเร็จ');
       });
-  }, [eventId, searchId, lineUserId, status, searchParams]);
+  }, [eventId, searchId, lineUserId, status, searchParams, deliverPhotos]);
 
   const handleRetry = () => {
     if (!eventId || !searchId || !lineUserId) return;
     setState('delivering');
-    deliverViaLine(eventId, searchId, lineUserId)
+    deliverPhotos({ eventId, searchId, lineUserId })
       .then((deliveryResult) => {
         setResult(deliveryResult);
         setState('success');
