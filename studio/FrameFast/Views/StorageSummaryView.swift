@@ -8,6 +8,7 @@ import SwiftUI
 
 struct StorageSummaryView: View {
     @StateObject private var store: StorageSummaryStore
+    @State private var retentionPeriod = SpoolRetentionConfig.period
 
     init(uploadQueueStore: UploadQueueStore, fileService: SpoolFileService, coordinator: AppCoordinator) {
         _store = StateObject(wrappedValue: StorageSummaryStore(store: uploadQueueStore, fileService: fileService, coordinator: coordinator))
@@ -76,15 +77,16 @@ struct StorageSummaryView: View {
 
     private var retentionSection: some View {
         Section("Retention") {
-            HStack {
-                Image(systemName: "calendar.badge.clock")
-                    .foregroundStyle(.secondary)
-                Text("Retention Period")
+            Picker(selection: $retentionPeriod) {
+                ForEach(SpoolRetentionConfig.Period.allCases, id: \.self) { period in
+                    Text(period.displayName).tag(period)
+                }
+            } label: {
+                Label("Retention Period", systemImage: "calendar.badge.clock")
                     .font(.body)
-                Spacer()
-                Text("7 days")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+            }
+            .onChange(of: retentionPeriod) { _, newValue in
+                SpoolRetentionConfig.period = newValue
             }
         }
     }
