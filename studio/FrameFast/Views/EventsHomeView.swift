@@ -165,7 +165,7 @@ struct EventsHomeView: View {
                     pendingJobs: 0,
                     uploadedLast7Days: 0
                 )
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                 .listRowBackground(Color.clear)
                 .redacted(reason: .placeholder)
             }
@@ -192,7 +192,7 @@ struct EventsHomeView: View {
                     pendingJobs: uploadStatusStore.summary.inFlight,
                     uploadedLast7Days: uploadedLast7Days
                 )
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                 .listRowBackground(Color.clear)
             }
 
@@ -220,7 +220,7 @@ struct EventsHomeView: View {
                     pendingJobs: uploadStatusStore.summary.inFlight,
                     uploadedLast7Days: uploadedLast7Days
                 )
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                 .listRowBackground(Color.clear)
             }
 
@@ -252,7 +252,7 @@ struct EventsHomeView: View {
                     pendingJobs: uploadStatusStore.summary.inFlight,
                     uploadedLast7Days: uploadedLast7Days
                 )
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                 .listRowBackground(Color.clear)
             }
 
@@ -273,7 +273,7 @@ struct EventsHomeView: View {
                     pendingJobs: uploadStatusStore.summary.inFlight,
                     uploadedLast7Days: uploadedLast7Days
                 )
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                 .listRowBackground(Color.clear)
             }
 
@@ -340,7 +340,7 @@ private struct UploadSyncCard: View {
     let pendingJobs: Int
 
     var body: some View {
-        let icon = "tray.and.arrow.up"
+        let icon = "clock.arrow.circlepath"
         let tint: Color = Color.orange
         let value = pendingJobs == 0 ? "—" : "\(pendingJobs)"
 
@@ -479,17 +479,47 @@ struct OfflineEventsPlaceholderView: View {
 
 // MARK: - Previews
 
-#Preview("Events Upload - Online Syncing") {
-    VStack(spacing: 12) {
-        HStack {
-            ConnectivityStatusToolbarView()
-            Spacer()
-        }
-        UploadStatsCardsRow(
-            pendingJobs: 7,
-            uploadedLast7Days: 42
-        )
+#Preview("1. Skeleton") {
+    NavigationStack {
         List {
+            Section {
+                UploadStatsCardsRow(
+                    pendingJobs: 0,
+                    uploadedLast7Days: 0
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
+                .redacted(reason: .placeholder)
+            }
+
+            Section {
+                ForEach(Event.placeholders) { event in
+                    SkeletonEventRow(title: event.name)
+                }
+            } header: {
+                Text("Events")
+                    .foregroundStyle(Color.secondary)
+            }
+        }
+        .redacted(reason: .placeholder)
+        .disabled(true)
+        .navigationTitle("Activity")
+        .navigationBarTitleDisplayMode(.large)
+    }
+}
+
+#Preview("2. Loaded Events") {
+    NavigationStack {
+        List {
+            Section {
+                UploadStatsCardsRow(
+                    pendingJobs: 3,
+                    uploadedLast7Days: 42
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
+            }
+
             Section {
                 UploadEventStatusRow(
                     title: "Bangkok Wedding",
@@ -511,58 +541,105 @@ struct OfflineEventsPlaceholderView: View {
                     .foregroundStyle(Color.secondary)
             }
         }
-            }
-    .padding(.horizontal, 16)
-    .padding(.top, 8)
-    .background(Color(UIColor.systemBackground))
-}
-
-#Preview("Events Upload - Offline Cold Start") {
-    VStack(spacing: 12) {
-        HStack {
-            ConnectivityStatusToolbarView()
-            Spacer()
-        }
-        UploadStatsCardsRow(
-            pendingJobs: 7,
-            uploadedLast7Days: 0
-        )
-        OfflineEventsPlaceholderView()
+        .navigationTitle("Activity")
+        .navigationBarTitleDisplayMode(.large)
     }
-    .padding(.horizontal, 16)
-    .padding(.top, 8)
-    .background(Color(UIColor.systemBackground))
 }
 
-#Preview("1. Skeleton Loading") {
+#Preview("3. Empty State") {
     NavigationStack {
-        EventsHomeSkeletonPreview()
-    }
-}
-
-#Preview("2. Loaded Events") {
-    NavigationStack {
-        EventsHomeView()
-    }
-}
-
-// MARK: - Preview Helpers
-
-private struct EventsHomeSkeletonPreview: View {
-    var body: some View {
         List {
             Section {
-                ForEach(Event.placeholders) { event in
-                    EventRow(event: event)
+                UploadStatsCardsRow(
+                    pendingJobs: 0,
+                    uploadedLast7Days: 0
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
+            }
+
+            Section {
+                VStack(spacing: 16) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 60))
+                        .foregroundStyle(Color.secondary)
+
+                    Text("No events yet")
+                        .font(.headline)
+                        .foregroundStyle(Color.primary)
+
+                    Text("Your events will appear here once created")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondary)
+                        .multilineTextAlignment(.center)
                 }
-            } header: {
-                Text("Recent Events")
-                    .foregroundStyle(Color.secondary)
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
             }
         }
-        .listStyle(.insetGrouped)
-        .redacted(reason: .placeholder)
-        .disabled(true)
-        .navigationTitle("Events")
+        .navigationTitle("Activity")
+        .navigationBarTitleDisplayMode(.large)
+    }
+}
+
+#Preview("4. Offline") {
+    NavigationStack {
+        List {
+            Section {
+                UploadStatsCardsRow(
+                    pendingJobs: 5,
+                    uploadedLast7Days: 0
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
+            }
+
+            Section {
+                OfflineEventsPlaceholderView()
+                    .listRowBackground(Color.clear)
+            }
+        }
+        .navigationTitle("Activity")
+        .navigationBarTitleDisplayMode(.large)
+    }
+}
+
+#Preview("5. Error") {
+    NavigationStack {
+        List {
+            Section {
+                UploadStatsCardsRow(
+                    pendingJobs: 0,
+                    uploadedLast7Days: 12
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
+            }
+
+            Section {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 48))
+                        .foregroundStyle(Color.red)
+
+                    Text("Error Loading Events")
+                        .font(.headline)
+                        .foregroundStyle(Color.primary)
+
+                    Text("The server returned an unexpected response.")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+
+                    Button("Retry") {}
+                        .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+            }
+        }
+        .navigationTitle("Activity")
+        .navigationBarTitleDisplayMode(.large)
     }
 }
