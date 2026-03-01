@@ -32,6 +32,17 @@ export const th = {
     hint: 'แตะรูปเพื่อเลือก แล้วกดดาวน์โหลด หรือรับรูปทาง LINE',
     download: (count: number) => `ดาวน์โหลด ${count} รูป`,
     downloadAll: 'ดาวน์โหลดทั้งหมด',
+    downloading: 'กำลังดาวน์โหลด...',
+    downloadSuccess: 'ดาวน์โหลดสำเร็จ',
+    downloadError: {
+      title: 'ดาวน์โหลดไม่สำเร็จ',
+      description: 'เกิดข้อผิดพลาดระหว่างดาวน์โหลด กรุณาลองอีกครั้ง',
+    },
+    maxSelection: {
+      title: (max: number) => `เลือกได้สูงสุด ${max} รูป`,
+      description: (max: number) => `กรุณายกเลิกรูปที่ไม่ต้องการก่อนเลือกเพิ่ม (สูงสุด ${max} รูป)`,
+    },
+    searchAgain: 'ค้นหาใหม่',
     lineButton: 'รับรูปทาง LINE',
     lineRedirecting: 'กำลังเปิด LINE...',
   },
@@ -70,6 +81,7 @@ export const th = {
       title: 'ไม่พบกิจกรรม',
       description: 'กิจกรรมที่คุณค้นหาไม่มีอยู่หรือหมดอายุแล้ว',
     },
+    pageNotFound: 'ไม่พบหน้านี้',
     fileSize: {
       title: 'ไฟล์ใหญ่เกินไป',
       description: 'กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 5MB',

@@ -29,7 +29,7 @@ export function ErrorStep({ type, onRetry }: ErrorStepProps) {
           description: th.errors.rateLimit.description,
           tips: null,
           button: null,
-          variant: 'default' as const,
+          variant: 'warning' as const,
         };
       case 'NOT_FOUND':
         return {
@@ -61,8 +61,8 @@ export function ErrorStep({ type, onRetry }: ErrorStepProps) {
       <div className="w-full max-w-sm space-y-6">
         {/* Icon */}
         <div className="flex justify-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10">
-            <Icon className="h-10 w-10 text-destructive" />
+          <div className={`flex h-20 w-20 items-center justify-center rounded-full ${content.variant === 'warning' ? 'bg-warning/10' : 'bg-destructive/10'}`}>
+            <Icon className={`h-10 w-10 ${content.variant === 'warning' ? 'text-warning' : 'text-destructive'}`} />
           </div>
         </div>
 
@@ -84,7 +84,7 @@ export function ErrorStep({ type, onRetry }: ErrorStepProps) {
 
         {/* Retry Button */}
         {content.button && (
-          <Button size="lg" className="w-full" onClick={onRetry}>
+          <Button variant="destructive" size="lg" className="w-full" onClick={onRetry}>
             {content.button}
           </Button>
         )}

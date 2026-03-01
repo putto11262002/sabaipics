@@ -60,10 +60,6 @@ export async function searchPhotos(
   return result.data;
 }
 
-export function getDownloadUrl(eventId: string, photoId: string): string {
-  return `${API_URL}/participant/events/${eventId}/photos/${photoId}/download`;
-}
-
 export async function downloadBulk(eventId: string, photoIds: string[]): Promise<Blob> {
   const response = await fetch(`${API_URL}/participant/events/${eventId}/photos/download`, {
     method: 'POST',
