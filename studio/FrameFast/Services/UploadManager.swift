@@ -75,6 +75,31 @@ actor UploadManager {
     }
 
     init(
+        baseURL: String,
+        store: UploadQueueStore,
+        connectivity: ConnectivityService,
+        backgroundSession: BackgroundUploadSessionManager,
+        fileManager: FileManager = .default
+    ) {
+        self.fileManager = fileManager
+        self.api = UploadsAPIClient(baseURL: baseURL)
+        self.store = store
+        self.connectivity = connectivity
+        self.backgroundSession = backgroundSession
+        self.now = { Date().timeIntervalSince1970 }
+        self.sleepNanoseconds = { ns in
+            try? await Task.sleep(nanoseconds: ns)
+        }
+
+        self.backgroundSession.onOrphanUploadCompletion = { [weak self] (jobId: String, result: Result<HTTPURLResponse, Error>) in
+            guard let self else { return }
+            Task {
+                await self.handleOrphanUploadCompletion(jobId: jobId, result: result)
+            }
+        }
+    }
+
+    init(
         store: UploadQueueStore,
         api: any UploadsAPIClienting,
         connectivity: any ConnectivityServicing,
@@ -734,22 +759,8 @@ actor UploadManager {
     }
 
     private func finalizeCompleted(job: UploadJobRecord) async throws {
-        guard let fileURL = URL(string: job.localFileURL) else {
-            try await store.markState(jobId: job.id, state: .completed, nextAttemptAt: now(), attemptsDelta: 0, lastError: nil)
-            return
-        }
-
-        do {
-            if fileManager.fileExists(atPath: fileURL.path) {
-                try fileManager.removeItem(at: fileURL)
-            }
-        } catch {
-            // Do not treat deletion as fatal; we can retry cleanup later.
-            print("[UploadManager] Cleanup failed: \(error)")
-        }
-
-        print("[UploadManager] job=\(job.id) completed; local file deleted")
-
+        // File stays on disk for retention-based cleanup.
+        print("[UploadManager] job=\(job.id) completed; file retained for cleanup")
         try await store.markState(jobId: job.id, state: .completed, nextAttemptAt: now(), attemptsDelta: 0, lastError: nil)
     }
 
@@ -774,7 +785,7 @@ actor UploadManager {
         return obj as? [String: String]
     }
 
-    private static func defaultDBURL(fileManager: FileManager) -> URL {
+    static func defaultDBURL(fileManager: FileManager = .default) -> URL {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport
             .appendingPathComponent("framefast", isDirectory: true)

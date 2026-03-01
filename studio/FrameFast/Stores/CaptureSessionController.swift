@@ -19,18 +19,16 @@ final class CaptureSessionController: ObservableObject {
     let ui: CaptureUISink
 
     private var camera: ActiveCamera?
-    private let spool: CaptureSpool
     private let pipeline: CaptureEventPipeline
 
     private var detectedByHandle: [UInt32: CaptureDetected] = [:]
 
-    init(activeCamera: ActiveCamera, makeExtraSinks: (CaptureUISink) -> [AnyCaptureEventSink] = { _ in [] }) {
+    init(activeCamera: ActiveCamera, fileService: SpoolFileService, eventId: String, makeExtraSinks: (CaptureUISink) -> [AnyCaptureEventSink] = { _ in [] }) {
         self.camera = activeCamera
         self.cameraName = activeCamera.name
         self.cameraIP = activeCamera.ipAddress
 
         self.ui = CaptureUISink(startedAt: Date(), maxPhotosInMemory: 200)
-        self.spool = CaptureSpool()
 
         var sinks: [AnyCaptureEventSink] = []
         sinks.append(
@@ -42,7 +40,7 @@ final class CaptureSessionController: ObservableObject {
         )
         sinks.append(contentsOf: makeExtraSinks(self.ui))
 
-        self.pipeline = CaptureEventPipeline(spool: spool, sinks: sinks)
+        self.pipeline = CaptureEventPipeline(fileService: fileService, eventId: eventId, sinks: sinks)
 
         // Bind PTP session delegate
         activeCamera.session.delegate = self
