@@ -4,10 +4,7 @@ import type { InferResponseType } from 'hono/client';
 import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
 
-type UpdateEventResponse = InferResponseType<
-  typeof api.events[':id']['$put'],
-  SuccessStatusCode
->;
+type UpdateEventResponse = InferResponseType<(typeof api.events)[':id']['$put'], SuccessStatusCode>;
 
 export type UpdateEventInput = {
   id: string;

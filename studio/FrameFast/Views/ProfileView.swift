@@ -16,9 +16,13 @@ struct ProfileView: View {
     @Environment(\.clerk) private var clerk
     @EnvironmentObject private var connectivityStore: ConnectivityStore
     @State private var showAccountPortal = false
+    @State private var showFeedback = false
     @State private var legalURL: URL?
     @State private var signOutError: Error?
     @State private var showSignOutError = false
+    @State private var showDeleteConfirmation = false
+    @State private var deleteError: Error?
+    @State private var showDeleteError = false
 
     var body: some View {
         NavigationStack {
@@ -32,24 +36,22 @@ struct ProfileView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(displayName(for: user))
                                     .font(.body.weight(.medium))
-                                    .foregroundStyle(Color.Theme.foreground)
+                                    .foregroundStyle(Color.primary)
 
                                 if let email = user.primaryEmailAddress?.emailAddress {
                                     Text(email)
                                         .font(.footnote)
-                                        .foregroundStyle(Color.Theme.mutedForeground)
+                                        .foregroundStyle(Color.secondary)
                                 }
                             }
 
                             Spacer(minLength: 0)
                         }
                         .padding(.vertical, 4)
-                        .sabaiCardRow()
-                    } else {
+                                            } else {
                         Text("Not signed in")
                             .foregroundStyle(.secondary)
-                            .sabaiCardRow()
-                    }
+                                                }
                 }
 
                 Section {
@@ -59,13 +61,26 @@ struct ProfileView: View {
                         profileRowLabel(
                             title: "Manage Account",
                             systemImage: connectivityStore.isOnline ? "person.crop.circle" : "wifi.slash",
-                            foreground: Color.Theme.foreground,
+                            foreground: Color.primary,
                             showsChevron: true
                         )
                     }
                     .buttonStyle(.plain)
-                    .sabaiCardRow()
-                    .disabled(!connectivityStore.isOnline)
+                                        .disabled(!connectivityStore.isOnline)
+                    .opacity(connectivityStore.isOnline ? 1 : 0.5)
+
+                    Button {
+                        showFeedback = true
+                    } label: {
+                        profileRowLabel(
+                            title: "Send Feedback",
+                            systemImage: connectivityStore.isOnline ? "bubble.left.and.exclamationmark.bubble.right" : "wifi.slash",
+                            foreground: Color.primary,
+                            showsChevron: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                                        .disabled(!connectivityStore.isOnline)
                     .opacity(connectivityStore.isOnline ? 1 : 0.5)
 
                     Button {
@@ -81,12 +96,25 @@ struct ProfileView: View {
                         profileRowLabel(
                             title: "Sign Out",
                             systemImage: "rectangle.portrait.and.arrow.right",
-                            foreground: Color.Theme.destructive,
+                            foreground: Color.red,
                             showsChevron: false
                         )
                     }
                     .buttonStyle(.plain)
-                    .sabaiCardRow()
+                    .disabled(!connectivityStore.isOnline)
+                    .opacity(connectivityStore.isOnline ? 1 : 0.5)
+
+                    Button {
+                        showDeleteConfirmation = true
+                    } label: {
+                        profileRowLabel(
+                            title: "Delete Account",
+                            systemImage: "person.crop.circle.badge.minus",
+                            foreground: Color.red,
+                            showsChevron: false
+                        )
+                    }
+                    .buttonStyle(.plain)
                     .disabled(!connectivityStore.isOnline)
                     .opacity(connectivityStore.isOnline ? 1 : 0.5)
                 }
@@ -98,13 +126,12 @@ struct ProfileView: View {
                         profileRowLabel(
                             title: "Terms of Service",
                             systemImage: "doc.text",
-                            foreground: Color.Theme.foreground,
+                            foreground: Color.primary,
                             showsChevron: true
                         )
                     }
                     .buttonStyle(.plain)
-                    .sabaiCardRow()
-                    .disabled(!connectivityStore.isOnline)
+                                        .disabled(!connectivityStore.isOnline)
                     .opacity(connectivityStore.isOnline ? 1 : 0.5)
 
                     Button {
@@ -113,18 +140,17 @@ struct ProfileView: View {
                         profileRowLabel(
                             title: "Privacy Policy",
                             systemImage: "hand.raised",
-                            foreground: Color.Theme.foreground,
+                            foreground: Color.primary,
                             showsChevron: true
                         )
                     }
                     .buttonStyle(.plain)
-                    .sabaiCardRow()
-                    .disabled(!connectivityStore.isOnline)
+                                        .disabled(!connectivityStore.isOnline)
                     .opacity(connectivityStore.isOnline ? 1 : 0.5)
                 }
             }
             #if os(iOS)
-            .background(Color(.systemBackground).ignoresSafeArea())
+            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
             #endif
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.large)
@@ -139,6 +165,9 @@ struct ProfileView: View {
             .sheet(isPresented: $showAccountPortal) {
                 UserProfileView()
             }
+            .sheet(isPresented: $showFeedback) {
+                FeedbackView()
+            }
             .sheet(item: $legalURL) { url in
                 SafariView(url: url)
                     .ignoresSafeArea()
@@ -147,6 +176,30 @@ struct ProfileView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(signOutError?.localizedDescription ?? "An unexpected error occurred. Please try again.")
+            }
+            .confirmationDialog(
+                "Delete Account",
+                isPresented: $showDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Account", role: .destructive) {
+                    Task {
+                        do {
+                            try await clerk.user?.delete()
+                        } catch {
+                            deleteError = error
+                            showDeleteError = true
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure? This will permanently delete your account and all associated data. This action cannot be undone.")
+            }
+            .alert("Delete Account Failed", isPresented: $showDeleteError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteError?.localizedDescription ?? "An unexpected error occurred. Please try again.")
             }
         }
     }

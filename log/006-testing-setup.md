@@ -9,6 +9,7 @@
 ## Summary
 
 Established testing patterns for `apps/api` with Cloudflare Workers:
+
 - Functional tests for Node.js (AWS SDK mocks)
 - Workers tests for Durable Objects (miniflare runtime)
 - Integration tests for real AWS calls (opt-in)
@@ -17,11 +18,11 @@ Established testing patterns for `apps/api` with Cloudflare Workers:
 
 ## Test Categories
 
-| Category | File Pattern | Runtime | External Deps |
-|----------|-------------|---------|---------------|
-| **Functional** | `*.test.ts` | Node.js | Mocked (aws-sdk-client-mock) |
-| **Workers** | `*.workers.test.ts` | workerd (miniflare) | None |
-| **Integration** | `*.integration.ts` | Node.js | Real AWS (opt-in) |
+| Category        | File Pattern        | Runtime             | External Deps                |
+| --------------- | ------------------- | ------------------- | ---------------------------- |
+| **Functional**  | `*.test.ts`         | Node.js             | Mocked (aws-sdk-client-mock) |
+| **Workers**     | `*.workers.test.ts` | workerd (miniflare) | None                         |
+| **Integration** | `*.integration.ts`  | Node.js             | Real AWS (opt-in)            |
 
 ---
 
@@ -30,6 +31,7 @@ Established testing patterns for `apps/api` with Cloudflare Workers:
 AWS SDK v3 has CJS dependencies (`snakecase-keys`) incompatible with workerd runtime.
 
 **Solution:** Two vitest configs:
+
 - `vitest.node.config.ts` - Node.js environment for AWS mock tests
 - `vitest.config.ts` - workerd pool for DO/R2/Queue tests
 
@@ -48,18 +50,18 @@ pnpm test:integration  # Requires INTEGRATION=true
 
 ## Files Created
 
-| File | Purpose |
-|------|---------|
-| `vitest.config.ts` | Workers pool config for DO tests |
-| `vitest.node.config.ts` | Node.js config for AWS mock tests |
-| `tests/tsconfig.json` | Test-specific TypeScript config |
-| `tests/env.d.ts` | Type declarations for `cloudflare:test` |
-| `tests/setup.ts` | Global test setup (credential validation) |
-| `tests/rate-limiter.workers.test.ts` | DO behavior tests (4 tests) |
-| `tests/rekognition.test.ts` | AWS SDK mock tests (11 tests) |
-| `tests/rekognition.integration.ts` | Real AWS integration test |
-| `tests/setup.integration.ts` | Integration test setup (Zod env validation) |
-| `tests/fixtures/index.ts` | Generic fixture downloader with R2 caching |
+| File                                 | Purpose                                     |
+| ------------------------------------ | ------------------------------------------- |
+| `vitest.config.ts`                   | Workers pool config for DO tests            |
+| `vitest.node.config.ts`              | Node.js config for AWS mock tests           |
+| `tests/tsconfig.json`                | Test-specific TypeScript config             |
+| `tests/env.d.ts`                     | Type declarations for `cloudflare:test`     |
+| `tests/setup.ts`                     | Global test setup (credential validation)   |
+| `tests/rate-limiter.workers.test.ts` | DO behavior tests (4 tests)                 |
+| `tests/rekognition.test.ts`          | AWS SDK mock tests (11 tests)               |
+| `tests/rekognition.integration.ts`   | Real AWS integration test                   |
+| `tests/setup.integration.ts`         | Integration test setup (Zod env validation) |
+| `tests/fixtures/index.ts`            | Generic fixture downloader with R2 caching  |
 
 ---
 
@@ -78,6 +80,7 @@ pnpm test:integration  # Requires INTEGRATION=true
 ```
 
 **Note:** `vite@6` required for Node.js 20.11.1 compatibility. Root `package.json` has override:
+
 ```json
 {
   "pnpm": {
@@ -113,17 +116,17 @@ pnpm test:integration
 ### 1. AWS SDK Mocking (aws-sdk-client-mock)
 
 ```typescript
-import { mockClient } from "aws-sdk-client-mock";
-import { RekognitionClient, IndexFacesCommand } from "@aws-sdk/client-rekognition";
+import { mockClient } from 'aws-sdk-client-mock';
+import { RekognitionClient, IndexFacesCommand } from '@aws-sdk/client-rekognition';
 
 const rekognitionMock = mockClient(RekognitionClient);
 
 beforeEach(() => rekognitionMock.reset());
 afterAll(() => rekognitionMock.restore());
 
-it("handles response", async () => {
+it('handles response', async () => {
   rekognitionMock.on(IndexFacesCommand).resolves({
-    FaceRecords: [{ Face: { FaceId: "face-001" } }],
+    FaceRecords: [{ Face: { FaceId: 'face-001' } }],
   });
   // ... test code
 });
@@ -132,10 +135,10 @@ it("handles response", async () => {
 ### 2. Durable Object Testing (cloudflare:test)
 
 ```typescript
-import { env } from "cloudflare:test";
+import { env } from 'cloudflare:test';
 
-it("tests DO behavior", async () => {
-  const id = env.AWS_REKOGNITION_RATE_LIMITER.idFromName("test");
+it('tests DO behavior', async () => {
+  const id = env.AWS_REKOGNITION_RATE_LIMITER.idFromName('test');
   const rateLimiter = env.AWS_REKOGNITION_RATE_LIMITER.get(id);
 
   const result = await rateLimiter.reserveBatch(10);
@@ -147,7 +150,7 @@ it("tests DO behavior", async () => {
 
 ```typescript
 // tests/setup.integration.ts - validates env with Zod
-import { z } from "zod";
+import { z } from 'zod';
 
 const envSchema = z.object({
   AWS_ACCESS_KEY_ID: z.string().min(1),
@@ -162,12 +165,12 @@ beforeAll(() => {
 
 ```typescript
 // Integration tests only verify API integration, NOT accuracy
-it("indexes faces from image", async () => {
-  const result = await indexFaces(client, eventId, testImage, "photo-001");
+it('indexes faces from image', async () => {
+  const result = await indexFaces(client, eventId, testImage, 'photo-001');
 
   // Only test integration point - API returns expected structure
-  expect(result).toHaveProperty("faceRecords");
-  expect(result).toHaveProperty("unindexedFaces");
+  expect(result).toHaveProperty('faceRecords');
+  expect(result).toHaveProperty('unindexedFaces');
 });
 ```
 
@@ -175,11 +178,11 @@ it("indexes faces from image", async () => {
 
 ## CI Integration
 
-| Trigger | Tests Run |
-|---------|-----------|
-| PR to master | `test:run` (functional + workers, mocked AWS) |
-| Push to master (staging) | `test:run` (mocked AWS only) |
-| Manual deploy (production) | `test:run` + `test:integration` (real AWS) |
+| Trigger                    | Tests Run                                     |
+| -------------------------- | --------------------------------------------- |
+| PR to master               | `test:run` (functional + workers, mocked AWS) |
+| Push to master (staging)   | `test:run` (mocked AWS only)                  |
+| Manual deploy (production) | `test:run` + `test:integration` (real AWS)    |
 
 **Note:** Integration tests only run on production deploys to minimize AWS costs.
 
@@ -224,11 +227,11 @@ it("indexes faces from image", async () => {
 
 Add these secrets at **repository level** (Settings → Secrets and variables → Actions → Repository secrets):
 
-| Secret | Description |
-|--------|-------------|
-| `AWS_ACCESS_KEY_ID` | IAM user access key for Rekognition |
-| `AWS_SECRET_ACCESS_KEY` | IAM user secret key |
-| `AWS_REGION` | AWS region (e.g., `us-west-2`) |
+| Secret                  | Description                         |
+| ----------------------- | ----------------------------------- |
+| `AWS_ACCESS_KEY_ID`     | IAM user access key for Rekognition |
+| `AWS_SECRET_ACCESS_KEY` | IAM user secret key                 |
+| `AWS_REGION`            | AWS region (e.g., `us-west-2`)      |
 
 **Note:** AWS credentials are shared across all environments. Use values from `.dev.vars`.
 
@@ -247,20 +250,23 @@ Add these secrets at **repository level** (Settings → Secrets and variables �
 
 Unit tests are now co-located with source files instead of centralized in `tests/` directory.
 
-| Test Type | Location | Pattern |
-|-----------|----------|---------|
-| **Unit tests** | `src/**/*.test.ts` | Co-located with module |
-| **Workers tests** | `tests/*.workers.test.ts` | Centralized (needs workerd) |
-| **Integration tests** | `tests/*.integration.ts` | Centralized (needs real services) |
+| Test Type             | Location                  | Pattern                           |
+| --------------------- | ------------------------- | --------------------------------- |
+| **Unit tests**        | `src/**/*.test.ts`        | Co-located with module            |
+| **Workers tests**     | `tests/*.workers.test.ts` | Centralized (needs workerd)       |
+| **Integration tests** | `tests/*.integration.ts`  | Centralized (needs real services) |
 
 **Rationale:**
+
 - Unit tests belong with the code they test for better discoverability
 - `tests/` folder is reserved for e2e, integration, and workers tests that need special runtime environments
 - Follows common TypeScript/JavaScript convention
 
 **Files Migrated:**
+
 - `tests/rekognition.test.ts` → `src/lib/rekognition/rekognition.test.ts`
 - `tests/line-webhook.test.ts` → `src/lib/line/webhook.test.ts`
 
 **Config Updated:**
+
 - `vitest.node.config.ts`: Changed include pattern from `tests/**/*.test.ts` to `src/**/*.test.ts`

@@ -7,6 +7,7 @@
 ## Idea
 
 Explore making event monitoring and downloads run in **separate threads** using mutex-based synchronization, so that:
+
 - ✅ Event monitoring is **non-blocking** (continues during downloads)
 - ✅ Downloads happen **concurrently** without blocking event detection
 - ✅ Better responsiveness during burst shooting
@@ -175,6 +176,7 @@ Benefit: Next event detected at 200ms, not 2100ms
 ### 1. Non-Blocking Event Detection
 
 **Current (Sequential):**
+
 - Event monitoring pauses during 2-second download
 - If photographer takes 3 photos in 5 seconds:
   - Photo 1: Detected at 0s, downloaded by 2s
@@ -183,6 +185,7 @@ Benefit: Next event detected at 200ms, not 2100ms
   - **Total time: 6 seconds**
 
 **Proposed (Concurrent):**
+
 - Event monitoring polls every 100ms regardless of downloads
 - If photographer takes 3 photos in 5 seconds:
   - Photo 1: Detected at 0s, downloading in background
@@ -196,11 +199,13 @@ Benefit: Next event detected at 200ms, not 2100ms
 **Scenario:** Photographer shoots 10 photos rapidly (action sequence)
 
 **Current:**
+
 - Photos detected/downloaded one at a time
 - 10 photos × 2 seconds = **20 seconds total**
 - Last photo appears 20 seconds after shutter
 
 **Proposed:**
+
 - All 10 photos detected within 1 second
 - 3-4 download in parallel at any time
 - 10 photos ÷ 3 threads × 2 seconds = **~7 seconds total**
@@ -217,12 +222,14 @@ Benefit: Next event detected at 200ms, not 2100ms
 ### 1. Mutex Deadlock Risk
 
 **Potential Issue:**
+
 ```objc
 Thread 1: Lock → Wait for event → [BLOCKED] → ...
 Thread 2: [Waiting for lock] → Lock → Download → Unlock
 ```
 
 **Mitigation:**
+
 - Always use `timeout=0` for event polling (non-blocking)
 - Lock is held for microseconds, not seconds
 - No nested locks (single mutex only)
@@ -232,11 +239,13 @@ Thread 2: [Waiting for lock] → Lock → Download → Unlock
 **Issue:** 3 concurrent downloads might overwhelm camera
 
 **Symptoms:**
+
 - Camera becomes unresponsive
 - Downloads fail with timeout errors
 - WiFi connection drops
 
 **Mitigation:**
+
 - Start with `maxConcurrentOperationCount = 1` (same as sequential)
 - Gradually increase to 2, then 3
 - Monitor for errors and adjust
@@ -246,11 +255,13 @@ Thread 2: [Waiting for lock] → Lock → Download → Unlock
 **Remember:** PTP command channel is inherently sequential
 
 **Reality Check:**
+
 - Even with 3 threads, only 1 can talk to camera at a time
 - Mutex serializes access anyway
 - **Benefit is non-blocking event detection**, not truly parallel downloads
 
 **Actual gain:**
+
 - Event monitoring doesn't pause ✅
 - Downloads still happen one at a time (protocol limitation)
 - But queue processes faster because monitoring continues
@@ -258,12 +269,14 @@ Thread 2: [Waiting for lock] → Lock → Download → Unlock
 ### 4. Complexity
 
 **Sequential (Current):**
+
 - ~150 lines of code
 - Easy to understand
 - Easy to debug
 - No race conditions
 
 **Concurrent (Proposed):**
+
 - ~250 lines of code
 - More complex logic
 - Harder to debug (threading issues)
@@ -309,30 +322,35 @@ Implement concurrent approach if **any** of these occur:
 **If we decide to implement:**
 
 ### Phase 1: Add Mutex Locking (2 hours)
+
 - Add NSLock to WiFiCameraManager
 - Wrap all camera operations with lock/unlock
 - Test for deadlocks
 - Verify no regressions
 
 ### Phase 2: Non-Blocking Event Loop (1 hour)
+
 - Change `gp_camera_wait_for_event()` to timeout=0
 - Add sleep delay in loop
 - Test detection still works
 - Measure CPU usage
 
 ### Phase 3: Concurrent Download Queue (2 hours)
+
 - Create NSOperationQueue
 - Move downloads to queue
 - Set maxConcurrentOperationCount = 1 initially
 - Test thoroughly
 
 ### Phase 4: Tuning & Testing (2 hours)
+
 - Gradually increase concurrent limit
 - Test with burst shooting (10+ photos)
 - Monitor for camera errors
 - Performance profiling
 
 ### Phase 5: Edge Case Handling (1 hour)
+
 - Camera disconnect during download
 - Queue cancellation on disconnect
 - Memory management
@@ -359,6 +377,7 @@ ret = gp_camera_file_get(_camera, folder, name, GP_FILE_TYPE_NORMAL, file, _cont
 ```
 
 **Benefits:**
+
 - Instant preview (200ms vs 2000ms)
 - User sees photos immediately
 - Full download happens in background
@@ -378,6 +397,7 @@ setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 ```
 
 **Benefits:**
+
 - Faster downloads (maybe 1.5s instead of 2s)
 - No architecture changes
 - Lower risk
@@ -389,6 +409,7 @@ setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 ### For MVP: Stick with Sequential
 
 **Reasons:**
+
 1. ✅ Simple, proven, reliable
 2. ✅ Fast enough for typical event photography
 3. ✅ Low complexity = easier to maintain
@@ -397,12 +418,14 @@ setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 ### Post-MVP: Monitor Real-World Usage
 
 **Collect data:**
+
 - Average photos per session
 - Shooting rate (photos/minute)
 - User complaints about responsiveness
 - Download times in production
 
 **Then decide:**
+
 - If users happy → Keep sequential ✅
 - If burst shooting common → Implement thumbnail preview first
 - If still issues → Implement concurrent threading
@@ -410,24 +433,28 @@ setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 ## Testing Plan (If We Implement)
 
 ### Unit Tests
+
 - [ ] Mutex lock/unlock correctness
 - [ ] No deadlocks under stress
 - [ ] Queue processes items correctly
 - [ ] Memory leaks checked
 
 ### Integration Tests
+
 - [ ] Single photo download
 - [ ] Burst shooting (10 photos)
 - [ ] Download while monitoring
 - [ ] Camera disconnect handling
 
 ### Performance Tests
+
 - [ ] CPU usage (should be < 10%)
 - [ ] Memory usage (should be stable)
 - [ ] Download throughput (measure improvement)
 - [ ] Event detection latency (should be < 100ms)
 
 ### Stress Tests
+
 - [ ] 50 photos rapid succession
 - [ ] Weak WiFi signal
 - [ ] Camera power off/on during operation

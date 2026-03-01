@@ -1,5 +1,6 @@
 import { ChevronsUpDown, LogOut, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import posthog from 'posthog-js';
 import { useAuth, useClerk, useUser } from '@/auth/react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/avatar';
@@ -36,6 +37,7 @@ export function NavUser() {
     .slice(0, 2);
 
   const handleSignOut = async () => {
+    posthog.reset();
     await signOut();
     navigate('/sign-in', { replace: true });
   };

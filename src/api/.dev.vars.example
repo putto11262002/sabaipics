@@ -50,9 +50,11 @@ STRIPE_SECRET_KEY=sk_test_xxxxx
 # Format: whsec_xxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxx
 
-# Admin API Key (for admin routes)
-# Generate a secure random string for admin operations
-ADMIN_API_KEY=admin-dev-key-change-in-production
+# Cloudflare Access (admin dashboard auth)
+# These are non-secret vars set in wrangler.api.jsonc.
+# Listed here for documentation only — no .dev.vars override needed.
+# CF_ACCESS_TEAM_DOMAIN=https://framefast.cloudflareaccess.com
+# CF_ACCESS_AUD=<AUD tag from CF Access dashboard>
 
 # Desktop uploader auth (SabaiPics-issued desktop session)
 # - DESKTOP_ACCESS_JWT_SECRET: HS256 signing secret for short-lived desktop access JWTs
@@ -66,6 +68,14 @@ DESKTOP_REFRESH_TOKEN_PEPPER=desktop-refresh-token-pepper-change-me
 # Access Token: Messaging API → Channel access token (long-lived) → Issue
 LINE_CHANNEL_SECRET=xxxxx
 LINE_CHANNEL_ACCESS_TOKEN=xxxxx
+
+# LINE Login Channel Credentials (separate channel from Messaging API)
+# Get from: LINE Developers Console → LINE Login Channel → Basic settings
+# Channel ID: Basic settings → Channel ID
+# Channel Secret: Basic settings → Channel secret
+# Note: Must link the LINE Login channel to the same LINE Official Account as the Messaging API channel
+LINE_LOGIN_CHANNEL_ID=xxxxx
+LINE_LOGIN_CHANNEL_SECRET=xxxxx
 
 # Legacy notes (kept for reference)
 # - CF_DOMAIN / R2_BASE_URL were older names; runtime code now uses CF_ZONE + PHOTO_R2_BASE_URL.

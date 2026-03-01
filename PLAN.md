@@ -1,291 +1,225 @@
-# Auto Color Grading (Slice 3) Plan
+# Image Pipeline Enhancement Plan
 
-Date: 2026-02-10
+## Overview
 
-Goal
+Add auto-edit, improve LUT performance, and add upscaling capabilities to the FrameFast image pipeline by consolidating processing on Modal (serverless Python).
 
-- Give photographers a Studio-managed LUT library (.cube upload or reference image -> LUT generation).
-- Let events enable color grading and pick a LUT + per-event settings.
-- Apply color grading automatically to NEW photo uploads for that event during normalization.
-- Provide LUT preview in Studio and Event settings via ephemeral image upload (no persistence).
+## Goals
 
-Non-goals (v1)
+1. **Auto-edit** - Automatic color/exposure correction (like Lightroom "Auto")
+2. **LUT application** - Faster processing (native Python vs Wasm)
+3. **Upscaling** - Optional face-aware upscaling (Real-ESRGAN)
 
-- No retroactive reprocessing of existing photos.
-- No "Lab" that saves sample images or produces new LUTs from tweaks.
-- No shared "typed upload infra" refactor; duplication is acceptable.
+## R2 Path Structure
 
----
+```
+events/{eventId}/{photoId}/
+├── original.jpeg        # Always present (normalized original)
+└── processed.jpeg       # Optional (only if pipeline enabled)
+```
 
-## UX / User Journey
+## Pipeline Flow
 
-Studio (LUTs)
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                               UPLOAD FLOW (unchanged)                         │
+│  Client → POST /presign → R2 (uploads/) → Queue notification                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                          UPLOAD CONSUMER (refactored)                         │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  1. Fetch from uploads/                                                       │
+│  2. Extract metadata (EXIF, dimensions)                                      │
+│  3. IF pipeline disabled:                                                     │
+│     └── Normalize via CF Images                                              │
+│     └── Save to events/{eventId}/{photoId}/original.jpeg                     │
+│  4. IF pipeline enabled:                                                      │
+│     └── Normalize via CF Images                                              │
+│     └── Save to events/{eventId}/{photoId}/original.jpeg                     │
+│     └── Call Modal with image + options (auto-edit, LUT, upscale)            │
+│     └── Save result to events/{eventId}/{photoId}/processed.jpeg             │
+│  5. Create photo record                                                       │
+│  6. Deduct credits                                                            │
+│  7. Enqueue to face detection                                                │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
 
-- Create LUT
-  - Upload .cube OR upload reference image
-  - Upload is direct-to-R2 via presigned PUT
-  - Async processing via queue; UI polls status
-- Manage LUTs
-  - List/search, rename
-  - Download LUT via presigned GET
-  - Delete LUT (blocked if in-use by any event)
-- Preview LUT
-  - Upload a sample image (ephemeral)
-  - Adjust intensity + include-luminance; preview renders server-side
+## DB Schema Changes
 
-Event Settings (Color Grade)
+```typescript
+// photos.ts - add fields
+pipelineApplied: jsonb().$type<{
+  autoEdit: boolean;
+  lutId: string | null;
+  upscale: boolean;
+} | null>().default(null),
+```
 
-- Enable/disable color grade
-- Select LUT from Studio library
-- Set per-event intensity + include-luminance
-- Optional preview (same ephemeral upload flow as Studio)
+## Event Settings (extended)
 
-Photo Upload Pipeline
-
-- For new uploads in an event with color grade enabled and a valid LUT selected:
-  - Apply LUT during normalization in `upload-processing` consumer
-  - Store final graded JPEG in R2; proceed with credit deduction + DB insert as normal
-
----
-
-## Data Model
-
-### 1) New table: photographer LUT library
-
-Add table (name TBD; suggested: `photo_luts`) in `packages/db/src/schema/`.
-
-Required fields (v1)
-
-- `id` (uuid, PK)
-- `photographerId` (uuid, FK)
-- `name` (text)
-- `sourceType` (enum: `cube | reference_image`)
-- `status` (enum: `pending | processing | completed | failed | expired`)
-- `uploadR2Key` (text, unique) // temp key under `lut-uploads/...`
-- `lutR2Key` (text, nullable) // final key under `luts/...`
-- `contentType` (text)
-- `contentLength` (int)
-- `errorCode` (text, nullable)
-- `errorMessage` (text, nullable)
-- `createdAt`, `expiresAt`, `completedAt` (timestamptz)
-
-Optional metadata (nice-to-have)
-
-- `lutSize` (int)
-- `title` (text)
-- `domainMin`, `domainMax` (jsonb)
-- `sha256` (text)
-
-### 2) Event settings JSONB
-
-Add `settings` (jsonb) to `packages/db/src/schema/events.ts` and type it at the application layer.
-
-Shape (v1)
-
-```ts
-type EventSettings = {
-  colorGrade?: {
-    enabled: boolean;
-    lutId: string | null;
-    intensity: number; // 0-100
-    includeLuminance: boolean;
-  };
+```typescript
+// events.ts - extend EventSettings
+imagePipeline?: {
+  enabled: boolean;
+  autoEdit: boolean;           // Enable auto color/exposure correction
+  lutId: string | null;        // Optional LUT to apply
+  lutIntensity: number;        // 0-100
+  upscale: boolean;            // Enable 2x upscaling
 };
 ```
 
-Defaults
+## Modal Service
 
-- `enabled=false`
-- `lutId=null`
-- `intensity=75`
-- `includeLuminance=false`
+### Deployed Endpoints
 
-Note: Event -> LUT relationship is stored in JSONB (no FK). API must validate LUT ownership.
+- **Process**: `https://putto11262002--framefast-image-pipeline-process.modal.run` 🔑
+- **Health**: `https://putto11262002--framefast-image-pipeline-health.modal.run` 🔑
 
----
+### Authentication
 
-## R2 Storage
+Proxy auth required. Set in Infisical/Terraform:
 
-- Temp uploads: `lut-uploads/{lutId}-{timestamp}`
-- Final LUT: `luts/{photographerId}/{lutId}.cube`
+- `MODAL_KEY` - Token ID
+- `MODAL_SECRET` - Token Secret
 
----
+Create token at: https://modal.com/settings/proxy-auth-tokens
 
-## API Design
+### API Request
 
-All endpoints require photographer auth unless stated.
+```bash
+curl -X POST https://putto11262002--framefast-image-pipeline-process.modal.run \
+  -H "Modal-Key: $MODAL_KEY" \
+  -H "Modal-Secret: $MODAL_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image_base64": "<base64>",
+    "options": {
+      "auto_edit": true,
+      "style": "vibrant",
+      "contrast": 1.2,
+      "saturation": 1.3
+    }
+  }'
+```
 
-### Studio LUT endpoints (new)
+### Available Style Presets
 
-- `GET /studio/luts`
-  - List LUTs owned by photographer
-- `POST /studio/luts/cube/presign`
-  - Body: `{ name: string, contentLength: number }`
-  - Returns: `{ lutId, putUrl, requiredHeaders, expiresAt }`
-- `POST /studio/luts/reference/presign`
-  - Body: `{ name: string, contentType: 'image/jpeg'|'image/png'|'image/webp', contentLength: number }`
-  - Returns: `{ lutId, putUrl, requiredHeaders, expiresAt }`
-- `GET /studio/luts/status?id={lutId}`
-  - Poll LUT processing status
-- `PATCH /studio/luts/:id`
-  - Rename LUT
-- `GET /studio/luts/:id/download`
-  - Returns presigned GET URL for final `.cube`
-- `DELETE /studio/luts/:id`
-  - Block if any event references it; else delete DB row + R2 object
+| Preset          | Contrast | Saturation | Use Case      |
+| --------------- | -------- | ---------- | ------------- |
+| `neutral`       | 1.0      | 1.0        | No style      |
+| `warm`          | 1.1      | 1.15       | Golden hour   |
+| `cool`          | 1.1      | 1.1        | Cool tones    |
+| `vibrant`       | 1.2      | 1.4        | Punchy colors |
+| `film`          | 0.95     | 0.85       | Nostalgic     |
+| `portrait`      | 1.05     | 1.1        | Skin-friendly |
+| `high_contrast` | 1.4      | 1.1        | Dramatic      |
+| `soft`          | 0.9      | 0.95       | Soft/dreamy   |
 
-### LUT preview endpoint (ephemeral)
+### Endpoints
 
-- `POST /studio/luts/:id/preview`
-  - Form: `{ image: File, intensity: number, includeLuminance: boolean }`
-  - Response: `image/jpeg` (preview-sized)
-  - No persistence of the sample image
+```python
+@app.function()
+def process_image(
+    image_bytes: bytes,
+    options: ProcessOptions,
+) -> ProcessResult:
+    """
+    Process image with optional auto-edit, LUT, and upscale.
 
-### Event color grade endpoints
+    Returns processed image bytes.
+    """
+```
 
-- `GET /events/:id/color-grade`
-  - Returns effective settings + selected LUT summary
-- `PUT /events/:id/color-grade`
-  - Body: `{ enabled, lutId, intensity, includeLuminance }`
-  - Validates event ownership and LUT ownership (if `lutId` set)
+### Processing Steps
 
----
+1. **Normalize** - Ensure consistent format (always)
+2. **Auto-edit** - Pillow-based color/exposure correction (optional)
+3. **LUT** - Apply color grade via colour-science (optional)
+4. **Upscale** - Real-ESRGAN via ONNX or Replicate (optional)
 
-## Queue / Async Processing
+### Cost Estimate
 
-### New queue: `lut-processing-*`
+| Volume         | Modal Cost |
+| -------------- | ---------- |
+| 10K images/mo  | ~$2-5      |
+| 50K images/mo  | ~$10-25    |
+| 100K images/mo | ~$20-50    |
 
-Add a new queue consumer similar to logo processing.
+## Implementation Phases
 
-Flow
+### Phase 1: Modal Service Prototype ✅ (Complete)
 
-- R2 notification for `lut-uploads/` emits an event to `lut-processing-*` queue
-- Consumer (`apps/api/src/queue/lut-processing-consumer.ts`) does:
-  - find LUT row by `uploadR2Key`
-  - if expired: mark `expired`, delete temp object, ack
-  - if `sourceType=cube`:
-    - download text -> parse/validate `.cube` -> write final LUT -> mark completed
-  - if `sourceType=reference_image`:
-    - download bytes -> validate magic bytes -> decode -> compute stats -> generate LUT -> write final -> mark completed
-  - failures:
-    - non-retryable: mark failed + error details, delete temp, ack
-    - retryable: throw so queue retries
+- [x] Create Modal app structure
+- [x] Implement auto-edit (Pillow) with style presets
+- [x] Implement LUT application (colour-science)
+- [x] Add upscaling placeholder (Pillow Lanczos - Real-ESRGAN deferred)
+- [x] Test with sample images locally
+- [x] Deploy to Modal
+- [x] Enable proxy auth (`requires_proxy_auth=True`)
+- [x] Parallel stress test (10/10 success)
+- [ ] Add Modal secrets to Terraform infra (Infisical)
+  - `MODAL_KEY` - Proxy Auth Token ID
+  - `MODAL_SECRET` - Proxy Auth Token Secret
+  - Create token at: https://modal.com/settings/proxy-auth-tokens
 
-Wrangler wiring
+### Phase 2: Integration ✅ (Complete)
 
-- Add producer/consumer entries in `apps/api/wrangler.jsonc` for dev/staging/prod.
-- Add routing in `apps/api/src/index.ts` based on `batch.queue.startsWith('lut-processing')`.
+- [x] Add Modal client to API (`src/api/src/lib/modal-client.ts`)
+- [x] Update upload-consumer to use Modal
+- [x] Update R2 path structure (`events/{eventId}/{photoId}/original.jpeg` and `processed.jpeg`)
+- [x] Add DB schema changes (`pipelineApplied` on photos, extended `colorGrade` on events)
+- [x] Create new API endpoint (`GET/PUT /events/:id/image-pipeline`)
+- [x] Create UI component (`ImagePipelineCard.tsx`)
+- [x] Create hooks (`useEventImagePipeline.ts`, `useUpdateEventImagePipeline.ts`)
+- [x] Update color tab to use new ImagePipelineCard component
+- [x] Add `MODAL_KEY`/`MODAL_SECRET` to Bindings type
 
-Ops wiring (required)
+### Phase 3: Cleanup & Deployment
 
-- Add Cloudflare R2 bucket notification:
-  - Prefix: `lut-uploads/`
-  - Destination: `lut-processing-*` queue
+- [ ] Remove Photon/Wasm LUT code
+- [ ] Migration script for existing photos (optional)
+- [ ] Update photo download endpoints
+- [ ] Add `MODAL_KEY`, `MODAL_SECRET` to Terraform external_secrets
+- [ ] Tests for upload-consumer changes
+- [ ] Commit and create PR
 
----
+## Files Created/Modified
 
-## Photo Upload Pipeline Integration
+### New Files (Created)
 
-### Extend photon normalization with a post-process hook
+- `apps/modal/` - Modal service directory
+  - `pyproject.toml` - UV project config
+  - `src/image_pipeline/main.py` - Modal endpoint with auth
+  - `src/image_pipeline/auto_edit.py` - Auto-edit with style presets
+  - `src/image_pipeline/lut.py` - LUT application (vectorized numpy)
+  - `src/image_pipeline/upscale.py` - Placeholder (deferred)
+- `src/api/src/lib/modal-client.ts` - Modal API client
+- `src/api/src/routes/events/image-pipeline-schema.ts` - Zod schema for new API
+- `src/dashboard/src/hooks/events/useEventImagePipeline.ts` - Fetch hook
+- `src/dashboard/src/hooks/events/useUpdateEventImagePipeline.ts` - Mutation hook
+- `src/dashboard/src/components/events/ImagePipelineCard.tsx` - UI component
 
-Modify `apps/api/src/lib/images/normalize.ts`:
+### Modified Files
 
-- Extend `normalizeWithPhoton(imageBytes, postProcess?)` where `postProcess` receives resized RGBA pixels.
-- Pipeline:
-  - photon decode -> resize -> get_raw_pixels -> postProcess -> new PhotonImage(raw, w, h) -> encode JPEG
+- `src/api/src/queue/upload-consumer.ts` - Modal integration, new R2 paths
+- `src/api/src/routes/events/index.ts` - Added `GET/PUT /:id/image-pipeline` routes
+- `src/api/src/routes/events/color-grade-schema.ts` - Added autoEdit/style fields
+- `src/api/src/types.ts` - Added MODAL_KEY/MODAL_SECRET to Bindings
+- `src/db/schema/events.ts` - Extended `EventSettings.colorGrade`
+- `src/db/schema/photos.ts` - Added `PipelineApplied` type and column
+- `src/db/drizzle/0020_dapper_lady_mastermind.sql` - Migration (merged)
+- `src/dashboard/src/routes/events/[id]/color/index.tsx` - Use ImagePipelineCard
 
-### Apply LUT during `upload-processing` consumer
+### Files to Remove (Phase 3)
 
-Update `apps/api/src/queue/upload-consumer.ts`:
+- `src/api/src/lib/images/color-grade.ts` - Photon LUT code (keep LUT parsing)
 
-- Load event settings; if color grade enabled + LUT selected:
-  - load LUT row from DB; ensure status=completed
-  - fetch `.cube` from R2; parse and cache parsed LUT per batch
-  - pass `postProcess` to `normalizeWithPhoton`
-- If LUT missing/invalid:
-  - warn to Sentry and proceed without grading (do not block photo uploads)
+## Open Questions
 
-Performance note (v1 defaults)
-
-- LUT size: prefer 33 (safe) for generated LUTs; accept common sizes for uploaded LUTs.
-- Include-luminance: implement a cheap luma preservation (Rec.709) per pixel rather than full per-pixel LAB.
-
----
-
-## Dashboard (UI)
-
-### Sidebar + routing
-
-- Add `Studio` nav item in `apps/dashboard/src/components/shell/app-sidebar.tsx`
-- Add route in `apps/dashboard/src/router.tsx` (e.g. `/studio/luts`)
-
-### Studio LUT page
-
-- LUT list with statuses
-- New LUT modal (cube vs reference)
-  - Uses presign -> PUT -> poll (pattern matches logo upload in Event details)
-- Row actions: Preview, Download, Rename, Delete
-- Preview modal
-  - Upload sample image (ephemeral)
-  - Intensity + include-luminance controls
-
-### Event details: Color Grade card
-
-Add a new section to `apps/dashboard/src/routes/events/[id]/details/index.tsx`:
-
-- Toggle enable
-- Select LUT (from `GET /studio/luts` completed)
-- Intensity + include-luminance
-- Preview button (same modal)
-- Save calls `PUT /events/:id/color-grade`
-
----
-
-## Stacked PR Plan (work order)
-
-PR 1: DB schema + migrations
-
-- Add `events.settings` JSONB
-- Add `photo_luts` table
-- Add drizzle migrations + exports
-
-PR 2: Core LUT library (parse/apply/generate) + tests
-
-- `.cube` parser/validator
-- LUT applier (trilinear + intensity + luma preservation)
-- Reference image -> LUT generator (queue-only)
-
-PR 3: LUT queue consumer + wrangler wiring
-
-- `apps/api/src/queue/lut-processing-consumer.ts`
-- `apps/api/src/index.ts` queue routing
-- `apps/api/wrangler.jsonc` queue definitions
-- Ops note: R2 notification wiring for `lut-uploads/`
-
-PR 4: Studio LUT API + preview API
-
-- `/studio/luts` routes
-- presign endpoints + status polling
-- download presign GET
-- preview endpoint (ephemeral upload)
-
-PR 5: Photo pipeline integration
-
-- `normalizeWithPhoton(..., postProcess?)`
-- apply LUT in `apps/api/src/queue/upload-consumer.ts`
-
-PR 6: Dashboard UI
-
-- Studio LUT page + preview modal
-- Event details color grade section + preview + save
-
----
-
-## Risks / Mitigations
-
-- Heavy CPU in queues (reference image generation)
-  - Separate queue, conservative concurrency
-- LUT correctness (DOMAIN_MIN/MAX, odd formatting)
-  - Parse + validate strictly; surface actionable error messages to users
-- Events referencing deleted LUT ids
-  - API validates; upload-consumer falls back to no-grade with warning
+- [ ] Auto-edit quality: Compare with Cloudinary VIESUS?
+- [ ] Migration: Convert existing photos to new structure?
+- [ ] Upscaling: Add Real-ESRGAN (GPU) later if needed?

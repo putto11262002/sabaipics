@@ -32,10 +32,19 @@ export interface SlideshowConfig {
  */
 export interface EventSettings {
   colorGrade?: {
-    enabled: boolean;
+    autoEdit: boolean;
+    autoEditPresetId: string | null;
+    autoEditIntensity: number;
     lutId: string | null;
-    intensity: number; // 0-100
+    lutIntensity: number;
     includeLuminance: boolean;
+  };
+  theme?: {
+    primary: string;
+    background: string;
+  };
+  slideshow?: {
+    template: string;
   };
 }
 
@@ -65,7 +74,6 @@ export const events = pgTable(
     startDate: timestamptz('start_date'),
     endDate: timestamptz('end_date'),
     qrCodeR2Key: text('qr_code_r2_key'), // R2 key for generated QR PNG
-    rekognitionCollectionId: text('rekognition_collection_id'), // Nullable, created on first upload
     slideshowConfig: jsonb('slideshow_config').$type<SlideshowConfig>(), // Nullable: Slideshow configuration (theme + blocks)
     logoR2Key: text('logo_r2_key'), // Nullable: R2 key for event logo (used in slideshow)
     settings: jsonb('settings').$type<EventSettings>(), // Nullable: Flexible per-event settings (typed at app level)
@@ -76,6 +84,7 @@ export const events = pgTable(
   (table) => [
     index('events_photographer_id_idx').on(table.photographerId),
     index('events_deleted_at_idx').on(table.deletedAt),
+    index('events_deleted_at_expires_at_idx').on(table.deletedAt, table.expiresAt),
   ],
 );
 

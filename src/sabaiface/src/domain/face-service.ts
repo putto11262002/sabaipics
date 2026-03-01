@@ -18,10 +18,10 @@
  * Values are ratios of the image dimensions (0-1).
  */
 export interface BoundingBox {
-  width: number;   // 0-1
-  height: number;  // 0-1
-  left: number;    // 0-1
-  top: number;     // 0-1
+  width: number; // 0-1
+  height: number; // 0-1
+  left: number; // 0-1
+  top: number; // 0-1
 }
 
 /**
@@ -36,7 +36,7 @@ export interface AgeRange {
  * Emotion detection
  */
 export interface Emotion {
-  type: string;      // e.g., 'HAPPY', 'SAD', 'ANGRY'
+  type: string; // e.g., 'HAPPY', 'SAD', 'ANGRY'
   confidence: number; // 0-1
 }
 
@@ -44,7 +44,7 @@ export interface Emotion {
  * Gender estimation
  */
 export interface Gender {
-  value: string;     // 'Male' | 'Female'
+  value: string; // 'Male' | 'Female'
   confidence: number; // 0-1
 }
 
@@ -68,10 +68,10 @@ export interface FaceAttributes {
  * Detected and indexed face
  */
 export interface Face {
-  faceId: string;            // Provider's face identifier
-  boundingBox: BoundingBox;  // Face location in image
-  confidence: number;        // Detection confidence (0-1)
-  externalImageId?: string;  // Our photo ID
+  faceId: string; // Provider's face identifier
+  boundingBox: BoundingBox; // Face location in image
+  confidence: number; // Detection confidence (0-1)
+  externalImageId?: string; // Our photo ID
   attributes?: FaceAttributes; // Optional attributes
   provider: 'aws' | 'sabaiface'; // Which provider indexed this face
 }
@@ -92,10 +92,10 @@ export interface UnindexedFace {
  */
 export interface SimilarFace {
   faceId: string;
-  similarity: number;        // Similarity score (0-1, higher = more similar)
+  similarity: number; // Similarity score (0-1, higher = more similar)
   boundingBox?: BoundingBox;
-  confidence?: number;       // Detection confidence (0-1)
-  externalImageId?: string;  // Our photo ID
+  confidence?: number; // Detection confidence (0-1)
+  externalImageId?: string; // Our photo ID
   provider: 'aws' | 'sabaiface';
 }
 
@@ -103,9 +103,9 @@ export interface SimilarFace {
  * Result of indexing a photo
  */
 export interface PhotoIndexed {
-  faces: Face[];               // Successfully indexed faces
+  faces: Face[]; // Successfully indexed faces
   unindexedFaces: UnindexedFace[]; // Faces that couldn't be indexed
-  modelVersion?: string;       // Provider's model version
+  modelVersion?: string; // Provider's model version
   provider: 'aws' | 'sabaiface';
 }
 
@@ -117,8 +117,8 @@ export interface PhotoIndexed {
  * Options for face indexing
  */
 export interface SearchOptions {
-  maxFaces?: number;         // Max results to return (default: 10)
-  minConfidence?: number;    // Min detection confidence (0-1, default: 0.5)
+  maxFaces?: number; // Max results to return (default: 10)
+  minConfidence?: number; // Min detection confidence (0-1, default: 0.5)
   qualityFilter?: 'auto' | 'none'; // Quality filtering
 }
 
@@ -126,9 +126,9 @@ export interface SearchOptions {
  * Parameters for indexing a photo
  */
 export interface IndexPhotoParams {
-  eventId: string;           // Event/collection identifier
-  photoId: string;           // Photo identifier
-  imageData: ArrayBuffer;    // Image bytes
+  eventId: string; // Event/collection identifier
+  photoId: string; // Photo identifier
+  imageData: ArrayBuffer; // Image bytes
   options?: SearchOptions;
 }
 
@@ -136,10 +136,10 @@ export interface IndexPhotoParams {
  * Parameters for finding similar faces
  */
 export interface FindSimilarParams {
-  eventId: string;           // Event/collection identifier
-  imageData: ArrayBuffer;    // Query image bytes
-  maxResults?: number;       // Max results to return (default: 10)
-  minSimilarity?: number;    // Min similarity threshold (0-1, default: 0.8)
+  eventId: string; // Event/collection identifier
+  imageData: ArrayBuffer; // Query image bytes
+  maxResults?: number; // Max results to return (default: 10)
+  minSimilarity?: number; // Min similarity threshold (0-1, default: 0.8)
 }
 
 // =============================================================================
@@ -196,7 +196,7 @@ export interface AWSRawResponse {
  */
 export interface SabaiFaceRawResponse {
   faceId: string;
-  descriptor: string;        // Base64 encoded 128-D descriptor
+  descriptor: string; // Base64 encoded 128-D descriptor
   detection: {
     box: { x: number; y: number; width: number; height: number };
     confidence: number;

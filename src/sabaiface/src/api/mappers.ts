@@ -60,15 +60,19 @@ export function toAWSFaceRecord(face: Face, externalImageId?: string): FaceRecor
     FaceDetail: {
       BoundingBox: toAWSBoundingBox(face.boundingBox),
       Confidence: face.confidence * 100,
-      AgeRange: face.attributes?.age ? {
-        Low: face.attributes.age.low ?? 0,
-        High: face.attributes.age.high ?? 100,
-      } : undefined,
-      Gender: face.attributes?.gender ? {
-        Value: face.attributes.gender.value === 'male' ? 'Male' : 'Female',
-        Confidence: face.attributes.gender.confidence * 100,
-      } : undefined,
-      Emotions: face.attributes?.emotions?.map(emotion => ({
+      AgeRange: face.attributes?.age
+        ? {
+            Low: face.attributes.age.low ?? 0,
+            High: face.attributes.age.high ?? 100,
+          }
+        : undefined,
+      Gender: face.attributes?.gender
+        ? {
+            Value: face.attributes.gender.value === 'male' ? 'Male' : 'Female',
+            Confidence: face.attributes.gender.confidence * 100,
+          }
+        : undefined,
+      Emotions: face.attributes?.emotions?.map((emotion) => ({
         Type: emotion.type.toUpperCase(),
         Confidence: emotion.confidence * 100,
       })),
@@ -91,12 +95,14 @@ export function toAWSFaceMatch(similarFace: SimilarFace): FaceMatch {
     Similarity: similarFace.similarity * 100, // 0-1 → 0-100
     Face: {
       FaceId: similarFace.faceId,
-      BoundingBox: similarFace.boundingBox ? toAWSBoundingBox(similarFace.boundingBox) : {
-        Width: 0,
-        Height: 0,
-        Left: 0,
-        Top: 0,
-      },
+      BoundingBox: similarFace.boundingBox
+        ? toAWSBoundingBox(similarFace.boundingBox)
+        : {
+            Width: 0,
+            Height: 0,
+            Left: 0,
+            Top: 0,
+          },
       ExternalImageId: similarFace.externalImageId,
       Confidence: (similarFace.confidence ?? 1.0) * 100,
     },
@@ -116,18 +122,21 @@ export function toAWSFaceMatch(similarFace: SimilarFace): FaceMatch {
  */
 export function toAWSIndexFacesResponse(
   result: PhotoIndexed,
-  externalImageId?: string
+  externalImageId?: string,
 ): IndexFacesResponse {
   return {
-    FaceRecords: result.faces.map(face => toAWSFaceRecord(face, externalImageId)),
-    UnindexedFaces: result.unindexedFaces.map(uf => ({
-      FaceDetail: uf.faceDetail?.boundingBox ? {
-        BoundingBox: toAWSBoundingBox(uf.faceDetail.boundingBox),
-      } : undefined,
+    FaceRecords: result.faces.map((face) => toAWSFaceRecord(face, externalImageId)),
+    UnindexedFaces: result.unindexedFaces.map((uf) => ({
+      FaceDetail: uf.faceDetail?.boundingBox
+        ? {
+            BoundingBox: toAWSBoundingBox(uf.faceDetail.boundingBox),
+          }
+        : undefined,
       Reasons: uf.reasons ?? ['UNKNOWN'],
     })),
-    FaceModelVersion: result.provider === 'aws'
-      ? result.modelVersion ?? 'aws-rekognition-6.0'
-      : 'face-api.js-1.7.15',
+    FaceModelVersion:
+      result.provider === 'aws'
+        ? (result.modelVersion ?? 'aws-rekognition-6.0')
+        : 'face-api.js-1.7.15',
   };
 }

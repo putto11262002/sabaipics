@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState } from 'react';
 
 export function useCopyToClipboard() {
   const [isCopied, setIsCopied] = useState(false);
@@ -15,7 +15,7 @@ export function useCopyToClipboard() {
 
       return true;
     } catch (error) {
-      console.error("Failed to copy:", error);
+      console.error('Failed to copy:', error);
       setIsCopied(false);
       return false;
     }

@@ -3,12 +3,14 @@
 ## 1. Hook / Component Boundary
 
 **Hook** (data mapping + cache ownership):
+
 - Map client → wire format (`apiFn`)
 - Map wire → client format (`parseResponse`)
 - Auth header injection
 - `onSuccess`: **ALL** cache invalidation and `removeQueries` — the hook is the single source of truth for "what becomes stale when this mutation succeeds"
 
 **Component** (UI feedback only):
+
 - `.mutate()` / `.mutateAsync()` callbacks: navigate, close modal, toast, reset form
 - `onError`: show Alert or `toast.error`
 - Loading UI: Spinner in button, disabled state
@@ -16,7 +18,8 @@
 - **Never** call `invalidateQueries` or `removeQueries` — that's the hook's job
 
 **Multi-step orchestration** (e.g. upload → poll status → complete):
-- When a flow spans multiple hooks (mutation + polling query), the orchestrating hook or component invalidates when the *full flow* completes — this is the one exception where a component may invalidate, because the individual mutation hook doesn't know when the flow is done
+
+- When a flow spans multiple hooks (mutation + polling query), the orchestrating hook or component invalidates when the _full flow_ completes — this is the one exception where a component may invalidate, because the individual mutation hook doesn't know when the flow is done
 
 ## 2. Wrappers
 
@@ -35,6 +38,7 @@
 ## 4. Hook Types
 
 Every hook must define and export:
+
 - **Input type** — what the mutation/query accepts
 - **Response type** — entry (single item) and/or collection (list) extracted from the API response
 - Components import types from the hook, never reach into the API layer
@@ -48,6 +52,7 @@ Hierarchical: `[feature, scope, id?, sub-resource?]`
 - `['events', 'detail', eventId, 'photos']` — photos for that event
 
 Invalidation targets the right level:
+
 - Create/delete event → `['events', 'list']`
 - Update event → `['events', 'detail', id]`
 - Upload photos → `['events', 'detail', id, 'photos']`

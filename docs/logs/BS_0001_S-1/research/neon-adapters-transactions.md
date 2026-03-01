@@ -10,20 +10,24 @@
 ## Question + Constraints
 
 ### Research Question
+
 How can we enable database transaction support in Cloudflare Workers using Drizzle ORM with Neon PostgreSQL while maintaining performance and compatibility?
 
 ### Decision Needed
+
 Which Neon adapter approach should we implement to support database transactions in our Cloudflare Workers environment?
 
 ### Constraints
 
 **Requirements & AC:**
+
 - Must support ACID transactions for multi-step database operations
 - Must be compatible with Cloudflare Workers runtime
 - Must maintain existing code patterns (Drizzle ORM)
 - Must handle 5 specific transaction use cases (T-10, T-16, T-17, T-5, T-13)
 
 **Codebase/Architecture:**
+
 - Current: `@neondatabase/serverless` ^1.0.2 + `drizzle-orm/neon-http`
 - ORM: Drizzle ^0.45.0
 - Runtime: Cloudflare Workers (compatibility_date: 2025-12-06)
@@ -31,11 +35,13 @@ Which Neon adapter approach should we implement to support database transactions
 - Current client location: `/packages/db/src/client.ts`
 
 **Environment/Runtime:**
+
 - Cloudflare Workers (serverless, edge computing)
 - V8 isolates (no Node.js APIs like net, tls)
 - Connection limitations: Can't maintain persistent TCP connections
 
 **Security/Compliance:**
+
 - Payment operations (Stripe webhooks) require idempotency
 - Credit ledger integrity is critical (financial data)
 - PDPA consent records must be atomic
@@ -49,9 +55,9 @@ Which Neon adapter approach should we implement to support database transactions
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent5/packages/db/src/client.ts`
 
 ```typescript
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import * as schema from "./schema";
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import * as schema from './schema';
 
 export function createDb(connectionString: string) {
   const sql = neon(connectionString);
@@ -62,6 +68,7 @@ export type Database = ReturnType<typeof createDb>;
 ```
 
 **Pattern Summary:**
+
 - Uses `@neondatabase/serverless` driver
 - Uses `drizzle-orm/neon-http` adapter
 - Factory function pattern (`createDb`)
@@ -73,15 +80,17 @@ export type Database = ReturnType<typeof createDb>;
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent5/docs/logs/BS_0001_S-1/plan/neon-transactions.md`
 
 **Required Transaction Pattern:**
+
 ```typescript
 await db.transaction(async (tx) => {
   // 1. Check idempotency/balance
   // 2. Insert/update records
   // 3. All operations atomic (all succeed or all rollback)
-})
+});
 ```
 
 **Use Cases:**
+
 1. **T-10 (Stripe Webhook):** Idempotency check + credit insert
 2. **T-16 (Photo Upload):** Balance check + credit deduct + photo insert
 3. **T-17 (Queue Consumer):** Faces insert + photo update + event update
@@ -96,7 +105,7 @@ await db.transaction(async (tx) => {
 transaction: vi.fn().mockImplementation(async (callback) => {
   queryCount = 0;
   return callback(mockDb);
-})
+});
 ```
 
 **Pattern:** Tests already expect `db.transaction()` API to exist, but it's not implemented in production.
@@ -106,6 +115,7 @@ transaction: vi.fn().mockImplementation(async (callback) => {
 ## Gaps (Must-Know / Nice-to-Know)
 
 ### Must-Know (Blockers)
+
 1. **Can Neon WebSocket adapter run in Cloudflare Workers?** - WS requires persistent connections
 2. **Does Neon support transactions via HTTP-only path?** - Need to verify `@neondatabase/serverless` capabilities
 3. **What is the Drizzle transaction API for Neon adapters?** - Different adapters have different transaction APIs
@@ -113,6 +123,7 @@ transaction: vi.fn().mockImplementation(async (callback) => {
 5. **How to handle connection pooling with WS adapter in Workers?** - Workers can't maintain connections
 
 ### Nice-to-Know (Optimization)
+
 1. **Cost implications of WS vs HTTP adapter?** - Neon pricing model
 2. **Are there Neon-specific transaction features?** - Batch operations, savepoints
 3. **Migration path from HTTP to WS?** - Backward compatibility
@@ -130,12 +141,14 @@ transaction: vi.fn().mockImplementation(async (callback) => {
 **Source:** Neon Official Documentation (inferred from package structure)
 
 The `@neondatabase/serverless` package provides:
+
 - **HTTP-based driver** for serverless environments
 - **No native transaction support** via the HTTP API
 - Each HTTP request is stateless and independent
 - Transactions require maintaining session state across requests
 
 **Key Limitation:**
+
 ```
 HTTP adapter = No session management = No transactions
 ```
@@ -169,11 +182,13 @@ Drizzle provides multiple Neon adapters:
 **Source:** Cloudflare Workers Documentation
 
 Cloudflare Workers supports WebSocket connections via:
+
 - `WebSocketPair` API
 - Client-initiated connections (hj WebSocket upgrade)
 - **Outbound WebSocket connections are NOT supported**
 
 **Critical Constraint:**
+
 ```
 Workers can accept WebSocket connections (as server)
 Workers cannot initiate WebSocket connections (as client)
@@ -193,11 +208,13 @@ PostgreSQL transactions require maintaining a database session with transaction 
 
 **The Solution (Neon's Approach):**
 Neon has introduced transaction support via their HTTP API using:
+
 1. **Session-based HTTP endpoints** - Maintain session via cookies/tokens
 2. **Batch operations** - Execute multiple SQL statements in one HTTP request
 3. **Transaction wrapper API** - `neon(..., { fullResults: false })` or similar
 
 **API Pattern:**
+
 ```typescript
 import { neon, neonConfig } from '@neondatabase/serverless';
 
@@ -220,6 +237,7 @@ await sql.transaction(async (txSql) => {
 **Source:** Drizzle ORM Source Code Analysis
 
 **neon-http Adapter (Current):**
+
 ```typescript
 // No transaction method available
 import { drizzle } from 'drizzle-orm/neon-http';
@@ -228,6 +246,7 @@ const db = drizzle(sql);
 ```
 
 **neon-js Adapter (WebSocket):**
+
 ```typescript
 // Full transaction support
 import { drizzle } from 'drizzle-orm/neon-js';
@@ -239,6 +258,7 @@ await db.transaction(async (tx) => {
 ```
 
 **pg Adapter (Traditional Node.js):**
+
 ```typescript
 // Full transaction support
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -253,11 +273,11 @@ Drizzle's transaction API is **adapter-dependent**. Not all adapters support tra
 
 #### Finding 6: Neon + Drizzle Integration Matrix
 
-| Adapter | Package | CF Workers Compatible | Transactions | Connection Model |
-|---------|---------|----------------------|--------------|------------------|
-| `neon-http` | `@neondatabase/serverless` | ✅ Yes | ❌ No | Stateless HTTP |
-| `neon-js` | `@neondatabase/serverless` | ❌ No | ✅ Yes | Persistent WebSocket |
-| `neon-serverless` | `@neondatabase/serverless` | ✅ Yes | ⚠️ Partial | HTTP with session |
+| Adapter           | Package                    | CF Workers Compatible | Transactions | Connection Model     |
+| ----------------- | -------------------------- | --------------------- | ------------ | -------------------- |
+| `neon-http`       | `@neondatabase/serverless` | ✅ Yes                | ❌ No        | Stateless HTTP       |
+| `neon-js`         | `@neondatabase/serverless` | ❌ No                 | ✅ Yes       | Persistent WebSocket |
+| `neon-serverless` | `@neondatabase/serverless` | ✅ Yes                | ⚠️ Partial   | HTTP with session    |
 
 ---
 
@@ -266,16 +286,19 @@ Drizzle's transaction API is **adapter-dependent**. Not all adapters support tra
 #### Finding 7: Dual-Adapter Implementation Challenges
 
 **Challenge 1: Connection Management**
+
 - HTTP adapter: Stateless, no connection pooling needed
 - WS adapter: Requires connection pool management
 - **Gotcha:** Workers cannot maintain connection pools across requests
 
 **Challenge 2: Performance Impact**
+
 - HTTP adapter: ~50-100ms per query (cold start to warm)
 - WS adapter: ~20-50ms per query (after connection established)
 - **Gotcha:** WS connection establishment adds 100-200ms overhead
 
 **Challenge 3: Error Handling**
+
 - HTTP adapter: Request-level errors only
 - WS adapter: Connection errors, query errors, transaction errors
 - **Gotcha:** Need to handle connection timeout/retry logic
@@ -283,16 +306,19 @@ Drizzle's transaction API is **adapter-dependent**. Not all adapters support tra
 #### Finding 8: Neon-Specific Transaction Limitations
 
 **Limitation 1: Transaction Timeout**
+
 - Neon HTTP transactions: **60 second timeout**
 - Neon WS transactions: **Configurable (default 30 minutes)**
 - **Gotcha:** Long-running transactions may timeout unexpectedly
 
 **Limitation 2: Nested Transactions**
+
 - Neon supports **SAVEPOINT** for nested transactions
 - Drizzle ORM: **Limited support** for nested transactions
 - **Gotcha:** Cannot rely on savepoints via Drizzle API
 
 **Limitation 3: Concurrent Transactions**
+
 - HTTP adapter: **One transaction per HTTP request**
 - WS adapter: **One transaction per connection**
 - **Gotcha:** Cannot parallelize transactions within single request
@@ -300,6 +326,7 @@ Drizzle's transaction API is **adapter-dependent**. Not all adapters support tra
 #### Finding 9: Financial Data Integrity Risks
 
 **Risk 1: Idempotency Without Transactions**
+
 ```typescript
 // Current T-10 Stripe Webhook (vulnerable to race condition)
 const [existing] = await db.select()
@@ -312,6 +339,7 @@ if (!existing) {
 ```
 
 **Risk 2: Credit Deduction Without Atomicity**
+
 ```typescript
 // Current T-16 Photo Upload (vulnerable to partial write)
 const balance = await getBalance(db); // Step 1
@@ -322,6 +350,7 @@ if (balance >= 1) {
 ```
 
 **Risk 3: Queue Consumer Data Inconsistency**
+
 ```typescript
 // Current T-17 Queue Consumer (vulnerable to inconsistent state)
 await insertFaces(db, faces); // Step 1 (may succeed)
@@ -339,6 +368,7 @@ await updateEventCounts(db); // Step 3 (may fail) → Wrong counts!
 Upgrade `@neondatabase/serverless` to use their HTTP-based transaction API (if available) or implement transaction logic via batch SQL execution.
 
 **Implementation:**
+
 ```typescript
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
@@ -347,36 +377,39 @@ const sql = neon(connectionString);
 const db = drizzle(sql, { schema });
 
 // Use Neon's transaction API directly
-async function withTransaction<T>(
-  callback: (tx: any) => Promise<T>
-): Promise<T> {
+async function withTransaction<T>(callback: (tx: any) => Promise<T>): Promise<T> {
   return sql.transaction(callback);
 }
 ```
 
 **Pros:**
+
 - ✅ Maintains Cloudflare Workers compatibility
 - ✅ No WebSocket infrastructure needed
 - ✅ Minimal code changes (same adapter)
 - ✅ Consistent performance profile
 
 **Cons:**
+
 - ❌ API availability unclear (may not exist)
 - ❌ Limited transaction features (no savepoints)
 - ❌ 60-second timeout limit
 - ❌ Documentation is sparse
 
 **Risks/Failure Modes:**
+
 - **Risk 1:** HTTP transaction API may not exist in current version
 - **Risk 2:** Performance degradation for complex transactions
 - **Risk 3:** Transaction isolation level limitations
 
 **Prerequisites:**
+
 - Verify `@neondatabase/serverless` supports HTTP transactions
 - May need to upgrade package version
 - Test transaction isolation levels
 
 **Red Flags:**
+
 - 🚩 Cannot find official documentation for HTTP transactions
 - 🚩 Package version 1.0.2 may be outdated
 - 🚩 No community examples of this pattern
@@ -391,15 +424,14 @@ async function withTransaction<T>(
 Use HTTP adapter for non-transactional queries and WebSocket adapter for transactional operations, implemented via Cloudflare Durable Objects to maintain persistent connections.
 
 **Implementation:**
+
 ```typescript
 // Non-transactional queries (HTTP)
 import { createDb } from '@sabaipics/db/client';
 
 // Transactional queries (via Durable Object)
 export class TransactionDO extends DurableObject {
-  async executeTransaction<T>(
-    callback: (tx: any) => Promise<T>
-  ): Promise<T> {
+  async executeTransaction<T>(callback: (tx: any) => Promise<T>): Promise<T> {
     // Maintain persistent WS connection
     if (!this.dbClient) {
       const ws = new WebSocket(neonWsUrl);
@@ -411,29 +443,34 @@ export class TransactionDO extends DurableObject {
 ```
 
 **Pros:**
+
 - ✅ Full transaction support via WS
 - ✅ Optimized performance (HTTP for fast, WS for transactions)
 - ✅ Maintains CF Workers compatibility
 - ✅ Durable Objects provide connection persistence
 
 **Cons:**
+
 - ❌ Complex architecture (Durable Objects + two adapters)
 - ❌ Higher operational overhead
 - ❌ Durable Objects have additional costs
 - ❌ Latency for Durable Object RPC calls
 
 **Risks/Failure Modes:**
+
 - **Risk 1:** Durable Object connection exhaustion
 - **Risk 2:** WS connection dropping in Durable Object
 - **Risk 3:** Increased latency for transactional operations
 
 **Prerequisites:**
+
 - Implement Cloudflare Durable Object
 - Configure Neon WebSocket connection string
 - Add error handling for WS lifecycle
 - Monitor Durable Object resource usage
 
 **Red Flags:**
+
 - 🚩 Significant architectural complexity
 - 🚩 Durable Object learning curve
 - 🚩 Cost implications unclear
@@ -448,6 +485,7 @@ export class TransactionDO extends DurableObject {
 Migrate from `drizzle-orm/neon-http` to `drizzle-orm/neon-serverless` (or newer `drizzle-orm/neon`), which provides transaction support while maintaining Cloudflare Workers compatibility.
 
 **Implementation:**
+
 ```typescript
 // packages/db/src/client.ts
 import { neon } from '@neondatabase/serverless';
@@ -471,6 +509,7 @@ await db.transaction(async (tx) => {
 ```
 
 **Pros:**
+
 - ✅ Native transaction support via Drizzle API
 - ✅ Maintains Cloudflare Workers compatibility
 - ✅ Minimal code changes (same patterns)
@@ -478,22 +517,26 @@ await db.transaction(async (tx) => {
 - ✅ Single adapter (simpler architecture)
 
 **Cons:**
+
 - ⚠️ May need package upgrade
 - ⚠️ API differences between adapters
 - ⚠️ Limited community examples
 
 **Risks/Failure Modes:**
+
 - **Risk 1:** Adapter may not exist or be experimental
 - **Risk 2:** Performance characteristics unknown
 - **Risk 3:** Breaking changes in Drizzle API
 
 **Prerequisites:**
+
 - Verify `drizzle-orm/neon-serverless` package exists and is stable
 - Test transaction behavior thoroughly
 - May need to upgrade Drizzle ORM version
 - Update tests for transaction behavior
 
 **Red Flags:**
+
 - 🚩 Cannot confirm package existence in official docs
 - 🚩 Version compatibility unclear
 
@@ -507,50 +550,56 @@ await db.transaction(async (tx) => {
 Use Cloudflare Hyperdrive to create a fast connection to Neon, enabling traditional PostgreSQL connection patterns including transactions.
 
 **Implementation:**
+
 ```typescript
 // wrangler.toml
-[[hyperdrive]]
-id = "neon-db"
-binding = "HYPERDRIVE"
-origin = "postgres://user:pass@host/db"
+[[hyperdrive]];
+id = 'neon-db';
+binding = 'HYPERDRIVE';
+origin = 'postgres://user:pass@host/db';
 
 // Worker code
 export default {
   async fetch(request, env) {
     const client = await env.HYPERDRIVE.connect();
     const db = drizzle(client, { schema });
-    
+
     await db.transaction(async (tx) => {
       // Transaction operations
     });
-  }
-}
+  },
+};
 ```
 
 **Pros:**
+
 - ✅ Native PostgreSQL protocol support
 - ✅ Full transaction support
 - ✅ Optimized connection pooling via Hyperdrive
 - ✅ Low latency (connection caching)
 
 **Cons:**
+
 - ❌ Hyperdrive is in Beta (as of 2025)
 - ❌ Additional infrastructure configuration
 - ❌ Pricing model unclear
 - ❌ Neon-specific integration may be needed
 
 **Risks/Failure Modes:**
+
 - **Risk 1:** Beta product stability
 - **Risk 2:** Pricing changes at GA
 - **Risk 3:** Neon compatibility issues
 
 **Prerequisites:**
+
 - Enable Cloudflare Hyperdrive
 - Configure Hyperdrive origin to Neon
 - Migrate to `drizzle-orm/node-postgres` or similar
 - Test thoroughly in production-like environment
 
 **Red Flags:**
+
 - 🚩 Beta status - production use risky
 - 🚩 Limited documentation
 - 🚩 Vendor lock-in (Cloudflare-specific)
@@ -565,22 +614,24 @@ export default {
 Implement application-level idempotency keys and compensation logic instead of database transactions.
 
 **Implementation:**
+
 ```typescript
 // Example: Idempotency-based approach
 async function createCreditLedgerEntry(sessionId: string, amount: number) {
   const idempotencyKey = `stripe-${sessionId}`;
-  
+
   // Check if already processed
   const existing = await redis.get(idempotencyKey);
   if (existing) return JSON.parse(existing);
-  
+
   // Insert with unique constraint
   try {
-    const result = await db.insert(creditLedger)
+    const result = await db
+      .insert(creditLedger)
       .values({ stripeSessionId: sessionId, amount })
       .onConflictDoNothing()
       .returning();
-    
+
     await redis.set(idempotencyKey, JSON.stringify(result), 'EX', 3600);
     return result;
   } catch (e) {
@@ -590,27 +641,32 @@ async function createCreditLedgerEntry(sessionId: string, amount: number) {
 ```
 
 **Pros:**
+
 - ✅ Works with current HTTP adapter
 - ✅ No database changes needed
 - ✅ Distributed system friendly
 
 **Cons:**
+
 - ❌ Not true atomicity (eventual consistency)
 - ❌ Requires Redis/ KV store
 - ❌ Complex compensation logic
 - ❌ No rollback mechanism
 
 **Risks/Failure Modes:**
+
 - **Risk 1:** Race conditions still possible
 - **Risk 2:** Data inconsistency during failures
 - **Risk 3:** Hard to reason about correctness
 
 **Prerequisites:**
+
 - Implement idempotency key storage (KV/Redis)
 - Add unique constraints to schema
 - Implement compensation logic for failures
 
 **Red Flags:**
+
 - 🚩 Not suitable for financial operations
 - 🚩 Increases system complexity
 - 🚩 Hard to test edge cases
@@ -666,6 +722,7 @@ async function createCreditLedgerEntry(sessionId: string, amount: number) {
 ### Recommended Approach: **Option C (Migrate to `neon-serverless` Adapter)**
 
 **Rationale:**
+
 1. **Lowest Complexity:** Single adapter, minimal code changes
 2. **Native Transaction Support:** Full Drizzle transaction API
 3. **CF Workers Compatible:** Maintains current deployment model
@@ -674,6 +731,7 @@ async function createCreditLedgerEntry(sessionId: string, amount: number) {
 ### Implementation Plan:
 
 **Phase 1: Verification (1-2 days)**
+
 ```bash
 # Research
 - Check Drizzle ORM documentation for neon-serverless adapter
@@ -683,6 +741,7 @@ async function createCreditLedgerEntry(sessionId: string, amount: number) {
 ```
 
 **Phase 2: POC Implementation (2-3 days)**
+
 ```typescript
 // Update packages/db/src/client.ts
 import { neon } from '@neondatabase/serverless';
@@ -697,13 +756,14 @@ export function createDb(connectionString: string) {
 // Add transaction helper
 export async function withTransaction<T>(
   db: Database,
-  callback: (tx: any) => Promise<T>
+  callback: (tx: any) => Promise<T>,
 ): Promise<T> {
   return db.transaction(callback);
 }
 ```
 
 **Phase 3: Rollout to Critical Paths (1 week)**
+
 - T-10: Stripe webhook (highest priority)
 - T-16: Photo upload API
 - T-17: Queue consumer
@@ -711,6 +771,7 @@ export async function withTransaction<T>(
 - T-13: Events API
 
 **Phase 4: Testing & Validation (1 week)**
+
 - Unit tests for transaction rollback
 - Integration tests for concurrent operations
 - Load testing for performance
@@ -752,8 +813,8 @@ export default {
   async fetch() {
     const websocket = new WebSocket('wss://example.com');
     // ... use websocket
-  }
-}
+  },
+};
 ```
 
 This changes our options significantly - the `neon-js` (WebSocket) adapter IS viable in Cloudflare Workers.
@@ -762,11 +823,11 @@ This changes our options significantly - the `neon-js` (WebSocket) adapter IS vi
 
 ### Updated Adapter Comparison
 
-| Adapter | Package | CF Workers Compatible | Transactions | Connection Model | Current Status |
-|---------|---------|----------------------|--------------|------------------|----------------|
-| `neon-http` | `@neondatabase/serverless` | ✅ Yes | ❌ No | Stateless HTTP | ✅ Currently Used |
-| `neon-js` | `@neondatabase/serverless` | ✅ **Yes (CORRECTED)** | ✅ Yes | WebSocket | ❌ Not Used |
-| `neon-serverless` | `@neondatabase/serverless` | ✅ Yes | ⚠️ Partial/Legacy | HTTP with session | ⚠️ Deprecated |
+| Adapter           | Package                    | CF Workers Compatible  | Transactions      | Connection Model  | Current Status    |
+| ----------------- | -------------------------- | ---------------------- | ----------------- | ----------------- | ----------------- |
+| `neon-http`       | `@neondatabase/serverless` | ✅ Yes                 | ❌ No             | Stateless HTTP    | ✅ Currently Used |
+| `neon-js`         | `@neondatabase/serverless` | ✅ **Yes (CORRECTED)** | ✅ Yes            | WebSocket         | ❌ Not Used       |
+| `neon-serverless` | `@neondatabase/serverless` | ✅ Yes                 | ⚠️ Partial/Legacy | HTTP with session | ⚠️ Deprecated     |
 
 ---
 
@@ -813,12 +874,14 @@ export type DatabaseWs = ReturnType<typeof createDbWs>;
 #### 2. Usage Pattern: HTTP vs WS
 
 **Use HTTP for:**
+
 - Single queries (SELECT, INSERT, UPDATE, DELETE)
 - Non-transactional operations
 - Read-heavy operations
 - Fast cold starts
 
 **Use WS for:**
+
 - Multi-step transactions
 - Batch operations requiring atomicity
 - Financial operations (credit ledger)
@@ -834,17 +897,13 @@ export async function uploadPhotoWithCredit(
   env: Bindings,
   photographerId: string,
   eventId: string,
-  photoData: PhotoData
+  photoData: PhotoData,
 ) {
   const dbHttp = createDbHttp(env.DATABASE_URL); // Fast HTTP for reads
-  const dbWs = getDbWs(env.DATABASE_URL);        // WS for transaction
+  const dbWs = getDbWs(env.DATABASE_URL); // WS for transaction
 
   // Fast read via HTTP
-  const [event] = await dbHttp
-    .select()
-    .from(events)
-    .where(eq(events.id, eventId))
-    .limit(1);
+  const [event] = await dbHttp.select().from(events).where(eq(events.id, eventId)).limit(1);
 
   if (!event) {
     return err({ code: 'NOT_FOUND' });
@@ -873,10 +932,13 @@ export async function uploadPhotoWithCredit(
       });
 
       // 3. Insert photo
-      const [photo] = await tx.insert(photos).values({
-        eventId,
-        // ...
-      }).returning();
+      const [photo] = await tx
+        .insert(photos)
+        .values({
+          eventId,
+          // ...
+        })
+        .returning();
 
       return photo;
     });
@@ -895,14 +957,14 @@ export async function uploadPhotoWithCredit(
 
 ### When to Use Each Adapter (Decision Matrix)
 
-| Operation Type | Adapter | Rationale |
-|---------------|---------|-----------|
-| Event listing (GET /events) | HTTP | Read-only, single query, fast cold start |
-| Photo upload (POST /photos) | WS | Credit deduction + photo insert (atomic) |
-| Stripe webhook (POST /webhook) | WS | Idempotency check + credit insert (atomic) |
-| Photo listing (GET /events/:id/photos) | HTTP | Read-only, cursor pagination |
-| Queue consumer (photo processing) | WS | Faces insert + photo update + event update (atomic) |
-| Consent API | WS | Consent insert + photographer update (atomic) |
+| Operation Type                         | Adapter | Rationale                                           |
+| -------------------------------------- | ------- | --------------------------------------------------- |
+| Event listing (GET /events)            | HTTP    | Read-only, single query, fast cold start            |
+| Photo upload (POST /photos)            | WS      | Credit deduction + photo insert (atomic)            |
+| Stripe webhook (POST /webhook)         | WS      | Idempotency check + credit insert (atomic)          |
+| Photo listing (GET /events/:id/photos) | HTTP    | Read-only, cursor pagination                        |
+| Queue consumer (photo processing)      | WS      | Faces insert + photo update + event update (atomic) |
+| Consent API                            | WS      | Consent insert + photographer update (atomic)       |
 
 ---
 
@@ -937,10 +999,10 @@ export function getDbWs(connectionString: string): DatabaseWs {
 
 #### 1. Cold Start Performance
 
-| Adapter | Cold Start | Warm Request | Notes |
-|---------|-----------|--------------|-------|
-| HTTP | ~50ms | ~50ms | Consistent, no connection pooling |
-| WS | ~150ms | ~20-50ms | Higher cold start, faster warm queries |
+| Adapter | Cold Start | Warm Request | Notes                                  |
+| ------- | ---------- | ------------ | -------------------------------------- |
+| HTTP    | ~50ms      | ~50ms        | Consistent, no connection pooling      |
+| WS      | ~150ms     | ~20-50ms     | Higher cold start, faster warm queries |
 
 **Strategy:** Use HTTP for all non-transactional operations to minimize WS cold starts.
 
@@ -951,6 +1013,7 @@ export function getDbWs(connectionString: string): DatabaseWs {
 - Workers can spawn many isolates concurrently
 
 **Mitigation:**
+
 - Use HTTP adapter for most operations (no persistent connection)
 - Reserve WS adapter for transactional operations only
 - Monitor connection usage via Neon dashboard
@@ -958,6 +1021,7 @@ export function getDbWs(connectionString: string): DatabaseWs {
 #### 3. Error Handling Differences
 
 **HTTP Adapter Errors:**
+
 ```typescript
 try {
   await db.insert(photos).values(...);
@@ -967,6 +1031,7 @@ try {
 ```
 
 **WS Adapter Errors:**
+
 ```typescript
 try {
   await db.transaction(async (tx) => {
@@ -1007,22 +1072,27 @@ try {
 #### Phase 2: Migrate Critical Paths (1 week)
 
 **Priority 1: T-16 (Photo Upload)**
+
 - Current: Manual locking with `for('update')`
 - Migrate to: WS transaction with automatic rollback
 
 **Priority 2: T-10 (Stripe Webhook)**
+
 - Current: Unique constraint for idempotency
 - Migrate to: WS transaction with proper idempotency check
 
 **Priority 3: T-17 (Queue Consumer)**
+
 - Current: Sequential updates with manual error handling
 - Migrate to: WS transaction for atomic multi-table updates
 
 **Priority 4: T-5 (Consent API)**
+
 - Current: Sequential updates
 - Migrate to: WS transaction
 
 **Priority 5: T-13 (Events API)**
+
 - Current: Sequential inserts
 - Migrate to: WS transaction
 
@@ -1042,6 +1112,7 @@ try {
 **Status:** **NOT RECOMMENDED** (Updated)
 
 **Reason:**
+
 - Neon does NOT provide HTTP transaction API in current package
 - The `neon-serverless` adapter mentioned in previous research does not exist
 - Confusion came from outdated docs and package naming
@@ -1053,12 +1124,14 @@ try {
 **Status:** **RECOMMENDED** (Updated from "Viable but complex")
 
 **Rationale:**
+
 - CF Workers DOES support outbound WebSocket connections (CORRECTED)
 - `@neondatabase/serverless` v1.0.2 supports both adapters
 - Clear separation of concerns: HTTP for reads, WS for transactions
 - Minimal package changes (already installed)
 
 **Updated Pros:**
+
 - ✅ Full transaction support via WS adapter
 - ✅ Optimized performance (HTTP for fast reads, WS for transactions)
 - ✅ No additional dependencies needed
@@ -1066,11 +1139,13 @@ try {
 - ✅ Works within CF Workers CPU limits
 
 **Updated Cons:**
+
 - ⚠️ Need to manage WS connection pooling (singleton pattern)
 - ⚠️ WS connection overhead on cold starts (~100ms)
 - ⚠️ Need to monitor Neon connection limits
 
 **Updated Risks:**
+
 - **Risk 1:** WS connection exhaustion if many isolates spawn
   - **Mitigation:** Use HTTP for reads, WS only for transactions
 - **Risk 2:** Higher cold start latency for first WS connection
@@ -1087,6 +1162,7 @@ try {
 **Status:** **NOT AVAILABLE** (Updated)
 
 **Reason:**
+
 - `drizzle-orm/neon-serverless` adapter does NOT exist
 - Confusion came from conflating Neon package names with Drizzle adapter names
 - Drizzle only has `neon-http` and `neon-js` adapters
@@ -1098,6 +1174,7 @@ try {
 **Status:** **FUTURE CONSIDERATION** (No change)
 
 **Reason:**
+
 - Still in Beta
 - Adds infrastructure complexity
 - No clear advantage over dual-adapter approach
@@ -1109,6 +1186,7 @@ try {
 **Status:** **NOT RECOMMENDED FOR FINANCIAL OPERATIONS** (No change)
 
 **Reason:**
+
 - Current implementation in `photos.ts` (lines 368-437) already uses manual locking
 - Moving to true transactions provides better guarantees
 - Reduces complexity and eliminates race conditions
@@ -1127,11 +1205,12 @@ try {
    - Export both `DatabaseHttp` and `DatabaseWs` types
 
 2. **Create transaction helper utility:**
+
    ```typescript
    // packages/db/src/transaction.ts
    export async function withTransaction<T>(
      dbWs: DatabaseWs,
-     callback: (tx: Transaction) => Promise<T>
+     callback: (tx: Transaction) => Promise<T>,
    ): Promise<T> {
      return dbWs.transaction(callback);
    }
@@ -1150,6 +1229,7 @@ try {
    - Monitor Neon connection usage
 
 **Success Criteria:**
+
 - [ ] All 5 transaction use cases implemented with WS adapter
 - [ ] HTTP adapter still used for all non-transactional queries
 - [ ] No regression in query performance for reads
@@ -1186,6 +1266,7 @@ try {
 ---
 
 **Next Steps:**
+
 1. Human decision on dual-adapter approach (Option B)
 2. Verify Neon tier (connection limits)
 3. Implement Phase 1: Add WS support to `/packages/db/src/client.ts`
@@ -1205,6 +1286,7 @@ try {
 ---
 
 **Next Steps:**
+
 1. Human decision on recommended approach (Option C vs Option B)
 2. Verification of `drizzle-orm/neon-serverless` availability
 3. Create implementation task breakdown

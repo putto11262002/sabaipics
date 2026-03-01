@@ -10,13 +10,165 @@
   "Hero": {
     "eyebrow": "For photographers and event organizers",
     "title": "<highlight>You shoot</highlight>, we handle the rest.",
-    "description": "Upload your way. Guests scan QR, snap a selfie, and AI finds their photos instantly.",
+    "description": "You shoot, upload, and share a QR code. Every guest finds their own photos using AI face search.",
     "ctaPrimary": "Start free trial",
     "ctaSecondary": "See features",
     "trialNote": "Trial includes 1000 photos/credits."
   },
   "Metadata": {
-    "title": "FrameFast - Event Photo Distribution",
-    "description": "AI-powered face recognition photo distribution platform for photographers and event organizers."
+    "title": "FrameFast - AI Face Recognition Photo Distribution for Events",
+    "description": "Deliver event photos instantly with AI face search. Guests find their photos in seconds via QR code or LINE. Free 1,000 credits to start."
+  },
+  "FeatureStory": {
+    "title": "One platform. Your entire workflow.",
+    "subtitle": "Face search that finds every guest, LINE delivery they already trust, and tools that match your style.",
+    "faceSearch": {
+      "label": "Face search",
+      "title": "Guests find themselves in seconds.",
+      "description": "Upload your photos. Guests scan a QR, take a selfie, and AI returns their matches instantly.",
+      "features": {
+        "accuracy": "98% match accuracy",
+        "privacy": "Guests only see their own photos",
+        "pdpa": "PDPA compliant"
+      },
+      "cta": "Start free trial"
+    },
+    "lineDelivery": {
+      "label": "LINE delivery",
+      "title": "Photos delivered straight to LINE.",
+      "description": "Guests send a selfie in LINE and receive their matched photos instantly, no app to download, no website to visit.",
+      "cta": "Start free trial"
+    },
+    "colorGrading": {
+      "label": "Image processing",
+      "title": "Automatic enhancement and color grading.",
+      "description": "Apply auto-edits and custom LUTs during upload for consistent results.",
+      "features": {
+        "upload": "Upload your own LUT or generate from a reference image",
+        "automatic": "Applied automatically during processing",
+        "consistent": "Consistent look across every photo"
+      },
+      "cta": "Start free trial"
+    },
+    "dashboard": {
+      "label": "Organizer UI",
+      "title": "One platform for your entire event workflow.",
+      "description": "Create events, upload photos, and track credits. Less time on logistics, more time behind the camera.",
+      "cta": "Start free trial"
+    }
+  },
+  "IosApp": {
+    "label": "iOS app",
+    "title": "Capture, sync, and deliver from your pocket.",
+    "description": "Import from camera, monitor upload status, and keep event delivery moving while you are still on-site."
+  },
+  "IosAppPanels": {
+    "panel1": {
+      "title": "Manage Multiple Events",
+      "description": "Track upload progress across all your events. See what's in the queue, monitor uploads, and switch between active sessions from one dashboard."
+    },
+    "panel2": {
+      "title": "Connect Your Camera",
+      "description": "Support for Canon, Nikon, and Sony WiFi-enabled cameras. Choose your brand and connect wirelessly in seconds."
+    },
+    "panel3": {
+      "title": "Pair Once, Upload Forever",
+      "description": "Quick wireless pairing with your camera. Once connected, photos automatically transfer in the background while you shoot."
+    },
+    "panel4": {
+      "title": "Photos Sync in Real-Time",
+      "description": "Watch your photos upload automatically as you capture them. No cables, no manual export—just shoot and they're instantly available for guests to find."
+    }
+  },
+  "Faq": {
+    "title": "Frequently asked questions",
+    "subtitle": "Privacy, attendee flow, and credit-based delivery.",
+    "items": {
+      "accuracy": {
+        "question": "How accurate is face search?",
+        "answer": "FrameFast is tuned for real event conditions and typically returns strong matches fast. Guests confirm with one selfie and see their photos in seconds."
+      },
+      "privacy": {
+        "question": "Is attendee privacy protected?",
+        "answer": "Yes. Guests only see photos matched to their own selfie. You control album visibility and event access."
+      },
+      "formats": {
+        "question": "What formats are supported, and how long are photos retained?",
+        "answer": "We support JPEG, PNG, and WebP uploads up to 10 MB per image. Event photo access is set to a 30-day window by default (about 1 month)."
+      },
+      "credits": {
+        "question": "Do free credits expire?",
+        "answer": "Yes. Your 1,000 free credits are valid for 1 month. After that, you can continue with paid top-ups at transparent tier pricing."
+      },
+      "upload": {
+        "question": "Which upload methods are supported?",
+        "answer": "Upload via iOS app, web uploader, or desktop uploader, then deliver through QR and LINE links."
+      },
+      "sales": {
+        "question": "Can I talk to sales for high-volume events?",
+        "answer": "Yes. Email {email} for volume pricing and support."
+      }
+    }
+  },
+  "Footer": {
+    "brandDescription": "Event photo distribution with AI-powered face recognition. Made for photographers and event organizers.",
+    "product": "Product",
+    "company": "Company",
+    "legal": "Legal",
+    "contact": "Contact",
+    "features": "Features",
+    "pricing": "Pricing",
+    "compatibility": "Compatibility",
+    "cameraSetup": "Camera Setup",
+    "upload": "Upload",
+    "faq": "FAQ",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "copyright": "© {year} FrameFast. All rights reserved."
+  },
+  "Pricing": {
+    "title": "Sign up free. Get <credits>1,000 credits</credits> for real event workloads.",
+    "subtitle": "<highlight>Pay as you go</highlight> after your free credits are used.",
+    "cta": "Start free trial",
+    "creditEquivalence": "1 credit = 1 image",
+    "storageLimits": "Storage & limits",
+    "uploadRequirements": "Upload requirements",
+    "uploadFormats": "JPEG, PNG, WebP · 10 MB",
+    "imageRetention": "Image retention",
+    "imageRetentionValue": "1 month",
+    "creditExpiration": "Credit expiration",
+    "creditExpirationValue": "Paid top-up credits: 6 months",
+    "topupTiers": "Top-up tiers",
+    "creditUsageTitle": "Credit usage",
+    "creditUsageDescription": "Credits are consumed based on features you use",
+    "imageUploadTitle": "Image upload",
+    "imageUploadCost": "1 credit per image uploaded",
+    "imageEnhancementTitle": "Image enhancement",
+    "imageEnhancementCost": "+1 credit per image with auto-edit or LUT",
+    "lineDeliveryTitle": "LINE delivery",
+    "lineDeliveryCost": "100 free per month, then 1 credit per message",
+    "salesCta": "Need high-volume event pricing? Contact sales"
+  },
+  "UploadWay": {
+    "title": "Upload your way",
+    "subtitle": "Pick the ingest path that fits the job, all feeding one delivery workflow.",
+    "methods": {
+      "ios": {
+        "title": "iOS app",
+        "description": "Connect to your camera wirelessly, shoot as usual, and keep uploads syncing in the background."
+      },
+      "web": {
+        "title": "Web upload",
+        "description": "Drag, drop, and batch upload from any modern browser."
+      },
+      "desktop": {
+        "title": "Desktop uploader",
+        "description": "Stable large-batch transfer from your workstation."
+      }
+    },
+    "seeIosApp": "See iOS app",
+    "compatibleCameras": "Compatible cameras",
+    "startFreeTrial": "Start free trial",
+    "download": "Download"
   }
 }

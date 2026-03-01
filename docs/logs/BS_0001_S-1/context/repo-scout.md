@@ -7,6 +7,7 @@ Generated: `2026-01-09 14:30 UTC`
 ## Relevant doc takeaways (only what matters for this slice)
 
 ### From `docs/tech/ARCHITECTURE.md`:
+
 - **API** (`apps/api/`): Hono 4.x on Cloudflare Workers. Handles REST, business logic, background job processing via Queues, and coordinates with Durable Objects for rate limiting. Webhooks must be mounted BEFORE CORS/auth middleware.
 - **Dashboard** (`apps/dashboard/`): React 19 + Vite 7 SPA on Cloudflare Pages. Uses Hono RPC client for type-safe API calls. Auth via Clerk React SDK.
 - **Database** (`packages/db/`): Neon Postgres with Drizzle ORM. Accessed exclusively via API. Uses `@neondatabase/serverless` driver for Workers compatibility.
@@ -16,6 +17,7 @@ Generated: `2026-01-09 14:30 UTC`
 - **Queues**: Photo processing queue with max 50 batch size, 3 retries, dead-letter queue.
 
 ### From `docs/tech/tech_stack.md`:
+
 - **Validation**: Zod 4.x (see `apps/api/src/lib/line/schemas.ts` for exemplar)
 - **Testing**: Vitest 3.x with `@cloudflare/vitest-pool-workers` for Workers runtime tests
 - **UI**: React 19, React Router 7, TanStack Query 5, Tailwind CSS 4, shadcn/ui (via `packages/ui`)
@@ -24,11 +26,13 @@ Generated: `2026-01-09 14:30 UTC`
 ## Key conventions (observed via exemplars)
 
 ### Validation
+
 - Use **Zod schemas** with `z.discriminatedUnion` for event types (see LINE schemas)
 - Export both schema and inferred TypeScript types: `export type X = z.infer<typeof XSchema>`
 - Validation errors: not yet standardized (no central error shape observed)
 
 ### Error handling
+
 - **Domain-specific error modules**: Each external service has its own `errors.ts` (Rekognition, Stripe, Auth)
 - **Error classification**: `isRetryableError()`, `isNonRetryableError()`, `isThrottlingError()` for queue retry logic
 - **Backoff calculation**: `getBackoffDelay(attempts)` with exponential backoff + jitter
@@ -36,6 +40,7 @@ Generated: `2026-01-09 14:30 UTC`
 - **Stripe errors**: `FormattedStripeError` interface with `code`, `message`, `type`, `retryable`, `declineCode`, `param`
 
 ### Auth/authz
+
 - **API middleware chain**: `createClerkAuth()` extracts JWT into `c.var.auth`, `requireAuth()` enforces
 - **Protected routes**: Use `requireAuth()` middleware before handler
 - **Dashboard**: `<ProtectedRoute>` component wraps authenticated routes, redirects to `/sign-in` if unauthenticated
@@ -43,11 +48,13 @@ Generated: `2026-01-09 14:30 UTC`
 - **Webhook verification**: Svix signature verification for Clerk/LINE, raw signature for Stripe
 
 ### Logging/metrics
+
 - `console.log/warn/error` with structured prefixes like `[Queue]`, `[auth]`, `[EventBus]`
 - Cloudflare observability enabled in staging/production (`head_sampling_rate: 1`)
 - No structured logging library observed yet
 
 ### Testing patterns
+
 - **Unit tests** (Node.js): `apps/api/src/lib/rekognition/rekognition.test.ts` - mock AWS SDK with `aws-sdk-client-mock`
 - **Workers tests**: `*.workers.test.ts` suffix, run via `@cloudflare/vitest-pool-workers`
 - **Test config**: Separate `vitest.config.ts` for Workers pool with isolated storage
@@ -55,23 +62,23 @@ Generated: `2026-01-09 14:30 UTC`
 
 ## Best exemplars (top 3-5)
 
-| Path | Why it matters | Pattern to copy |
-|------|----------------|-----------------|
-| `apps/api/src/lib/line/schemas.ts` | Comprehensive Zod schema with discriminated unions | Validation schema structure, export both schema + types |
-| `apps/api/src/lib/rekognition/errors.ts` | Error classification + backoff logic | `isRetryableError()`, `getBackoffDelay()`, `formatErrorMessage()` |
-| `apps/api/src/queue/photo-consumer.ts` | Queue consumer with rate limiting, parallel execution | Paced request initiation, per-message ack/retry, DO coordination |
-| `apps/api/src/routes/webhooks/clerk.ts` | Webhook handler with signature verification | Svix verification, event routing via switch, handler functions |
-| `packages/auth/src/middleware.ts` | Auth middleware with proper typing | `createClerkAuth()`, `requireAuth()`, context variable typing |
+| Path                                     | Why it matters                                        | Pattern to copy                                                   |
+| ---------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------- |
+| `apps/api/src/lib/line/schemas.ts`       | Comprehensive Zod schema with discriminated unions    | Validation schema structure, export both schema + types           |
+| `apps/api/src/lib/rekognition/errors.ts` | Error classification + backoff logic                  | `isRetryableError()`, `getBackoffDelay()`, `formatErrorMessage()` |
+| `apps/api/src/queue/photo-consumer.ts`   | Queue consumer with rate limiting, parallel execution | Paced request initiation, per-message ack/retry, DO coordination  |
+| `apps/api/src/routes/webhooks/clerk.ts`  | Webhook handler with signature verification           | Svix verification, event routing via switch, handler functions    |
+| `packages/auth/src/middleware.ts`        | Auth middleware with proper typing                    | `createClerkAuth()`, `requireAuth()`, context variable typing     |
 
 ## Likely primary surfaces
 
-| Surface | Priority | Rationale |
-|---------|----------|-----------|
-| **DB** | Primary | Stories require photographers, events, photos, faces, credits tables. Currently only test schema exists. |
-| **API** | Primary | New routes needed: events CRUD, photo upload, credit purchase, face detection triggers |
-| **UI** | Primary | Dashboard pages: events list, event detail, photo upload, credit purchase flow |
-| **Jobs** | Secondary | Photo processing queue already exists; may need face indexing orchestration |
-| **Ops** | Secondary | Webhook handlers for Clerk (user sync), Stripe (credit fulfillment) - shells exist |
+| Surface  | Priority  | Rationale                                                                                                |
+| -------- | --------- | -------------------------------------------------------------------------------------------------------- |
+| **DB**   | Primary   | Stories require photographers, events, photos, faces, credits tables. Currently only test schema exists. |
+| **API**  | Primary   | New routes needed: events CRUD, photo upload, credit purchase, face detection triggers                   |
+| **UI**   | Primary   | Dashboard pages: events list, event detail, photo upload, credit purchase flow                           |
+| **Jobs** | Secondary | Photo processing queue already exists; may need face indexing orchestration                              |
+| **Ops**  | Secondary | Webhook handlers for Clerk (user sync), Stripe (credit fulfillment) - shells exist                       |
 
 ## Gaps / flags
 

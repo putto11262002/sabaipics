@@ -15,10 +15,8 @@ import type { R2EventMessage } from '../types/r2-event';
 import type { Bindings } from '../types';
 import { createDb, photoLuts } from '@/db';
 import { eq } from 'drizzle-orm';
-import { Result, ResultAsync, safeTry, ok, err, type Result as NtResult } from 'neverthrow';
-import { PhotonImage } from '@cf-wasm/photon/workerd';
-import { validateImageMagicBytes } from '../lib/images';
-import { parseCubeLut, generateCubeLutFromReferenceRgba } from '../lib/images/color-grade';
+import { ResultAsync, safeTry, ok, err, type Result as NtResult } from 'neverthrow';
+import { parseCubeLut } from '../lib/images/color-grade';
 import * as Sentry from '@sentry/cloudflare';
 
 // =============================================================================
@@ -35,13 +33,6 @@ type LutProcessingError =
       key: string;
       lutId: string;
       reason: 'invalid_format' | 'unsupported';
-      message: string;
-    }
-  | {
-      type: 'invalid_image';
-      key: string;
-      lutId: string;
-      reason: 'invalid_magic_bytes' | 'decode_failed';
       message: string;
     }
   | { type: 'database'; operation: string; cause: unknown }
@@ -66,17 +57,6 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
-
-const safePhotonDecode = Result.fromThrowable(
-  (bytes: Uint8Array) => PhotonImage.new_from_byteslice(bytes),
-  (cause): LutProcessingError => ({
-    type: 'invalid_image',
-    key: 'unknown',
-    lutId: 'unknown',
-    reason: 'decode_failed',
-    message: cause instanceof Error ? cause.message : 'Failed to decode image',
-  }),
-);
 
 // =============================================================================
 // Processing
@@ -206,128 +186,6 @@ async function processLutUpload(
       return ok(undefined);
     }
 
-    if (lut.sourceType === 'reference_image') {
-      const r2Object = yield* ResultAsync.fromPromise(
-        env.PHOTOS_BUCKET.get(key),
-        (cause): LutProcessingError => ({
-          type: 'r2',
-          operation: 'get_temp_reference_image',
-          cause,
-        }),
-      );
-      if (!r2Object) {
-        return err<never, LutProcessingError>({ type: 'r2_not_found', key, lutId: lut.id });
-      }
-
-      const imageBytes = new Uint8Array(
-        yield* ResultAsync.fromPromise(
-          r2Object.arrayBuffer(),
-          (cause): LutProcessingError => ({
-            type: 'r2',
-            operation: 'read_temp_reference_image',
-            cause,
-          }),
-        ),
-      );
-
-      const magicValidation = validateImageMagicBytes(imageBytes.slice(0, 16));
-      if (!magicValidation.valid) {
-        return err<never, LutProcessingError>({
-          type: 'invalid_image',
-          key,
-          lutId: lut.id,
-          reason: 'invalid_magic_bytes',
-          message: 'Invalid image format (magic bytes check failed)',
-        });
-      }
-
-      // Decode to RGBA using photon (in-Worker Wasm)
-      const photon = yield* safePhotonDecode(imageBytes).mapErr((e) => ({
-        ...e,
-        key,
-        lutId: lut.id,
-      }));
-
-      let pixels: Uint8Array;
-      let width: number;
-      let height: number;
-      try {
-        width = photon.get_width();
-        height = photon.get_height();
-        // Copy out of Wasm memory before free.
-        pixels = photon.get_raw_pixels().slice();
-      } finally {
-        photon.free();
-      }
-
-      const lutText = generateCubeLutFromReferenceRgba({
-        referencePixels: pixels,
-        width,
-        height,
-        size: 33,
-        includeLuminance: true,
-        title: lut.name,
-      });
-
-      const parsed = parseCubeLut(lutText);
-      if (parsed.isErr()) {
-        return err<never, LutProcessingError>({
-          type: 'invalid_lut',
-          key,
-          lutId: lut.id,
-          reason: parsed.error.type,
-          message: parsed.error.message,
-        });
-      }
-
-      const bytes = new TextEncoder().encode(lutText);
-      const sha256 = yield* ResultAsync.fromPromise(
-        sha256Hex(bytes),
-        (cause): LutProcessingError => ({ type: 'r2', operation: 'sha256', cause }),
-      );
-
-      yield* ResultAsync.fromPromise(
-        env.PHOTOS_BUCKET.put(finalR2Key, bytes, {
-          httpMetadata: { contentType: 'text/plain' },
-        }),
-        (cause): LutProcessingError => ({
-          type: 'r2',
-          operation: 'put_final_generated_cube',
-          cause,
-        }),
-      );
-
-      yield* ResultAsync.fromPromise(
-        db
-          .update(photoLuts)
-          .set({
-            status: 'completed',
-            lutR2Key: finalR2Key,
-            lutSize: parsed.value.size,
-            title: parsed.value.title ?? null,
-            domainMin: parsed.value.domainMin ?? null,
-            domainMax: parsed.value.domainMax ?? null,
-            sha256,
-            completedAt: now,
-            errorCode: null,
-            errorMessage: null,
-          })
-          .where(eq(photoLuts.id, lut.id)),
-        (cause): LutProcessingError => ({
-          type: 'database',
-          operation: 'mark_completed_reference',
-          cause,
-        }),
-      );
-
-      yield* ResultAsync.fromPromise(
-        bestEffortDeleteTemp(env, key),
-        (cause): LutProcessingError => ({ type: 'r2', operation: 'delete_temp_reference', cause }),
-      );
-
-      return ok(undefined);
-    }
-
     return err<never, LutProcessingError>({
       type: 'unsupported_source',
       key,
@@ -396,24 +254,6 @@ async function handleLutProcessingError(env: Bindings, error: LutProcessingError
           .where(eq(photoLuts.id, error.lutId));
       } catch (e) {
         console.error('[lut-processing-consumer] Failed to mark invalid_lut:', e);
-        Sentry.captureException(e);
-        throw e;
-      }
-      await bestEffortDeleteTemp(env, error.key);
-      return;
-
-    case 'invalid_image':
-      try {
-        await db
-          .update(photoLuts)
-          .set({
-            status: 'failed',
-            errorCode: error.reason === 'decode_failed' ? 'IMAGE_DECODE_FAILED' : 'INVALID_IMAGE',
-            errorMessage: error.message,
-          })
-          .where(eq(photoLuts.id, error.lutId));
-      } catch (e) {
-        console.error('[lut-processing-consumer] Failed to mark invalid_image:', e);
         Sentry.captureException(e);
         throw e;
       }

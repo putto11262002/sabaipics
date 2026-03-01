@@ -29,7 +29,7 @@ Rocc is designed to be as generic as possible, both from a coding point of view 
 
 ### Swift Package Manager
 
-[Swift package manager](https://swift.org/package-manager/) is swift's de-facto distribution mechanism for code distribution. 
+[Swift package manager](https://swift.org/package-manager/) is swift's de-facto distribution mechanism for code distribution.
 
 Once you have your swift project/package setup, add Rocc as a dependency in your `Package.swift` file:
 
@@ -45,8 +45,8 @@ Carthage is a dependency manager which builds frameworks for you or downloads pr
 
 1. If you haven't already, setup Carthage as outlined [here](https://github.com/Carthage/Carthage#quick-start).
 1. Add Rocc as a dependency in your Cartfile: `github "simonmitchell/rocc" == 2.0.0`.
-1. Drag the `Rocc.framework` into your project's  `Frameworks, Libraries and Embedded Content` section.
-1. Make sure that Rocc is included in your carthage copy files build phase. 
+1. Drag the `Rocc.framework` into your project's `Frameworks, Libraries and Embedded Content` section.
+1. Make sure that Rocc is included in your carthage copy files build phase.
 
 ### Manual
 
@@ -61,7 +61,7 @@ Manual installation is a bit more involved, and not the suggested approach.
 
 ### Discovering Cameras
 
-To discover cameras you will use the class `CameraDiscoverer`. You must keep a strong reference to this in order to keep it in memory. It will start all the various tasks necessary for device discovery as well as keeping track of WiFi network changes and re-starting the search e.t.c. in these cases. 
+To discover cameras you will use the class `CameraDiscoverer`. You must keep a strong reference to this in order to keep it in memory. It will start all the various tasks necessary for device discovery as well as keeping track of WiFi network changes and re-starting the search e.t.c. in these cases.
 
 It will not start and re-start when your application enters the background and foreground however so you may want to implement this yourself!
 
@@ -74,9 +74,9 @@ init () {
 
 
 func cameraDiscoverer(_ discoverer: CameraDiscoverer, didError error: Error) {
-    // Called with errors, these do happen a lot so you will want to check the error code and type here before displaying!        
+    // Called with errors, these do happen a lot so you will want to check the error code and type here before displaying!
 }
-    
+
 func cameraDiscoverer(_ discoverer: CameraDiscoverer, discovered device: Camera) {
     // Connect to the device!
    connect(to: device)
@@ -90,7 +90,8 @@ let cameras = discoverer.camerasBySSID[Reachability.currentWiFiSSID] ?? []
 ```
 
 ### Connecting to a Camera
------
+
+---
 
 Once you have discovered to a camera, you will need to connect to it. Not all, but most Sony cameras require an API call to be made to enable remote functionality, but for the sake of genericness this should be called on all `Camera` objects.
 
@@ -107,12 +108,12 @@ You should then progress to performing the functionality you wish to with the co
 
 ```swift
 switch camera.connectionMode {
-case .contentsTransfer(let preselected): 
+case .contentsTransfer(let preselected):
     if preselected {
         camera.loadFilesToTransfer(callback: { (fileUrls) in
             // Download Files Somehow!
             camera.finishTransfer(callback: { (_) in
-                
+
             })
         })
     } else {
@@ -124,7 +125,8 @@ case .remoteControl:
 ```
 
 ### Staying Connected!
------
+
+---
 
 Rocc provides a simple delegate based class that will alert you when a `Camera` has become disconnected.
 
@@ -134,8 +136,8 @@ init(camera: Camera) {
 }
 
 func connectivityNotifier(_ notifier: DeviceConnectivityNotifier, didDisconnectFrom device: Camera) {
-    // If it is appropriate to show some kind of UI to let 
-    //  the user know the camera has disconnected!    
+    // If it is appropriate to show some kind of UI to let
+    //  the user know the camera has disconnected!
 }
 
 func connectivityNotifier(_ notifier: DeviceConnectivityNotifier, didReconnectTo device: Camera) {
@@ -144,7 +146,8 @@ func connectivityNotifier(_ notifier: DeviceConnectivityNotifier, didReconnectTo
 ```
 
 ### Streaming the Live View
------
+
+---
 
 Streaming the live view is as simple as using a `LiveViewStream` class.
 
@@ -159,17 +162,17 @@ func liveViewStream(_ stream: LiveViewStream, didReceive image: UIImage) {
         // Show the next image
     }
 }
-    
+
 func liveViewStream(_ stream: LiveViewStream, didReceive frames: [FrameInfo]) {
     OperationQueue.main.addOperation {
         // Show frame information (Focus info)
     }
 }
-    
+
 func liveViewStreamDidStop(_ stream: LiveViewStream) {
     // Live view stopped!
 }
-    
+
 func liveViewStream(_ stream: LiveViewStream, didError error: Error) {
     // Stream errored, you can try and restart it in this method if
     // you want, but be careful not to recurse too much!
@@ -177,7 +180,8 @@ func liveViewStream(_ stream: LiveViewStream, didError error: Error) {
 ```
 
 ### Receiving Camera "Events"
------
+
+---
 
 Because your camera settings can still be adjusted manually on the camera whilst shooting, and some settings may affect others (Changing aperture whilst in aperture priority mode may change shutter speed/ISO e.t.c) it is important that the camera can communicate these changes over WiFi. To get changes you should subscribe to them using `CameraEventNotifier`:
 
@@ -188,21 +192,22 @@ init(camera: Camera) {
 }
 
 func eventNotifier(_ notifier: CameraEventNotifier, didError error: Error) {
-    // If it's important to, show the user an Error        
+    // If it's important to, show the user an Error
 }
-    
+
 func eventNotifier(_ notifier: CameraEventNotifier, receivedEvent event: CameraEvent) {
     // Handle the event and update UI! CameraEvent includes all exposure
     // info as well as changes to shooting mode, camera status, e.t.c.
 }
 ```
 
-It is important to note that the information provided by `CameraEventNotifier` will vary by manufacturer, and even by model of camera for the same manufacturer, so you may not always be able to rely on it solely! 
+It is important to note that the information provided by `CameraEventNotifier` will vary by manufacturer, and even by model of camera for the same manufacturer, so you may not always be able to rely on it solely!
 
 **IMPORTANT:** The `CameraEvent` object may have `nil` values for properties that haven't changed with a given `event` occuring. For example if only the aperture has changed things like `cameraStatus` could be `nil`, which doesn't mean the camera is now `idle`. This depends on whether the camera is API driven (e.g. a7ii) or PTP/IP model (e.g. a9ii). This behaviour will be bought in line across all models in a future release of ROCC.
 
 ### Performing Camera Functions
------
+
+---
 
 Camera functions are written generically, so there are only 4 methods you need to call on `Camera` rather than an individual set of methods for each piece of functionality on the camera.
 
@@ -260,7 +265,8 @@ camera.performFunction(Focus.Mode.get, payload: nil, callback: { (error, value) 
 As with calling `isFunctionAvailable` or `supportsFunction` both the send type (`payload` parameter) and return type (`value` in the second example) are defined by associated types on the function you are calling!
 
 ### Transferring Images
------
+
+---
 
 This topic will only cover transferring images whilst connected to a camera using the 'Remote Control' connection mode, as the other methods have already been covered above.
 
@@ -270,13 +276,13 @@ Before allowing the user to enter "Content Transfer" mode, it is important to ma
 
 ```swift
 camera.supportsFunction(Function.set, callback: { (setFunctionSupported, _, _) in
-                    
+
     // If we're not allowed to set the camera's "Function" then we're done
     guard let supported = setFunctionSupported, supported else {
         self.supportsContentsTransfer = false
         return
     }
-    
+
     // Check if once we've set the camera's function we can actually list contents!
     device.supportsFunction(FileSystem.Contents.list) { (isSupported, error, supported) in
         self.supportsContentsTransfer = isSupported
@@ -291,16 +297,16 @@ First off, we need to enter "Contents Transfer" mode on the camera, this may not
 ```swift
 // First check if listing contents is already available!
 camera.isFunctionAvailable(FileSystem.Contents.list, callback: { (isAvailable, error, _) in
-	
+
     guard let available = isAvailable else {
         // Show error!
         return
     }
-	
+
     guard !isAvailable else {
         // Load schemes
     }
-	
+
     camera.makeFunctionAvailable(FileSystem.Contents.list, callback: { (error) in
         guard error = error else {
             // Load schemes
@@ -316,7 +322,7 @@ Sony cameras require a "Scheme" when calling further APIs. Although their docs s
 
 ```swift
 camera.performFunction(FileSystem.Schemes.list, payload: nil, callback: { (error, schemes) in
-	
+
     // If multiple schemes, give the user some kind of UI to pick!
     // Then move on to loading "Sources"
 }
@@ -342,7 +348,7 @@ Once you have loaded schemes, you can load sources for the given scheme, again m
 
 ```swift
 camera.performFunction(FileSystem.Schemes.list, payload: scheme, callback: { (error, schemes) in
-	
+
     // Again, if multiple "schemes" are returned, let the user pick!
     // Then move on to getting the count of items on the camera.
 }
@@ -355,12 +361,12 @@ It's important to load this as it will let you know when to paginate (If you are
 ```swift
 let countRequest = CountRequest(uri: source)
 camera.performFunction(FileSystem.Contents.Count.get, payload: countRequest, callback: { [weak self] (error, count) in
-            
+
     guard let _count = count else {
         // Show error
         return
     }
-    
+
     // Save the content count and start loading content!
 })
 ```
@@ -379,7 +385,7 @@ camera?.performFunction(FileSystem.Contents.list, payload: fileRequest, callback
         // Show error!
         return
     }
-	
+
     // File response returns whether we have reached the end of the files:
     fullyLoaded = response.fullyLoaded
     // And an array of `File` objects:
@@ -395,5 +401,3 @@ Class level documentation is available for inspection in Xcode, and will be made
 ## Contributing
 
 Please see our [contribution guidelines](CONTRIBUTING.md)
-
-

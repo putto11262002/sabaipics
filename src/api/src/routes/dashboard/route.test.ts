@@ -69,16 +69,23 @@ function createMockDb(
     const promise = Promise.resolve(resolveValue);
     const chainObj: Record<string, unknown> = {
       limit: vi.fn().mockImplementation(() => {
-        // For stats query (whereCallCount === 4), return stats
-        // For events query (whereCallCount === 5), return events
+        // Query 1 (middleware): photographer lookup
+        if (whereCallCount === 1) {
+          return Promise.resolve(photographer ? [photographer] : []);
+        }
+        // Query 2 (getBalance): photographers row with cached balance
+        if (whereCallCount === 2) {
+          return Promise.resolve([{ balance, balanceInvalidateAt: null }]);
+        }
+        // Query 4: stats
         if (whereCallCount === 4) {
           return Promise.resolve([{ totalPhotos, totalFaces }]);
         }
+        // Query 5: events
         if (whereCallCount === 5) {
           return Promise.resolve(events);
         }
-        // Default: photographer lookup
-        return Promise.resolve(photographer ? [photographer] : []);
+        return Promise.resolve(resolveValue);
       }),
       orderBy: vi.fn().mockReturnThis(),
       then: promise.then.bind(promise),
@@ -96,9 +103,9 @@ function createMockDb(
       if (whereCallCount === 1) {
         return createChain(photographer ? [photographer] : []);
       }
-      // Query 1: balance (awaited directly)
+      // Query 1: balance (chains to .limit())
       if (whereCallCount === 2) {
-        return createChain([{ balance }]);
+        return createChain([{ balance, balanceInvalidateAt: null }]);
       }
       // Query 2: nearest expiry (awaited directly)
       if (whereCallCount === 3) {

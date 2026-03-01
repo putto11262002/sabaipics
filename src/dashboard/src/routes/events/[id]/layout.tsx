@@ -44,7 +44,7 @@ export default function EventDetailLayout() {
   const [hardDeleteDialogOpen, setHardDeleteDialogOpen] = useState(false);
 
   const handleCopyLink = (eventId: string) => {
-    const searchUrl = `${window.location.origin}/participant/events/${eventId}/search`;
+    const searchUrl = `${import.meta.env.VITE_EVENT_URL}/${eventId}/search`;
     copyToClipboard(searchUrl);
   };
 
@@ -66,7 +66,7 @@ export default function EventDetailLayout() {
           });
           setDeleteDialogOpen(false);
         },
-      }
+      },
     );
   };
 
@@ -88,7 +88,7 @@ export default function EventDetailLayout() {
           });
           setHardDeleteDialogOpen(false);
         },
-      }
+      },
     );
   };
 
@@ -171,7 +171,10 @@ export default function EventDetailLayout() {
               Download QR Code
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={() => setDeleteDialogOpen(true)}>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
               Delete Event
             </DropdownMenuItem>
             {import.meta.env.DEV && (

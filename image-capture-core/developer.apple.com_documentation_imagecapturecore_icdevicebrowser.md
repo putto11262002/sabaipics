@@ -1,6 +1,6 @@
 ---
-url: "https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser"
-title: "ICDeviceBrowser | Apple Developer Documentation"
+url: 'https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser'
+title: 'ICDeviceBrowser | Apple Developer Documentation'
 ---
 
 [Skip Navigation](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#app-main)
@@ -40,12 +40,12 @@ Only search within “Documentation”
 
 [Open Menu](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#)
 
-- SwiftLanguage:  Swift  Objective-C
+- SwiftLanguage: Swift Objective-C
 
 Language:
 
-  - Swift
-  - [Objective-C](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#)
+- Swift
+- [Objective-C](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#)
 
 All Technologies
 
@@ -384,15 +384,15 @@ iOS 13.0+iPadOS 13.0+Mac Catalyst 13.1+macOS 10.4+visionOS 1.0+
 class ICDeviceBrowser
 ```
 
-## [Topics](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#topics)
+## [Topics](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#topics)
 
-### [Creating a Device Browser](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#Creating-a-Device-Browser)
+### [Creating a Device Browser](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#Creating-a-Device-Browser)
 
-[`init()`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/init())
+[`init()`](<https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/init()>)
 
 Creates an ImageCaptureCore device browser.
 
-### [Managing Device Browsing](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#Managing-Device-Browsing)
+### [Managing Device Browsing](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#Managing-Device-Browsing)
 
 [`var delegate: (any ICDeviceBrowserDelegate)?`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/delegate)
 
@@ -402,7 +402,7 @@ The object that acts as the delegate of the device browser.
 
 Methods for managing the addition and removal of devices and responding to device changes.
 
-### [Browsing Devices](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#Browsing-Devices)
+### [Browsing Devices](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#Browsing-Devices)
 
 [`var isBrowsing: Bool`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/isbrowsing)
 
@@ -420,21 +420,21 @@ An abstract object that represents a device.
 
 A mask whose set bits indicate the type of devices being browsed after the delegate receives the start message.
 
-[`func start()`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/start())
+[`func start()`](<https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/start()>)
 
 Tells the delegate to start looking for devices.
 
-[`func stop()`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/stop())
+[`func stop()`](<https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/stop()>)
 
 Tells the delegate to stop looking for devices.
 
-### [Setting a Preferred Device](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#Setting-a-Preferred-Device)
+### [Setting a Preferred Device](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#Setting-a-Preferred-Device)
 
 [`var preferredDevice: ICDevice?`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/preferreddevice)
 
 Returns a device object that the client application should select when it launches.
 
-### [Instance Properties](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#Instance-Properties)
+### [Instance Properties](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#Instance-Properties)
 
 [`var contentsAuthorizationStatus: ICAuthorizationStatus`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/contentsauthorizationstatus)
 
@@ -442,23 +442,23 @@ Returns a device object that the client application should select when it launch
 
 [`var isSuspended: Bool`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/issuspended)
 
-### [Instance Methods](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#Instance-Methods)
+### [Instance Methods](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#Instance-Methods)
 
-[`func requestContentsAuthorization(completion: (ICAuthorizationStatus) -> Void)`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/requestcontentsauthorization(completion:))
+[`func requestContentsAuthorization(completion: (ICAuthorizationStatus) -> Void)`](<https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/requestcontentsauthorization(completion:)>)
 
-[`func requestControlAuthorization(completion: (ICAuthorizationStatus) -> Void)`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/requestcontrolauthorization(completion:))
+[`func requestControlAuthorization(completion: (ICAuthorizationStatus) -> Void)`](<https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/requestcontrolauthorization(completion:)>)
 
-[`func resetContentsAuthorization(completion: (ICAuthorizationStatus) -> Void)`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/resetcontentsauthorization(completion:))
+[`func resetContentsAuthorization(completion: (ICAuthorizationStatus) -> Void)`](<https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/resetcontentsauthorization(completion:)>)
 
-[`func resetControlAuthorization(completion: (ICAuthorizationStatus) -> Void)`](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/resetcontrolauthorization(completion:))
+[`func resetControlAuthorization(completion: (ICAuthorizationStatus) -> Void)`](<https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser/resetcontrolauthorization(completion:)>)
 
-## [Relationships](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#relationships)
+## [Relationships](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#relationships)
 
-### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#inherits-from)
+### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#inherits-from)
 
 - [`NSObject`](https://developer.apple.com/documentation/ObjectiveC/NSObject-swift.class)
 
-### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#conforms-to)
+### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#conforms-to)
 
 - [`CVarArg`](https://developer.apple.com/documentation/Swift/CVarArg)
 - [`CustomDebugStringConvertible`](https://developer.apple.com/documentation/Swift/CustomDebugStringConvertible)
@@ -467,9 +467,9 @@ Returns a device object that the client application should select when it launch
 - [`Hashable`](https://developer.apple.com/documentation/Swift/Hashable)
 - [`NSObjectProtocol`](https://developer.apple.com/documentation/ObjectiveC/NSObjectProtocol)
 
-## [See Also](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#see-also)
+## [See Also](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#see-also)
 
-### [Essentials](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser\#Essentials)
+### [Essentials](https://developer.apple.com/documentation/imagecapturecore/icdevicebrowser#Essentials)
 
 [`Photos Library Entitlement`](https://developer.apple.com/documentation/BundleResources/Entitlements/com.apple.security.personal-information.photos-library)
 

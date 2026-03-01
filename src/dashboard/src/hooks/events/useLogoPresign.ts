@@ -4,7 +4,7 @@ import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
 
 type LogoPresignResponse = InferResponseType<
-  typeof api.events[':id']['logo']['presign']['$post'],
+  (typeof api.events)[':id']['logo']['presign']['$post'],
   SuccessStatusCode
 >;
 

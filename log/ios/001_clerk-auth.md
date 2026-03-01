@@ -7,6 +7,7 @@ Date: 2026-01-21
 Add Clerk-based authentication to the iOS Studio app (`apps/studio`) so the app can make authenticated requests to SabaiPics API.
 
 Non-goals (for this slice):
+
 - Event selection
 - Upload queue/sync
 - Offline/background upload
@@ -24,20 +25,21 @@ Clerk publishable key is not a secret, but it is environment-specific (dev/stagi
 
 Recommended approach:
 
-1) Store the key in Xcode build settings via `.xcconfig` files
+1. Store the key in Xcode build settings via `.xcconfig` files
+
 - Create (or reuse) config files under `apps/studio/Config/`:
   - `apps/studio/Config/Studio.Debug.xcconfig`
   - `apps/studio/Config/Studio.Release.xcconfig`
 - Add a build setting:
   - `CLERK_PUBLISHABLE_KEY = pk_...`
 
-2) Inject the key into the app Info.plist at build time
+2. Inject the key into the app Info.plist at build time
 
 This project uses `GENERATE_INFOPLIST_FILE = YES`, so we should set an Info.plist key using Xcode's `INFOPLIST_KEY_*` build setting:
 
 - `INFOPLIST_KEY_ClerkPublishableKey = $(CLERK_PUBLISHABLE_KEY)`
 
-3) Read from Bundle in Swift
+3. Read from Bundle in Swift
 
 Example:
 
@@ -64,6 +66,7 @@ Update `apps/studio/SabaiPicsStudio/SabaiPicsStudioApp.swift`:
   - `try await clerk.load()`
 
 Notes:
+
 - `load()` is required to restore any previously authenticated session.
 
 ### 3) Add an auth gate view
@@ -92,6 +95,7 @@ Use API route `GET /auth/me` (exists in `apps/api/src/routes/auth.ts`) to verify
 ## References (Official)
 
 Clerk:
+
 - iOS Quickstart: https://clerk.com/docs/ios/getting-started/quickstart
 - `AuthView` reference: https://clerk.com/docs/ios/reference/views/authentication/auth-view
 - iOS `getToken()` reference: https://clerk.com/docs/reference/ios/get-token
@@ -99,5 +103,6 @@ Clerk:
 - Force token refresh: https://clerk.com/docs/guides/sessions/force-token-refresh
 
 Open questions (defer):
+
 - Whether Studio needs Sign in with Apple in MVP (depends on desired UX)
 - Whether we want JWT templates vs default session token claims (likely not needed initially)

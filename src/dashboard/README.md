@@ -4,15 +4,15 @@ Photographer dashboard for managing events, uploading photos, and tracking credi
 
 ## Tech Stack
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Vite | 7.2.x | Build tool |
-| React | 19.x | UI framework |
-| React Router | 7.x | Routing |
-| TanStack Query | 5.x | Data fetching |
-| Tailwind CSS | 4.x | Styling |
-| shadcn/ui | latest | Component library |
-| Clerk | 5.x | Authentication |
+| Technology     | Version | Purpose           |
+| -------------- | ------- | ----------------- |
+| Vite           | 7.2.x   | Build tool        |
+| React          | 19.x    | UI framework      |
+| React Router   | 7.x     | Routing           |
+| TanStack Query | 5.x     | Data fetching     |
+| Tailwind CSS   | 4.x     | Styling           |
+| shadcn/ui      | latest  | Component library |
+| Clerk          | 5.x     | Authentication    |
 
 ## Development
 
@@ -25,21 +25,25 @@ Photographer dashboard for managing events, uploading photos, and tracking credi
 ### Setup
 
 1. Copy environment variables:
+
    ```bash
    cp .env.example .env
    ```
 
 2. Add your Clerk publishable key to `.env`:
+
    ```
    VITE_CLERK_PUBLISHABLE_KEY=pk_test_xxx
    ```
 
 3. Install dependencies (from monorepo root):
+
    ```bash
    pnpm install
    ```
 
 4. Start development server:
+
    ```bash
    # From monorepo root (runs all apps)
    pnpm dev
@@ -50,21 +54,22 @@ Photographer dashboard for managing events, uploading photos, and tracking credi
 
 ### Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start Vite dev server |
-| `pnpm build` | Build for production |
-| `pnpm preview` | Preview production build locally |
-| `pnpm check-types` | TypeScript type checking |
-| `pnpm lint` | ESLint |
-| `pnpm pages:dev` | Preview with Wrangler Pages |
-| `pnpm pages:deploy` | Deploy to Cloudflare Pages |
+| Command             | Description                      |
+| ------------------- | -------------------------------- |
+| `pnpm dev`          | Start Vite dev server            |
+| `pnpm build`        | Build for production             |
+| `pnpm preview`      | Preview production build locally |
+| `pnpm check-types`  | TypeScript type checking         |
+| `pnpm lint`         | ESLint                           |
+| `pnpm pages:dev`    | Preview with Wrangler Pages      |
+| `pnpm pages:deploy` | Deploy to Cloudflare Pages       |
 
 ## Cloudflare Pages Deployment
 
 ### Local Preview
 
 After building, preview with Cloudflare Pages locally:
+
 ```bash
 pnpm build
 pnpm pages:dev
@@ -98,9 +103,9 @@ This builds and deploys to Cloudflare Pages. First run will prompt to create pro
 
 Set in Cloudflare Pages dashboard under Settings → Environment variables:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `VITE_CLERK_PUBLISHABLE_KEY` | Yes | Clerk publishable key |
+| Variable                     | Required | Description           |
+| ---------------------------- | -------- | --------------------- |
+| `VITE_CLERK_PUBLISHABLE_KEY` | Yes      | Clerk publishable key |
 
 ## Project Structure
 

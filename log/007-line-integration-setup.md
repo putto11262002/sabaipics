@@ -14,34 +14,34 @@ Set up LINE Messaging API infrastructure for webhook handling. This is infrastru
 
 ## What Was Implemented
 
-| Component | Description |
-|-----------|-------------|
-| **Environment Config** | Added `LINE_CHANNEL_SECRET` and `LINE_CHANNEL_ACCESS_TOKEN` to `.dev.vars.example` |
-| **LINE SDK** | Installed `@line/bot-sdk` for types and future push message support |
+| Component                  | Description                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| **Environment Config**     | Added `LINE_CHANNEL_SECRET` and `LINE_CHANNEL_ACCESS_TOKEN` to `.dev.vars.example`   |
+| **LINE SDK**               | Installed `@line/bot-sdk` for types and future push message support                  |
 | **Signature Verification** | Custom HMAC-SHA256 verification using Web Crypto API (Cloudflare Workers compatible) |
-| **Webhook Endpoint** | `POST /api/webhooks/line` with event logging |
-| **Tests** | 13 tests for signature verification |
+| **Webhook Endpoint**       | `POST /api/webhooks/line` with event logging                                         |
+| **Tests**                  | 13 tests for signature verification                                                  |
 
 ---
 
 ## Files Created
 
-| File | Purpose |
-|------|---------|
-| `apps/api/src/lib/line/webhook.ts` | `verifyLineSignature()` - HMAC-SHA256 signature verification |
-| `apps/api/src/lib/line/index.ts` | Barrel export |
-| `apps/api/src/routes/webhooks/line.ts` | LINE webhook router with event logging |
-| `apps/api/.dev.vars.example` | Example environment variables file |
-| `apps/api/tests/line-webhook.test.ts` | Signature verification tests |
+| File                                   | Purpose                                                      |
+| -------------------------------------- | ------------------------------------------------------------ |
+| `apps/api/src/lib/line/webhook.ts`     | `verifyLineSignature()` - HMAC-SHA256 signature verification |
+| `apps/api/src/lib/line/index.ts`       | Barrel export                                                |
+| `apps/api/src/routes/webhooks/line.ts` | LINE webhook router with event logging                       |
+| `apps/api/.dev.vars.example`           | Example environment variables file                           |
+| `apps/api/tests/line-webhook.test.ts`  | Signature verification tests                                 |
 
 ---
 
 ## Files Modified
 
-| File | Change |
-|------|--------|
-| `apps/api/src/routes/webhooks/index.ts` | Added LINE webhook router |
-| `apps/api/package.json` | Added `@line/bot-sdk` dependency |
+| File                                    | Change                           |
+| --------------------------------------- | -------------------------------- |
+| `apps/api/src/routes/webhooks/index.ts` | Added LINE webhook router        |
+| `apps/api/package.json`                 | Added `@line/bot-sdk` dependency |
 
 ---
 
@@ -52,6 +52,7 @@ Set up LINE Messaging API infrastructure for webhook handling. This is infrastru
 **Why:** The official `@line/bot-sdk` middleware uses Node.js `crypto.timingSafeEqual` which doesn't work on Cloudflare Workers edge runtime.
 
 **Solution:** Implemented custom verification using Web Crypto API:
+
 - `crypto.subtle.importKey()` for HMAC key
 - `crypto.subtle.sign()` for HMAC-SHA256
 - Custom timing-safe string comparison
@@ -61,6 +62,7 @@ Set up LINE Messaging API infrastructure for webhook handling. This is infrastru
 All LINE webhook events are logged with placeholder handlers. Specific logic (like updating `line_linked` in database) will be added when database tables exist.
 
 **Events handled:**
+
 - `follow` - User adds bot as friend
 - `unfollow` - User blocks/removes bot
 - `message` - Text, image, etc.
@@ -83,6 +85,7 @@ LINE_CHANNEL_ACCESS_TOKEN=xxx    # For push message authentication (future use)
 ```
 
 **Where to get:**
+
 1. Go to [LINE Developers Console](https://developers.line.biz/console/)
 2. Select Provider → Messaging API Channel
 3. Channel Secret: Basic settings tab
@@ -94,11 +97,11 @@ LINE_CHANNEL_ACCESS_TOKEN=xxx    # For push message authentication (future use)
 
 After deployment, configure webhook URL in LINE Developers Console:
 
-| Environment | Webhook URL |
-|-------------|-------------|
-| Development | `https://{NGROK_DOMAIN}/api/webhooks/line` |
-| Staging | `https://api-staging.sabaipics.com/api/webhooks/line` |
-| Production | `https://api.sabaipics.com/api/webhooks/line` |
+| Environment | Webhook URL                                           |
+| ----------- | ----------------------------------------------------- |
+| Development | `https://{NGROK_DOMAIN}/api/webhooks/line`            |
+| Staging     | `https://api-staging.sabaipics.com/api/webhooks/line` |
+| Production  | `https://api.sabaipics.com/api/webhooks/line`         |
 
 ---
 
@@ -113,6 +116,7 @@ pnpm --filter=@sabaipics/api test -- tests/line-webhook.test.ts
 ```
 
 **Test coverage:**
+
 - Valid signature acceptance
 - Invalid signature rejection
 - Tampered body detection

@@ -11,6 +11,7 @@
 ### File: `/apps/dashboard/src/routes/dashboard/index.tsx`
 
 **What it demonstrates:**
+
 - Protected dashboard page with PageHeader + layout
 - API data fetching with React Query
 - Loading/error/success states
@@ -20,36 +21,37 @@
 **Current code:**
 
 ```tsx
-import { useUser } from "@sabaipics/auth/react";
-import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../lib/api";
+import { useUser } from '@sabaipics/auth/react';
+import { useQuery } from '@tanstack/react-query';
+import { useApiClient } from '../../lib/api';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@sabaipics/ui/components/card";
-import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
-import { PageHeader } from "../../components/shell/page-header";
+} from '@sabaipics/ui/components/card';
+import { Alert, AlertDescription, AlertTitle } from '@sabaipics/ui/components/alert';
+import { PageHeader } from '../../components/shell/page-header';
 
 export function DashboardPage() {
   const { user } = useUser();
   const { getToken } = useApiClient();
 
   // Test protected route
-  const { data: profile, isLoading, error } = useQuery({
-    queryKey: ["profile"],
+  const {
+    data: profile,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['profile'],
     queryFn: async () => {
       const token = await getToken();
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/auth/profile`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/profile`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -61,14 +63,13 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader breadcrumbs={[{ label: "Dashboard" }]} />
+      <PageHeader breadcrumbs={[{ label: 'Dashboard' }]} />
 
       <div className="flex flex-1 flex-col gap-4 p-4">
         <div>
           <h1 className="text-2xl font-bold mb-2">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome back,{" "}
-            {user?.firstName || user?.emailAddresses[0]?.emailAddress}!
+            Welcome back, {user?.firstName || user?.emailAddresses[0]?.emailAddress}!
           </p>
         </div>
 
@@ -83,9 +84,7 @@ export function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Protected API Test</CardTitle>
-            <CardDescription>
-              Testing authenticated request to /auth/profile
-            </CardDescription>
+            <CardDescription>Testing authenticated request to /auth/profile</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading && <p>Loading...</p>}
@@ -119,36 +118,42 @@ export function DashboardPage() {
 **Key patterns to reuse for T-11:**
 
 1. **Page Structure:**
+
    ```tsx
    <>
-     <PageHeader breadcrumbs={[{ label: "Dashboard" }]} />
-     <div className="flex flex-1 flex-col gap-4 p-4">
-       {/* Content */}
-     </div>
+     <PageHeader breadcrumbs={[{ label: 'Dashboard' }]} />
+     <div className="flex flex-1 flex-col gap-4 p-4">{/* Content */}</div>
    </>
    ```
 
 2. **Data Fetching:**
+
    ```tsx
    const { getToken } = useApiClient();
    const { data, isLoading, error } = useQuery({
-     queryKey: ["dashboard"],
+     queryKey: ['dashboard'],
      queryFn: async () => {
        const token = await getToken();
        const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard`, {
-         headers: { Authorization: `Bearer ${token}` }
+         headers: { Authorization: `Bearer ${token}` },
        });
        if (!response.ok) throw new Error(`HTTP ${response.status}`);
        return response.json();
-     }
+     },
    });
    ```
 
 3. **Loading/Error/Success States:**
    ```tsx
-   {isLoading && <p>Loading...</p>}
-   {error && <Alert variant="destructive">...</Alert>}
-   {data && <ActualContent />}
+   {
+     isLoading && <p>Loading...</p>;
+   }
+   {
+     error && <Alert variant="destructive">...</Alert>;
+   }
+   {
+     data && <ActualContent />;
+   }
    ```
 
 ---
@@ -215,15 +220,15 @@ interface DashboardData {
 }
 
 const { data } = useQuery<DashboardData>({
-  queryKey: ["dashboard"],
+  queryKey: ['dashboard'],
   queryFn: async () => {
     const token = await getToken();
     const res = await fetch(`${import.meta.env.VITE_API_URL}/dashboard`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
-  }
+  },
 });
 
 // Access data
@@ -238,6 +243,7 @@ const events = data?.data.events ?? [];
 ### File: `/apps/dashboard/src/routes/onboarding/index.tsx`
 
 **What it demonstrates:**
+
 - Custom hook for API data (`useConsentStatus`)
 - Multiple UI states (loading, timeout, error, success)
 - Empty state pattern with `Empty` component
@@ -247,23 +253,23 @@ const events = data?.data.events ?? [];
 **Key patterns:**
 
 ```tsx
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@sabaipics/ui/components/empty";
-import { Spinner } from "@sabaipics/ui/components/spinner";
-import { Alert, AlertDescription, AlertTitle } from "@sabaipics/ui/components/alert";
-import { AlertTriangle } from "lucide-react";
+} from '@sabaipics/ui/components/empty';
+import { Spinner } from '@sabaipics/ui/components/spinner';
+import { Alert, AlertDescription, AlertTitle } from '@sabaipics/ui/components/alert';
+import { AlertTriangle } from 'lucide-react';
 
 export function OnboardingPage() {
   const navigate = useNavigate();
   const [hasTimeout, setHasTimeout] = useState(false);
-  
+
   const { photographerExists, isConsented, refetch } = useConsentStatus();
 
   // State-based rendering
@@ -287,9 +293,7 @@ export function OnboardingPage() {
           <Spinner className="size-5" />
         </EmptyMedia>
         <EmptyTitle>Setting up your account...</EmptyTitle>
-        <EmptyDescription>
-          We're preparing your photographer profile.
-        </EmptyDescription>
+        <EmptyDescription>We're preparing your photographer profile.</EmptyDescription>
       </EmptyHeader>
     </Empty>
   );
@@ -297,6 +301,7 @@ export function OnboardingPage() {
 ```
 
 **Why it matters for T-11:**
+
 - Empty state pattern for new users with no events
 - Loading spinner pattern
 - Alert component for warnings (credit expiry)
@@ -308,6 +313,7 @@ export function OnboardingPage() {
 ### File: `/apps/dashboard/src/routes/onboarding/_components/PDPAConsentModal.tsx`
 
 **What it demonstrates:**
+
 - React Query mutation (POST request)
 - Form state management (checkbox)
 - Loading/error states in forms
@@ -317,13 +323,13 @@ export function OnboardingPage() {
 **Key patterns:**
 
 ```tsx
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@sabaipics/auth/react";
-import { Button } from "@sabaipics/ui/components/button";
-import { Checkbox } from "@sabaipics/ui/components/checkbox";
-import { Alert, AlertDescription } from "@sabaipics/ui/components/alert";
-import { Spinner } from "@sabaipics/ui/components/spinner";
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@sabaipics/auth/react';
+import { Button } from '@sabaipics/ui/components/button';
+import { Checkbox } from '@sabaipics/ui/components/checkbox';
+import { Alert, AlertDescription } from '@sabaipics/ui/components/alert';
+import { Spinner } from '@sabaipics/ui/components/spinner';
 
 export function PDPAConsentModal({ open, onAcceptSuccess }) {
   const [isAgreed, setIsAgreed] = useState(false);
@@ -334,16 +340,16 @@ export function PDPAConsentModal({ open, onAcceptSuccess }) {
     mutationFn: async () => {
       const token = await getToken();
       const response = await fetch(`${import.meta.env.VITE_API_URL}/consent`, {
-        method: "POST",
+        method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok && response.status !== 409) {
-        throw new Error("Failed to submit consent");
+        throw new Error('Failed to submit consent');
       }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["consent-status"] });
+      queryClient.invalidateQueries({ queryKey: ['consent-status'] });
       onAcceptSuccess();
     },
   });
@@ -368,17 +374,14 @@ export function PDPAConsentModal({ open, onAcceptSuccess }) {
           </Alert>
         )}
 
-        <Button
-          onClick={() => mutation.mutate()}
-          disabled={!isAgreed || mutation.isPending}
-        >
+        <Button onClick={() => mutation.mutate()} disabled={!isAgreed || mutation.isPending}>
           {mutation.isPending ? (
             <>
               <Spinner className="mr-2" />
               Submitting...
             </>
           ) : (
-            "Accept"
+            'Accept'
           )}
         </Button>
       </DialogContent>
@@ -388,6 +391,7 @@ export function PDPAConsentModal({ open, onAcceptSuccess }) {
 ```
 
 **Why it matters for T-11:**
+
 - "Create Event" modal will use similar mutation pattern
 - Button loading states
 - Form validation (checkbox must be checked)
@@ -399,14 +403,15 @@ export function PDPAConsentModal({ open, onAcceptSuccess }) {
 ### File: `/apps/dashboard/src/hooks/consent/useConsentStatus.ts`
 
 **What it demonstrates:**
+
 - Custom hook wrapping `useQuery`
 - Polling support (`refetchInterval`)
 - Error handling for specific status codes (403 = not found)
 - Computed return values
 
 ```tsx
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@sabaipics/auth/react";
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@sabaipics/auth/react';
 
 interface ConsentStatusResponse {
   data: {
@@ -420,15 +425,12 @@ export function useConsentStatus(options = {}) {
   const { pollingInterval } = options;
 
   const query = useQuery({
-    queryKey: ["consent-status"],
+    queryKey: ['consent-status'],
     queryFn: async () => {
       const token = await getToken();
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/consent`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/consent`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       // Handle 403 as "not found" (not an error)
       if (response.status === 403) {
@@ -461,6 +463,7 @@ export function useConsentStatus(options = {}) {
 ```
 
 **Why it matters for T-11:**
+
 - Create `useDashboardData()` hook following same pattern
 - Encapsulate API call + error handling
 - Return computed values
@@ -484,7 +487,7 @@ import {
   CardContent,
   CardFooter,
   CardAction,
-} from "@sabaipics/ui/components/card";
+} from '@sabaipics/ui/components/card';
 
 <Card>
   <CardHeader>
@@ -502,7 +505,7 @@ import {
       {nearestExpiry && `Expires: ${formatDate(nearestExpiry)}`}
     </p>
   </CardFooter>
-</Card>
+</Card>;
 ```
 
 **Why it matters:** Credit balance and stats will use Card components.
@@ -523,26 +526,26 @@ import {
   EmptyTitle,
   EmptyDescription,
   EmptyContent,
-} from "@sabaipics/ui/components/empty";
-import { Calendar } from "lucide-react";
-import { Button } from "@sabaipics/ui/components/button";
+} from '@sabaipics/ui/components/empty';
+import { Calendar } from 'lucide-react';
+import { Button } from '@sabaipics/ui/components/button';
 
-{events.length === 0 && (
-  <Empty>
-    <EmptyHeader>
-      <EmptyMedia variant="icon">
-        <Calendar />
-      </EmptyMedia>
-      <EmptyTitle>No events yet</EmptyTitle>
-      <EmptyDescription>
-        Create your first event to start organizing photos.
-      </EmptyDescription>
-    </EmptyHeader>
-    <EmptyContent>
-      <Button>Create Event</Button>
-    </EmptyContent>
-  </Empty>
-)}
+{
+  events.length === 0 && (
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Calendar />
+        </EmptyMedia>
+        <EmptyTitle>No events yet</EmptyTitle>
+        <EmptyDescription>Create your first event to start organizing photos.</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button>Create Event</Button>
+      </EmptyContent>
+    </Empty>
+  );
+}
 ```
 
 **Why it matters:** Show empty state for new photographers with no events.
@@ -556,18 +559,20 @@ import { Button } from "@sabaipics/ui/components/button";
 **Usage pattern:**
 
 ```tsx
-import { Alert, AlertTitle, AlertDescription } from "@sabaipics/ui/components/alert";
-import { AlertTriangle } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from '@sabaipics/ui/components/alert';
+import { AlertTriangle } from 'lucide-react';
 
-{nearestExpiry && isExpiringSoon(nearestExpiry) && (
-  <Alert variant="warning">
-    <AlertTriangle className="h-4 w-4" />
-    <AlertTitle>Credits Expiring Soon</AlertTitle>
-    <AlertDescription>
-      {balance} credits expire on {formatDate(nearestExpiry)}
-    </AlertDescription>
-  </Alert>
-)}
+{
+  nearestExpiry && isExpiringSoon(nearestExpiry) && (
+    <Alert variant="warning">
+      <AlertTriangle className="h-4 w-4" />
+      <AlertTitle>Credits Expiring Soon</AlertTitle>
+      <AlertDescription>
+        {balance} credits expire on {formatDate(nearestExpiry)}
+      </AlertDescription>
+    </Alert>
+  );
+}
 ```
 
 **Why it matters:** Show expiry warnings when credits expire within 7 days.
@@ -579,9 +584,9 @@ import { AlertTriangle } from "lucide-react";
 ### File: `/apps/dashboard/src/components/Layout.tsx`
 
 ```tsx
-import { Outlet } from "react-router";
-import { SidebarInset, SidebarProvider } from "@sabaipics/ui/components/sidebar";
-import { AppSidebar } from "./shell/app-sidebar";
+import { Outlet } from 'react-router';
+import { SidebarInset, SidebarProvider } from '@sabaipics/ui/components/sidebar';
+import { AppSidebar } from './shell/app-sidebar';
 
 export function Layout() {
   return (
@@ -614,15 +619,9 @@ export function PageHeader({ breadcrumbs = [], children }: PageHeaderProps) {
       <div className="flex items-center gap-2 px-4">
         <SidebarTrigger className="-ml-1 md:hidden" />
         <Separator orientation="vertical" className="mr-2 md:hidden" />
-        {breadcrumbs.length > 0 && (
-          <Breadcrumb>
-            {/* Breadcrumb rendering logic */}
-          </Breadcrumb>
-        )}
+        {breadcrumbs.length > 0 && <Breadcrumb>{/* Breadcrumb rendering logic */}</Breadcrumb>}
       </div>
-      {children && (
-        <div className="ml-auto flex items-center gap-2 px-4">{children}</div>
-      )}
+      {children && <div className="ml-auto flex items-center gap-2 px-4">{children}</div>}
     </header>
   );
 }
@@ -634,13 +633,11 @@ export function PageHeader({ breadcrumbs = [], children }: PageHeaderProps) {
 export function DashboardPage() {
   return (
     <>
-      <PageHeader breadcrumbs={[{ label: "Dashboard" }]}>
+      <PageHeader breadcrumbs={[{ label: 'Dashboard' }]}>
         <Button>Buy Credits</Button>
         <Button>Create Event</Button>
       </PageHeader>
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        {/* Content */}
-      </div>
+      <div className="flex flex-1 flex-col gap-4 p-4">{/* Content */}</div>
     </>
   );
 }
@@ -655,9 +652,9 @@ export function DashboardPage() {
 ### File: `/apps/dashboard/src/lib/api.ts`
 
 ```tsx
-import { hc } from "hono/client";
-import type { AppType } from "@sabaipics/api";
-import { useAuth } from "@sabaipics/auth/react";
+import { hc } from 'hono/client';
+import type { AppType } from '@sabaipics/api';
+import { useAuth } from '@sabaipics/auth/react';
 
 // Base client (unauthenticated)
 export const api = hc<AppType>(import.meta.env.VITE_API_URL);
@@ -678,6 +675,7 @@ export function useApiClient() {
 ```
 
 **Why it matters:**
+
 - Use `useApiClient()` in all dashboard components
 - Hono RPC client provides type-safe API calls (but fetch is also fine for now)
 
@@ -690,30 +688,30 @@ export function useApiClient() {
 **Recommended pattern for T-11:**
 
 ```tsx
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { DashboardPage } from "./index";
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { DashboardPage } from './index';
 
 // Mock API client
-vi.mock("../../lib/api", () => ({
+vi.mock('../../lib/api', () => ({
   useApiClient: () => ({
-    getToken: vi.fn().mockResolvedValue("mock-token"),
+    getToken: vi.fn().mockResolvedValue('mock-token'),
   }),
 }));
 
-describe("DashboardPage", () => {
-  it("renders loading state initially", () => {
+describe('DashboardPage', () => {
+  it('renders loading state initially', () => {
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
         <DashboardPage />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
 
-  it("renders credit balance when data loads", async () => {
+  it('renders credit balance when data loads', async () => {
     // Mock fetch
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -730,7 +728,7 @@ describe("DashboardPage", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <DashboardPage />
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
 
     await waitFor(() => {
@@ -747,10 +745,10 @@ describe("DashboardPage", () => {
 ### File: `/apps/dashboard/src/App.tsx`
 
 ```tsx
-import { Routes, Route } from "react-router";
-import { Layout } from "./components/Layout";
-import { ProtectedRoute } from "./components/auth/ProtectedRoute";
-import { DashboardPage } from "./routes/dashboard";
+import { Routes, Route } from 'react-router';
+import { Layout } from './components/Layout';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { DashboardPage } from './routes/dashboard';
 
 function App() {
   return (
@@ -758,8 +756,14 @@ function App() {
       <Route path="/sign-in" element={<SignInPage />} />
       <Route path="/sign-up" element={<SignUpPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
-      
-      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+
+      <Route
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/credits/packages" element={<CreditPackagesPage />} />
         {/* More routes */}
@@ -776,12 +780,14 @@ function App() {
 ## Summary: Implementation Checklist for T-11
 
 ### 1. Data Fetching
+
 - [ ] Create `useDashboardData()` hook (pattern: `useConsentStatus.ts`)
 - [ ] Use React Query with `queryKey: ["dashboard"]`
 - [ ] Handle loading/error/success states
 - [ ] Type the API response: `{ data: DashboardResponse }`
 
 ### 2. UI Components
+
 - [ ] Replace placeholder cards with real data
 - [ ] Credit Balance Card (show balance + expiry warning)
 - [ ] Stats Cards (totalPhotos, totalFaces)
@@ -789,25 +795,30 @@ function App() {
 - [ ] Empty state when `events.length === 0`
 
 ### 3. Action Buttons
+
 - [ ] "Buy Credits" button → navigate to `/credits/packages`
 - [ ] "Create Event" button → open modal (or navigate to create page)
 
 ### 4. Layout
+
 - [ ] Keep existing `PageHeader` with breadcrumbs
 - [ ] Add action buttons to PageHeader `children` slot
 - [ ] Use existing grid layout: `grid auto-rows-min gap-4 md:grid-cols-3`
 
 ### 5. Error Handling
+
 - [ ] Show Alert (destructive) if API returns error
 - [ ] Show Alert (warning) if credits expiring within 7 days
 - [ ] Graceful fallback for empty data
 
 ### 6. Performance
+
 - [ ] Use `staleTime` in React Query (already set globally to 1 min)
 - [ ] Avoid unnecessary re-renders
 - [ ] Test p95 load time < 2s
 
 ### 7. Testing
+
 - [ ] Component test: renders loading state
 - [ ] Component test: renders credit balance correctly
 - [ ] Component test: shows empty state for new users
@@ -832,16 +843,16 @@ function App() {
 
 ## File Paths Reference
 
-| What | Where |
-|------|-------|
-| Dashboard page | `apps/dashboard/src/routes/dashboard/index.tsx` |
-| API client | `apps/dashboard/src/lib/api.ts` |
-| PageHeader | `apps/dashboard/src/components/shell/page-header.tsx` |
-| Layout | `apps/dashboard/src/components/Layout.tsx` |
-| Dashboard API | `apps/api/src/routes/dashboard/route.ts` |
-| Dashboard types | `apps/api/src/routes/dashboard/types.ts` |
-| UI components | `packages/ui/src/components/*.tsx` |
-| Auth hooks | `@sabaipics/auth/react` (from packages/auth) |
+| What            | Where                                                 |
+| --------------- | ----------------------------------------------------- |
+| Dashboard page  | `apps/dashboard/src/routes/dashboard/index.tsx`       |
+| API client      | `apps/dashboard/src/lib/api.ts`                       |
+| PageHeader      | `apps/dashboard/src/components/shell/page-header.tsx` |
+| Layout          | `apps/dashboard/src/components/Layout.tsx`            |
+| Dashboard API   | `apps/api/src/routes/dashboard/route.ts`              |
+| Dashboard types | `apps/api/src/routes/dashboard/types.ts`              |
+| UI components   | `packages/ui/src/components/*.tsx`                    |
+| Auth hooks      | `@sabaipics/auth/react` (from packages/auth)          |
 
 ---
 

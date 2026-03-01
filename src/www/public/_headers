@@ -1,2 +1,23 @@
+# Immutable static assets (hashed filenames - cache forever)
 /_next/static/*
-  Cache-Control: public,max-age=31536000,immutable
+  Cache-Control: public, max-age=31536000, immutable
+
+# Images and media
+/images/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=3600
+
+# Badges and icons
+/badges/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=3600
+
+# Landing page assets
+/landing/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=3600
+
+# Guide images
+/guides/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=3600
+
+# Fonts
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable

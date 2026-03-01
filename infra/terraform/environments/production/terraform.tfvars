@@ -73,3 +73,19 @@ bucket_notifications = [
 # ------------------------------------------------------------------------------
 
 worker_script_name = "framefast-api-production"
+
+# ------------------------------------------------------------------------------
+# Cache Rules
+# Edge cache for SSG landing pages - 1 week TTL
+# ------------------------------------------------------------------------------
+
+cache_rules = [
+  {
+    # Note: Excluding "/" path because next-intl middleware performs locale negotiation/redirects.
+    # Caching "/" would pin all users to the first cached locale variant for up to 1 week.
+    name        = "WWW Landing Pages"
+    expression  = "(http.host eq \"framefast.io\" or http.host eq \"www.framefast.io\") and (http.request.uri.path eq \"/en\" or http.request.uri.path eq \"/th\" or http.request.uri.path eq \"/en/\" or http.request.uri.path eq \"/th/\")"
+    edge_ttl    = 604800  # 1 week in seconds
+    browser_ttl = 3600    # 1 hour
+  }
+]

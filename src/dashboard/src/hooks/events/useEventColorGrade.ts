@@ -4,7 +4,7 @@ import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
 type ColorGradeResponse = InferResponseType<
-  typeof api.events[':id']['color-grade']['$get'],
+  (typeof api.events)[':id']['color-grade']['$get'],
   SuccessStatusCode
 >;
 

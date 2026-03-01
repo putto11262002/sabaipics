@@ -26,14 +26,32 @@
  */
 export type FaceServiceError =
   // Domain errors (not retryable)
-  | { type: 'not_found'; resource: 'collection' | 'face'; id: string; retryable: false; throttle: false }
+  | {
+      type: 'not_found';
+      resource: 'collection' | 'face';
+      id: string;
+      retryable: false;
+      throttle: false;
+    }
   | { type: 'invalid_input'; field: string; reason: string; retryable: false; throttle: false }
 
   // AWS provider failures - bubbles retryable/throttle from AWS
-  | { type: 'provider_failed'; provider: 'aws'; retryable: boolean; throttle: boolean; cause: unknown }
+  | {
+      type: 'provider_failed';
+      provider: 'aws';
+      retryable: boolean;
+      throttle: boolean;
+      cause: unknown;
+    }
 
   // SabaiFace provider failures - never retryable (local op)
-  | { type: 'provider_failed'; provider: 'sabaiface'; retryable: false; throttle: false; cause: unknown }
+  | {
+      type: 'provider_failed';
+      provider: 'sabaiface';
+      retryable: false;
+      throttle: false;
+      cause: unknown;
+    }
 
   // Database errors - retryable
   | { type: 'database'; operation: string; retryable: true; throttle: false; cause: unknown };
@@ -45,10 +63,7 @@ export type FaceServiceError =
 /**
  * Create a not_found error.
  */
-export function notFound(
-  resource: 'collection' | 'face',
-  id: string
-): FaceServiceError {
+export function notFound(resource: 'collection' | 'face', id: string): FaceServiceError {
   return {
     type: 'not_found',
     resource,
@@ -61,10 +76,7 @@ export function notFound(
 /**
  * Create an invalid_input error.
  */
-export function invalidInput(
-  field: string,
-  reason: string
-): FaceServiceError {
+export function invalidInput(field: string, reason: string): FaceServiceError {
   return {
     type: 'invalid_input',
     field,
@@ -92,10 +104,7 @@ export function sabaifaceProviderFailed(cause: unknown): FaceServiceError {
  * Create a database error.
  * Database operations are retryable.
  */
-export function databaseError(
-  operation: string,
-  cause: unknown
-): FaceServiceError {
+export function databaseError(operation: string, cause: unknown): FaceServiceError {
   return {
     type: 'database',
     operation,
@@ -112,28 +121,36 @@ export function databaseError(
 /**
  * Check if error is a not_found error.
  */
-export function isNotFound(err: FaceServiceError): err is Extract<FaceServiceError, { type: 'not_found' }> {
+export function isNotFound(
+  err: FaceServiceError,
+): err is Extract<FaceServiceError, { type: 'not_found' }> {
   return err.type === 'not_found';
 }
 
 /**
  * Check if error is an invalid_input error.
  */
-export function isInvalidInput(err: FaceServiceError): err is Extract<FaceServiceError, { type: 'invalid_input' }> {
+export function isInvalidInput(
+  err: FaceServiceError,
+): err is Extract<FaceServiceError, { type: 'invalid_input' }> {
   return err.type === 'invalid_input';
 }
 
 /**
  * Check if error is a provider_failed error.
  */
-export function isProviderFailed(err: FaceServiceError): err is Extract<FaceServiceError, { type: 'provider_failed' }> {
+export function isProviderFailed(
+  err: FaceServiceError,
+): err is Extract<FaceServiceError, { type: 'provider_failed' }> {
   return err.type === 'provider_failed';
 }
 
 /**
  * Check if error is a database error.
  */
-export function isDatabaseError(err: FaceServiceError): err is Extract<FaceServiceError, { type: 'database' }> {
+export function isDatabaseError(
+  err: FaceServiceError,
+): err is Extract<FaceServiceError, { type: 'database' }> {
   return err.type === 'database';
 }
 

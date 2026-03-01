@@ -11,12 +11,14 @@
 This document outlines the integration plan to bring WiFi photo capture capabilities from the proven GPhoto2Example into the production SabaiPicsStudio app.
 
 **What we've proven:**
+
 - ✅ GPhoto2Framework successfully detects Canon cameras via WiFi (PTP/IP protocol)
 - ✅ Event monitoring (`GP_EVENT_FILE_ADDED`) detects new photos in real-time
 - ✅ Camera operates normally (shutter button works, LCD stays on)
 - ✅ Tested and confirmed working on iPad with Canon camera
 
 **What we're integrating:**
+
 - GPhoto2Framework (Objective-C) → SabaiPicsStudio (Swift)
 - WiFi camera detection and connection
 - Real-time photo event monitoring
@@ -29,7 +31,9 @@ This document outlines the integration plan to bring WiFi photo capture capabili
 ### Decision 1: Keep USB Code or Remove?
 
 <mark data-comment="1">**Option A: Keep Both Modes (Parallel)**</mark>
+
 <!-- COMMENT-1: And we keep both but diable usb for now. Just focus on wifi? -->
+
 - Pros:
   - Flexibility for users with different cameras
   - USB code is already written and tested
@@ -40,6 +44,7 @@ This document outlines the integration plan to bring WiFi photo capture capabili
   - USB doesn't meet core requirement (shutter blocked)
 
 **Option B: WiFi Only (Recommended)**
+
 - Pros:
   - Simpler codebase
   - Focused on what actually works
@@ -55,6 +60,7 @@ This document outlines the integration plan to bring WiFi photo capture capabili
 ### Decision 2: Objective-C Bridge Strategy
 
 **Option A: Thin Wrapper**
+
 ```objc
 // Just expose minimal C/Objective-C functions to Swift
 @interface WiFiCameraWrapper : NSObject
@@ -62,11 +68,14 @@ This document outlines the integration plan to bring WiFi photo capture capabili
 - (void)startEventMonitoring;
 @end
 ```
+
 - Pros: Simple, minimal code
 - Cons: Swift code has to handle more low-level details
 
 <mark data-comment="2">**Option B: Full Service Layer (Recommended)**</mark>
+
 <!-- COMMENT-2: This seems better OK -->
+
 ```objc
 // Complete service with delegates and state management
 @protocol WiFiCameraManagerDelegate
@@ -79,6 +88,7 @@ This document outlines the integration plan to bring WiFi photo capture capabili
 - (void)downloadPhoto:(NSString*)filename toPath:(NSURL*)destination;
 @end
 ```
+
 - Pros: Clean separation, Swift doesn't touch C code, professional architecture
 - Cons: More code upfront (but cleaner long-term)
 
@@ -87,11 +97,13 @@ This document outlines the integration plan to bring WiFi photo capture capabili
 ---
 
 <mark data-comment="6">### Decision 3: UI/UX Flow</mark>
+
 <!-- COMMENT-6: Yes but use all swift ui make it look nice this current exmaple one is just shit that is all. So for ip address prompt use dialog right then connect loading dialoig? error back to enter ip?
 
 Also i see it can connect to differnt camera e..g nikkon cannon ... how does that differ. Should we show nice ui to select? as a flow e.g. page i what cam then ip? -->
 
 **Option A: Simple WiFi-Only Flow (Recommended for MVP)**
+
 ```
 App Launch
   ↓
@@ -103,6 +115,7 @@ Live Capture View (same as current)
 ```
 
 **Option B: Mode Picker First**
+
 ```
 App Launch
   ↓
@@ -121,17 +134,24 @@ Live Capture View
 ### Decision 4: Photo Download Strategy
 
 **Option A: Detect Only (Manual Download)**
+
 - When `GP_EVENT_FILE_ADDED` fires, add to list
 - User taps photo to download
 - Pros: Less data transfer, user control
 - Cons: Extra step, not "automatic"
 
 <mark data-comment="3">**Option B: Download Immediately (Recommended)**</mark>
+
 <!-- COMMENT-3: Yes download to local store for now OK -->
+
 <mark data-comment="4">- When `GP_EVENT_FILE_ADDED` fires, auto-download photo</mark>
+
 <!-- COMMENT-4: Done use grid use list ok -->
+
 <mark data-comment="5">- Show in grid as soon as downloaded</mark>
+
 <!-- COMMENT-5: Also only jpeg is download if raw we show wanring to set to jepg or jefp + raw. WE can determines this? -->
+
 - Pros: Fully automatic, matches original vision
 - Cons: More network traffic (but WiFi should be fast enough)
 
@@ -142,12 +162,15 @@ Live Capture View
 ### Decision 5: State Management
 
 **Option A: New WiFiCameraViewModel**
+
 - Create separate `WiFiCameraViewModel.swift`
 - Keep `CameraViewModel.swift` for USB
 - Switch between them in ContentView
 
 <mark data-comment="7">**Option B: Unified ViewModel (Recommended)**</mark>
+
 <!-- COMMENT-7: I quesss unified what do you think? -->
+
 - Update existing `CameraViewModel.swift` to support both modes
 - Add `connectionMode` enum: `.usb` or `.wifi`
 - Single source of truth for app state
@@ -159,11 +182,14 @@ Live Capture View
 ### Decision 6: Existing USB Code
 
 **Option A: Delete USB Code Entirely**
+
 - Clean slate, no confusion
 - Can recover from git if needed
 
 <mark data-comment="8">**Option B: Disable USB Code (Recommended)**</mark>
+
 <!-- COMMENT-8: Disable borther -->
+
 - Comment out or `#if false` USB connection logic
 - Keep as reference for learning/comparison
 - Remove in future cleanup sprint
@@ -177,15 +203,18 @@ Live Capture View
 ### Phase 1: Framework Setup (1 hour)
 
 **Tasks:**
+
 1. Add GPhoto2Framework to SabaiPicsStudio project
    - Drag `GPhoto2Framework/GPhoto2.xcframework` into Xcode
    - Add to "Frameworks, Libraries, and Embedded Content"
    - Set "Embed & Sign"
 
 2. Create bridging header
+
    ```
    apps/studio/SabaiPicsStudio-Bridging-Header.h
    ```
+
    ```objc
    #import <GPhoto2/gphoto2.h>
    ```
@@ -197,6 +226,7 @@ Live Capture View
    ```
 
 **Acceptance:**
+
 - ✅ Project builds with GPhoto2Framework linked
 - ✅ No linker errors
 - ✅ Bridge header found by Swift compiler
@@ -206,6 +236,7 @@ Live Capture View
 ### Phase 2: Objective-C Bridge (2 hours)
 
 **Create:** `WiFiCameraManager.h`
+
 ```objc
 #import <Foundation/Foundation.h>
 
@@ -250,6 +281,7 @@ typedef NS_ENUM(NSInteger, WiFiCameraConnectionState) {
 ```
 
 **Create:** `WiFiCameraManager.m`
+
 ```objc
 #import "WiFiCameraManager.h"
 #import <GPhoto2/gphoto2.h>
@@ -452,6 +484,7 @@ typedef NS_ENUM(NSInteger, WiFiCameraConnectionState) {
 ```
 
 **Acceptance:**
+
 - ✅ Bridge compiles without errors
 - ✅ All GPhoto2 functions wrapped cleanly
 - ✅ Delegate pattern ready for Swift
@@ -461,6 +494,7 @@ typedef NS_ENUM(NSInteger, WiFiCameraConnectionState) {
 ### Phase 3: Swift Service Layer (2 hours)
 
 **Create:** `WiFiCameraService.swift`
+
 ```swift
 import Foundation
 import Combine
@@ -594,6 +628,7 @@ extension WiFiCameraService: WiFiCameraManagerDelegate {
 ```
 
 **Acceptance:**
+
 - ✅ Swift compiles with Objective-C bridge
 - ✅ Published properties work with Combine
 - ✅ Connection/disconnection works
@@ -712,6 +747,7 @@ class CameraViewModel: NSObject, ObservableObject {
 ```
 
 **Acceptance:**
+
 - ✅ WiFi connection triggers state changes
 - ✅ Photos automatically download when detected
 - ✅ `capturedPhotos` array updates
@@ -722,6 +758,7 @@ class CameraViewModel: NSObject, ObservableObject {
 ### Phase 5: UI Updates (2 hours)
 
 **Create:** `WiFiSetupView.swift`
+
 ```swift
 import SwiftUI
 
@@ -831,6 +868,7 @@ struct TipRow: View {
 ```
 
 **Update:** `ContentView.swift`
+
 ```swift
 struct ContentView: View {
     @StateObject private var viewModel = CameraViewModel()
@@ -876,6 +914,7 @@ struct ContentView: View {
 **Update:** `LiveCaptureView.swift`
 
 Add disconnect button:
+
 ```swift
 // In action buttons section
 VStack(spacing: 12) {
@@ -897,6 +936,7 @@ VStack(spacing: 12) {
 ```
 
 **Acceptance:**
+
 - ✅ WiFiSetupView shows on app launch
 - ✅ User can enter camera IP
 - ✅ Connect button triggers WiFi connection
@@ -912,6 +952,7 @@ VStack(spacing: 12) {
 Additional polish:
 
 **Add download progress indicator:**
+
 ```swift
 // In CapturedPhoto struct
 struct CapturedPhoto: Identifiable {
@@ -921,6 +962,7 @@ struct CapturedPhoto: Identifiable {
 ```
 
 **Add chunked download (optional, for large files):**
+
 ```objc
 // In WiFiCameraManager.m
 - (void)downloadPhotoAtPath:(NSString*)folder
@@ -933,6 +975,7 @@ struct CapturedPhoto: Identifiable {
 ```
 
 **Acceptance:**
+
 - ✅ Photos download automatically after detection
 - ✅ Thumbnails appear in grid
 - ✅ Download count updates in real-time
@@ -978,6 +1021,7 @@ struct CapturedPhoto: Identifiable {
    - [ ] Camera battery dies → graceful error
 
 **Polish Tasks:**
+
 - [ ] Add loading spinner during connection
 - [ ] Add success checkmark animation when connected
 - [ ] Add photo download animation (fade in)
@@ -986,6 +1030,7 @@ struct CapturedPhoto: Identifiable {
 - [ ] Add camera settings guide (how to enable WiFi)
 
 **Acceptance:**
+
 - ✅ All 5 testing checklists pass
 - ✅ No crashes during 30-minute session
 - ✅ Memory usage < 200 MB with 50 photos
@@ -1014,6 +1059,7 @@ apps/studio/SabaiPicsStudio/
 ```
 
 **Lines of Code:**
+
 - New files: ~800 lines
 - Updated files: ~150 lines
 - Total: ~950 lines
@@ -1023,41 +1069,51 @@ apps/studio/SabaiPicsStudio/
 ## Risks & Mitigation
 
 ### Risk 1: GPhoto2Framework Build Issues
+
 **Likelihood:** Medium
 **Impact:** High (blocks entire integration)
 **Mitigation:**
+
 - Test framework import in Phase 1 before writing any code
 - Use exact same framework binary that worked in GPhoto2Example
 - If build fails, use GPhoto2Example project as reference
 
 ### Risk 2: Bridging Header Conflicts
+
 **Likelihood:** Low
 **Impact:** Medium (compilation errors)
 **Mitigation:**
+
 - Keep bridging header minimal (only import gphoto2.h)
 - Use Objective-C wrapper to avoid exposing C types to Swift
 - Test compilation after Phase 2
 
 ### Risk 3: Camera Discovery Reliability
+
 **Likelihood:** Medium
 **Impact:** Medium (user has to manually enter IP)
 **Mitigation:**
+
 - Phase 1: Manual IP entry (always works)
 - Phase 2: Add auto-discovery later (optional)
 - Document camera WiFi setup clearly
 
 ### Risk 4: Photo Download Speed
+
 **Likelihood:** Low
 **Impact:** Low (slower than USB but acceptable)
 **Mitigation:**
+
 - WiFi should transfer ~5 MB/s (RAW photos in 2-3 seconds)
 - If too slow, implement thumbnail-first download
 - Queue downloads to prevent network congestion
 
 ### Risk 5: Memory Leaks in C/Objective-C Bridge
+
 **Likelihood:** Medium
 **Impact:** High (app crashes after extended use)
 **Mitigation:**
+
 - Use ARC for Objective-C objects
 - Manually free GPhoto2 C structs (gp_camera_free, gp_file_free)
 - Test with Instruments to detect leaks
@@ -1067,6 +1123,7 @@ apps/studio/SabaiPicsStudio/
 ## Success Criteria
 
 **Phase completion criteria:**
+
 - ✅ All 7 phases implemented
 - ✅ Build succeeds with no errors
 - ✅ All tests pass (30+ test cases)
@@ -1075,6 +1132,7 @@ apps/studio/SabaiPicsStudio/
 - ✅ No crashes during 30-minute session
 
 **Production-ready criteria:**
+
 - App Store build succeeds
 - Privacy descriptions approved
 - Field testing with photographer (1 real event)
@@ -1085,6 +1143,7 @@ apps/studio/SabaiPicsStudio/
 ## Timeline
 
 **Conservative estimate: 12 hours**
+
 - Phase 1: 1 hour
 - Phase 2: 2 hours
 - Phase 3: 2 hours
@@ -1094,6 +1153,7 @@ apps/studio/SabaiPicsStudio/
 - Phase 7: 2 hours
 
 **Optimistic estimate: 8 hours**
+
 - Phases 1-6: 6 hours (if no major issues)
 - Phase 7: 2 hours
 
@@ -1113,6 +1173,7 @@ Before starting implementation, please confirm your choices:
 6. **Decision 6:** Delete USB code or keep disabled? **[ A / B ]**
 
 **My recommendations:**
+
 - Decision 1: **B** (WiFi only - simpler, USB doesn't work)
 - Decision 2: **B** (Full service layer - cleaner architecture)
 - Decision 3: **A** (Simple WiFi flow - MVP first)

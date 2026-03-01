@@ -5,6 +5,7 @@ Root: BS_0001_S-1
 Date: 2026-01-10
 
 ## Exemplar 1: Dashboard Page (Complete Page Pattern)
+
 - **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent4/apps/dashboard/src/routes/dashboard/index.tsx`
 - **Purpose:** Shows the complete pattern for a dashboard page with API data fetching, loading/error states, and UI composition
 - **Key patterns:**
@@ -16,32 +17,40 @@ Date: 2026-01-10
   - Empty state handling using `Empty` component
   - Inline helper functions for data transformation (e.g., `isExpiringSoon`)
 - **Relevant code snippet:**
+
 ```tsx
 // Pattern: Loading, Error, Success states
-{isLoading && (
-  <>
-    <Skeleton className="h-32 w-full rounded-xl" />
-  </>
-)}
+{
+  isLoading && (
+    <>
+      <Skeleton className="h-32 w-full rounded-xl" />
+    </>
+  );
+}
 
-{error && (
-  <Alert variant="destructive">
-    <AlertCircle className="size-4" />
-    <AlertTitle>Error loading dashboard</AlertTitle>
-    <AlertDescription>
-      <Button onClick={() => refetch()}>Retry</Button>
-    </AlertDescription>
-  </Alert>
-)}
+{
+  error && (
+    <Alert variant="destructive">
+      <AlertCircle className="size-4" />
+      <AlertTitle>Error loading dashboard</AlertTitle>
+      <AlertDescription>
+        <Button onClick={() => refetch()}>Retry</Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
-{dashboardData && (
-  <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-    <Card>...</Card>
-  </div>
-)}
+{
+  dashboardData && (
+    <div className="grid auto-rows-min gap-4 md:grid-cols-3">
+      <Card>...</Card>
+    </div>
+  );
+}
 ```
 
 ## Exemplar 2: API Data Fetching Hook
+
 - **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent4/apps/dashboard/src/hooks/dashboard/useDashboardData.ts`
 - **Purpose:** Shows the pattern for creating custom React Query hooks for API integration
 - **Key patterns:**
@@ -54,18 +63,18 @@ Date: 2026-01-10
   - Query configuration: `staleTime`, `refetchOnWindowFocus` (useful for Stripe redirect flow)
   - Returns typed response with `{ data: T }` envelope
 - **Relevant code snippet:**
+
 ```ts
 export function useDashboardData() {
   const { getToken } = useApiClient();
 
   return useQuery({
-    queryKey: ["dashboard"],
+    queryKey: ['dashboard'],
     queryFn: async () => {
       const token = await getToken();
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/dashboard`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/dashboard`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -80,6 +89,7 @@ export function useDashboardData() {
 ```
 
 ## Exemplar 3: Mutation Hook with Error Handling
+
 - **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent4/apps/dashboard/src/routes/onboarding/_components/PDPAConsentModal.tsx`
 - **Purpose:** Shows the pattern for POST requests using React Query mutations
 - **Key patterns:**
@@ -92,51 +102,52 @@ export function useDashboardData() {
   - Button state: shows spinner during mutation
   - Uses `useQueryClient` to invalidate related queries after mutation
 - **Relevant code snippet:**
+
 ```tsx
 const mutation = useMutation({
   mutationFn: async () => {
     const token = await getToken();
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/consent`,
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/consent`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
     if (!response.ok && response.status !== 409) {
-      throw new Error("Failed to submit consent");
+      throw new Error('Failed to submit consent');
     }
 
     return response.json();
   },
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ["consent-status"] });
+    queryClient.invalidateQueries({ queryKey: ['consent-status'] });
     onAcceptSuccess();
   },
 });
 
 // Usage in button
-<Button
-  onClick={() => mutation.mutate()}
-  disabled={!isAgreed || mutation.isPending}
->
+<Button onClick={() => mutation.mutate()} disabled={!isAgreed || mutation.isPending}>
   {mutation.isPending ? (
-    <><Spinner className="mr-2" />Accepting...</>
+    <>
+      <Spinner className="mr-2" />
+      Accepting...
+    </>
   ) : (
-    "Accept"
+    'Accept'
   )}
-</Button>
+</Button>;
 
-{mutation.isError && (
-  <Alert variant="destructive">
-    <AlertTitle>Error</AlertTitle>
-    <AlertDescription>Failed to submit consent. Please try again.</AlertDescription>
-  </Alert>
-)}
+{
+  mutation.isError && (
+    <Alert variant="destructive">
+      <AlertTitle>Error</AlertTitle>
+      <AlertDescription>Failed to submit consent. Please try again.</AlertDescription>
+    </Alert>
+  );
+}
 ```
 
 ## Exemplar 4: Onboarding Page (Complex State Management)
+
 - **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent4/apps/dashboard/src/routes/onboarding/index.tsx`
 - **Purpose:** Shows complex state transitions, polling pattern, and conditional rendering
 - **Key patterns:**
@@ -148,6 +159,7 @@ const mutation = useMutation({
   - Modal integration
   - `Empty` component for loading state with spinner
 - **Relevant code snippet:**
+
 ```tsx
 // Pattern: Conditional rendering based on state
 if (hasTimeout) {
@@ -173,6 +185,7 @@ return (
 ```
 
 ## Exemplar 5: API Route - Credit Packages
+
 - **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent4/apps/api/src/routes/credits.ts`
 - **Purpose:** Shows the backend API pattern for credit packages and Stripe checkout
 - **Key patterns:**
@@ -186,6 +199,7 @@ return (
   - Response format: `{ data: { checkoutUrl, sessionId } }`
   - Error responses: `{ error: { code, message } }` with proper HTTP status
 - **Relevant code snippet:**
+
 ```ts
 // GET endpoint (public)
 .get("/", async (c) => {
@@ -231,6 +245,7 @@ return (
 ```
 
 ## Exemplar 6: Stripe Checkout Integration
+
 - **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent4/apps/api/src/lib/stripe/checkout.ts`
 - **Purpose:** Shows how to create Stripe checkout sessions with line items
 - **Key patterns:**
@@ -242,6 +257,7 @@ return (
   - Currency in smallest unit (satang for THB)
   - Mode: "payment" for one-time purchases
 - **Relevant code snippet:**
+
 ```ts
 export async function createCheckoutSession({
   stripe,
@@ -250,8 +266,8 @@ export async function createCheckoutSession({
   successUrl,
   cancelUrl,
   metadata = {},
-  mode = "payment",
-  currency = "thb",
+  mode = 'payment',
+  currency = 'thb',
 }: CreateCheckoutParams): Promise<CheckoutSessionResult> {
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
@@ -268,10 +284,10 @@ export async function createCheckoutSession({
       },
       quantity: item.quantity,
     })),
-    success_url: `${successUrl}${successUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${successUrl}${successUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: cancelUrl,
     metadata,
-    billing_address_collection: "auto",
+    billing_address_collection: 'auto',
     allow_promotion_codes: true,
   });
 
@@ -280,6 +296,7 @@ export async function createCheckoutSession({
 ```
 
 ## Shared components available
+
 - **Layout & Navigation:**
   - `PageHeader` - Header with breadcrumbs and action buttons (`apps/dashboard/src/components/shell/page-header.tsx`)
   - `Layout` - Sidebar layout wrapper (`apps/dashboard/src/components/Layout.tsx`)
@@ -301,11 +318,13 @@ export async function createCheckoutSession({
   - Using `lucide-react` (e.g., `CreditCard`, `AlertCircle`, `RefreshCw`, `ImageIcon`, `Smile`, `Calendar`)
 
 ## Test patterns
+
 - **Location:** No test files found in `apps/dashboard/src/**/*.test.*`
 - **Pattern:** Testing not yet implemented for dashboard
 - **Note:** API tests exist in `apps/api/tests/` (e.g., `stripe.test.ts`, `stripe.integration.ts`) using fixtures
 
 ## API integration patterns
+
 - **Authentication:**
   - Use `useApiClient()` hook to get `getToken()` function
   - Add `Authorization: Bearer ${token}` header to all authenticated requests
@@ -341,6 +360,7 @@ export async function createCheckoutSession({
   - HTTP status codes: 200 (OK), 400 (validation), 403 (forbidden), 404 (not found)
 
 ## Routing patterns
+
 - **Router:** Using `react-router` (v7) with `BrowserRouter`
 - **Route definition:** Defined in `App.tsx` using `<Routes>` and `<Route>`
 - **Protected routes:** Wrap in `<ProtectedRoute>` and `<ConsentGate>` components
@@ -355,6 +375,7 @@ export async function createCheckoutSession({
   - Future credit routes should be added inside the Layout route group
 
 ## Notes
+
 - The dashboard already has a "Buy Credits" button that links to `/credits/packages` (line 56 of dashboard/index.tsx)
 - The API `/credit-packages` endpoint is already implemented and working
 - The API `/credit-packages/checkout` endpoint is already implemented with Stripe integration

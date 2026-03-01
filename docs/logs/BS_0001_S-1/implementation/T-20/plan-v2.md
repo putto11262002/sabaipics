@@ -9,18 +9,21 @@ Version: 2 (Queue-based architecture per code review feedback)
 ## Changes from v1
 
 **Original design issues (per PR review):**
+
 - ❌ Risky: Batch DB + parallel AWS calls in cron handler with no retry mechanism
 - ❌ No DLQ for failed operations
 - ❌ No individual retry logic per event
 - ❌ All-or-nothing approach (10 events in ~500ms)
 
 **New design benefits:**
+
 - ✅ Queue-based: Each event processed individually with retries
 - ✅ DLQ: Failed operations after 3 retries go to dead letter queue
 - ✅ Idempotent: State-based cleanup (check before action)
 - ✅ Resilient: DB errors, AWS throttling, partial failures all handled gracefully
 
 ## Inputs
+
 - Task: `docs/logs/BS_0001_S-1/tasks.md` (section: T-20, lines 511-533)
 - Upstream plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Context reports: `docs/logs/BS_0001_S-1/implementation/T-20/context/*`
@@ -30,18 +33,22 @@ Version: 2 (Queue-based architecture per code review feedback)
 ## Goal / non-goals
 
 ### Goal
+
 Implement **queue-based** daily cleanup of AWS Rekognition collections for expired events (30+ days old), with robust retry logic and idempotent state-based operations.
 
 **Architecture:**
+
 1. **Cron** (lightweight) → Query expired events → Send to queue
 2. **Queue consumer** (heavy) → State-based cleanup → Retry on failure → DLQ after 3 attempts
 
 **Cleanup operations (per event):**
+
 1. Soft-delete photos (set `deletedAt` timestamp)
 2. Delete Rekognition collection from AWS
 3. Clear `rekognitionCollectionId` from event record
 
 ### Non-goals
+
 - Hard-deleting photos from R2 (kept forever per plan)
 - Deleting events from database (kept forever)
 - Deleting face metadata from database (kept for model training)
@@ -101,6 +108,7 @@ Query Event from DB:
 ```
 
 **Why state-based?**
+
 - Handles partial failures from previous attempts
 - Idempotent: Can run multiple times safely
 - Resilient: AWS succeeds but DB fails? Next retry fixes DB only
@@ -112,23 +120,28 @@ Query Event from DB:
 **File:** `apps/api/src/crons/cleanup.ts`
 
 **Responsibilities:**
+
 - Query expired events (LIMIT 10 for safety)
 - Send each event to `CLEANUP_QUEUE`
 - No DB updates, no AWS calls (lightweight)
 
 **Key code:**
+
 ```typescript
-const expiredEvents = await db.select({
-  id: events.id,
-  collectionId: events.rekognitionCollectionId,
-})
-.from(events)
-.where(and(
-  lt(events.createdAt, sql`NOW() - INTERVAL '30 days'`),
-  lt(events.expiresAt, sql`NOW()`),
-  // Don't filter by collectionId - let consumer handle all states
-))
-.limit(10);
+const expiredEvents = await db
+  .select({
+    id: events.id,
+    collectionId: events.rekognitionCollectionId,
+  })
+  .from(events)
+  .where(
+    and(
+      lt(events.createdAt, sql`NOW() - INTERVAL '30 days'`),
+      lt(events.expiresAt, sql`NOW()`),
+      // Don't filter by collectionId - let consumer handle all states
+    ),
+  )
+  .limit(10);
 
 for (const event of expiredEvents) {
   await env.CLEANUP_QUEUE.send({
@@ -145,6 +158,7 @@ for (const event of expiredEvents) {
 **File:** `apps/api/src/queue/cleanup-consumer.ts`
 
 **Responsibilities:**
+
 - Check current state (photos deleted? collection exists?)
 - Determine actions needed based on state
 - Execute cleanup actions (idempotent operations)
@@ -152,11 +166,9 @@ for (const event of expiredEvents) {
 - Use neverthrow for error composition
 
 **Pattern (from photo-consumer.ts):**
+
 ```typescript
-export async function queue(
-  batch: MessageBatch<CleanupJob>,
-  env: Bindings
-): Promise<void> {
+export async function queue(batch: MessageBatch<CleanupJob>, env: Bindings): Promise<void> {
   const db = createDb(env.DATABASE_URL);
   const client = createRekognitionClient(env);
 
@@ -186,13 +198,14 @@ export async function queue(
         } else {
           message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
         }
-      }
+      },
     );
   }
 }
 ```
 
 **Key patterns:**
+
 - Use existing `getBackoffDelay()` and `getThrottleBackoffDelay()` from rekognition/errors.ts
 - Use neverthrow for error composition
 - Use `.orElse()` to remap ResourceNotFoundException → success
@@ -220,6 +233,7 @@ export async function queue(
 ```
 
 **Rationale:**
+
 - `max_retries: 3` - 3 attempts per message before DLQ
 - `max_concurrency: 1` - Sequential batches (no AWS throttling risk)
 - `max_batch_size: 10` - Match cron batch size
@@ -232,12 +246,13 @@ export async function queue(
 ```typescript
 const awsResult = await ResultAsync.fromPromise(
   deleteCollection(client, eventId),
-  (e: any) => new CleanupError('AWS_DELETE_FAILED', {
-    name: e.name,
-    retryable: ['ThrottlingException', 'ServiceUnavailableException'].includes(e.name),
-    isThrottle: e.name === 'ThrottlingException',
-    cause: e
-  })
+  (e: any) =>
+    new CleanupError('AWS_DELETE_FAILED', {
+      name: e.name,
+      retryable: ['ThrottlingException', 'ServiceUnavailableException'].includes(e.name),
+      isThrottle: e.name === 'ThrottlingException',
+      cause: e,
+    }),
 ).orElse((error) => {
   // Remap ResourceNotFoundException → success
   if (error.name === 'ResourceNotFoundException') {
@@ -248,6 +263,7 @@ const awsResult = await ResultAsync.fromPromise(
 ```
 
 **Retry strategy:**
+
 - **DB errors:** Retryable (exponential backoff: 2s, 4s, 8s)
 - **ThrottlingException:** Retryable (longer backoff: 5s, 10s, 20s)
 - **ResourceNotFoundException:** Success (collection already deleted)
@@ -256,7 +272,9 @@ const awsResult = await ResultAsync.fromPromise(
 ## Contracts (only if touched)
 
 ### DB
+
 No schema changes required. Uses existing fields:
+
 - `events.rekognitionCollectionId` (nullable text) - set to NULL
 - `events.createdAt` (timestamptz) - query for 30-day threshold
 - `events.expiresAt` (timestamptz) - double-check expired
@@ -264,7 +282,9 @@ No schema changes required. Uses existing fields:
 - `photos.eventId` (uuid) - FK to events
 
 ### Queue
+
 New queue binding:
+
 - **Name:** `rekognition-cleanup`
 - **Binding:** `CLEANUP_QUEUE` (producer in cron)
 - **Consumer:** `cleanup-consumer.ts` (export as `cleanupQueue` function)
@@ -277,6 +297,7 @@ New queue binding:
   ```
 
 ### Cron
+
 No changes to cron schedule (`0 20 * * *` = 3 AM Bangkok).
 
 ## Success path
@@ -291,6 +312,7 @@ No changes to cron schedule (`0 20 * * *` = 3 AM Bangkok).
 5. **Next day:** Cron runs again, skips already-cleaned events
 
 **Performance:**
+
 - Cron: <1 second (lightweight query + queue send)
 - Consumer: ~10-30 seconds per batch (10 events × 1-3 seconds each)
 - Total latency: 10-30 seconds (vs ~500ms in v1, but more reliable)
@@ -298,31 +320,37 @@ No changes to cron schedule (`0 20 * * *` = 3 AM Bangkok).
 ## Failure modes / edge cases (major only)
 
 ### 1. Collection already deleted (ResourceNotFoundException)
+
 - **Handling:** Use `.orElse()` to convert to success
 - **Action:** Log "already deleted", continue to event update
 - **Result:** Idempotent, no retry needed
 
 ### 2. AWS throttling (ThrottlingException)
+
 - **Handling:** `message.retry()` with longer backoff (60s, 120s, 240s)
 - **Action:** Queue retries message automatically
 - **Result:** Succeeds on retry when rate limit resets
 
 ### 3. Photos deleted, AWS fails, DB not updated
+
 - **State:** `photosNotDeleted=false, collectionId!=null`
 - **Retry:** Skip photo deletion (already done), retry AWS + DB
 - **Result:** Eventually consistent
 
 ### 4. All 3 retries fail
+
 - **Handling:** Message goes to DLQ (`rekognition-cleanup-dlq`)
 - **Action:** Manual intervention required
 - **Monitoring:** Alert on DLQ depth > 0
 
 ### 5. DB connection timeout
+
 - **Handling:** DB errors are retryable
 - **Action:** `message.retry()` with exponential backoff
 - **Result:** Succeeds on retry when DB connection available
 
 ### 6. Zero photos for event
+
 - **Behavior:** `photosNotDeleted=false` (no photos to delete)
 - **Action:** Skip soft-delete, still delete AWS collection if exists
 - **Result:** Safe, idempotent
@@ -330,9 +358,11 @@ No changes to cron schedule (`0 20 * * *` = 3 AM Bangkok).
 ## Validation plan
 
 ### Unit Tests
+
 **File:** `apps/api/src/queue/cleanup-consumer.test.ts`
 
 **Test cases:**
+
 1. ✅ State fully complete (photosDeleted=true, collectionId=null) → ack immediately
 2. ✅ Fresh event (photosDeleted=false, collectionId!=null) → all 3 actions
 3. ✅ Photos deleted, AWS pending (photosDeleted=true, collectionId!=null) → skip photos
@@ -344,22 +374,26 @@ No changes to cron schedule (`0 20 * * *` = 3 AM Bangkok).
 ### Commands to run
 
 **Type check:**
+
 ```bash
 pnpm --filter=@sabaipics/api check-types
 ```
 
 **Build:**
+
 ```bash
 pnpm --filter=@sabaipics/api build
 ```
 
 **Local cron trigger:**
+
 ```bash
 pnpm --filter=@sabaipics/api dev
 curl "http://localhost:8787/__scheduled?cron=0+20+*+*+*"
 ```
 
 **Check queue processing:**
+
 ```bash
 # Monitor Cloudflare dashboard for queue metrics
 # Check logs for [Cleanup] entries
@@ -368,6 +402,7 @@ curl "http://localhost:8787/__scheduled?cron=0+20+*+*+*"
 ## Rollout / rollback
 
 ### Phase 1: Dry-run (Manual verification) 🚨 HI GATE
+
 1. Deploy code to staging WITHOUT enabling cron
 2. Create test events with backdated `createdAt` (> 30 days ago)
 3. Manually trigger cron: `curl http://localhost:8787/__scheduled?cron=0+20+*+*+*`
@@ -383,6 +418,7 @@ curl "http://localhost:8787/__scheduled?cron=0+20+*+*+*"
 **🛑 STOP for HI approval before Phase 2**
 
 ### Phase 2: Staging with cron (Automated) 🚨 HI GATE
+
 1. Enable cron trigger in staging `wrangler.jsonc`
 2. Deploy to staging
 3. Monitor for 7 days:
@@ -398,6 +434,7 @@ curl "http://localhost:8787/__scheduled?cron=0+20+*+*+*"
 **🛑 STOP for HI approval before Phase 3**
 
 ### Phase 3: Production rollout
+
 1. Enable cron in production `wrangler.jsonc`
 2. Deploy to production
 3. Monitor closely for first week
@@ -407,7 +444,9 @@ curl "http://localhost:8787/__scheduled?cron=0+20+*+*+*"
    - Cron execution failures
 
 ### Rollback procedure
+
 **If issues detected:**
+
 1. Remove cron trigger from `wrangler.jsonc`
 2. Redeploy (cron stops queuing messages)
 3. Existing queue messages will still be processed (drain queue)
@@ -415,6 +454,7 @@ curl "http://localhost:8787/__scheduled?cron=0+20+*+*+*"
 5. Fix and re-test in staging
 
 **Data recovery (worst case):**
+
 - Rekognition collections: **CANNOT BE RECOVERED** (permanent deletion)
 - Photos: Can "undelete" by setting `deletedAt = NULL`
 - Prevention is critical - hence phased rollout with HI gates
@@ -456,24 +496,29 @@ curl "http://localhost:8787/__scheduled?cron=0+20+*+*+*"
 ## Evidence from codebase
 
 **Queue pattern reference:**
+
 - `apps/api/src/queue/photo-consumer.ts:426-593` - Batch processing with per-message ack/retry
 - `apps/api/src/lib/rekognition/errors.ts:73-105` - Backoff delay helpers
 
 **Queue config reference:**
+
 - `apps/api/wrangler.jsonc:38-55` - Photo queue configuration (existing pattern to follow)
 
 **State checking pattern:**
+
 - Current design: Query once, execute all actions (idempotent WHERE clauses)
 - No complex state machine needed (simpler than discussed)
 
 ## Performance comparison
 
 ### v1 (Batch operations in cron)
+
 - Cron: 3 DB calls + 10 parallel AWS calls = ~500ms
 - Retry: None (all-or-nothing)
 - Risk: High (no retry, AWS throttling risk, partial failures)
 
 ### v2 (Queue-based)
+
 - Cron: 1 DB query + 10 queue sends = ~200ms
 - Consumer: 10 events × (1 DB query + 1-3 actions) = ~10-30 seconds
 - Retry: Per-event with exponential backoff

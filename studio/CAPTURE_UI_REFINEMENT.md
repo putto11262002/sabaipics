@@ -16,10 +16,12 @@
 ## View Checklist
 
 ### ✅ 1. ManufacturerSelectionView
+
 **Status:** Complete
 
 **Changes made:**
-- ✅ Theme colors applied (Color.Theme.*)
+
+- ✅ Theme colors applied (Color.Theme.\*)
 - ✅ Button order: Canon, Nikon, Sony
 - ✅ "Coming Soon" badge removed
 - ✅ Disabled buttons muted (60% opacity)
@@ -27,10 +29,12 @@
 ---
 
 ### ✅ 2. HotspotSetupView
+
 **Status:** Complete
 
 **Changes made:**
-- ✅ Theme colors applied (Color.Theme.*)
+
+- ✅ Theme colors applied (Color.Theme.\*)
 - ✅ Back button verified (toolbar pattern correct)
 - ✅ Design refined (title size, visual hierarchy)
 - ✅ WiFi icon and instruction styling updated
@@ -42,11 +46,13 @@
 ---
 
 ### ✅ 3. CameraDiscoveryView
+
 **Status:** Complete
 
 **Changes made:**
+
 - ✅ Removed redundant status bar (was duplicating scan state info)
-- ✅ Theme colors applied throughout (Color.Theme.*)
+- ✅ Theme colors applied throughout (Color.Theme.\*)
 - ✅ Camera row: primary color icon, themed border, muted chevron
 - ✅ Empty states: muted icons and text
 - ✅ Toolbar back button: primary color
@@ -57,11 +63,13 @@
 ---
 
 ### ✅ 4. ManualIPEntryView (formerly WiFiSetupView)
+
 **Status:** Complete
 
 **Changes made:**
+
 - ✅ Renamed from WiFiSetupView to ManualIPEntryView
-- ✅ Theme colors applied (Color.Theme.*)
+- ✅ Theme colors applied (Color.Theme.\*)
 - ✅ Icon size reduced from 80 to 50
 - ✅ Connect button uses `.buttonStyle(.primary)`
 - ✅ All text and UI elements use theme colors
@@ -73,10 +81,12 @@
 ---
 
 ### ✅ 5. ConnectingView
+
 **Status:** Complete
 
 **Changes made:**
-- ✅ Theme colors applied (Color.Theme.*)
+
+- ✅ Theme colors applied (Color.Theme.\*)
 - ✅ Removed technical details (IP address, retry count)
 - ✅ Simplified to clean "Connecting..." with spinner
 - ✅ Removed ConnectionStore dependency
@@ -87,10 +97,12 @@
 ---
 
 ### ✅ 6. LiveCaptureView
+
 **Status:** Complete
 
 **Changes made:**
-- ✅ All theme colors applied (Color.Theme.*)
+
+- ✅ All theme colors applied (Color.Theme.\*)
 - ✅ Simplified toolbar (removed complex status indicators)
 - ✅ Just camera name in toolbar (minimal and clean)
 - ✅ **Removed redundant Disconnect button** (Close button handles everything)
@@ -103,10 +115,12 @@
 ---
 
 ### ✅ 7. ConnectionErrorView
+
 **Status:** Complete
 
 **Changes made:**
-- ✅ Theme colors applied (Color.Theme.*)
+
+- ✅ Theme colors applied (Color.Theme.\*)
 - ✅ Error icon color: Color.Theme.destructive
 - ✅ Button uses `.buttonStyle(.primary)`
 - ✅ "Try Again" behavior confirmed: full reset via `backToManufacturerSelection()`
@@ -115,15 +129,18 @@
 ---
 
 ### ⏳ 8. Camera-Specific Setup Guide (NEW)
+
 **Status:** Not started
 
 **Purpose:**
+
 - Shows between Hotspot Setup and Camera Discovery
 - Camera-specific instructions (Canon/Nikon/Sony)
 - Sheet/modal presentation with manufacturer-specific WiFi setup steps
 - Helps users enable WiFi transfer mode on their specific camera model
 
 **Needs:**
+
 - Design sheet layout
 - Create manufacturer-specific instruction content
 - Add images/icons for each step
@@ -135,29 +152,35 @@
 ## Investigation Tasks
 
 ### ✅ 1. Photo Detection & Download Flow
+
 **Status:** Complete
 
 **Findings:**
+
 - Canon uses adaptive polling (50-200ms intervals) via Canon_EOS_GetEvent
 - Downloads are sequential (awaited one-by-one in for loop)
 - RAW files filtered at GetObjectInfo stage
 - Two-phase delegate: didDetectPhoto (immediate) + didCompleteDownload (after download)
 
 **Implementation:**
+
 - ✅ Added placeholder photos with download status
 - ✅ Progressive UI updates (show photo immediately, thumbnail loads after)
 - ✅ Status badge: spinner → arrow.down.circle (primary color)
 
 ### ✅ 2. Disconnection Flow & UI
+
 **Status:** Complete
 
 **Findings:**
+
 - Disconnect waits for current poll batch to complete (all photos detected in that poll)
 - Graceful timeout: 1 second, then force cancel (but still awaits task completion)
 - Expected duration: 200-600ms (idle) to 5-10+ seconds (burst shooting)
 - Current poll batch downloads sequentially before task exits (no Task.checkCancellation())
 
 **Implementation:**
+
 - ✅ Added "Disconnecting..." overlay with spinner
 - ✅ Shows when TransferSession.end() starts
 - ✅ Documented behavior in PTP_IP_ARCHITECTURE.md
@@ -167,11 +190,13 @@
 ## Global Changes Applied
 
 ### ✅ Shell/Container
+
 - ✅ Changed from sheet to fullScreenCover
 - ✅ Close button moved to top-right (icon only)
 - ✅ NavigationStack wrapper added
 
 ### ✅ Cleanup System
+
 - ✅ Cleanup registration implemented
 - ✅ Scanner cancellation (no wait)
 - ✅ Camera disconnect (waits for completion)

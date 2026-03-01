@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <rect x="32" y="32" width="1136" height="611" rx="28" fill="#ffffff" stroke="#d4d4d8" stroke-width="4"/>
+  <rect x="96" y="112" width="1008" height="88" rx="18" fill="#f4f4f5"/>
+  <text x="120" y="168" font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="28" fill="#111827">
+    Placeholder illustration
+  </text>
+  <text x="120" y="240" font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="22" fill="#6b7280">
+    Access authentication settings (set to OFF)
+  </text>
+  <text x="120" y="290" font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="18" fill="#9ca3af">
+    Replace with real screenshot/diagram later.
+  </text>
+</svg>
+

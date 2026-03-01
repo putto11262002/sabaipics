@@ -41,6 +41,7 @@ Cleanup
 ## Tasks
 
 ### T-1 — Create database schema (all domain tables)
+
 - [x] Done
 - **Type:** `scaffold`
 - **StoryRefs:** All (foundation)
@@ -65,6 +66,7 @@ Cleanup
 ---
 
 ### T-2 — Implement requirePhotographer middleware
+
 - [x] Done
 - **Type:** `scaffold`
 - **StoryRefs:** All (foundation)
@@ -87,6 +89,7 @@ Cleanup
 ---
 
 ### T-3 — Admin credit packages API
+
 - [x] Done
 - **Type:** `scaffold`
 - **StoryRefs:** US-4 (foundation for credit purchase)
@@ -109,6 +112,7 @@ Cleanup
 ---
 
 ### T-4 — Clerk webhook handler for user.created
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-1
@@ -131,6 +135,7 @@ Cleanup
 ---
 
 ### T-5 — PDPA consent API
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-1
@@ -154,6 +159,7 @@ Cleanup
 ---
 
 ### T-6 — Signup UI + PDPA consent modal
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-1, US-2
@@ -178,6 +184,7 @@ Cleanup
 ---
 
 ### T-7 — Dashboard API
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-3
@@ -200,6 +207,7 @@ Cleanup
 ---
 
 ### T-8 — Credit packages public API
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-4
@@ -220,6 +228,7 @@ Cleanup
 ---
 
 ### T-9 — Stripe checkout API
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-4
@@ -247,6 +256,7 @@ Cleanup
 ---
 
 ### T-10 — Stripe webhook handler
+
 - [x] Done
 - **PR:** https://github.com/putto11262002/sabaipics/pull/17
 - **Type:** `integration`
@@ -274,6 +284,7 @@ Cleanup
 ---
 
 ### T-11 — Dashboard UI
+
 - [x] Done
 - **PR:** https://github.com/putto11262002/sabaipics/pull/19
 - **Type:** `feature`
@@ -298,6 +309,7 @@ Cleanup
 ---
 
 ### T-12 — Credit packages page UI
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-4
@@ -321,6 +333,7 @@ Cleanup
 ---
 
 ### T-13 — Events API (CRUD + QR generation)
+
 - [x] Done
 - **PR:** https://github.com/putto11262002/sabaipics/pull/22
 - **Type:** `feature`
@@ -349,6 +362,7 @@ Cleanup
 ---
 
 ### T-14 — QR code generation library
+
 - [x] Done
 - **Type:** `scaffold`
 - **StoryRefs:** US-5, US-6
@@ -371,6 +385,7 @@ Cleanup
 ---
 
 ### T-15 — Events UI (list + create modal + QR display)
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-5, US-6
@@ -394,6 +409,7 @@ Cleanup
 ---
 
 ### T-16 — Photo upload API (validation + normalization + credit deduction)
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-7
@@ -426,6 +442,7 @@ Cleanup
 ---
 
 ### T-17 — Photo queue consumer (Rekognition indexing)
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-8
@@ -457,6 +474,7 @@ Cleanup
 ---
 
 ### T-18 — Gallery API
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-9
@@ -480,6 +498,7 @@ Cleanup
 ---
 
 ### T-19 — Upload dropzone + Gallery UI
+
 - [x] Done
 - **Type:** `feature`
 - **StoryRefs:** US-7, US-9
@@ -509,6 +528,7 @@ Cleanup
 ---
 
 ### T-20 — Rekognition cleanup cron job
+
 - [x] Done
 - **Type:** `hardening`
 - **StoryRefs:** None (ops)
@@ -536,22 +556,24 @@ Cleanup
 
 ## Summary
 
-| Phase | Tasks | PRs |
-|-------|-------|-----|
-| Phase 0 (Foundation) | T-1, T-2, T-3, T-14 | 4 |
-| Phase 1 (Auth) | T-4, T-5, T-6 | 3 |
-| Phase 2 (Dashboard) | T-7, T-8, T-9, T-10, T-11, T-12 | 6 |
-| Phase 3 (Events) | T-13, T-15 | 2 |
-| Phase 4 (Upload) | T-16, T-17, T-18, T-19 | 4 |
-| Cleanup | T-20 | 1 |
-| **Total** | **20 tasks** | **20 PRs** |
+| Phase                | Tasks                           | PRs        |
+| -------------------- | ------------------------------- | ---------- |
+| Phase 0 (Foundation) | T-1, T-2, T-3, T-14             | 4          |
+| Phase 1 (Auth)       | T-4, T-5, T-6                   | 3          |
+| Phase 2 (Dashboard)  | T-7, T-8, T-9, T-10, T-11, T-12 | 6          |
+| Phase 3 (Events)     | T-13, T-15                      | 2          |
+| Phase 4 (Upload)     | T-16, T-17, T-18, T-19          | 4          |
+| Cleanup              | T-20                            | 1          |
+| **Total**            | **20 tasks**                    | **20 PRs** |
 
 ---
 
 ## Parallelization Opportunities
 
 After T-1 (DB schema) completes, these can run in parallel:
+
 - T-2, T-3, T-4, T-7, T-8, T-14, T-18
 
 After Phase 0 + Phase 1, UI tasks can parallelize:
+
 - T-6, T-11, T-12, T-15 can be worked on simultaneously by different engineers

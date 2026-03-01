@@ -6,8 +6,8 @@ Date: 2026-01-21
 
 Add pre-PTP gates in the iOS Studio app (`apps/studio`) for:
 
-1) PDPA consent (required by backend for photographer routes)
-2) Event selection (required for upload destination)
+1. PDPA consent (required by backend for photographer routes)
+2. Event selection (required for upload destination)
 
 This should integrate cleanly with the existing PTP flow without expanding the PTP state machine.
 
@@ -18,6 +18,7 @@ Gating stack (full-screen, in order):
 `AuthGateView` → `ConsentGateView` → `EventSelectionGateView` → existing `ContentView` (PTP camera flow)
 
 Notes:
+
 - Keep `AppCoordinator.appState` focused on camera/PTP states.
 - Gates are additive wrapper views around the existing PTP app.
 
@@ -43,6 +44,7 @@ Consent view should be intentionally minimal:
 - Secondary action: "Sign out"
 
 Behavior:
+
 - On load, call `GET /consent`.
 - If consented, continue to Event Selection.
 - If not consented, show consent screen.
@@ -62,6 +64,7 @@ Behavior:
 Use SwiftUI `List` with `Section` and `.listStyle(.insetGrouped)` to achieve an iPhone Settings feel.
 
 Row design:
+
 - Left: event name (headline)
 - Subtitle: date range and/or expiry
 - Right: checkmark for selected event
@@ -78,6 +81,7 @@ We group events into sections for fast selection:
 - "Older": other non-expired events
 
 Default decisions:
+
 - Recent window: 7 days
 - Expired events: hidden by default (not shown)
 
@@ -102,10 +106,12 @@ Persist the selected event id locally (initially UserDefaults):
 Lock the selected event for the duration of a transfer session.
 
 Rationale:
+
 - Avoids mixing uploads from one camera session into multiple events.
 - Makes it clear where photos are going.
 
 Implementation guideline:
+
 - Allow changing the selected event only when not transferring.
 - In `LiveCaptureView`, display the selected event in the header (read-only during session).
 

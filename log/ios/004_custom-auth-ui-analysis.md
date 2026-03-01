@@ -26,26 +26,31 @@ Clerk iOS supports:
 Build a SabaiPics-branded "Welcome / Sign in" screen (logo, typography, copy, buttons for providers), but still present `AuthView()` for the actual authentication step.
 
 Pros:
+
 - Fast (low engineering time).
 - Clerk handles edge cases (MFA, recovery, state transitions).
 - Minimal auth-risk.
 
 Cons:
+
 - The actual credential entry screens remain Clerk-styled.
 
 ### Medium: Fully custom UI (happy paths)
 
 Implement custom screens for:
+
 - Email OTP: input email, then input code.
 - OAuth buttons: start redirect flow for Google/LINE.
 
 You must handle:
+
 - Sign-in vs sign-up transfer cases after OAuth (result may create a SignUp).
 - "Incomplete" states (e.g., still needs additional steps) and errors.
 
 ### Hard: Fully custom UI with robust coverage
 
 To match `AuthView()` completeness you also need to cover:
+
 - MFA (if enabled)
 - account recovery / reset flows
 - configuration-driven "missing requirements"
@@ -79,12 +84,12 @@ To match `AuthView()` completeness you also need to cover:
 
 Start with the Hybrid approach:
 
-1) Build a polished SabaiPics-branded entry screen (custom UI) with:
+1. Build a polished SabaiPics-branded entry screen (custom UI) with:
    - Email "Continue" button
    - Google button
    - LINE button
-2) On tap, present `AuthView()` to complete auth.
-3) If we still want full control after shipping the hybrid experience, implement custom flows incrementally:
+2. On tap, present `AuthView()` to complete auth.
+3. If we still want full control after shipping the hybrid experience, implement custom flows incrementally:
    - Phase 1: Email OTP custom flow
    - Phase 2: OAuth custom flow buttons (Google + LINE)
    - Phase 3: MFA + edge-case completeness

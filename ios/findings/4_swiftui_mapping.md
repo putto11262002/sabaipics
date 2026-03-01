@@ -88,6 +88,7 @@ struct ContentView: View {
 ```
 
 **SwiftUI Components Used:**
+
 - `NavigationStack` - App navigation container
 - `Group` - Conditional rendering
 - `switch` - State-based view selection
@@ -165,6 +166,7 @@ struct InstructionsCard: View {
 ```
 
 **SwiftUI Components Used:**
+
 - `VStack` - Vertical layout with spacing
 - `Image(systemName:)` - SF Symbols icons
 - `ProgressView()` - Loading spinner
@@ -174,6 +176,7 @@ struct InstructionsCard: View {
 - `.padding()`, `.background()`, `.cornerRadius()` - Card design
 
 **User Sees:**
+
 ```
 ┌─────────────────────────────────┐
 │                                 │
@@ -327,6 +330,7 @@ struct RequirementsCard: View {
 ```
 
 **SwiftUI Components Used:**
+
 - `@State` - Local component state
 - `Button(action:)` - Tap handler
 - `ButtonStyle` - Custom button appearance
@@ -335,6 +339,7 @@ struct RequirementsCard: View {
 - Custom view components (CameraDetailsCard, etc.)
 
 **User Interaction:**
+
 ```
 User sees:
 ┌─────────────────────────────────┐
@@ -472,11 +477,13 @@ struct SessionStatsCard: View {
 ```
 
 **SwiftUI Components Used:**
+
 - `.symbolEffect(.pulse)` - SF Symbols animation (iOS 17+)
 - Custom view decomposition
 - Reusable components
 
 **User Sees:**
+
 ```
 ┌─────────────────────────────────┐
 │ ✅ Canon EOS R5  [Disconnect]   │
@@ -674,6 +681,7 @@ struct StatusBadge: View {
 ```
 
 **SwiftUI Components Used:**
+
 - `LazyVGrid` - Efficient grid (only renders visible items)
 - `ScrollView` - Scrollable container
 - `ForEach` - List iteration with identifiable items
@@ -684,6 +692,7 @@ struct StatusBadge: View {
 - `.onTapGesture` - Tap handling
 
 **User Sees:**
+
 ```
 ┌─────────────────────────────────┐
 │ ✅ Canon EOS R5          [End]  │
@@ -883,11 +892,13 @@ struct TertiaryButtonStyle: ButtonStyle {
 ```
 
 **SwiftUI Components Used:**
+
 - `Divider` - Visual separator
 - Custom `ButtonStyle` variants
 - Computed properties from service
 
 **User Sees:**
+
 ```
 ┌─────────────────────────────────┐
 │                                 │
@@ -1070,6 +1081,7 @@ struct CommonIPButton: View {
 ```
 
 **SwiftUI Components Used:**
+
 - `Form` - Native iOS form layout
 - `Section` - Form sections with headers
 - `TextField` - Text input with keyboard type
@@ -1078,6 +1090,7 @@ struct CommonIPButton: View {
 - `@State` - Local form state
 
 **User Interaction:**
+
 ```
 ┌─────────────────────────────────┐
 │ WiFi Manual Setup               │
@@ -1231,11 +1244,13 @@ struct BulletPoint: View {
 ```
 
 **SwiftUI Components Used:**
+
 - Conditional rendering (`if lostCount > 0`)
 - Color-coded status (green/red)
 - Custom bullet point component
 
 **User Sees:**
+
 ```
 ┌─────────────────────────────────┐
 │                                 │
@@ -1528,19 +1543,20 @@ App
 
 ## Summary: Journey → SwiftUI Mapping
 
-| Journey Step | SwiftUI View | Key Components | State |
-|--------------|--------------|----------------|-------|
-| Launch | `ContentView` | `NavigationStack`, `Group` | `.searching` |
-| Searching | `SearchingView` | `ProgressView`, `VStack` | `.searching` |
-| Found | `CameraFoundView` | `Button`, Card | `.found` |
-| Ready | `ReadyToShootView` | `.symbolEffect`, Stats | `.connected` |
-| **Capturing** | `LiveCaptureView` | `LazyVGrid`, `ZStack` | `.connected` |
-| Complete | `SessionCompleteView` | Summary, Buttons | `.disconnected` |
-| Error | `ConnectionLostView` | Error card, Actions | `.disconnected` |
+| Journey Step  | SwiftUI View          | Key Components             | State           |
+| ------------- | --------------------- | -------------------------- | --------------- |
+| Launch        | `ContentView`         | `NavigationStack`, `Group` | `.searching`    |
+| Searching     | `SearchingView`       | `ProgressView`, `VStack`   | `.searching`    |
+| Found         | `CameraFoundView`     | `Button`, Card             | `.found`        |
+| Ready         | `ReadyToShootView`    | `.symbolEffect`, Stats     | `.connected`    |
+| **Capturing** | `LiveCaptureView`     | `LazyVGrid`, `ZStack`      | `.connected`    |
+| Complete      | `SessionCompleteView` | Summary, Buttons           | `.disconnected` |
+| Error         | `ConnectionLostView`  | Error card, Actions        | `.disconnected` |
 
 ## All SwiftUI Primitives Used
 
 ### Layouts
+
 - `VStack` - Vertical stacking
 - `HStack` - Horizontal layout
 - `ZStack` - Layering (badges)
@@ -1551,6 +1567,7 @@ App
 - `NavigationStack` - Navigation
 
 ### Components
+
 - `Image(systemName:)` - SF Symbols
 - `Text` - Labels
 - `Button` - Actions
@@ -1562,6 +1579,7 @@ App
 - `Divider` - Separators
 
 ### Modifiers
+
 - `.font()` - Typography
 - `.foregroundColor()` - Colors
 - `.padding()` - Spacing
@@ -1576,6 +1594,7 @@ App
 - `.disabled()` - State control
 
 ### State Management
+
 - `@State` - Local state
 - `@StateObject` - Service creation
 - `@EnvironmentObject` - Shared state

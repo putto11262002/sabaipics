@@ -13,6 +13,7 @@
 **Overall Risk:** LOW-MEDIUM
 
 T-11 builds dashboard UI on top of the completed T-7 API. The API contract is stable and tested. Primary risks are:
+
 1. UI state management for empty vs populated states
 2. Pending T-10 (Stripe webhook) means credit balance won't update in real-time
 3. Event list UI is implemented but events don't exist yet (T-13)
@@ -23,15 +24,17 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 ## Technical Risks
 
 ### [RISK] T-10 (Stripe webhook) not complete
+
 - **Impact:** Credit balance won't auto-update after purchase
 - **Manifestation:** User buys credits → returns to dashboard → sees old balance until page refresh
-- **Mitigation:** 
+- **Mitigation:**
   - Add manual refresh button or auto-refresh on focus/mount
   - Use React Query's `refetchInterval` or `refetchOnWindowFocus`
   - Document in UI that balance updates may take a few seconds
 - **Severity:** MEDIUM (affects UX but not functionality)
 
 ### [RISK] Empty state testing
+
 - **Impact:** New users see placeholder UI, need clear guidance
 - **Manifestation:** Empty events list, zero credits, no stats
 - **Current state:** T-7 API returns proper empty state (`{ balance: 0, events: [], stats: { totalPhotos: 0, totalFaces: 0 } }`)
@@ -42,6 +45,7 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 - **Severity:** LOW (well-defined API contract)
 
 ### [RISK] Credit expiry warning logic
+
 - **Impact:** Users don't see when credits expire
 - **API contract:** `credits.nearestExpiry` is ISO string or null
 - **UI requirement:** Show warning if expiry < 7 days
@@ -56,6 +60,7 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 - **Severity:** LOW (API handles complexity, UI just displays)
 
 ### [RISK] Performance with large event lists
+
 - **Impact:** Slow render if photographer has 100+ events
 - **Current API behavior:** Returns last 10 events (hardcoded LIMIT 10 in T-7)
 - **Gap:** No pagination in API yet
@@ -70,6 +75,7 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 ## Coupling / Integration Points
 
 ### [COUPLING] Dashboard API contract (T-7)
+
 - **File:** `apps/api/src/routes/dashboard/types.ts`
 - **Contract:**
   ```typescript
@@ -77,18 +83,20 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
     credits: { balance: number; nearestExpiry: string | null };
     events: DashboardEvent[];
     stats: { totalPhotos: number; totalFaces: number };
-  }
+  };
   ```
 - **Status:** STABLE (T-7 complete, tests passing, PR merged)
 - **Risk:** LOW (breaking changes unlikely, but version if needed)
 
 ### [COUPLING] Consent gate (T-6)
+
 - **File:** `apps/dashboard/src/components/auth/ConsentGate.tsx`
 - **Behavior:** Redirects to `/onboarding` if not consented
 - **Integration:** Dashboard route wrapped in ConsentGate (App.tsx line 32-34)
 - **Risk:** LOW (already working in production)
 
 ### [COUPLING] Sidebar navigation (PR #16)
+
 - **File:** `apps/dashboard/src/components/shell/app-sidebar.tsx`
 - **Issue:** Sidebar has links to unimplemented routes:
   - `/events` (T-15)
@@ -102,6 +110,7 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 - **Severity:** MEDIUM (UX confusion)
 
 ### [COUPLING] API client pattern
+
 - **File:** `apps/dashboard/src/lib/api.ts`
 - **Pattern:** Uses Hono RPC client for type safety
 - **Current usage:** Dashboard page uses raw `fetch()` instead of RPC client
@@ -117,9 +126,11 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 ## HI Gates (Block if Not Resolved)
 
 ### [HI_GATE] Sidebar navigation scope
+
 **Question:** Should unimplemented routes be visible in sidebar?
 
 **Options:**
+
 1. **Show all routes with "Coming soon" tooltips**
    - Pro: Shows product vision, encourages exploration
    - Con: Users click and get confused
@@ -137,11 +148,13 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 ---
 
 ### [HI_GATE] Credit balance refresh strategy
+
 **Question:** How should dashboard handle stale credit balance?
 
 **Context:** T-10 (Stripe webhook) not done, so balance won't update immediately after purchase.
 
 **Options:**
+
 1. **Manual refresh button**
    - Pro: Simple, no polling overhead
    - Con: Users must remember to click
@@ -162,11 +175,13 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 ---
 
 ### [HI_GATE] Empty state CTAs
+
 **Question:** What actions should empty state encourage?
 
 **Context:** New photographer lands on dashboard with 0 credits, 0 events.
 
 **Options:**
+
 1. **Primary CTA: "Buy Credits"**
    - Links to `/credits/packages` (T-12)
    - Assumes user needs credits first
@@ -185,6 +200,7 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 ## Unknowns
 
 ### [UNKNOWN] Event card design
+
 - **What:** How to display events in dashboard list
 - **API provides:** name, photoCount, faceCount, createdAt, expiresAt, startDate, endDate
 - **Questions:**
@@ -194,6 +210,7 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 - **Resolution:** Use simple card with text info, defer thumbnail to T-15
 
 ### [UNKNOWN] Stats card design
+
 - **What:** How to display totalPhotos, totalFaces
 - **Options:**
   - Separate cards ("120 Photos", "340 Faces")
@@ -202,6 +219,7 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 - **Resolution:** Refer to shadcn card patterns, keep simple
 
 ### [UNKNOWN] Loading states
+
 - **What:** Dashboard loads 3 queries (T-7 returns all in one response)
 - **Options:**
   - Single skeleton for whole page
@@ -263,14 +281,14 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 
 ## Dependencies Status
 
-| Task | Status | Impact on T-11 |
-|------|--------|----------------|
-| T-7 (Dashboard API) | ✅ DONE (PR #12) | Core dependency, stable |
-| T-10 (Stripe webhook) | ❌ NOT DONE | Credit balance won't auto-update |
-| T-6 (Signup + Consent) | ✅ DONE (PR #14) | ConsentGate working |
-| PR #16 (Shell layout) | ✅ DONE | Sidebar, Layout ready |
-| T-12 (Credit packages UI) | ❌ NOT DONE | "Buy Credits" button links here |
-| T-13 (Events API) | ❌ NOT DONE | Event list shows but no events exist |
+| Task                      | Status           | Impact on T-11                       |
+| ------------------------- | ---------------- | ------------------------------------ |
+| T-7 (Dashboard API)       | ✅ DONE (PR #12) | Core dependency, stable              |
+| T-10 (Stripe webhook)     | ❌ NOT DONE      | Credit balance won't auto-update     |
+| T-6 (Signup + Consent)    | ✅ DONE (PR #14) | ConsentGate working                  |
+| PR #16 (Shell layout)     | ✅ DONE          | Sidebar, Layout ready                |
+| T-12 (Credit packages UI) | ❌ NOT DONE      | "Buy Credits" button links here      |
+| T-13 (Events API)         | ❌ NOT DONE      | Event list shows but no events exist |
 
 **Critical path:** T-7 is done ✅ → T-11 can proceed.
 
@@ -281,16 +299,19 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 ## Sensitive Areas
 
 ### [SECURITY] No PII in dashboard API
+
 - **Check:** T-7 returns photographer data (name, email) → not exposed in dashboard response
 - **Verification:** Review `apps/api/src/routes/dashboard/route.ts` lines 100-109
 - **Status:** SAFE (only returns aggregated data, no PII)
 
 ### [SECURITY] Credit balance exposure
+
 - **Risk:** Balance visible in network response
 - **Mitigation:** Already protected by `requirePhotographer()` + `requireConsent()` middleware
 - **Status:** SAFE (authenticated endpoints only)
 
 ### [AUTH] Consent gate bypass
+
 - **Risk:** Direct navigation to /dashboard bypasses consent check
 - **Mitigation:** ConsentGate wraps Layout in App.tsx (line 32-34)
 - **Status:** SAFE (tested in T-6)
@@ -300,6 +321,7 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 ## Testing Strategy
 
 ### Unit Tests (Component)
+
 - [ ] Dashboard page renders with mock data
 - [ ] Empty state shows when balance=0, events=[]
 - [ ] Credit expiry warning shows when nearestExpiry < 7 days
@@ -307,11 +329,13 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 - [ ] Error state shows alert with retry
 
 ### Integration Tests (E2E)
+
 - [ ] Full flow: Login → Dashboard loads → Shows credit balance
 - [ ] Click "Buy Credits" → Navigates to /credits/packages (when T-12 done)
 - [ ] Refresh after Stripe purchase → Balance updates (when T-10 done)
 
 ### Manual Testing Checklist
+
 - [ ] Desktop: Chrome, Safari, Firefox
 - [ ] Mobile: Safari iOS, Chrome Android
 - [ ] Empty state (new user)
@@ -324,15 +348,19 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 ## Rollout Notes
 
 ### Feature Flags
+
 - None required (dashboard is core feature)
 
 ### Migrations
+
 - None (UI only)
 
 ### Environment Variables
+
 - `VITE_API_URL` (already configured)
 
 ### Monitoring
+
 - Track page load time (React Query devtools)
 - Track API errors (dashboard endpoint failures)
 - Track empty vs populated state ratio (analytics)
@@ -342,12 +370,14 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 ## Follow-Up Tasks
 
 ### Immediate (In T-11)
+
 - Resolve HI gates (sidebar scope, refresh strategy, empty CTAs)
 - Implement dashboard page with cards
 - Add loading/error/empty states
 - Test responsive layout
 
 ### Future (Post-T-11)
+
 - T-12: Wire "Buy Credits" button
 - T-10: Add credit refresh logic after webhook
 - T-15: Add "Create Event" button functionality
@@ -358,6 +388,7 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 ## Provenance
 
 **Context sources:**
+
 - `docs/logs/BS_0001_S-1/tasks.md` (T-11 requirements)
 - `docs/logs/BS_0001_S-1/plan/final.md` (architecture)
 - `docs/logs/BS_0001_S-1/context/repo-scout.md` (codebase patterns)
@@ -369,6 +400,7 @@ T-11 builds dashboard UI on top of the completed T-7 API. The API contract is st
 - Git log: PRs #12 (T-7), #14 (T-6), #16 (Shell)
 
 **Commands run:**
+
 - `Read` tasks.md, plan/final.md, context reports
 - `Read` API route, dashboard page, sidebar, consent gate
 - `Glob` dashboard components

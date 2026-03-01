@@ -1,4 +1,5 @@
 # iOS Network Permissions Guide
+
 ## Local Network Access for Canon Camera Discovery
 
 **Last Updated:** 2026-01-08
@@ -22,6 +23,7 @@ You need to add two keys to your iOS Info.plist:
 **Purpose:** Tells users why your app needs local network access
 
 **Example:**
+
 ```xml
 <key>NSLocalNetworkUsageDescription</key>
 <string>This app needs to discover and connect to Canon cameras on your local network to automatically transfer photos.</string>
@@ -34,6 +36,7 @@ You need to add two keys to your iOS Info.plist:
 **Purpose:** Declares the Bonjour service types your app uses
 
 **For Canon cameras (UPnP/SSDP):**
+
 ```xml
 <key>NSBonjourServices</key>
 <array>
@@ -60,6 +63,7 @@ Since UPnP/SSDP uses **custom UDP multicast** (not standard Bonjour), you need t
 #### Why This is Required
 
 From Apple's documentation:
+
 > "Custom multicast and broadcast protocols require the com.apple.developer.networking.multicast restricted entitlement since these capabilities give your app complete access to the user's local network."
 
 UPnP/SSDP broadcasts to 239.255.255.250:1900, which is a custom multicast protocol, not standard Bonjour discovery.
@@ -73,6 +77,7 @@ UPnP/SSDP broadcasts to 239.255.255.250:1900, which is a custom multicast protoc
 **URL:** https://developer.apple.com/contact/request/networking-multicast
 
 **Required Information:**
+
 - Your Apple Developer Team ID
 - App Name
 - App Bundle ID
@@ -128,10 +133,7 @@ Add to your `app.json` or `app.config.js`:
       "bundleIdentifier": "com.yourcompany.canonapp",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "This app needs to discover and connect to Canon cameras on your local network to automatically transfer photos.",
-        "NSBonjourServices": [
-          "_upnp._tcp",
-          "_ssdp._udp"
-        ]
+        "NSBonjourServices": ["_upnp._tcp", "_ssdp._udp"]
       }
     }
   }
@@ -175,9 +177,7 @@ Then in `app.json`:
 ```json
 {
   "expo": {
-    "plugins": [
-      "./config-plugin-multicast.js"
-    ]
+    "plugins": ["./config-plugin-multicast.js"]
   }
 }
 ```
@@ -230,6 +230,7 @@ When your app first tries to use local network (e.g., listens on UDP 1900), iOS 
 ### 2. User Grants Permission
 
 If user taps "OK":
+
 - ✅ App can now send/receive on local network
 - ✅ UPnP discovery works
 - ✅ Permission saved (won't ask again)
@@ -237,11 +238,13 @@ If user taps "OK":
 ### 3. User Denies Permission
 
 If user taps "Don't Allow":
+
 - ❌ App cannot access local network
 - ❌ UPnP discovery fails silently
 - ❌ No camera discovery possible
 
 **You should:**
+
 - Detect the permission denial
 - Show user-friendly error message
 - Provide button to open Settings
@@ -251,12 +254,14 @@ If user taps "Don't Allow":
 Unfortunately, there's **no direct API** to check local network permission status. You can:
 
 **Option A: Try and fail gracefully**
+
 ```swift
 // Try to create UDP connection
 // If it fails, assume permission denied
 ```
 
 **Option B: Use a library**
+
 ```bash
 npm install @generac/react-native-local-network-permission
 ```
@@ -284,9 +289,9 @@ Alert.alert(
     { text: 'Cancel', style: 'cancel' },
     {
       text: 'Open Settings',
-      onPress: () => Linking.openSettings()
-    }
-  ]
+      onPress: () => Linking.openSettings(),
+    },
+  ],
 );
 ```
 
@@ -298,21 +303,25 @@ User must manually go to:
 ## Testing Considerations
 
 ### iOS Simulator
+
 - ✅ Can test without multicast entitlement
 - ✅ No permission prompt (automatically granted)
 - ⚠️ May not accurately reflect real device behavior
 
 ### Physical iOS Device (Development)
+
 - ❌ Requires multicast entitlement from Apple
 - ✅ Shows actual permission prompt
 - ✅ Tests real network discovery
 
 ### TestFlight
+
 - ✅ Works with approved multicast entitlement
 - ✅ Shows permission prompt to testers
 - ✅ Full network functionality
 
 ### App Store
+
 - ✅ Requires approved multicast entitlement
 - ✅ App will be rejected without proper justification
 - ✅ Users see permission prompt on first network access
@@ -324,11 +333,13 @@ User must manually go to:
 ### Issue 1: Permission Prompt Never Shows
 
 **Symptoms:**
+
 - App doesn't show local network permission dialog
 - UPnP discovery doesn't work
 - No errors in console
 
 **Solutions:**
+
 1. ✅ Add `NSLocalNetworkUsageDescription` to Info.plist
 2. ✅ Add `NSBonjourServices` array to Info.plist
 3. ✅ Rebuild app (changes don't apply via OTA update)
@@ -339,6 +350,7 @@ User must manually go to:
 **Cause:** Missing multicast entitlement
 
 **Solution:**
+
 1. Request `com.apple.developer.networking.multicast` from Apple
 2. Add entitlement to your Xcode project/Expo config
 3. Rebuild with entitlement
@@ -348,6 +360,7 @@ User must manually go to:
 **Cause:** App blocked from local network without prompt
 
 **Solution:**
+
 - Ensure `NSBonjourServices` is set (this triggers the prompt)
 - The prompt is triggered when iOS detects your app receiving broadcast/multicast data
 
@@ -356,6 +369,7 @@ User must manually go to:
 **Cause:** iOS 14 introduced local network privacy controls
 
 **Solution:**
+
 - Add all required Info.plist keys
 - Request multicast entitlement
 - Update app to handle permission denial gracefully
@@ -365,11 +379,13 @@ User must manually go to:
 ## Implementation Checklist
 
 ### Before Coding
+
 - [ ] Request multicast entitlement from Apple (allow 2-4 weeks)
 - [ ] Prepare justification (explain UPnP/SSDP usage)
 - [ ] Wait for Apple approval
 
 ### In Code
+
 - [ ] Add `NSLocalNetworkUsageDescription` to Info.plist
 - [ ] Add `NSBonjourServices` array to Info.plist
 - [ ] Add multicast entitlement (after approval)
@@ -379,6 +395,7 @@ User must manually go to:
 - [ ] Provide Settings navigation for denied state
 
 ### Testing
+
 - [ ] Test permission prompt appears on first network access
 - [ ] Test camera discovery works after granting permission
 - [ ] Test graceful failure when permission denied
@@ -387,6 +404,7 @@ User must manually go to:
 - [ ] Test in TestFlight before App Store submission
 
 ### App Store Submission
+
 - [ ] Include multicast entitlement in build
 - [ ] Provide clear explanation in App Review notes
 - [ ] Reference industry-standard UPnP/SSDP protocol

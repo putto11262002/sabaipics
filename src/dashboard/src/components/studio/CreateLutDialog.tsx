@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Alert } from '@/shared/components/ui/alert';
-import { FileUp, Image, Loader2, Upload, X } from 'lucide-react';
+import { FileUp, Loader2, Upload, X } from 'lucide-react';
 import { useCreateStudioLut } from '../../hooks/studio/useCreateStudioLut';
 import {
   AlertDialog,
@@ -31,31 +31,22 @@ import type { SuccessStatusCode } from 'hono/utils/http-status';
 import { toast } from 'sonner';
 import { cn } from '@/shared/utils/ui';
 
-type Kind = 'cube' | 'reference';
-
 const getLutStatus = api.studio.luts.status.$get;
 type LutStatusResponse = InferResponseType<typeof getLutStatus, SuccessStatusCode>;
 
 function isCubeFile(file: File): boolean {
   const name = file.name.toLowerCase();
   if (name.endsWith('.cube')) return true;
-  // Some browsers may set empty type for unknown extensions
   if (file.type === 'text/plain') return true;
   return false;
-}
-
-function isReferenceImageFile(file: File): boolean {
-  return file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp';
 }
 
 export function CreateLutDialog({
   open,
   onOpenChange,
-  kind,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  kind: Kind;
 }) {
   const create = useCreateStudioLut();
   const queryClient = useQueryClient();
@@ -73,13 +64,6 @@ export function CreateLutDialog({
     setCreatedLutId(null);
     create.reset();
   };
-
-  // If the creation kind changes, clear any previously selected file.
-  useEffect(() => {
-    setFile(null);
-    setFileError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind]);
 
   const lutStatusQuery = useApiQuery<LutStatusResponse>({
     queryKey: ['studio', 'luts', 'status', createdLutId],
@@ -118,22 +102,11 @@ export function CreateLutDialog({
     }
   };
 
-  const accept = useMemo(() => {
-    return kind === 'cube' ? '.cube,text/plain' : 'image/jpeg,image/png,image/webp';
-  }, [kind]);
-
-  const title = kind === 'cube' ? 'New LUT (.cube)' : 'New LUT (Reference image)';
-  const fileLabel = kind === 'cube' ? 'LUT file (.cube)' : 'Reference image';
-
   const [isDragging, setIsDragging] = useState(false);
 
   const validateAndSetFile = (f: File) => {
-    if (kind === 'cube' && !isCubeFile(f)) {
+    if (!isCubeFile(f)) {
       setFileError('Please select a .cube LUT file');
-      return;
-    }
-    if (kind === 'reference' && !isReferenceImageFile(f)) {
-      setFileError('Please select a JPEG, PNG, or WebP image');
       return;
     }
     setFile(f);
@@ -144,11 +117,10 @@ export function CreateLutDialog({
 
   const submit = async () => {
     if (!file) return;
-    const { lutId } = await create.mutateAsync({ kind, name: name.trim(), file });
+    const { lutId } = await create.mutateAsync({ kind: 'cube', name: name.trim(), file });
     setCreatedLutId(lutId);
   };
 
-  // Auto-close once LUT is fully processed.
   useEffect(() => {
     if (!open) return;
     if (!createdLutId) return;
@@ -160,13 +132,11 @@ export function CreateLutDialog({
     resetForm();
   }, [open, createdLutId, lutStatusData?.status, onOpenChange, queryClient]);
 
-  // Block in-app navigation while processing.
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       isProcessing && currentLocation.pathname !== nextLocation.pathname,
   );
 
-  // Browser navigation guard (back button, close tab, refresh)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isProcessing) {
@@ -201,7 +171,7 @@ export function CreateLutDialog({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
+            <DialogTitle>New LUT (.cube)</DialogTitle>
           </DialogHeader>
 
           <div className="min-w-0 space-y-4 overflow-hidden">
@@ -216,19 +186,18 @@ export function CreateLutDialog({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs">{fileLabel}</Label>
+              <Label className="text-xs">LUT file (.cube)</Label>
               {file ? (
                 <div className="flex min-w-0 items-center gap-3 overflow-hidden rounded-lg border bg-muted/30 px-3 py-2.5 text-sm">
-                  {kind === 'cube' ? (
-                    <FileUp className="size-4 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <Image className="size-4 shrink-0 text-muted-foreground" />
-                  )}
+                  <FileUp className="size-4 shrink-0 text-muted-foreground" />
                   <span className="min-w-0 flex-1 truncate">{file.name}</span>
                   {!isProcessing && (
                     <button
                       type="button"
-                      onClick={() => { setFile(null); setFileError(null); }}
+                      onClick={() => {
+                        setFile(null);
+                        setFileError(null);
+                      }}
                       className="shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
                     >
                       <X className="size-3.5" />
@@ -237,9 +206,20 @@ export function CreateLutDialog({
                 </div>
               ) : (
                 <div
-                  onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (!isProcessing) setIsDragging(true); }}
-                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!isProcessing) setIsDragging(true);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDragging(false);
+                  }}
                   onDrop={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -261,16 +241,14 @@ export function CreateLutDialog({
                   <p className="text-sm font-medium">
                     {isDragging ? 'Drop file here' : 'Drag file here or click to browse'}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {kind === 'cube' ? '.cube file' : 'JPEG, PNG, or WebP'}
-                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">.cube file</p>
                 </div>
               )}
               <input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept={accept}
+                accept=".cube,text/plain"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) validateAndSetFile(f);
@@ -284,11 +262,15 @@ export function CreateLutDialog({
 
             {(() => {
               const errorMessage = create.isError
-                ? (create.error instanceof Error ? create.error.message : 'Failed to create LUT')
+                ? create.error instanceof Error
+                  ? create.error.message
+                  : 'Failed to create LUT'
                 : lutStatusQuery.isError
-                  ? (lutStatusQuery.error instanceof Error ? lutStatusQuery.error.message : 'Failed to check LUT status')
-                  : (lutStatusData?.status === 'failed' || lutStatusData?.status === 'expired')
-                    ? (lutStatusData?.errorMessage || 'Failed to process LUT')
+                  ? lutStatusQuery.error instanceof Error
+                    ? lutStatusQuery.error.message
+                    : 'Failed to check LUT status'
+                  : lutStatusData?.status === 'failed' || lutStatusData?.status === 'expired'
+                    ? lutStatusData?.errorMessage || 'Failed to process LUT'
                     : null;
               return errorMessage ? <Alert variant="destructive">{errorMessage}</Alert> : null;
             })()}

@@ -33,19 +33,19 @@ struct CaptureSessionSheetView: View {
                         Spacer()
                         Image(systemName: "photo.on.rectangle")
                             .font(.system(size: 44))
-                            .foregroundStyle(Color.Theme.mutedForeground)
+                            .foregroundStyle(Color.secondary)
                         Text("No live session")
                             .font(.headline)
-                            .foregroundStyle(Color.Theme.foreground)
+                            .foregroundStyle(Color.primary)
                         Text("Connect a camera to see photos here.")
                             .font(.subheadline)
-                            .foregroundStyle(Color.Theme.mutedForeground)
+                            .foregroundStyle(Color.secondary)
                         Spacer()
                     }
                     .frame(maxWidth: .infinity)
-                    .background(Color(.systemBackground))
                 }
             }
+            .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -55,7 +55,7 @@ struct CaptureSessionSheetView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.Theme.primary)
+                            .foregroundStyle(Color.accentColor)
                     }
                     .buttonStyle(.plain)
                 }
@@ -64,7 +64,7 @@ struct CaptureSessionSheetView: View {
                 bottomActions
             }
         }
-        .tint(Color.Theme.primary)
+        .tint(Color.accentColor)
     }
 
     private var sessionInfoList: some View {
@@ -99,25 +99,25 @@ struct CaptureSessionSheetView: View {
                 value: "\(syncedCount)"
             )
         }
-        .background(Color(.systemBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
     private func sessionInfoRow(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 15))
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .frame(width: 20)
 
             Text(label)
                 .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
 
             Spacer()
 
             Text(value)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 11)
@@ -128,14 +128,16 @@ struct CaptureSessionSheetView: View {
             onDisconnect()
         } label: {
             Text(isDisconnecting ? "Disconnecting…" : "Disconnect")
+                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.destructiveSecondary)
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
         .disabled(isDisconnecting)
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 12)
         .background(
-            Color(.systemBackground)
+            Color(uiColor: .systemGroupedBackground)
                 .ignoresSafeArea()
         )
     }
@@ -160,7 +162,7 @@ private struct CaptureSessionPhotosView: View {
                                     .padding(.vertical, 10)
 
                                 Divider()
-                                    .background(Color.Theme.border)
+                                    .background(Color(UIColor.separator))
                             }
                         }
                     }
@@ -169,26 +171,19 @@ private struct CaptureSessionPhotosView: View {
                 }
             }
         }
-        .background(Color(.systemBackground))
+        .scrollContentBackground(.hidden)
+        .background(Color(uiColor: .systemGroupedBackground))
         .animation(.easeOut(duration: 0.4), value: session.photos.count)
         .overlay {
             if session.isDisconnecting {
                 ZStack {
-                    Color.black.opacity(0.4)
+                    Color.black.opacity(0.2)
                         .ignoresSafeArea()
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                            .tint(Color.white)
-                        Text("Disconnecting...")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                    }
-                    .padding(32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.black.opacity(0.8))
-                    )
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .padding(20)
+                        .background(.regularMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
         }
@@ -206,7 +201,7 @@ private struct CaptureSessionPhotosView: View {
         .padding(.top, 10)
         .padding(.bottom, session.skippedRawCount > 0 && session.showRawSkipBanner ? 10 : 0)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
     private var emptyState: some View {
@@ -214,14 +209,14 @@ private struct CaptureSessionPhotosView: View {
             Spacer(minLength: 30)
             Image(systemName: "camera.viewfinder")
                 .font(.system(size: 56))
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
             VStack(spacing: 6) {
                 Text("Ready to Capture")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(Color.Theme.foreground)
+                    .foregroundStyle(Color.primary)
                 Text("Take photos with your camera.\nThey'll appear here automatically.")
                     .font(.subheadline)
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
                     .multilineTextAlignment(.center)
             }
             Spacer(minLength: 30)
@@ -239,7 +234,7 @@ private struct CaptureSessionPhotosView: View {
 
             Text("\(session.skippedRawCount) RAW file\(session.skippedRawCount == 1 ? "" : "s") skipped")
                 .font(.subheadline)
-                .foregroundColor(Color.Theme.foreground)
+                .foregroundColor(Color.primary)
 
             Spacer()
 
@@ -250,7 +245,7 @@ private struct CaptureSessionPhotosView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption)
-                    .foregroundColor(Color.Theme.mutedForeground)
+                    .foregroundColor(Color.secondary)
             }
             .buttonStyle(.plain)
         }

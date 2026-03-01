@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
-import { sql, eq, gt, and, desc } from 'drizzle-orm';
-import { creditLedger, events, photos } from '@/db';
+import { sql, eq, desc } from 'drizzle-orm';
+import { events, photos } from '@/db';
 import { requirePhotographer } from '../../middleware';
 import type { Env } from '../../types';
 import type { DashboardEvent, DashboardResponse } from './types';
 import { apiError, type HandlerError } from '../../lib/error';
 import { ResultAsync, safeTry, ok } from 'neverthrow';
+import { getBalance, getNextExpiry } from '../../lib/credits';
 
 // =============================================================================
 // Routes
@@ -19,36 +20,21 @@ export const dashboardRouter = new Hono<Env>()
 
     return safeTry(async function* () {
       // Query 1: Credit balance (sum of unexpired credits)
-      const [balanceResult] = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int`,
-          })
-          .from(creditLedger)
-          .where(
-            and(
-              eq(creditLedger.photographerId, photographer.id),
-              gt(creditLedger.expiresAt, sql`NOW()`),
-            ),
-          ),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      const creditBalance = yield* getBalance(db, photographer.id).mapErr(
+        (e): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Database error',
+          cause: e.cause,
+        }),
       );
 
       // Query 2: Nearest expiry (earliest expiry from purchase rows)
-      const [expiryResult] = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            nearestExpiry: sql<string | null>`MIN(${creditLedger.expiresAt})`,
-          })
-          .from(creditLedger)
-          .where(
-            and(
-              eq(creditLedger.photographerId, photographer.id),
-              gt(creditLedger.amount, 0),
-              gt(creditLedger.expiresAt, sql`NOW()`),
-            ),
-          ),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      const nearestExpiry = yield* getNextExpiry(db, photographer.id).mapErr(
+        (e): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Database error',
+          cause: e.cause,
+        }),
       );
 
       // Query 3: Total stats across ALL events (not limited)
@@ -112,8 +98,8 @@ export const dashboardRouter = new Hono<Env>()
 
       const response: DashboardResponse = {
         credits: {
-          balance: balanceResult?.balance ?? 0,
-          nearestExpiry: expiryResult?.nearestExpiry ?? null,
+          balance: creditBalance,
+          nearestExpiry: nearestExpiry,
         },
         events: formattedEvents,
         stats: {

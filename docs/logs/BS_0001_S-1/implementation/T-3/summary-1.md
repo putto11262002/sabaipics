@@ -17,19 +17,19 @@ Implemented admin API for CRUD operations on credit packages. Uses `X-Admin-API-
 
 ## Files Created
 
-| File | Purpose |
-|------|---------|
-| `apps/api/src/middleware/require-admin.ts` | API key authentication middleware |
-| `apps/api/src/routes/admin/credit-packages.ts` | Credit package CRUD routes |
-| `apps/api/src/routes/admin/index.ts` | Admin router barrel |
-| `apps/api/src/routes/admin/credit-packages.test.ts` | Unit tests using Hono testClient |
+| File                                                | Purpose                           |
+| --------------------------------------------------- | --------------------------------- |
+| `apps/api/src/middleware/require-admin.ts`          | API key authentication middleware |
+| `apps/api/src/routes/admin/credit-packages.ts`      | Credit package CRUD routes        |
+| `apps/api/src/routes/admin/index.ts`                | Admin router barrel               |
+| `apps/api/src/routes/admin/credit-packages.test.ts` | Unit tests using Hono testClient  |
 
 ## Files Modified
 
-| File | Change |
-|------|--------|
-| `apps/api/src/middleware/index.ts` | Added `requireAdmin` export |
-| `apps/api/src/index.ts` | Added admin router (placed before Clerk auth) |
+| File                               | Change                                        |
+| ---------------------------------- | --------------------------------------------- |
+| `apps/api/src/middleware/index.ts` | Added `requireAdmin` export                   |
+| `apps/api/src/index.ts`            | Added admin router (placed before Clerk auth) |
 
 ---
 
@@ -40,9 +40,9 @@ Implemented admin API for CRUD operations on credit packages. Uses `X-Admin-API-
 ```typescript
 export function requireAdmin(): MiddlewareHandler<Env> {
   return async (c, next) => {
-    const apiKey = c.req.header("X-Admin-API-Key");
+    const apiKey = c.req.header('X-Admin-API-Key');
     if (!apiKey || apiKey !== c.env.ADMIN_API_KEY) {
-      return c.json(createAuthError("UNAUTHENTICATED", "..."), 401);
+      return c.json(createAuthError('UNAUTHENTICATED', '...'), 401);
     }
     return next();
   };
@@ -51,15 +51,16 @@ export function requireAdmin(): MiddlewareHandler<Env> {
 
 ### Admin Routes — `apps/api/src/routes/admin/credit-packages.ts`
 
-| Route | Description |
-|-------|-------------|
-| `GET /admin/credit-packages` | List all packages ordered by sortOrder |
-| `POST /admin/credit-packages` | Create new package |
-| `PATCH /admin/credit-packages/:id` | Update package by UUID |
+| Route                              | Description                            |
+| ---------------------------------- | -------------------------------------- |
+| `GET /admin/credit-packages`       | List all packages ordered by sortOrder |
+| `POST /admin/credit-packages`      | Create new package                     |
+| `PATCH /admin/credit-packages/:id` | Update package by UUID                 |
 
 **Validation:** Uses `zValidator` from `@hono/zod-validator` for type-safe request validation and testClient inference.
 
 Schemas:
+
 - `createPackageSchema`: name (required), credits, priceThb, active (default: true), sortOrder (default: 0)
 - `updatePackageSchema`: All fields optional
 
@@ -86,25 +87,25 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 Uses Hono's `testClient` for type-safe testing:
 
 ```typescript
-import { testClient } from "hono/testing";
+import { testClient } from 'hono/testing';
 
 const client = testClient(app, MOCK_ENV);
 
 // GET
-const res = await client["credit-packages"].$get(undefined, {
-  headers: { "X-Admin-API-Key": TEST_API_KEY },
+const res = await client['credit-packages'].$get(undefined, {
+  headers: { 'X-Admin-API-Key': TEST_API_KEY },
 });
 
 // POST
-const res = await client["credit-packages"].$post(
-  { json: { name: "Basic", credits: 100, priceThb: 299 } },
-  { headers: { "X-Admin-API-Key": TEST_API_KEY } },
+const res = await client['credit-packages'].$post(
+  { json: { name: 'Basic', credits: 100, priceThb: 299 } },
+  { headers: { 'X-Admin-API-Key': TEST_API_KEY } },
 );
 
 // PATCH
-const res = await client["credit-packages"][":id"].$patch(
-  { param: { id: MOCK_UUID }, json: { name: "Updated" } },
-  { headers: { "X-Admin-API-Key": TEST_API_KEY } },
+const res = await client['credit-packages'][':id'].$patch(
+  { param: { id: MOCK_UUID }, json: { name: 'Updated' } },
+  { headers: { 'X-Admin-API-Key': TEST_API_KEY } },
 );
 ```
 

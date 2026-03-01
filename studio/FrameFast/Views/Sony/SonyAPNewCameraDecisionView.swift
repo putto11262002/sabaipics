@@ -41,35 +41,35 @@ struct SonyAPNewCameraDecisionView: View {
             HStack(spacing: 14) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(isPrimary ? Color.Theme.primary.opacity(0.14) : Color.Theme.primary.opacity(0.10))
+                        .fill(isPrimary ? Color.accentColor.opacity(0.14) : Color.accentColor.opacity(0.10))
                         .frame(width: 52, height: 52)
 
                     Image(systemName: icon)
                         .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(Color.Theme.primary)
+                        .foregroundColor(Color.accentColor)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.headline)
                         .fontWeight(isPrimary ? .semibold : .regular)
-                        .foregroundColor(Color.Theme.foreground)
+                        .foregroundColor(Color.primary)
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color.Theme.mutedForeground)
+                    .foregroundColor(Color.secondary)
             }
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.Theme.background)
+                    .fill(Color(UIColor.systemBackground))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(isPrimary ? Color.Theme.primary.opacity(0.9) : Color.Theme.border, lineWidth: isPrimary ? 2 : 1)
+                    .stroke(isPrimary ? Color.accentColor.opacity(0.9) : Color(UIColor.separator), lineWidth: isPrimary ? 2 : 1)
             )
         }
         .buttonStyle(.plain)

@@ -37,13 +37,15 @@
 
 ```typescript
 // packages/db/src/schema/credit-packages.ts
-creditPackages = pgTable("credit_packages", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  credits: integer("credits").notNull(),
-  priceThb: integer("price_thb").notNull(),
-  active: boolean("active").notNull().default(true),
-  sortOrder: integer("sort_order").notNull().default(0),
+creditPackages = pgTable('credit_packages', {
+  id: uuid('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text('name').notNull(),
+  credits: integer('credits').notNull(),
+  priceThb: integer('price_thb').notNull(),
+  active: boolean('active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
   createdAt: createdAtCol(),
 });
 ```
@@ -52,14 +54,14 @@ creditPackages = pgTable("credit_packages", {
 
 ## Files to Create/Modify
 
-| File | Action | Description |
-|------|--------|-------------|
-| `apps/api/src/middleware/require-admin.ts` | Create | Admin API key middleware |
-| `apps/api/src/middleware/index.ts` | Modify | Export `requireAdmin` |
-| `apps/api/src/routes/admin/credit-packages.ts` | Create | CRUD routes for credit packages |
-| `apps/api/src/routes/admin/index.ts` | Create | Admin router barrel |
-| `apps/api/src/index.ts` | Modify | Wire `/admin` routes |
-| `apps/api/src/routes/admin/credit-packages.test.ts` | Create | Unit tests |
+| File                                                | Action | Description                     |
+| --------------------------------------------------- | ------ | ------------------------------- |
+| `apps/api/src/middleware/require-admin.ts`          | Create | Admin API key middleware        |
+| `apps/api/src/middleware/index.ts`                  | Modify | Export `requireAdmin`           |
+| `apps/api/src/routes/admin/credit-packages.ts`      | Create | CRUD routes for credit packages |
+| `apps/api/src/routes/admin/index.ts`                | Create | Admin router barrel             |
+| `apps/api/src/index.ts`                             | Modify | Wire `/admin` routes            |
+| `apps/api/src/routes/admin/credit-packages.test.ts` | Create | Unit tests                      |
 
 ---
 
@@ -70,15 +72,17 @@ creditPackages = pgTable("credit_packages", {
 **Purpose:** Verify admin API key for admin-only endpoints.
 
 **Behavior:**
+
 - Check `X-Admin-API-Key` header against `ADMIN_API_KEY` env binding
 - Return 401 if header missing
 - Return 401 if key doesn't match
 - Bypasses Clerk auth (admin is not a photographer)
 
 **Code Pattern:**
+
 ```typescript
-import type { MiddlewareHandler } from "hono";
-import { createAuthError } from "@sabaipics/auth/errors";
+import type { MiddlewareHandler } from 'hono';
+import { createAuthError } from '@sabaipics/auth/errors';
 
 type Env = {
   Bindings: { ADMIN_API_KEY: string };
@@ -86,20 +90,14 @@ type Env = {
 
 export function requireAdmin(): MiddlewareHandler<Env> {
   return async (c, next) => {
-    const apiKey = c.req.header("X-Admin-API-Key");
+    const apiKey = c.req.header('X-Admin-API-Key');
 
     if (!apiKey) {
-      return c.json(
-        createAuthError("UNAUTHENTICATED", "Admin API key required"),
-        401
-      );
+      return c.json(createAuthError('UNAUTHENTICATED', 'Admin API key required'), 401);
     }
 
     if (apiKey !== c.env.ADMIN_API_KEY) {
-      return c.json(
-        createAuthError("UNAUTHENTICATED", "Invalid admin API key"),
-        401
-      );
+      return c.json(createAuthError('UNAUTHENTICATED', 'Invalid admin API key'), 401);
     }
 
     return next();
@@ -114,7 +112,7 @@ export function requireAdmin(): MiddlewareHandler<Env> {
 **Zod 4 schemas:**
 
 ```typescript
-import { z } from "zod";
+import { z } from 'zod';
 
 const createPackageSchema = z.object({
   name: z.string().min(1).max(100),
@@ -137,18 +135,20 @@ const updatePackageSchema = z.object({
 
 ### 3. Route Definitions (`credit-packages.ts`)
 
-| Method | Path | Description | Response |
-|--------|------|-------------|----------|
-| GET | `/` | List all packages | `{ data: CreditPackage[] }` |
-| POST | `/` | Create package | `{ data: CreditPackage }` |
-| PATCH | `/:id` | Update package | `{ data: CreditPackage }` |
+| Method | Path   | Description       | Response                    |
+| ------ | ------ | ----------------- | --------------------------- |
+| GET    | `/`    | List all packages | `{ data: CreditPackage[] }` |
+| POST   | `/`    | Create package    | `{ data: CreditPackage }`   |
+| PATCH  | `/:id` | Update package    | `{ data: CreditPackage }`   |
 
 **GET /** — List all packages
+
 - No request body
 - Returns all packages ordered by `sortOrder` ASC
 - Response: `{ data: CreditPackage[] }`
 
 **POST /** — Create package
+
 - Request body: `createPackageSchema`
 - Validates input
 - Inserts row, returns created package
@@ -156,6 +156,7 @@ const updatePackageSchema = z.object({
 - Error: `{ error: { code, message } }` (400 for validation)
 
 **PATCH /:id** — Update package
+
 - Request body: `updatePackageSchema`
 - Validates UUID param
 - Validates input (at least one field required)
@@ -168,11 +169,13 @@ const updatePackageSchema = z.object({
 ### 4. Response Format
 
 **Success:**
+
 ```typescript
 { data: CreditPackage | CreditPackage[] }
 ```
 
 **Validation Error (400):**
+
 ```typescript
 {
   error: {
@@ -184,11 +187,13 @@ const updatePackageSchema = z.object({
 ```
 
 **Not Found (404):**
+
 ```typescript
 { error: { code: "NOT_FOUND", message: "Credit package not found" } }
 ```
 
 **Auth Error (401):**
+
 ```typescript
 { error: { code: "UNAUTHENTICATED", message: "Admin API key required" } }
 ```
@@ -213,55 +218,56 @@ import { adminRouter } from "./routes/admin";
 **Testing Pattern:** Use Hono's built-in testing utilities.
 
 **References:**
+
 - https://hono.dev/docs/guides/testing
 - https://hono.dev/docs/helpers/testing
 
 **Approach 1: `app.request()` method**
 
 ```typescript
-import { describe, it, expect } from "vitest";
-import app from "../index"; // or create isolated test app
+import { describe, it, expect } from 'vitest';
+import app from '../index'; // or create isolated test app
 
 const MOCK_ENV = {
-  ADMIN_API_KEY: "test-admin-key",
-  DATABASE_URL: "mock-db-url",
+  ADMIN_API_KEY: 'test-admin-key',
+  DATABASE_URL: 'mock-db-url',
 };
 
-describe("Admin Credit Packages API", () => {
-  it("GET /admin/credit-packages returns all packages", async () => {
+describe('Admin Credit Packages API', () => {
+  it('GET /admin/credit-packages returns all packages', async () => {
     const res = await app.request(
-      "/admin/credit-packages",
+      '/admin/credit-packages',
       {
-        headers: { "X-Admin-API-Key": "test-admin-key" },
+        headers: { 'X-Admin-API-Key': 'test-admin-key' },
       },
-      MOCK_ENV
+      MOCK_ENV,
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ data: [] });
   });
 
-  it("POST /admin/credit-packages creates package", async () => {
+  it('POST /admin/credit-packages creates package', async () => {
     const res = await app.request(
-      "/admin/credit-packages",
+      '/admin/credit-packages',
       {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify({
-          name: "Basic Pack",
+          name: 'Basic Pack',
           credits: 100,
           priceThb: 299,
         }),
         headers: {
-          "Content-Type": "application/json",
-          "X-Admin-API-Key": "test-admin-key",
+          'Content-Type': 'application/json',
+          'X-Admin-API-Key': 'test-admin-key',
         },
       },
-      MOCK_ENV
+      MOCK_ENV,
     );
     expect(res.status).toBe(201);
   });
 
-  it("rejects request without API key", async () => {
-    const res = await app.request("/admin/credit-packages", {}, MOCK_ENV);
+  it('rejects request without API key', async () => {
+    const res = await app.request('/admin/credit-packages', {}, MOCK_ENV);
     expect(res.status).toBe(401);
   });
 });
@@ -270,16 +276,13 @@ describe("Admin Credit Packages API", () => {
 **Approach 2: `testClient()` for type-safe testing (if using chained routes)**
 
 ```typescript
-import { testClient } from "hono/testing";
-import { adminCreditPackagesRouter } from "./credit-packages";
+import { testClient } from 'hono/testing';
+import { adminCreditPackagesRouter } from './credit-packages';
 
 const client = testClient(adminCreditPackagesRouter);
 
 // Type-safe route calls with autocompletion
-const res = await client.index.$get(
-  {},
-  { headers: { "X-Admin-API-Key": "test-key" } }
-);
+const res = await client.index.$get({}, { headers: { 'X-Admin-API-Key': 'test-key' } });
 ```
 
 **Test Categories:**
@@ -312,8 +315,8 @@ Pass mocked DB in env for isolated tests:
 
 ```typescript
 const MOCK_ENV = {
-  ADMIN_API_KEY: "test-admin-key",
-  DATABASE_URL: "mock", // or inject mock db factory
+  ADMIN_API_KEY: 'test-admin-key',
+  DATABASE_URL: 'mock', // or inject mock db factory
 };
 ```
 

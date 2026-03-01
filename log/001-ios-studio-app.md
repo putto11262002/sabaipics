@@ -7,11 +7,13 @@ Topic-based changelog for SabaiPics Studio (iOS app for photographers)
 ## 2026-01-14 - Initial Project Setup
 
 ### Created
+
 - Xcode project at `apps/studio/SabaiPicsStudio.xcodeproj`
 - SwiftUI-based iOS app structure
 - Basic app scaffold with ContentView
 
 ### Configuration
+
 - **Product Name:** SabaiPicsStudio
 - **Bundle ID:** sabaipics.SabaiPicsStudio
 - **iOS Target:** 18.5 (recommend lowering to 17.0 or 16.0 for wider device support)
@@ -20,21 +22,25 @@ Topic-based changelog for SabaiPics Studio (iOS app for photographers)
 - **Tests:** Unit tests + UI tests included
 
 ### Environment Verified
+
 - macOS 15.5 (Sequoia)
 - Xcode 16.4
 - Swift 6.1.2
 - iOS SDK 18.5
 
 ### Git Setup
+
 - Integrated into main monorepo (no submodule)
 - Updated `.gitignore` with Xcode-specific ignores
 - Removed separate `.git` repo created by Xcode
 
 ### Tested
+
 - ✅ Project opens in Xcode
 - ✅ Builds and runs on simulator
 
 ### Next Steps
+
 - ✅ Lower iOS deployment target to 16.6
 - ✅ Add ImageCaptureCore framework
 - ✅ Create CameraService.swift
@@ -46,12 +52,14 @@ Topic-based changelog for SabaiPics Studio (iOS app for photographers)
 ## 2026-01-14 - Camera Service Implementation
 
 ### Added
+
 - `CameraService.swift` - Camera detection service using ImageCaptureCore
   - USB camera discovery via ICDeviceBrowser
   - Delegate methods for camera add/remove events
   - Published properties for SwiftUI integration
 
 ### Fixed
+
 - Info.plist conflict (multiple commands produce error)
   - Removed manual Info.plist, added keys to project settings
 - ImageCaptureCore API syntax for `browsedDeviceTypeMask`
@@ -60,14 +68,17 @@ Topic-based changelog for SabaiPics Studio (iOS app for photographers)
   - NSLocalNetworkUsageDescription
 
 ### Configuration
+
 - iOS deployment target: 16.6
 - Privacy permissions configured
 
 ### Build Status
+
 - ✅ Build succeeds on iOS Simulator (iPhone 16)
 - ✅ No errors, only AppIntents warning (expected)
 
 ### Next Steps
+
 - ✅ Create camera discovery UI views
 - ✅ Wire CameraService to SwiftUI views
 - TODO: Test USB camera detection with real hardware
@@ -79,6 +90,7 @@ Topic-based changelog for SabaiPics Studio (iOS app for photographers)
 ## 2026-01-14 - UI Implementation (Phase 1A)
 
 ### Added Views
+
 - `SearchingView.swift` - Initial camera search screen
   - Animated search icon
   - USB/WiFi connection instructions
@@ -96,6 +108,7 @@ Topic-based changelog for SabaiPics Studio (iOS app for photographers)
   - Reactive bindings using Combine
 
 ### Updated
+
 - `ContentView.swift` - Root view with state switching
   - NavigationView wrapper
   - State-based view rendering
@@ -104,6 +117,7 @@ Topic-based changelog for SabaiPics Studio (iOS app for photographers)
   - ErrorView (error handling with retry)
 
 ### Architecture
+
 ```
 ContentView (root)
   ├── CameraViewModel (@StateObject)
@@ -118,28 +132,33 @@ ContentView (root)
 ```
 
 ### Fixed
+
 - ICCameraDevice API compatibility for iOS 16+
   - Removed deprecated `manufacturer` property
   - Fixed `transportType` checking
   - Simplified camera detail display
 
 ### Build Status
+
 - ✅ Build succeeds
 - ✅ All views compile
 - ✅ State management working
 
 ### What Works
+
 - App launches and shows SearchingView
 - UI automatically searches for cameras on launch
 - State transitions: searching → cameraFound → connecting → ready
 - Error handling with retry
 
 ### Testing Notes
+
 - **Simulator testing**: Camera detection won't work (no USB/hardware access)
 - **Real device testing required**: Need physical iPhone + USB camera to test actual detection
 - UI/UX flow can be previewed in simulator
 
 ### Next Steps
+
 - ✅ Test on real device with USB camera
 - TODO: Implement photo download when shutter is pressed
 - TODO: Build live capture grid view (showing downloaded photos)
@@ -150,11 +169,13 @@ ContentView (root)
 ## 2026-01-14 - Real Device Testing on iPad
 
 ### Hardware Testing Results
+
 - **Device**: iPad (USB-C)
 - **Camera**: Connected via USB-C
 - **Status**: ✅ **WORKING!**
 
 ### What Works
+
 - ✅ App installs and launches on iPad
 - ✅ Camera detection works (USB-C connection)
 - ✅ Camera found screen displays correctly
@@ -162,17 +183,21 @@ ContentView (root)
 - ✅ Camera enters tethered mode (see below)
 
 ### Fixed
+
 - **iPad sidebar issue** - Added `.navigationViewStyle(.stack)` to ContentView
   - Forces single-column layout on iPad (no split-view sidebar)
   - App now works properly in landscape mode
 
 ### Camera Tethered Mode Behavior (EXPECTED)
+
 When the app connects to the camera (`requestOpenSession`):
+
 - Camera LCD goes **black** ⬛
 - Camera shows **computer icon** 💻
 - This is **NORMAL** and **CORRECT** behavior!
 
 **Why this happens:**
+
 - Camera enters "tethered shooting" mode
 - Camera control is transferred to iPad
 - LCD is disabled to save power
@@ -180,12 +205,14 @@ When the app connects to the camera (`requestOpenSession`):
 - This is standard for professional tethered workflows
 
 **How it works in professional use:**
+
 ```
 Photographer → Camera Shutter → Photo → iPad App (automatic download)
               (Camera LCD off)         (Preview on iPad)
 ```
 
 ### Camera Connection Flow Verified
+
 ```
 1. App Launch → "Looking for cameras..." ✅
 2. Plug in USB → "Camera Found" ✅
@@ -195,6 +222,7 @@ Photographer → Camera Shutter → Photo → iPad App (automatic download)
 ```
 
 ### Next Steps
+
 - ✅ Implement photo download delegate methods
 - ✅ Build live capture view showing downloaded photos
 - TODO: Test actual photo capture when shutter is pressed on real iPad
@@ -205,6 +233,7 @@ Photographer → Camera Shutter → Photo → iPad App (automatic download)
 ## 2026-01-14 - Photo Download Implementation (Phase 1B)
 
 ### Added
+
 - `CapturedPhoto` model - Represents downloaded photos
   - UUID identifier
   - Photo name, data, UIImage
@@ -218,6 +247,7 @@ Photographer → Camera Shutter → Photo → iPad App (automatic download)
   - End Session button (UI only, functionality TODO)
 
 ### Updated
+
 - **CameraViewModel.swift** - Full tethered photo capture
   - Conforms to `ICCameraDeviceDelegate` + `ICCameraDeviceDownloadDelegate`
   - State: Added `.capturing` state for active sessions
@@ -234,6 +264,7 @@ Photographer → Camera Shutter → Photo → iPad App (automatic download)
   - Removed `.ready` state (goes straight to `.capturing`)
 
 ### Architecture
+
 ```
 User presses shutter
   ↓
@@ -255,6 +286,7 @@ Photo appears in grid! 📸
 ```
 
 ### Fixed API Issues
+
 - ImageCaptureCore iOS 16+ compatibility
   - Correct delegate method signatures
   - ICDownloadOption dictionary usage
@@ -266,11 +298,13 @@ Photo appears in grid! 📸
     - `cameraDeviceDidEnableAccessRestriction`
 
 ### Build Status
+
 - ✅ **BUILD SUCCEEDED**
 - ✅ All delegate methods implemented
 - ✅ Photo download pipeline complete
 
 ### What Works Now (Ready to Test on iPad!)
+
 1. App launches → Searching for cameras
 2. Connect camera via USB-C → Camera Found
 3. Tap "Connect Camera" → Connecting → Capturing (LiveCaptureView)
@@ -280,6 +314,7 @@ Photo appears in grid! 📸
 7. Stats update in real-time
 
 ### Testing Checklist (iPad + Camera)
+
 - [ ] Connect camera, tap "Connect Camera"
 - [ ] Camera LCD goes black (expected)
 - [ ] Take 1 photo - does it appear in grid?
@@ -288,6 +323,7 @@ Photo appears in grid! 📸
 - [ ] Verify photo thumbnails display correctly
 
 ### Next Steps
+
 - ✅ **TESTED ON REAL HARDWARE!** (iPad + Camera)
 - ✅ Fixed: Only download NEW photos (not old ones)
 - TODO: Test shutter button works without "BUSY" blocking
@@ -299,19 +335,24 @@ Photo appears in grid! 📸
 ## 2026-01-14 - Critical Fix: Only Download NEW Photos
 
 ### Issue Found During Testing
+
 When connecting camera to iPad:
+
 - ✅ Camera detected successfully
 - ✅ Connection worked
 - ❌ **ALL old photos on camera started downloading** (not just new ones!)
 - ❌ Camera showed "BUSY" when pressing shutter
 
 ### Root Cause
+
 When `requestOpenSession()` is called:
+
 1. Camera sends its **entire file catalog** to the app
 2. `didAdd(items:)` is called with **ALL existing files**
 3. Our code downloaded everything (could be hundreds of photos!)
 
 ### Fix Implemented
+
 Added **initial catalog filtering**:
 
 ```swift
@@ -328,6 +369,7 @@ initialCatalogReceived = true  // NOW start downloading new photos only
 ```
 
 **How it works:**
+
 1. Connect camera → Session opens
 2. Camera sends catalog of existing files → **IGNORED** ✅
 3. `deviceDidBecomeReady(withCompleteContentCatalog:)` fires
@@ -335,13 +377,16 @@ initialCatalogReceived = true  // NOW start downloading new photos only
 5. **From now on**, any `didAdd()` call = NEW photo from shutter → **DOWNLOAD** ✅
 
 ### Testing Status
+
 - ✅ Build succeeds
 - ⏳ Needs testing on iPad with camera
 - ⏳ Verify only NEW photos download (not old ones)
 - ⏳ Test if "BUSY" was just processing, or if shutter actually works
 
 ### Hypothesis on "BUSY"
+
 User suggests "BUSY" might mean:
+
 - Camera is processing the image to send to iPad
 - NOT blocking the shutter
 - Just showing transfer status
@@ -355,6 +400,7 @@ User suggests "BUSY" might mean:
 ### Testing Results: USB Connection Issues
 
 **What we tested:**
+
 1. ✅ Camera detection works
 2. ✅ Connection via `requestOpenSession()` works
 3. ✅ Fixed: Only NEW photos download (not old ones)
@@ -364,6 +410,7 @@ User suggests "BUSY" might mean:
 ### Root Cause: PTP Protocol Limitations
 
 When `requestOpenSession()` is called on iOS:
+
 - Camera enters **PTP (Picture Transfer Protocol) mode**
 - Camera LCD goes black or shows "PC Connected"
 - **Camera shutter button is DISABLED** (camera firmware behavior)
@@ -385,18 +432,19 @@ camera.requestTakePicture()  // ✅ Works on macOS
 
 ### Why USB/PTP Doesn't Work for This Use Case
 
-| Requirement | USB/PTP Mode | Status |
-|-------------|--------------|--------|
-| Detect camera | ✅ Works | ✅ |
-| Connect to camera | ✅ Works | ✅ |
-| Download photos | ✅ Works | ✅ |
-| **Take NEW photos with shutter** | ❌ Blocked | ❌ **BLOCKER** |
-| Remote capture from iPad | ❌ Not on iOS | ❌ **BLOCKER** |
-| Camera LCD stays on | ❌ Goes black | ❌ |
+| Requirement                      | USB/PTP Mode  | Status         |
+| -------------------------------- | ------------- | -------------- |
+| Detect camera                    | ✅ Works      | ✅             |
+| Connect to camera                | ✅ Works      | ✅             |
+| Download photos                  | ✅ Works      | ✅             |
+| **Take NEW photos with shutter** | ❌ Blocked    | ❌ **BLOCKER** |
+| Remote capture from iPad         | ❌ Not on iOS | ❌ **BLOCKER** |
+| Camera LCD stays on              | ❌ Goes black | ❌             |
 
 ### Conclusion: USB/PTP Mode is NOT viable
 
 **The fundamental issue:**
+
 - Photographer needs to **press camera shutter** during event
 - PTP mode **disables the shutter button**
 - iOS doesn't support **remote capture**
@@ -407,12 +455,14 @@ camera.requestTakePicture()  // ✅ Works on macOS
 **Next approach: WiFi Transfer (Phase 2)**
 
 Use camera's built-in WiFi features:
+
 - Camera stays in **normal shooting mode**
 - Shutter button works normally
 - LCD stays on
 - Photos transfer via WiFi after each shot
 
 **Two WiFi options:**
+
 1. **Manual IP** - Enter camera IP manually (simple, works now)
 2. **Auto-discovery** - mDNS/SSDP discovery (requires multicast entitlement)
 
@@ -423,11 +473,13 @@ Use camera's built-in WiFi features:
 ### Why WiFi Instead of USB
 
 **USB/PTP failed because:**
+
 - ❌ Camera shutter disabled in PTP mode
 - ❌ No remote capture on iOS
 - ❌ Camera unusable during event
 
 **WiFi solves this:**
+
 - ✅ Camera works normally
 - ✅ Shutter button works
 - ✅ LCD stays on
@@ -435,6 +487,7 @@ Use camera's built-in WiFi features:
 - ⚠️ Slower than USB (but acceptable)
 
 ### Next Steps
+
 1. Research camera WiFi protocols (likely uses HTTP/WebDAV/PTP-IP)
 2. Implement WiFi connection mode
 3. Test with manual IP entry first

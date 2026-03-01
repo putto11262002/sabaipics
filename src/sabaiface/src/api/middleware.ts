@@ -41,55 +41,76 @@ export async function errorHandler(c: Context, next: Next) {
 
     // Zod validation errors
     if (error instanceof ZodError) {
-      return c.json({
-        __type: ErrorCodes.INVALID_PARAMETER,
-        message: `Invalid request: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
-      }, 400);
+      return c.json(
+        {
+          __type: ErrorCodes.INVALID_PARAMETER,
+          message: `Invalid request: ${error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+        },
+        400,
+      );
     }
 
     // Domain errors (if any)
     if (error instanceof Error) {
       // Check error name for specific handling
       if (error.name === 'ResourceNotFoundException') {
-        return c.json({
-          __type: ErrorCodes.RESOURCE_NOT_FOUND,
-          message: error.message,
-        }, 404);
+        return c.json(
+          {
+            __type: ErrorCodes.RESOURCE_NOT_FOUND,
+            message: error.message,
+          },
+          404,
+        );
       }
 
       if (error.name === 'ResourceAlreadyExistsException') {
-        return c.json({
-          __type: ErrorCodes.RESOURCE_ALREADY_EXISTS,
-          message: error.message,
-        }, 400);
+        return c.json(
+          {
+            __type: ErrorCodes.RESOURCE_ALREADY_EXISTS,
+            message: error.message,
+          },
+          400,
+        );
       }
 
       if (error.name === 'InvalidImageFormatException') {
-        return c.json({
-          __type: ErrorCodes.INVALID_IMAGE,
-          message: error.message,
-        }, 400);
+        return c.json(
+          {
+            __type: ErrorCodes.INVALID_IMAGE,
+            message: error.message,
+          },
+          400,
+        );
       }
 
       if (error.name === 'ImageTooLargeException') {
-        return c.json({
-          __type: ErrorCodes.IMAGE_TOO_LARGE,
-          message: error.message,
-        }, 400);
+        return c.json(
+          {
+            __type: ErrorCodes.IMAGE_TOO_LARGE,
+            message: error.message,
+          },
+          400,
+        );
       }
 
       // Generic error
-      return c.json({
-        __type: ErrorCodes.INTERNAL_ERROR,
-        message: error.message || 'Internal server error',
-      }, 500);
+      return c.json(
+        {
+          __type: ErrorCodes.INTERNAL_ERROR,
+          message: error.message || 'Internal server error',
+        },
+        500,
+      );
     }
 
     // Unknown error
-    return c.json({
-      __type: ErrorCodes.INTERNAL_ERROR,
-      message: 'An unexpected error occurred',
-    }, 500);
+    return c.json(
+      {
+        __type: ErrorCodes.INTERNAL_ERROR,
+        message: 'An unexpected error occurred',
+      },
+      500,
+    );
   }
 }
 

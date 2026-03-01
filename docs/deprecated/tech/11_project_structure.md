@@ -10,6 +10,7 @@
 **Decision:** Yes, monorepo with pnpm workspaces + Turborepo
 
 **Why monorepo:**
+
 - Shared TypeScript types between API and frontends
 - Shared UI components between Dashboard, Participant Web, Desktop
 - Atomic changes across packages
@@ -17,12 +18,14 @@
 - Easier dependency management
 
 **Why pnpm:**
+
 - Fastest package manager
 - Strict dependency resolution (no phantom deps)
 - Efficient disk space (hardlinks)
 - Native workspace support
 
 **Why Turborepo:**
+
 - Smart caching (skip unchanged builds)
 - Parallel execution
 - Works with any package manager
@@ -102,6 +105,7 @@ apps/api/
 ```
 
 **Cloudflare bindings:**
+
 - `DB` - D1 or Hyperdrive to Neon
 - `R2` - Photo storage bucket
 - `QUEUE` - Photo processing queue
@@ -385,18 +389,18 @@ packages:
 
 **Scope:** `@facelink/`
 
-| Package | Name |
-|---------|------|
-| API | `@facelink/api` |
-| Web | `@facelink/web` |
-| Dashboard | `@facelink/dashboard` |
+| Package     | Name                    |
+| ----------- | ----------------------- |
+| API         | `@facelink/api`         |
+| Web         | `@facelink/web`         |
+| Dashboard   | `@facelink/dashboard`   |
 | Participant | `@facelink/participant` |
-| Desktop | `@facelink/desktop` |
-| DB | `@facelink/db` |
-| Types | `@facelink/types` |
-| UI | `@facelink/ui` |
-| Utils | `@facelink/utils` |
-| Config | `@facelink/config` |
+| Desktop     | `@facelink/desktop`     |
+| DB          | `@facelink/db`          |
+| Types       | `@facelink/types`       |
+| UI          | `@facelink/ui`          |
+| Utils       | `@facelink/utils`       |
+| Config      | `@facelink/config`      |
 
 ---
 
@@ -426,6 +430,7 @@ packages:
 ```
 
 **Key dependencies:**
+
 - All packages depend on `@facelink/types`
 - `@facelink/api` depends on `@facelink/db`
 - All frontends depend on `@facelink/ui`
@@ -449,16 +454,14 @@ apps/web/.env.local        # NEXT_PUBLIC_* vars
 ```json
 // turbo.json
 {
-  "globalEnv": [
-    "NODE_ENV",
-    "CLERK_PUBLISHABLE_KEY"
-  ]
+  "globalEnv": ["NODE_ENV", "CLERK_PUBLISHABLE_KEY"]
 }
 ```
 
 ### Required Variables
 
 **API (`apps/api/.env`):**
+
 ```
 # Cloudflare
 CLOUDFLARE_ACCOUNT_ID=
@@ -487,6 +490,7 @@ LINE_CHANNEL_SECRET=
 ```
 
 **Frontend (`apps/dashboard/.env`):**
+
 ```
 VITE_API_URL=https://api.facelink.app
 VITE_CLERK_PUBLISHABLE_KEY=pk_...
@@ -510,12 +514,12 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 
 ### Deployment Triggers
 
-| App | Trigger | Target |
-|-----|---------|--------|
-| API | Push to `main` + changes in `apps/api/` or `packages/` | Cloudflare Workers |
-| Web | Push to `main` + changes in `apps/web/` | Cloudflare Pages |
-| Dashboard | Push to `main` + changes in `apps/dashboard/` or `packages/ui/` | Cloudflare Pages |
-| Participant | Push to `main` + changes in `apps/participant/` or `packages/ui/` | Cloudflare Pages |
+| App         | Trigger                                                           | Target             |
+| ----------- | ----------------------------------------------------------------- | ------------------ |
+| API         | Push to `main` + changes in `apps/api/` or `packages/`            | Cloudflare Workers |
+| Web         | Push to `main` + changes in `apps/web/`                           | Cloudflare Pages   |
+| Dashboard   | Push to `main` + changes in `apps/dashboard/` or `packages/ui/`   | Cloudflare Pages   |
+| Participant | Push to `main` + changes in `apps/participant/` or `packages/ui/` | Cloudflare Pages   |
 
 ### Turborepo Remote Cache
 

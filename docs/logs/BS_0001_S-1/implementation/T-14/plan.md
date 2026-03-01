@@ -6,6 +6,7 @@ Date: `2026-01-10`
 Owner: `Claude (implementv3)`
 
 ## Inputs
+
 - Task: `docs/logs/BS_0001_S-1/tasks.md` (section: T-14)
 - Upstream plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Context reports:
@@ -18,9 +19,11 @@ Owner: `Claude (implementv3)`
 ## Goal / non-goals
 
 ### Goal
+
 Create a minimal, typed utility library that wraps `@juit/qrcode` to generate QR code PNGs for event access codes. The library must work in Cloudflare Workers and be ready for T-13 (Events API) to consume.
 
 ### Non-goals
+
 - QR code rendering/display UI (handled by T-15 Dashboard UI)
 - R2 upload logic (T-13's responsibility)
 - Lazy/on-demand generation (eager generation on event creation)
@@ -30,12 +33,15 @@ Create a minimal, typed utility library that wraps `@juit/qrcode` to generate QR
 ## Approach (data-driven)
 
 ### Architecture decision: Minimal pattern
+
 Based on codebase exemplars, QR generation fits the **LINE client pattern** (minimal, single-purpose utility):
+
 - **Why not Stripe pattern?** No network calls, no retry logic, no complex error handling needed
 - **Why not Rekognition pattern?** No AWS SDK complexity, no stateful client required
 - **Chosen pattern:** Simple function export with input validation
 
 ### File structure
+
 ```
 apps/api/src/lib/qr/
 ├── index.ts           # Barrel export (clean import for consumers)
@@ -46,9 +52,11 @@ apps/api/src/lib/qr/
 ### Implementation steps
 
 **1. Install dependency**
+
 ```bash
 pnpm --filter=@sabaipics/api add @juit/qrcode
 ```
+
 - Library selection validated in `docs/logs/BS_0001_S-1/research/qr-code-library.md`
 - Zero dependencies, Cloudflare Workers compatible
 - Estimated bundle impact: ~15-20 KB
@@ -56,8 +64,8 @@ pnpm --filter=@sabaipics/api add @juit/qrcode
 **2. Create generate.ts**
 Core function with input validation and typed interface:
 
-```typescript
-import { generatePngQrCode } from "@juit/qrcode";
+````typescript
+import { generatePngQrCode } from '@juit/qrcode';
 
 /**
  * Generates a QR code PNG for an event access code.
@@ -76,14 +84,11 @@ import { generatePngQrCode } from "@juit/qrcode";
  * await env.PHOTOS_BUCKET.put(`qr/${eventId}.png`, qrPng);
  * ```
  */
-export async function generateEventQR(
-  accessCode: string,
-  baseUrl: string
-): Promise<Uint8Array> {
+export async function generateEventQR(accessCode: string, baseUrl: string): Promise<Uint8Array> {
   // Validate access code format (security: prevent injection)
   if (!/^[A-Z0-9]{6}$/.test(accessCode)) {
     throw new Error(
-      `Invalid access code format: "${accessCode}". Must be 6 uppercase alphanumeric characters (A-Z0-9).`
+      `Invalid access code format: "${accessCode}". Must be 6 uppercase alphanumeric characters (A-Z0-9).`,
     );
   }
 
@@ -92,24 +97,25 @@ export async function generateEventQR(
 
   // Generate QR PNG with validated options
   const pngBytes = await generatePngQrCode(searchUrl, {
-    ecLevel: "M",  // Decision: Medium (15%) error correction
-    margin: 4,     // Standard quiet zone (4 modules)
+    ecLevel: 'M', // Decision: Medium (15%) error correction
+    margin: 4, // Standard quiet zone (4 modules)
   });
 
   return pngBytes;
 }
-```
+````
 
 **3. Create index.ts**
 Barrel export for clean imports:
 
 ```typescript
-export { generateEventQR } from "./generate";
+export { generateEventQR } from './generate';
 ```
 
 **4. Add APP_BASE_URL environment variable**
 
 To `apps/api/wrangler.jsonc` (vars section):
+
 ```json
 {
   "vars": {
@@ -119,11 +125,13 @@ To `apps/api/wrangler.jsonc` (vars section):
 ```
 
 To `apps/api/.dev.vars` (local development):
+
 ```
 APP_BASE_URL=http://localhost:5173
 ```
 
 Update `apps/api/src/types.ts` Bindings interface:
+
 ```typescript
 export type Bindings = CloudflareBindings & {
   APP_BASE_URL: string;
@@ -135,14 +143,14 @@ export type Bindings = CloudflareBindings & {
 Create `apps/api/src/lib/qr/generate.test.ts`:
 
 ```typescript
-import { describe, it, expect } from "vitest";
-import { generateEventQR } from "./generate";
+import { describe, it, expect } from 'vitest';
+import { generateEventQR } from './generate';
 
-describe("generateEventQR", () => {
-  const baseUrl = "https://sabaipics.com";
+describe('generateEventQR', () => {
+  const baseUrl = 'https://sabaipics.com';
 
-  it("generates valid PNG Uint8Array for valid access code", async () => {
-    const result = await generateEventQR("ABC123", baseUrl);
+  it('generates valid PNG Uint8Array for valid access code', async () => {
+    const result = await generateEventQR('ABC123', baseUrl);
 
     expect(result).toBeInstanceOf(Uint8Array);
     expect(result.length).toBeGreaterThan(0);
@@ -154,8 +162,8 @@ describe("generateEventQR", () => {
     expect(result[3]).toBe(0x47);
   });
 
-  it("accepts different valid access codes", async () => {
-    const codes = ["A1B2C3", "XXXXXX", "000000", "ZZZZZZ"];
+  it('accepts different valid access codes', async () => {
+    const codes = ['A1B2C3', 'XXXXXX', '000000', 'ZZZZZZ'];
 
     for (const code of codes) {
       const result = await generateEventQR(code, baseUrl);
@@ -164,39 +172,29 @@ describe("generateEventQR", () => {
     }
   });
 
-  it("rejects access code with lowercase characters", async () => {
-    await expect(generateEventQR("abc123", baseUrl)).rejects.toThrow(
-      /Invalid access code format/
-    );
+  it('rejects access code with lowercase characters', async () => {
+    await expect(generateEventQR('abc123', baseUrl)).rejects.toThrow(/Invalid access code format/);
   });
 
-  it("rejects access code with special characters", async () => {
-    await expect(generateEventQR("ABC!@#", baseUrl)).rejects.toThrow(
-      /Invalid access code format/
-    );
+  it('rejects access code with special characters', async () => {
+    await expect(generateEventQR('ABC!@#', baseUrl)).rejects.toThrow(/Invalid access code format/);
   });
 
-  it("rejects access code that is too short", async () => {
-    await expect(generateEventQR("ABC", baseUrl)).rejects.toThrow(
-      /Invalid access code format/
-    );
+  it('rejects access code that is too short', async () => {
+    await expect(generateEventQR('ABC', baseUrl)).rejects.toThrow(/Invalid access code format/);
   });
 
-  it("rejects access code that is too long", async () => {
-    await expect(generateEventQR("ABCDEFG", baseUrl)).rejects.toThrow(
-      /Invalid access code format/
-    );
+  it('rejects access code that is too long', async () => {
+    await expect(generateEventQR('ABCDEFG', baseUrl)).rejects.toThrow(/Invalid access code format/);
   });
 
-  it("rejects empty access code", async () => {
-    await expect(generateEventQR("", baseUrl)).rejects.toThrow(
-      /Invalid access code format/
-    );
+  it('rejects empty access code', async () => {
+    await expect(generateEventQR('', baseUrl)).rejects.toThrow(/Invalid access code format/);
   });
 
-  it("generates different PNGs for different access codes", async () => {
-    const png1 = await generateEventQR("CODE01", baseUrl);
-    const png2 = await generateEventQR("CODE02", baseUrl);
+  it('generates different PNGs for different access codes', async () => {
+    const png1 = await generateEventQR('CODE01', baseUrl);
+    const png2 = await generateEventQR('CODE02', baseUrl);
 
     // PNGs should be different (different QR content)
     expect(png1).not.toEqual(png2);
@@ -207,6 +205,7 @@ describe("generateEventQR", () => {
 ### Validation approach
 
 **Scannability verification:**
+
 - Unit tests validate PNG format (magic bytes)
 - Unit tests validate error handling (invalid formats rejected)
 - Manual testing required for actual scannability (see Validation Plan below)
@@ -215,36 +214,42 @@ describe("generateEventQR", () => {
 ## Contracts (only if touched)
 
 ### Function contract (PUBLIC API for T-13)
+
 ```typescript
 generateEventQR(accessCode: string, baseUrl: string): Promise<Uint8Array>
 ```
 
 **Inputs:**
+
 - `accessCode`: 6-character uppercase alphanumeric string (A-Z0-9)
 - `baseUrl`: Base URL for the application (from `env.APP_BASE_URL`)
 
 **Outputs:**
+
 - `Promise<Uint8Array>`: PNG image bytes (ready for R2 upload or HTTP response)
 
 **Throws:**
+
 - `Error`: If `accessCode` does not match format `/^[A-Z0-9]{6}$/`
 
 **Example usage (T-13 integration):**
+
 ```typescript
-import { generateEventQR } from "../lib/qr";
+import { generateEventQR } from '../lib/qr';
 
 // In POST /events handler
-const accessCode = "ABC123"; // Generated by T-13
+const accessCode = 'ABC123'; // Generated by T-13
 const qrPng = await generateEventQR(accessCode, env.APP_BASE_URL);
 
 // Upload to R2
 const qrKey = `qr/${eventId}.png`;
 await env.PHOTOS_BUCKET.put(qrKey, qrPng, {
-  httpMetadata: { contentType: "image/png" }
+  httpMetadata: { contentType: 'image/png' },
 });
 ```
 
 ### Environment variable (NEW)
+
 - **Name:** `APP_BASE_URL`
 - **Type:** `string`
 - **Required:** Yes
@@ -255,9 +260,11 @@ await env.PHOTOS_BUCKET.put(qrKey, qrPng, {
   - Local: `http://localhost:5173`
 
 ### No DB changes
+
 T-14 is pure compute logic, no database schema changes.
 
 ### No API changes
+
 T-14 is a library, not an HTTP endpoint. API integration happens in T-13.
 
 ## Success path
@@ -277,33 +284,40 @@ T-14 is a library, not an HTTP endpoint. API integration happens in T-13.
 ## Failure modes / edge cases (major only)
 
 ### 1. Invalid access code format
+
 **Scenario:** T-13 passes malformed access code (lowercase, special chars, wrong length)
 
 **Handling:** Throw descriptive error immediately (fail fast)
+
 ```typescript
-throw new Error(`Invalid access code format: "${accessCode}". Must be 6 uppercase alphanumeric characters (A-Z0-9).`);
+throw new Error(
+  `Invalid access code format: "${accessCode}". Must be 6 uppercase alphanumeric characters (A-Z0-9).`,
+);
 ```
 
 **Impact:** T-13 will receive error, can log and return 500 to client
 **Mitigation:** T-13 should validate access code before calling `generateEventQR()`
 
 ### 2. Missing APP_BASE_URL environment variable
+
 **Scenario:** Env var not configured in wrangler.jsonc or .dev.vars
 
 **Handling:** Function receives empty string or undefined, generates invalid URL
 **Impact:** QR code will encode malformed URL (e.g., `undefined/search/ABC123`)
 
 **Mitigation:**
+
 - Document APP_BASE_URL as required in PR description
 - T-13 should validate `env.APP_BASE_URL` exists before calling
 - Consider adding validation in `generateEventQR()`:
   ```typescript
-  if (!baseUrl || !baseUrl.startsWith("http")) {
-    throw new Error("Invalid baseUrl: must be a valid HTTP(S) URL");
+  if (!baseUrl || !baseUrl.startsWith('http')) {
+    throw new Error('Invalid baseUrl: must be a valid HTTP(S) URL');
   }
   ```
 
 ### 3. QR generation fails (library error)
+
 **Scenario:** `@juit/qrcode` throws unexpected error (unlikely, but possible)
 
 **Handling:** Error bubbles up to caller (T-13), logged by Sentry
@@ -312,24 +326,29 @@ throw new Error(`Invalid access code format: "${accessCode}". Must be 6 uppercas
 **Mitigation:** T-13 should wrap in try-catch and provide user-friendly error
 
 ### 4. QR not scannable in real-world conditions
+
 **Scenario:** Generated QR works in tests but fails to scan on printed materials
 
 **Root causes:**
+
 - Print quality too low (resolution, printer DPI)
 - QR too small (< 2cm)
 - Low contrast (faded print)
 - Dirty/damaged surface
 
 **Mitigation:**
+
 - Error correction level "M" provides 15% resilience (decision confirmed)
 - Margin of 4 modules ensures quiet zone
 - Document minimum print size in photographer onboarding
 - If issues arise, can upgrade to error correction "Q" (25%) in follow-up
 
 ### 5. URL length exceeds QR capacity
+
 **Scenario:** Very long baseUrl + accessCode exceeds QR limits
 
 **Analysis:**
+
 - Max URL: `https://staging.sabaipics.com/search/ABC123` = ~46 chars
 - QR capacity (Version 1, M level): ~14 alphanumeric chars (NOT ENOUGH)
 - QR capacity (Version 3, M level): ~53 alphanumeric chars (sufficient)
@@ -343,6 +362,7 @@ throw new Error(`Invalid access code format: "${accessCode}". Must be 6 uppercas
 ### Tests to add
 
 **Unit tests (automated):**
+
 - ✅ Valid access code generates PNG Uint8Array
 - ✅ PNG magic bytes verification (89 50 4E 47)
 - ✅ Different codes generate different PNGs
@@ -351,6 +371,7 @@ throw new Error(`Invalid access code format: "${accessCode}". Must be 6 uppercas
 - ✅ Wrong length rejected (too short, too long, empty)
 
 **Integration tests (manual for MVP):**
+
 - ✅ Generate QR in Workers environment (if time permits, use `@cloudflare/vitest-pool-workers`)
 - ✅ Manual scannability test (see below)
 
@@ -378,13 +399,14 @@ pnpm build
 **Required before marking T-14 complete:**
 
 1. **Generate test QR:**
+
    ```typescript
    // In Vitest test or dev script
-   import { generateEventQR } from "./src/lib/qr";
-   import { writeFileSync } from "fs";
+   import { generateEventQR } from './src/lib/qr';
+   import { writeFileSync } from 'fs';
 
-   const png = await generateEventQR("TEST01", "https://sabaipics.com");
-   writeFileSync("test-qr.png", png);
+   const png = await generateEventQR('TEST01', 'https://sabaipics.com');
+   writeFileSync('test-qr.png', png);
    ```
 
 2. **Scan tests:**
@@ -403,30 +425,37 @@ pnpm build
 ## Rollout / rollback
 
 ### Rollout (T-14)
+
 - T-14 introduces library only, no user-facing changes
 - No database migrations
 - No API endpoints
 - Risk: **Very low** (pure utility, no side effects)
 
 ### Rollout (T-13 integration)
+
 T-13 will integrate this library for event creation:
+
 - QR generation happens synchronously during `POST /events`
 - Expected latency: < 100ms per QR (acceptable for event creation)
 - Storage: R2 (`qr/{eventId}.png`)
 - Rollback: If QR generation fails, event creation should still succeed (optional QR)
 
 ### Environment configuration
+
 **Required before T-13 merge:**
+
 - Add `APP_BASE_URL` to production `wrangler.jsonc`
 - Add `APP_BASE_URL` to staging `wrangler.jsonc` (if exists)
 - Verify `.dev.vars` has `APP_BASE_URL=http://localhost:5173`
 
 **Rollback:** If QR generation causes issues in production:
+
 1. Option A: Disable QR generation in T-13 (make it optional/skippable)
 2. Option B: Revert T-13 PR (does not affect T-14 library code)
 3. Option C: Fix forward (adjust error correction, validation, etc.)
 
 ### Monitoring
+
 - No specific monitoring for T-14 (library code)
 - T-13 will add Sentry spans for QR generation operations
 - Check Sentry for errors after T-13 deployment:

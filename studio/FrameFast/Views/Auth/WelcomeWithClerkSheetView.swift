@@ -20,18 +20,18 @@ struct WelcomeWithClerkSheetView: View {
     private var clerkTheme: ClerkTheme {
         ClerkTheme(
             colors: .init(
-                primary: Color.Theme.primary,
+                primary: Color.accentColor,
                 background: Color(.systemBackground),
-                input: Color.Theme.input,
-                danger: Color.Theme.destructive,
+                input: Color(UIColor.secondarySystemBackground),
+                danger: Color.red,
                 success: Color(hex: "#22c55e"),  // green-500
-                foreground: Color.Theme.foreground,
-                mutedForeground: Color.Theme.mutedForeground,
-                primaryForeground: Color.Theme.primaryForeground,
-                inputForeground: Color.Theme.foreground,
-                ring: Color.Theme.ring,
-                muted: Color.Theme.muted,
-                border: Color.Theme.border
+                foreground: Color.primary,
+                mutedForeground: Color.secondary,
+                primaryForeground: Color.white,
+                inputForeground: Color.primary,
+                ring: Color.accentColor,
+                muted: Color(UIColor.tertiarySystemFill),
+                border: Color(UIColor.separator)
             ),
             design: .init(
                 borderRadius: 10.0  // 0.625rem = 10px
@@ -55,12 +55,12 @@ struct WelcomeWithClerkSheetView: View {
                 // App name
                 Text("FrameFast")
                     .font(.system(size: 32, weight: .bold))
-                    .foregroundStyle(Color.Theme.foreground)
+                    .foregroundStyle(Color.primary)
                 
                 // Tagline
                 Text("Event photography made simple")
                     .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(Color.Theme.mutedForeground)
+                    .foregroundStyle(Color.secondary)
             }
             
             Spacer()
@@ -72,14 +72,16 @@ struct WelcomeWithClerkSheetView: View {
                     authMode = .signIn
                     showAuthSheet = true
                 }
-                .buttonStyle(.primary)
-                
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+
                 // Secondary: Sign up (ghost style)
                 Button("Create an account") {
                     authMode = .signUp
                     showAuthSheet = true
                 }
-                .buttonStyle(.ghost)
+                .buttonStyle(.borderless)
                 .padding(.top, 4)
             }
             .padding(.horizontal, 24)
@@ -88,8 +90,8 @@ struct WelcomeWithClerkSheetView: View {
             // MARK: - Footer
             Text("By continuing, you agree to our [Terms of Service](https://framefast.io/terms) and [Privacy Policy](https://framefast.io/privacy)")
                 .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(Color.Theme.mutedForeground)
-                .tint(Color.Theme.primary)
+                .foregroundStyle(Color.secondary)
+                .tint(Color.accentColor)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
                 .padding(.bottom, 16)

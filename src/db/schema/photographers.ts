@@ -1,26 +1,43 @@
-import { pgTable, text, index, uuid, pgView } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
-import { timestamptz, createdAtCol } from "./common";
+import { pgTable, text, integer, index, uuid, pgView, jsonb } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { timestamptz, createdAtCol } from './common';
+
+export interface LineSettings {
+  photoCap: 5 | 10 | 15 | 20 | null; // null = send all
+  overageEnabled: boolean;
+}
+
+export interface PhotographerSettings {
+  lineSettings?: LineSettings;
+}
 
 export const photographers = pgTable(
-  "photographers",
+  'photographers',
   {
-    id: uuid("id")
+    id: uuid('id')
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    clerkId: text("clerk_id").notNull().unique(),
-    email: text("email").notNull(),
-    name: text("name"),
-    stripeCustomerId: text("stripe_customer_id").unique(),
-    pdpaConsentAt: timestamptz("pdpa_consent_at"),
-    deletedAt: timestamptz("deleted_at"), // null = active, set = soft deleted
+    clerkId: text('clerk_id').notNull().unique(),
+    email: text('email').notNull(),
+    name: text('name'),
+    stripeCustomerId: text('stripe_customer_id').unique(),
+    pdpaConsentAt: timestamptz('pdpa_consent_at'),
+    balance: integer('balance').notNull().default(0), // Denormalized running balance
+    balanceInvalidateAt: timestamptz('balance_invalidate_at'),
+    settings: jsonb('settings').$type<PhotographerSettings>(),
+    bannedAt: timestamptz('banned_at'), // null = not banned, set = account suspended
+    deletedAt: timestamptz('deleted_at'), // null = active, set = soft deleted
+    cleanedAt: timestamptz('cleaned_at'), // null = not cleaned, set = content cleanup completed
     createdAt: createdAtCol(),
   },
   (table) => [
-    index("photographers_clerk_id_idx").on(table.clerkId),
-    index("photographers_stripe_customer_id_idx").on(table.stripeCustomerId),
-    index("photographers_deleted_at_idx").on(table.deletedAt),
-  ]
+    index('photographers_clerk_id_idx').on(table.clerkId),
+    index('photographers_stripe_customer_id_idx').on(table.stripeCustomerId),
+    index('photographers_balance_invalidate_at_idx').on(table.balanceInvalidateAt),
+    index('photographers_banned_at_idx').on(table.bannedAt),
+    index('photographers_deleted_at_idx').on(table.deletedAt),
+    index('photographers_cleaned_at_idx').on(table.cleanedAt),
+  ],
 );
 
 export type Photographer = typeof photographers.$inferSelect;
@@ -34,7 +51,10 @@ export type NewPhotographer = typeof photographers.$inferInsert;
  * Query the base `photographers` table directly only for admin/debugging purposes.
  */
 export const activePhotographers = pgView('active_photographers').as((qb) =>
-  qb.select().from(photographers).where(sql`${photographers.deletedAt} IS NULL`)
+  qb
+    .select()
+    .from(photographers)
+    .where(sql`${photographers.deletedAt} IS NULL`),
 );
 
 export type ActivePhotographer = typeof activePhotographers.$inferSelect;

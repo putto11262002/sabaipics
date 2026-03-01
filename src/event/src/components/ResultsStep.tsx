@@ -1,12 +1,13 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Download, Check, RefreshCw, Image, Info } from 'lucide-react';
 import { RowsPhotoAlbum, type Photo } from 'react-photo-album';
 import { toast } from 'sonner';
 import { Button } from '@/shared/components/ui/button';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Spinner } from '@/shared/components/ui/spinner';
-import { downloadBulk } from '../lib/api';
+import { downloadBulk, getLineStatus, type SearchResult } from '../lib/api';
 import { th } from '../lib/i18n';
+import { LineDeliveryButton } from './LineDeliveryButton';
 
 const MAX_SELECTION = 15;
 
@@ -19,13 +20,22 @@ interface ResultPhoto {
 
 interface ResultsStepProps {
   eventId: string;
+  searchId: string;
   photos: ResultPhoto[];
+  searchResult: SearchResult;
   onSearchAgain: () => void;
 }
 
-export function ResultsStep({ eventId, photos, onSearchAgain }: ResultsStepProps) {
+export function ResultsStep({ eventId, searchId, photos, searchResult, onSearchAgain }: ResultsStepProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDownloading, setIsDownloading] = useState(false);
+  const [lineAvailable, setLineAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    getLineStatus(eventId)
+      .then((s) => setLineAvailable(s.available))
+      .catch(() => setLineAvailable(true));
+  }, [eventId]);
 
   const albumPhotos: Photo[] = photos.map((photo) => ({
     src: photo.thumbnailUrl,
@@ -138,29 +148,37 @@ export function ResultsStep({ eventId, photos, onSearchAgain }: ResultsStepProps
         />
       </div>
 
-      {/* Sticky Footer */}
-      {selectedIds.size > 0 && (
-        <div className="sticky bottom-0 z-30 border-t bg-background p-4">
-          <Button
-            size="lg"
-            className="w-full"
-            onClick={handleDownloadSelected}
-            disabled={isDownloading}
-          >
-            {isDownloading ? (
-              <>
-                <Spinner className="mr-1 size-4" />
-                {th.results.downloading}
-              </>
-            ) : (
-              <>
-                <Download className="mr-1 size-4" />
-                {th.results.download(selectedIds.size)}
-              </>
-            )}
-          </Button>
-        </div>
-      )}
+      {/* Sticky Footer — always visible */}
+      <div className="sticky bottom-0 z-30 space-y-2 border-t bg-background p-4">
+        {lineAvailable && (
+          <LineDeliveryButton
+            eventId={eventId}
+            searchId={searchId}
+            searchResult={searchResult}
+          />
+        )}
+        <Button
+          variant="outline"
+          size="lg"
+          className="w-full"
+          onClick={handleDownloadSelected}
+          disabled={isDownloading || selectedIds.size === 0}
+        >
+          {isDownloading ? (
+            <>
+              <Spinner className="mr-1 size-4" />
+              {th.results.downloading}
+            </>
+          ) : (
+            <>
+              <Download className="mr-1 size-4" />
+              {selectedIds.size > 0
+                ? th.results.download(selectedIds.size)
+                : th.results.download(0)}
+            </>
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

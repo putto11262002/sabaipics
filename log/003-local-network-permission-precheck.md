@@ -31,6 +31,7 @@ When user connects to camera for the **first time**:
 ### Discovery
 
 From testing with Canon camera + iPhone hotspot:
+
 - **First attempt:** Timeout -7 (GP_ERROR_TIMEOUT) after iOS permission prompt
 - **Second attempt:** Immediate success - permission already granted
 - iPhone hotspot **WORKS** with local network permission (research was outdated)
@@ -44,18 +45,21 @@ Trigger local network permission prompt **before** attempting camera connection,
 ### Implementation Strategy
 
 **Step 1: Pre-Flight Check**
+
 - Before showing WiFi setup UI, trigger permission prompt
 - Use dummy local network connection (non-blocking)
 - iOS shows permission prompt immediately
 - User approves once, never asked again
 
 **Step 2: Smart Retry Logic**
+
 - If first connection times out → Auto-retry with exponential backoff
 - Max 3 retry attempts
 - Backoff: 2s → 5s → 10s (not too long)
 - After 3 failures → Show user troubleshooting message
 
 **Step 3: Connection State Management**
+
 - Track connection attempt count
 - Reset retry counter on success
 - Clear retry state when user manually retries
@@ -320,9 +324,11 @@ struct WiFiSetupView: View {
 ### Phase 1: Core Permission Checker (30 min)
 
 **Files to create:**
+
 - `apps/studio/SabaiPicsStudio/LocalNetworkPermissionChecker.swift`
 
 **Tasks:**
+
 - [ ] Create LocalNetworkPermissionChecker class
 - [ ] Implement `triggerPermissionPrompt()` method
 - [ ] Add UserDefaults tracking for permission state
@@ -331,9 +337,11 @@ struct WiFiSetupView: View {
 ### Phase 2: Retry Logic (45 min)
 
 **Files to modify:**
+
 - `apps/studio/SabaiPicsStudio/WiFiCameraService.swift`
 
 **Tasks:**
+
 - [ ] Add retry state properties (retryCount, maxRetries, retryTimer)
 - [ ] Implement `connectWithRetry()` method
 - [ ] Implement `attemptConnection()` with backoff logic
@@ -343,9 +351,11 @@ struct WiFiSetupView: View {
 ### Phase 3: ViewModel Integration (30 min)
 
 **Files to modify:**
+
 - `apps/studio/SabaiPicsStudio/CameraViewModel.swift`
 
 **Tasks:**
+
 - [ ] Add `isCheckingPermission` published property
 - [ ] Update `connectToWiFiCamera()` to use pre-flight check
 - [ ] Create `initiateWiFiConnection()` helper method
@@ -355,9 +365,11 @@ struct WiFiSetupView: View {
 ### Phase 4: UI Polish (15 min)
 
 **Files to modify:**
+
 - `apps/studio/SabaiPicsStudio/WiFiSetupView.swift`
 
 **Tasks:**
+
 - [ ] Add permission check loading state
 - [ ] Add helpful message during first connection
 - [ ] Test UI feedback on device
@@ -365,6 +377,7 @@ struct WiFiSetupView: View {
 ### Phase 5: Testing & Validation (30 min)
 
 **Test scenarios:**
+
 1. **Fresh install (no permission):**
    - App triggers pre-flight check
    - iOS shows permission prompt
@@ -419,12 +432,14 @@ Final failure: +10s delay (total: 17s)
 ### User Experience
 
 **Before:**
+
 - 😞 First connection always fails
 - 😞 User must manually retry
 - 😞 Confusing timeout error
 - 😞 Takes 2 attempts minimum
 
 **After:**
+
 - 😊 Permission prompt appears immediately
 - 😊 Auto-retry handles timeout gracefully
 - 😊 Usually succeeds on first attempt
@@ -444,6 +459,7 @@ Final failure: +10s delay (total: 17s)
 ### 1. User Denies Permission
 
 **Behavior:**
+
 - Pre-flight check completes (denial is a result)
 - Connection attempts will fail
 - After 3 retries, show error: "Local network access required. Enable in Settings > Privacy > Local Network."
@@ -451,6 +467,7 @@ Final failure: +10s delay (total: 17s)
 ### 2. Permission Prompt Dismissed
 
 **Behavior:**
+
 - iOS treats as "not determined" (neither granted nor denied)
 - Next network attempt triggers prompt again
 - Retry logic handles gracefully
@@ -458,6 +475,7 @@ Final failure: +10s delay (total: 17s)
 ### 3. App Backgrounded During Connection
 
 **Behavior:**
+
 - Connection may timeout
 - Retry timer continues
 - User returns to app → sees retry in progress or result
@@ -465,6 +483,7 @@ Final failure: +10s delay (total: 17s)
 ### 4. Multiple Simultaneous Connection Attempts
 
 **Behavior:**
+
 - Retry state is instance-level (WiFiCameraService)
 - Only one connection active at a time
 - Subsequent attempts cancel previous retry timer
@@ -562,19 +581,23 @@ Final failure: +10s delay (total: 17s)
 ### Alternative Approaches Considered
 
 **Option A: Just extend timeout to 120s**
+
 - ❌ Still requires manual retry
 - ❌ User waits too long
 
 **Option B: Show instructions before connect**
+
 - ❌ User still must retry manually
 - ❌ Extra tap required
 
 **Option C: Network Extension framework**
+
 - ❌ Overkill for this use case
 - ❌ Requires additional entitlements
 - ❌ More complex implementation
 
 **Selected: Pre-flight + Auto-retry**
+
 - ✅ Best user experience
 - ✅ Handles all edge cases
 - ✅ No manual retry needed

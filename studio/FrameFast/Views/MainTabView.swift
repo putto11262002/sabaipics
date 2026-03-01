@@ -91,6 +91,7 @@ struct MainTabView: View {
             )
             .presentationDetents([.large], selection: $captureSheetDetent)
             .presentationDragIndicator(.visible)
+            .presentationBackground(Color(uiColor: .systemGroupedBackground))
         }
     }
 
@@ -107,6 +108,12 @@ struct MainTabView: View {
             guard uploadStatusStore.stateByJobId[jobId] == .completed else { return }
             acc += 1
         }
+    }
+
+    private var isSyncing: Bool {
+        let hasDownloads = captureSessionStore.captureSession?.photos.contains { $0.isDownloading } ?? false
+        let hasUploads = uploadStatusStore.summary.inFlight > 0
+        return hasDownloads || hasUploads
     }
 
     private var statusForBar: CaptureStatusBarView.Status {
@@ -132,81 +139,22 @@ struct MainTabView: View {
     @ViewBuilder
     private var statusBarInset: some View {
         if captureSessionStore.state != .idle {
-            if let liveSession = captureSessionStore.captureSession {
-                CaptureStatusBarLiveView(
-                    status: statusForBar,
-                    cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
-                    downloadsCount: captureSessionStore.stats.downloadsCount,
-                    lastFilename: captureSessionStore.stats.lastFilename,
-                    eventName: coordinator.selectedEventName,
-                    session: liveSession,
-                    stateByJobId: uploadStatusStore.stateByJobId,
-                    onOpen: {
-                        captureSheetDetent = .large
-                        captureSessionStore.isDetailsPresented = true
-                    },
-                    onDisconnect: {
-                        captureSessionStore.disconnect()
-                    }
-                )
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-            } else {
-                CaptureStatusBarView(
-                    status: statusForBar,
-                    cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
-                    downloadsCount: captureSessionStore.stats.downloadsCount,
-                    lastFilename: captureSessionStore.stats.lastFilename,
-                    uploadedCount: 0,
-                    eventName: coordinator.selectedEventName,
-                    onOpen: {
-                        captureSheetDetent = .large
-                        captureSessionStore.isDetailsPresented = true
-                    },
-                    onDisconnect: {
-                        captureSessionStore.disconnect()
-                    }
-                )
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-            }
-        }
-    }
-}
-
-private struct CaptureStatusBarLiveView: View {
-    let status: CaptureStatusBarView.Status
-    let cameraName: String
-    let downloadsCount: Int
-    let lastFilename: String?
-    let eventName: String?
-    @ObservedObject var session: CaptureUISink
-    let stateByJobId: [String: UploadJobState]
-    let onOpen: () -> Void
-    let onDisconnect: () -> Void
-
-    var body: some View {
-        CaptureStatusBarView(
-            status: status,
-            cameraName: cameraName,
-            downloadsCount: downloadsCount,
-            lastFilename: lastFilename,
-            uploadedCount: uploadedCount,
-            eventName: eventName,
-            onOpen: onOpen,
-            onDisconnect: onDisconnect
-        )
-    }
-
-    private var uploadedCount: Int {
-        // Count only this session's downloaded photos that have completed server processing.
-        session.photos.reduce(into: 0) { acc, photo in
-            guard case .completed = photo.status else { return }
-            guard let jobId = photo.uploadJobId else { return }
-            guard stateByJobId[jobId] == .completed else { return }
-            acc += 1
+            CaptureStatusBarView(
+                status: statusForBar,
+                cameraName: captureSessionStore.activeCamera?.name ?? "Camera",
+                eventName: coordinator.selectedEventName,
+                isSyncing: isSyncing,
+                onOpen: {
+                    captureSheetDetent = .large
+                    captureSessionStore.isDetailsPresented = true
+                },
+                onDisconnect: {
+                    captureSessionStore.disconnect()
+                }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
         }
     }
 }

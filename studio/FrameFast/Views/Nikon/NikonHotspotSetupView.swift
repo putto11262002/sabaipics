@@ -12,36 +12,34 @@ struct NikonHotspotSetupView: View {
     @State private var showWiFiWarning = false
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Connect to your Nikon camera's WiFi network in Settings before continuing.")
+                .font(.subheadline)
+                .foregroundColor(Color.secondary)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 32)
+
+            CameraWiFiJoinScene(ssid: "Nikon camera Wi‑Fi")
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 28)
+
             Spacer()
 
-            Image(systemName: "wifi")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.Theme.primary)
-
-            Text("Connect to Nikon Wi-Fi")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(Color.Theme.foreground)
-
-            Text("Join your camera's Wi-Fi network in **Settings**, then continue to scan for the camera.")
-                .font(.subheadline)
-                .foregroundColor(Color.Theme.mutedForeground)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-
-            Button("Continue") {
-                if WiFiNetworkInfo.currentWiFiIPv4() != nil {
-                    onNext()
-                } else {
-                    showWiFiWarning = true
+            HStack {
+                Spacer()
+                CircleNavButton {
+                    if WiFiNetworkInfo.currentWiFiIPv4() != nil {
+                        onNext()
+                    } else {
+                        showWiFiWarning = true
+                    }
                 }
             }
-            .buttonStyle(.compact)
-            .padding(.top, 4)
-
-            Spacer()
+            .padding(.horizontal, 28)
+            .padding(.bottom, 24)
         }
+        .navigationTitle("Connect to WiFi")
+        .navigationBarTitleDisplayMode(.large)
         .alert("Wi-Fi not detected", isPresented: $showWiFiWarning) {
             Button("Cancel", role: .cancel) {}
             Button("Continue anyway") { onNext() }

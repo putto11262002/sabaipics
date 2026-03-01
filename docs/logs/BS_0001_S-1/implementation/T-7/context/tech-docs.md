@@ -34,6 +34,7 @@
 ## API Conventions
 
 ### Framework & Stack
+
 - **Framework:** Hono ^4.10.7 on Cloudflare Workers
 - **Validation:** Zod ^4.1.13 with `@hono/zod-validator`
 - **ORM:** Drizzle ORM ^0.45.0 with Neon Postgres
@@ -42,6 +43,7 @@
 ### Response Format
 
 **Success responses:**
+
 ```typescript
 // Single entity or aggregate
 c.json({ data: result });
@@ -52,6 +54,7 @@ c.json({ data: items });
 ```
 
 **Error responses:**
+
 ```typescript
 // Standard error shape
 {
@@ -79,22 +82,22 @@ Routes are defined as separate Hono instances, then mounted in `index.ts`:
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/routes/dashboard.ts` (new file)
 
 ```typescript
-import { Hono } from "hono";
-import type { Bindings } from "../types";
-import { requirePhotographer, type PhotographerVariables } from "../middleware";
+import { Hono } from 'hono';
+import type { Bindings } from '../types';
+import { requirePhotographer, type PhotographerVariables } from '../middleware';
 
 type Env = {
   Bindings: Bindings;
   Variables: PhotographerVariables;
 };
 
-export const dashboardRouter = new Hono<Env>()
-  .get("/", requirePhotographer(), async (c) => {
-    // Implementation here
-  });
+export const dashboardRouter = new Hono<Env>().get('/', requirePhotographer(), async (c) => {
+  // Implementation here
+});
 ```
 
 **Mount in index.ts:**
+
 ```typescript
 .route("/dashboard", dashboardRouter)
 ```
@@ -104,8 +107,8 @@ export const dashboardRouter = new Hono<Env>()
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/types.ts`
 
 ```typescript
-import type { AuthVariables } from "@sabaipics/auth/types";
-import type { Database } from "@sabaipics/db";
+import type { AuthVariables } from '@sabaipics/auth/types';
+import type { Database } from '@sabaipics/db';
 
 export type Bindings = CloudflareBindings & {
   ADMIN_API_KEY: string;
@@ -128,28 +131,30 @@ export type Env = { Bindings: Bindings; Variables: Variables };
 2. **requirePhotographer()** - Route-level middleware for photographer-only routes
 
 **Pattern:**
+
 ```typescript
-import { requirePhotographer, type PhotographerVariables } from "../middleware";
+import { requirePhotographer, type PhotographerVariables } from '../middleware';
 
 type Env = {
   Bindings: Bindings;
   Variables: PhotographerVariables;
 };
 
-export const router = new Hono<Env>()
-  .get("/", requirePhotographer(), async (c) => {
-    const photographer = c.var.photographer;  // { id, pdpaConsentAt }
-    const db = c.var.db();
-    // ...
-  });
+export const router = new Hono<Env>().get('/', requirePhotographer(), async (c) => {
+  const photographer = c.var.photographer; // { id, pdpaConsentAt }
+  const db = c.var.db();
+  // ...
+});
 ```
 
 ### Middleware Location
+
 - **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/middleware/require-photographer.ts`
 
 ### Photographer Context
+
 ```typescript
-export type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
+export type PhotographerContext = Pick<Photographer, 'id' | 'pdpaConsentAt'>;
 ```
 
 ---
@@ -157,6 +162,7 @@ export type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
 ## Database Schema (Relevant Tables)
 
 ### photographers
+
 ```typescript
 // File: packages/db/src/schema/photographers.ts
 {
@@ -170,6 +176,7 @@ export type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
 ```
 
 ### credit_ledger
+
 ```typescript
 // File: packages/db/src/schema/credit-ledger.ts
 {
@@ -184,6 +191,7 @@ export type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
 ```
 
 **Balance Query (FIFO unexpired):**
+
 ```sql
 SELECT SUM(amount)
 FROM credit_ledger
@@ -192,6 +200,7 @@ WHERE photographer_id = ?
 ```
 
 **Nearest Expiry Query:**
+
 ```sql
 SELECT expires_at
 FROM credit_ledger
@@ -203,6 +212,7 @@ LIMIT 1
 ```
 
 ### events
+
 ```typescript
 // File: packages/db/src/schema/events.ts
 {
@@ -226,12 +236,13 @@ LIMIT 1
 **Endpoint:** `GET /dashboard`
 
 **Response shape (from plan/final.md):**
+
 ```typescript
 {
   credits: {
     balance: number;
-    nearestExpiry: string | null;  // ISO timestamp or null if no credits
-  };
+    nearestExpiry: string | null; // ISO timestamp or null if no credits
+  }
   events: Array<{
     id: string;
     name: string;
@@ -242,7 +253,7 @@ LIMIT 1
   stats: {
     totalPhotos: number;
     totalFaces: number;
-  };
+  }
 }
 ```
 
@@ -253,16 +264,18 @@ LIMIT 1
 ### Test Configuration
 
 **Unit tests (co-located with source):**
+
 ```typescript
 // File: vitest.node.config.ts
-include: ["src/**/*.test.ts"]
-environment: "node"
+include: ['src/**/*.test.ts'];
+environment: 'node';
 ```
 
 **Workers runtime tests:**
+
 ```typescript
 // File: vitest.config.ts
-include: ["tests/**/*.workers.test.ts"]
+include: ['tests/**/*.workers.test.ts'];
 ```
 
 ### Test Pattern
@@ -270,12 +283,12 @@ include: ["tests/**/*.workers.test.ts"]
 **File:** `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/routes/dashboard.test.ts` (new file)
 
 ```typescript
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Hono } from "hono";
-import { testClient } from "hono/testing";
-import { dashboardRouter } from "./dashboard";
-import type { Database } from "@sabaipics/db";
-import type { PhotographerVariables } from "../middleware";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Hono } from 'hono';
+import { testClient } from 'hono/testing';
+import { dashboardRouter } from './dashboard';
+import type { Database } from '@sabaipics/db';
+import type { PhotographerVariables } from '../middleware';
 
 // Mock DB pattern
 function createMockDb(overrides = {}) {
@@ -292,33 +305,33 @@ function createMockDb(overrides = {}) {
 // Test app setup
 function createTestApp(options: { mockDb?: any; photographer?: any; hasAuth?: boolean }) {
   const app = new Hono<Env>()
-    .use("/*", (c, next) => {
+    .use('/*', (c, next) => {
       if (options.hasAuth) {
-        c.set("auth", { userId: "clerk_123", sessionId: "session_123" });
+        c.set('auth', { userId: 'clerk_123', sessionId: 'session_123' });
       }
       return next();
     })
-    .use("/*", (c, next) => {
-      c.set("db", () => options.mockDb);
+    .use('/*', (c, next) => {
+      c.set('db', () => options.mockDb);
       return next();
     })
-    .use("/*", (c, next) => {
+    .use('/*', (c, next) => {
       if (options.photographer) {
-        c.set("photographer", options.photographer);
+        c.set('photographer', options.photographer);
       }
       return next();
     })
-    .route("/dashboard", dashboardRouter);
+    .route('/dashboard', dashboardRouter);
 
   return { app, mockDb: options.mockDb };
 }
 
-describe("GET /dashboard", () => {
-  it("returns credit balance with FIFO expiry", async () => {
+describe('GET /dashboard', () => {
+  it('returns credit balance with FIFO expiry', async () => {
     // Test implementation
   });
 
-  it("returns empty state for new user", async () => {
+  it('returns empty state for new user', async () => {
     // Test implementation
   });
 });
@@ -339,6 +352,7 @@ pnpm --filter=@sabaipics/api test src/routes/dashboard.test.ts
 ## Drizzle Query Patterns
 
 **Basic select with conditions:**
+
 ```typescript
 const [row] = await db
   .select({ id: table.id, name: table.name })
@@ -348,23 +362,22 @@ const [row] = await db
 ```
 
 **Aggregation (SUM):**
+
 ```typescript
-import { sql, sum, gt } from "drizzle-orm";
+import { sql, sum, gt } from 'drizzle-orm';
 
 const [result] = await db
   .select({ total: sum(creditLedger.amount) })
   .from(creditLedger)
   .where(
-    and(
-      eq(creditLedger.photographerId, photographerId),
-      gt(creditLedger.expiresAt, sql`NOW()`)
-    )
+    and(eq(creditLedger.photographerId, photographerId), gt(creditLedger.expiresAt, sql`NOW()`)),
   );
 ```
 
 **Ordering:**
+
 ```typescript
-import { desc, asc } from "drizzle-orm";
+import { desc, asc } from 'drizzle-orm';
 
 const events = await db
   .select()
@@ -374,6 +387,7 @@ const events = await db
 ```
 
 **Multiple conditions:**
+
 ```typescript
 import { and, eq, gt } from "drizzle-orm";
 
@@ -389,14 +403,14 @@ import { and, eq, gt } from "drizzle-orm";
 
 ## File Locations Summary
 
-| Purpose | Path |
-|---------|------|
-| New route file | `apps/api/src/routes/dashboard.ts` |
-| New test file | `apps/api/src/routes/dashboard.test.ts` |
-| Mount route | `apps/api/src/index.ts` |
-| Middleware | `apps/api/src/middleware/require-photographer.ts` |
-| DB schemas | `packages/db/src/schema/*.ts` |
-| Type definitions | `apps/api/src/types.ts` |
+| Purpose          | Path                                              |
+| ---------------- | ------------------------------------------------- |
+| New route file   | `apps/api/src/routes/dashboard.ts`                |
+| New test file    | `apps/api/src/routes/dashboard.test.ts`           |
+| Mount route      | `apps/api/src/index.ts`                           |
+| Middleware       | `apps/api/src/middleware/require-photographer.ts` |
+| DB schemas       | `packages/db/src/schema/*.ts`                     |
+| Type definitions | `apps/api/src/types.ts`                           |
 
 ---
 

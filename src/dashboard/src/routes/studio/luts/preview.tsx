@@ -3,7 +3,13 @@ import { useParams, useSearchParams } from 'react-router';
 import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
-import { Field, FieldContent, FieldGroup, FieldLabel, FieldDescription } from '@/shared/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldGroup,
+  FieldLabel,
+  FieldDescription,
+} from '@/shared/components/ui/field';
 import { Alert, AlertTitle, AlertDescription } from '@/shared/components/ui/alert';
 import { Button } from '@/shared/components/ui/button';
 import { Spinner } from '@/shared/components/ui/spinner';
@@ -12,6 +18,7 @@ import { cn } from '@/shared/utils/ui';
 
 import { useDebounce } from '../../../hooks/useDebounce';
 import { useAuth } from '@/auth/react';
+import { blendToCanvas, loadImage } from './lib/blend-images';
 
 function parseIntensity(value: string | null): number {
   if (value == null) return 100;
@@ -40,8 +47,11 @@ export default function StudioLutPreviewPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
-  const [gradedUrl, setGradedUrl] = useState<string | null>(null);
+  const [gradedBaseUrl, setGradedBaseUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const originalImgRef = useRef<HTMLImageElement | null>(null);
+  const gradedImgRef = useRef<HTMLImageElement | null>(null);
 
   const [intensity, setIntensity] = useState<number>(() =>
     parseIntensity(searchParams.get('intensity')),
@@ -55,31 +65,31 @@ export default function StudioLutPreviewPage() {
   const [retryCount, setRetryCount] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
-  const debouncedIntensity = useDebounce(intensity, 300);
   const debouncedIncludeLuminance = useDebounce(includeLuminance, 300);
 
-  useEffect(() => {
-    return () => {
-      if (originalUrl) URL.revokeObjectURL(originalUrl);
-      if (gradedUrl) URL.revokeObjectURL(gradedUrl);
-    };
-  }, [originalUrl, gradedUrl]);
+  // Blob URL revocation is handled imperatively in handleFile (on new file)
+  // and setGradedBaseUrl updater (on new API response). We avoid revoking in
+  // a deps-based cleanup effect because React StrictMode re-runs effects
+  // and URL.revokeObjectURL is irreversible — the second mount would fail to
+  // load the already-revoked URLs.
 
-  // Clear rendered image when switching LUT.
+  // Clear graded base when switching LUT.
   useEffect(() => {
-    if (gradedUrl) URL.revokeObjectURL(gradedUrl);
-    setGradedUrl(null);
+    if (gradedBaseUrl) URL.revokeObjectURL(gradedBaseUrl);
+    setGradedBaseUrl(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const handleFile = (f: File) => {
     if (originalUrl) URL.revokeObjectURL(originalUrl);
-    if (gradedUrl) URL.revokeObjectURL(gradedUrl);
+    if (gradedBaseUrl) URL.revokeObjectURL(gradedBaseUrl);
     setFile(f);
     setOriginalUrl(URL.createObjectURL(f));
-    setGradedUrl(null);
+    setGradedBaseUrl(null);
   };
 
+  // Fetch the fully-graded image (intensity=100) from the server.
+  // Intensity blending is handled client-side via canvas compositing.
   const abortRef = useRef<AbortController | null>(null);
   const renderSeqRef = useRef(0);
   useEffect(() => {
@@ -94,7 +104,7 @@ export default function StudioLutPreviewPage() {
 
     const form = new FormData();
     form.set('file', file);
-    form.set('intensity', String(debouncedIntensity));
+    form.set('intensity', '100');
     form.set('includeLuminance', debouncedIncludeLuminance ? 'true' : 'false');
 
     // Small delay to avoid duplicate requests in React StrictMode (dev)
@@ -149,7 +159,7 @@ export default function StudioLutPreviewPage() {
         if (controller.signal.aborted) return;
         if (seq !== renderSeqRef.current) return;
 
-        setGradedUrl((prev) => {
+        setGradedBaseUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);
           return URL.createObjectURL(blob);
         });
@@ -173,7 +183,60 @@ export default function StudioLutPreviewPage() {
         abortRef.current = null;
       }
     };
-  }, [id, file, debouncedIntensity, debouncedIncludeLuminance, retryCount]);
+  }, [id, file, debouncedIncludeLuminance, retryCount]);
+
+  // Pre-load images into refs when URLs change. This avoids re-fetching blob
+  // URLs on every intensity tick and is resilient to StrictMode double-execution
+  // (the loaded HTMLImageElement stays valid even if the blob URL is later revoked).
+  useEffect(() => {
+    if (!originalUrl) {
+      originalImgRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    loadImage(originalUrl).then((img) => {
+      if (!cancelled) originalImgRef.current = img;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [originalUrl]);
+
+  useEffect(() => {
+    if (!gradedBaseUrl) {
+      gradedImgRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    loadImage(gradedBaseUrl).then((img) => {
+      if (!cancelled) {
+        gradedImgRef.current = img;
+        // Trigger initial blend now that both images are ready.
+        const canvas = canvasRef.current;
+        if (canvas && originalImgRef.current) {
+          blendToCanvas({ canvas, original: originalImgRef.current, graded: img, intensity });
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [gradedBaseUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Client-side intensity blending: draw original + graded at current intensity onto canvas.
+  // Runs instantly on every intensity change — no server round-trip needed.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (!originalImgRef.current || !gradedImgRef.current) return;
+
+    blendToCanvas({
+      canvas,
+      original: originalImgRef.current,
+      graded: gradedImgRef.current,
+      intensity,
+    });
+  }, [intensity]);
 
   const canRender = Boolean(id) && Boolean(file);
 
@@ -239,7 +302,9 @@ export default function StudioLutPreviewPage() {
                 onValueChange={(v) => setIntensity(v[0] ?? 100)}
                 disabled={!canRender}
               />
-              <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">{intensity}%</span>
+              <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
+                {intensity}%
+              </span>
             </div>
           </Field>
 
@@ -270,9 +335,20 @@ export default function StudioLutPreviewPage() {
                     : 'border-muted-foreground/25 hover:border-muted-foreground/50',
               )}
               onClick={() => fileInputRef.current?.click()}
-              onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
-              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(true);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(false);
+              }}
               onDrop={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -297,8 +373,8 @@ export default function StudioLutPreviewPage() {
           <div className="space-y-2">
             <FieldLabel>After</FieldLabel>
             <div className="relative aspect-[4/3] overflow-hidden rounded-md border bg-muted">
-              {gradedUrl ? (
-                <img src={gradedUrl} alt="Preview" className="h-full w-full object-contain" />
+              {gradedBaseUrl ? (
+                <canvas ref={canvasRef} className="h-full w-full object-contain" />
               ) : file ? null : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
                   <ImageIcon className="size-8" />

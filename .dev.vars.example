@@ -26,17 +26,9 @@ CLERK_WEBHOOK_SIGNING_SECRET=whsec_xxxxx
 # Format: postgres://user:password@host/database?sslmode=require
 DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 
-# Face Recognition Provider Configuration
-# FACE_PROVIDER: 'aws' (default) or 'sabaiface' (for local development)
-# When using sabaiface, set SABAIFACE_ENDPOINT to the local server URL
-FACE_PROVIDER=sabaiface
-SABAIFACE_ENDPOINT=http://localhost:8086
-
-# AWS Credentials for Rekognition (required when FACE_PROVIDER=aws)
-# Get from: AWS IAM Console → Users → Security Credentials
-AWS_ACCESS_KEY_ID=AKIAXXXXXXXXXX
-AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
-AWS_REGION=us-west-2
+# Face Recognition Service (self-hosted InsightFace)
+# URL of the /extract endpoint
+RECOGNITION_ENDPOINT=http://localhost:8082
 
 # Stripe Secret Key (get from Stripe Dashboard → Developers → API Keys)
 # Use TEST mode keys for development (sk_test_xxx)
@@ -50,9 +42,11 @@ STRIPE_SECRET_KEY=sk_test_xxxxx
 # Format: whsec_xxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxx
 
-# Admin API Key (for admin routes)
-# Generate a secure random string for admin operations
-ADMIN_API_KEY=admin-dev-key-change-in-production
+# Cloudflare Access (admin dashboard auth)
+# These are non-secret vars set in wrangler.api.jsonc.
+# Listed here for documentation only — no .dev.vars override needed.
+# CF_ACCESS_TEAM_DOMAIN=https://framefast.cloudflareaccess.com
+# CF_ACCESS_AUD=<AUD tag from CF Access dashboard>
 
 # Desktop uploader auth (SabaiPics-issued desktop session)
 # - DESKTOP_ACCESS_JWT_SECRET: HS256 signing secret for short-lived desktop access JWTs

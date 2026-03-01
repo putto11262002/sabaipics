@@ -32,11 +32,7 @@ export interface PromoCodeValidationResponse {
 export function useValidatePromoCode(code: string, enabled = true) {
   return useApiQuery<PromoCodeValidateResponse>({
     queryKey: ['promo-code-validate', code],
-    apiFn: (opts) =>
-      getPromoCodeValidate(
-        { query: { code } },
-        opts,
-      ),
+    apiFn: (opts) => getPromoCodeValidate({ query: { code } }, opts),
     withAuth: false,
     enabled: enabled && !!code,
     retry: false,

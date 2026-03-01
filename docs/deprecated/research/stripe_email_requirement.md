@@ -51,36 +51,41 @@ When a customer has no email address:
 For customers who only provide LINE contact information (no email):
 
 #### Option A: Create Customer Without Email (Recommended)
+
 ```javascript
 const customer = await stripe.customers.create({
   name: customerName,
   metadata: {
     line_user_id: lineUserId,
-    communication_channel: 'line'
-  }
+    communication_channel: 'line',
+  },
 });
 ```
 
 **Advantages:**
+
 - Clean data model - no fake emails
 - Metadata can store LINE ID for your own reference
 - Still get full Stripe Customer benefits (payment methods, history, etc.)
 
 **Handle receipts yourself:**
+
 - Send payment confirmations via LINE messages
 - Store payment records in your database
 - Generate receipts/invoices in-app or via LINE
 
 #### Option B: Use a Generated Email (Not Recommended)
+
 ```javascript
 const customer = await stripe.customers.create({
   name: customerName,
   email: `${lineUserId}@noemail.facelink.local`,
-  metadata: { line_user_id: lineUserId }
+  metadata: { line_user_id: lineUserId },
 });
 ```
 
 **Why this is discouraged:**
+
 - Pollutes email field with non-deliverable addresses
 - Stripe may attempt to send emails that will bounce
 - Creates confusion in Dashboard
@@ -95,7 +100,7 @@ const customer = await stripe.customers.create({
 5. **Update customer with email** when/if user provides it:
    ```javascript
    await stripe.customers.update(customerId, {
-     email: userProvidedEmail
+     email: userProvidedEmail,
    });
    ```
 
@@ -114,6 +119,7 @@ For LINE-only users, implement your own receipt system:
 ## Technical Implementation Notes
 
 ### Creating Customer Without Email
+
 ```javascript
 // Minimal customer creation
 const customer = await stripe.customers.create({
@@ -121,19 +127,20 @@ const customer = await stripe.customers.create({
   metadata: {
     line_user_id: lineUserId,
     communication_preference: 'line',
-    event_id: eventId
-  }
+    event_id: eventId,
+  },
 });
 
 // Store mapping in your database
 await db.photographers.create({
   line_user_id: lineUserId,
   stripe_customer_id: customer.id,
-  name: photographerName
+  name: photographerName,
 });
 ```
 
 ### Handling Payment Confirmations
+
 ```javascript
 // In your webhook handler
 stripe.webhooks.on('payment_intent.succeeded', async (paymentIntent) => {
@@ -143,22 +150,23 @@ stripe.webhooks.on('payment_intent.succeeded', async (paymentIntent) => {
   // Send LINE message instead of email
   await lineClient.pushMessage(lineUserId, {
     type: 'text',
-    text: `Payment successful! Amount: ${paymentIntent.amount / 100} THB`
+    text: `Payment successful! Amount: ${paymentIntent.amount / 100} THB`,
   });
 });
 ```
 
 ### Optional Email Collection Flow
+
 ```javascript
 // If user later provides email (e.g., wants email receipts)
 async function updateCustomerEmail(stripeCustomerId, email) {
   await stripe.customers.update(stripeCustomerId, {
-    email: email
+    email: email,
   });
 
   // Enable Stripe's automatic email receipts if desired
   await stripe.invoices.update(invoiceId, {
-    auto_advance: true
+    auto_advance: true,
   });
 }
 ```

@@ -1,5 +1,5 @@
 // Common utilities
-export * from "./common";
+export * from './common';
 
 // Tables
-export * from "./faces";
+export * from './faces';

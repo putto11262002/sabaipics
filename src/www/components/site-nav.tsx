@@ -1,47 +1,8 @@
-import { Link } from '@/i18n/navigation';
+'use client';
 
-import { RoundedButton } from '@/components/ui/rounded-button';
-import { LogoMark } from '@/shared/components/icons/logo-mark';
+// Lazy-loaded wrapper for SiteNav to reduce initial bundle size
+import dynamic from 'next/dynamic';
 
-const navItems = [
-  { href: '#features', label: 'Features' },
-  { href: '#upload', label: 'Upload' },
-  { href: '#pricing', label: 'Pricing' },
-  { href: '#faq', label: 'FAQ' },
-] as const;
-
-export function SiteNav() {
-  return (
-    <header className="sticky top-0 z-50 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4">
-        <div className="flex items-center gap-8">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight"
-          >
-            <LogoMark className="h-5 w-5" />
-            FrameFast
-          </Link>
-
-          <nav className="hidden items-center gap-6 md:flex" aria-label="Primary">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-
-        <div className="flex items-center justify-end gap-3">
-          <RoundedButton asChild variant="outline" size="sm">
-            <Link href="#">Sign in</Link>
-          </RoundedButton>
-        </div>
-      </div>
-    </header>
-  );
-}
+export const SiteNav = dynamic(() => import('./site-nav-client').then((mod) => ({ default: mod.SiteNav })), {
+  ssr: false, // Don't render on server - load after hydration
+});

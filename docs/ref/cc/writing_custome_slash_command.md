@@ -32,28 +32,31 @@ Prompt content with $ARGUMENTS or $1, $2...
 
 ## Frontmatter
 
-| Field | Purpose | Default |
-|-------|---------|---------|
-| `description` | Shown in `/help` | First line |
-| `allowed-tools` | `[Bash, Editor, WebFetch]` | Inherits |
-| `argument-hint` | Argument syntax hint | None |
-| `model` | Specific model | Current |
+| Field           | Purpose                    | Default    |
+| --------------- | -------------------------- | ---------- |
+| `description`   | Shown in `/help`           | First line |
+| `allowed-tools` | `[Bash, Editor, WebFetch]` | Inherits   |
+| `argument-hint` | Argument syntax hint       | None       |
+| `model`         | Specific model             | Current    |
 
 ---
 
 ## Arguments
 
 **All arguments:**
+
 ```markdown
 $ARGUMENTS
 ```
 
 **Positional:**
+
 ```markdown
 $1 $2 $3...
 ```
 
 **With defaults:**
+
 ```markdown
 ${1:-default}
 ```
@@ -89,6 +92,7 @@ Analyze output above.
 ## Examples
 
 ### Simple Prompt
+
 ```markdown
 ---
 description: Explain code simply
@@ -100,6 +104,7 @@ Explain this code in simple terms:
 ```
 
 ### With Bash
+
 ```markdown
 ---
 description: Review PR
@@ -110,12 +115,14 @@ argument-hint: <branch>
 !git diff main...$1
 
 Review for:
+
 - Code quality
-- Test coverage  
+- Test coverage
 - Breaking changes
 ```
 
 ### Multi-file Analysis
+
 ```markdown
 ---
 description: Compare implementations
@@ -131,6 +138,7 @@ Recommend which is better and why.
 ```
 
 ### Template Generator
+
 ```markdown
 ---
 description: Generate React component
@@ -148,6 +156,7 @@ Follow style in @.eslintrc.json
 ```
 
 ### Workflow
+
 ```markdown
 ---
 description: Feature branch workflow
@@ -170,11 +179,13 @@ Feature: $1
 ## Patterns
 
 **Direct instructions:**
+
 ```markdown
 Review @$1 for security issues. List vulnerabilities with severity.
 ```
 
 **Context + task:**
+
 ```markdown
 !git log --oneline -10
 
@@ -182,16 +193,20 @@ Review recent commits. Suggest changelog entries.
 ```
 
 **Checklist style:**
+
 ```markdown
 Analyze @$1:
+
 - [ ] Performance bottlenecks
 - [ ] Memory leaks
 - [ ] Error handling
 ```
 
 **Conditional logic:**
+
 ```markdown
 Deploy to $1:
+
 - If production: full test suite
 - If staging: smoke tests
 - Validate config before deploy
@@ -229,4 +244,4 @@ Your prompt with $ARGUMENTS
 
 ---
 
-*Source: https://code.claude.com/docs/en/slash-commands*
+_Source: https://code.claude.com/docs/en/slash-commands_

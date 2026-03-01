@@ -19,14 +19,15 @@ We need to accept photo uploads (JPEG/PNG/HEIC/WebP/RAW) on Cloudflare Workers, 
 
 The request body size limit is tied to your **Cloudflare account plan** (not Workers plan):
 
-| Cloudflare Plan | Maximum Body Size |
-|-----------------|-------------------|
-| Free            | 100 MB            |
-| Pro             | 100 MB            |
-| Business        | 200 MB            |
+| Cloudflare Plan | Maximum Body Size                    |
+| --------------- | ------------------------------------ |
+| Free            | 100 MB                               |
+| Pro             | 100 MB                               |
+| Business        | 200 MB                               |
 | Enterprise      | 500 MB (default, can request higher) |
 
 **Key notes:**
+
 - Exceeding the limit returns `413 Request Entity Too Large`
 - This applies to `POST`/`PUT`/`PATCH` requests
 - Enterprise customers can contact support for limits beyond 500 MB
@@ -35,21 +36,22 @@ The request body size limit is tied to your **Cloudflare account plan** (not Wor
 
 **Source:** [Cloudflare Images Transform Documentation](https://developers.cloudflare.com/images/transform-images/)
 
-| Constraint | Limit |
-|------------|-------|
-| Maximum input file size | **70 MB** |
-| Maximum image area | 100 megapixels (e.g., 10,000 x 10,000 px) |
-| GIF/WebP animation total area | 50 megapixels (sum of all frames) |
+| Constraint                    | Limit                                     |
+| ----------------------------- | ----------------------------------------- |
+| Maximum input file size       | **70 MB**                                 |
+| Maximum image area            | 100 megapixels (e.g., 10,000 x 10,000 px) |
+| GIF/WebP animation total area | 50 megapixels (sum of all frames)         |
 
 **Output format limits:**
 
-| Output Format | Hard Limit (longest side) | Soft Limit (longest side) |
-|---------------|---------------------------|---------------------------|
-| AVIF          | 1,200 px (1,600 px if explicit) | 640 px |
-| WebP          | N/A | 2,560 px (lossy) / 1,920 px (lossless) |
-| Other (JPEG, PNG) | 12,000 px | N/A |
+| Output Format     | Hard Limit (longest side)       | Soft Limit (longest side)              |
+| ----------------- | ------------------------------- | -------------------------------------- |
+| AVIF              | 1,200 px (1,600 px if explicit) | 640 px                                 |
+| WebP              | N/A                             | 2,560 px (lossy) / 1,920 px (lossless) |
+| Other (JPEG, PNG) | 12,000 px                       | N/A                                    |
 
 **Supported input formats:**
+
 - JPEG, PNG, WebP, GIF, AVIF, SVG
 - HEIC (can decode for input, must output to web-safe format)
 - **RAW formats are NOT natively supported** by Cloudflare Images
@@ -58,13 +60,14 @@ The request body size limit is tied to your **Cloudflare account plan** (not Wor
 
 **Source:** [Cloudflare R2 Error Codes](https://developers.cloudflare.com/r2/api/error-codes/)
 
-| Upload Method | Maximum Size |
-|---------------|--------------|
-| Single PUT upload | 5 GiB |
-| Multipart upload (total) | 5 TiB |
-| Multipart part (minimum, except last) | 5 MiB |
+| Upload Method                         | Maximum Size |
+| ------------------------------------- | ------------ |
+| Single PUT upload                     | 5 GiB        |
+| Multipart upload (total)              | 5 TiB        |
+| Multipart part (minimum, except last) | 5 MiB        |
 
 **Workers binding considerations:**
+
 - When uploading via Workers R2 binding, the **request body limit still applies** (100-500 MB based on plan)
 - For files larger than the request body limit, use **multipart uploads** with streaming
 - Each part upload is subject to the request body limit
@@ -79,6 +82,7 @@ The request body size limit is tied to your **Cloudflare account plan** (not Wor
 ### 4. RAW File Considerations
 
 RAW files (CR2, NEF, ARW, etc.) present challenges:
+
 - Typical sizes: 25-50 MB (well within limits)
 - **Cloudflare Images does NOT support RAW decoding**
 - We would need to:
@@ -118,6 +122,7 @@ RAW files (CR2, NEF, ARW, etc.) present challenges:
 ### Alternative Consideration: 100 MB
 
 If we want to support larger files (e.g., very high-res PNG exports):
+
 - Works on Free/Pro plans (at the limit)
 - Would need to test reliability at boundary
 - Adds risk of request failures
@@ -129,13 +134,7 @@ If we want to support larger files (e.g., very high-res PNG exports):
 export const UPLOAD_LIMITS = {
   MAX_FILE_SIZE: 50 * 1024 * 1024, // 50 MB
   MAX_IMAGE_DIMENSION: 10000, // 10,000 px (100 megapixels max)
-  ALLOWED_MIME_TYPES: [
-    'image/jpeg',
-    'image/png',
-    'image/heic',
-    'image/heif',
-    'image/webp',
-  ],
+  ALLOWED_MIME_TYPES: ['image/jpeg', 'image/png', 'image/heic', 'image/heif', 'image/webp'],
   // RAW formats excluded for MVP
   // 'image/x-canon-cr2', 'image/x-nikon-nef', 'image/x-sony-arw'
 } as const;
@@ -161,13 +160,13 @@ export const UPLOAD_LIMITS = {
 
 ## Summary Table
 
-| Component | Limit | Our Validation |
-|-----------|-------|----------------|
-| CF Workers Request Body | 100-500 MB (plan-dependent) | 50 MB |
-| CF Images Input | 70 MB | 50 MB |
-| CF Images Area | 100 megapixels | 100 megapixels |
-| R2 Single Upload | 5 GiB | N/A (post-transform ~1-5 MB) |
-| Supported Formats | JPEG, PNG, HEIC, WebP, GIF | JPEG, PNG, HEIC, WebP |
+| Component               | Limit                       | Our Validation               |
+| ----------------------- | --------------------------- | ---------------------------- |
+| CF Workers Request Body | 100-500 MB (plan-dependent) | 50 MB                        |
+| CF Images Input         | 70 MB                       | 50 MB                        |
+| CF Images Area          | 100 megapixels              | 100 megapixels               |
+| R2 Single Upload        | 5 GiB                       | N/A (post-transform ~1-5 MB) |
+| Supported Formats       | JPEG, PNG, HEIC, WebP, GIF  | JPEG, PNG, HEIC, WebP        |
 
 ---
 

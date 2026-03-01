@@ -2,9 +2,11 @@
  * Hard Delete Event Service
  *
  * Permanently deletes an event and all related data:
- * - Database: 7 tables (faces, photos, participants, uploads, ftp, event)
+ * - Database: 6 tables (photos, participants, uploads, logo uploads, ftp, event)
  * - R2: Photos, logos, QR codes, selfies
- * - AWS: Rekognition collection
+ *
+ * Face embeddings cascade-delete with photos (ON DELETE CASCADE).
+ * No external service calls needed.
  *
  * WARNING: This is irreversible. Only use in development or for cleanup.
  */
@@ -13,16 +15,32 @@ import type { DatabaseTx } from '@/db';
 import {
 	events,
 	photos,
-	faces,
 	participantSearches,
 	uploadIntents,
 	logoUploadIntents,
 	ftpCredentials,
+	feedback,
 } from '@/db';
 import { eq, inArray } from 'drizzle-orm';
 import { ResultAsync, okAsync, errAsync } from 'neverthrow';
 import type { EventServiceError } from '../error';
-import { databaseError, storageFailed } from '../error';
+import { customError, databaseError, storageFailed } from '../error';
+
+export const EVENT_RELATION_STRATEGIES = {
+	direct: {
+		photos: 'delete',
+		participant_searches: 'delete',
+		upload_intents: 'delete',
+		logo_upload_intents: 'delete',
+		ftp_credentials: 'delete',
+		line_deliveries: 'set_null_via_fk',
+		feedback: 'set_null_soft_reference',
+	},
+	transitive: {
+		face_embeddings: 'delete_via_photo_cascade',
+		line_deliveries: 'set_null_via_fk_from_participant_searches',
+	},
+} as const;
 
 export interface HardDeleteResult {
 	success: boolean;
@@ -30,7 +48,6 @@ export interface HardDeleteResult {
 	error?: EventServiceError; // Present when success = false
 	deleted: {
 		database: {
-			faces: number;
 			photos: number;
 			participantSearches: number;
 			uploadIntents: number;
@@ -39,7 +56,6 @@ export interface HardDeleteResult {
 			events: number;
 		};
 		r2Objects: number;
-		rekognitionCollection: boolean;
 	};
 }
 
@@ -47,7 +63,6 @@ export interface HardDeleteEventsOptions {
 	db: DatabaseTx; // Requires WebSocket adapter for transaction support
 	eventIds: string[];
 	r2Bucket: R2Bucket;
-	deleteRekognition: (collectionId: string) => Promise<void>;
 }
 
 /**
@@ -59,7 +74,6 @@ export interface HardDeleteEventsOptions {
  * Order of operations (per event, all in ONE transaction):
  * 1. Collect R2 keys and delete database records atomically (transaction)
  * 2. Delete R2 objects (parallel, best effort)
- * 3. Delete Rekognition collection (best effort)
  *
  * Events are deleted in parallel using Promise.allSettled for optimal performance.
  * Returns Ok with array of results (may include failures). Only returns Err if
@@ -70,7 +84,7 @@ export interface HardDeleteEventsOptions {
 export function hardDeleteEvents(
 	options: HardDeleteEventsOptions
 ): ResultAsync<HardDeleteResult[], EventServiceError> {
-	const { db, eventIds, r2Bucket, deleteRekognition } = options;
+	const { db, eventIds, r2Bucket } = options;
 
 	// Validate batch size to prevent performance issues
 	if (eventIds.length === 0) {
@@ -87,13 +101,10 @@ export function hardDeleteEvents(
 		});
 	}
 
-	// Query events to get rekognitionCollectionId for each
+	// Query events
 	return ResultAsync.fromPromise(
 		db
-			.select({
-				id: events.id,
-				rekognitionCollectionId: events.rekognitionCollectionId,
-			})
+			.select({ id: events.id })
 			.from(events)
 			.where(inArray(events.id, eventIds)),
 		(error) => databaseError('query_events', error, { eventId: eventIds[0] || 'batch' })
@@ -104,14 +115,14 @@ export function hardDeleteEvents(
 			Promise.allSettled(
 				eventDetails.map(async (event): Promise<HardDeleteResult> => {
 					const eventId = event.id;
-					const rekognitionCollectionId = event.rekognitionCollectionId;
 
 					// Use ResultAsync for proper error handling (no try-catch)
 					const result = await ResultAsync.fromPromise(
 						// ONE transaction for database operations + R2 key collection
 						db.transaction(async (tx) => {
 							// Step 1: Collect R2 keys INSIDE transaction (prevents race condition)
-							const [eventPhotos, eventSearches, eventData] = await Promise.all([
+							const [eventPhotos, eventSearches, eventUploads, eventLogoUploads, eventData] =
+								await Promise.all([
 								tx
 									.select({ r2Key: photos.r2Key, id: photos.id })
 									.from(photos)
@@ -121,6 +132,16 @@ export function hardDeleteEvents(
 									.select({ selfieR2Key: participantSearches.selfieR2Key })
 									.from(participantSearches)
 									.where(eq(participantSearches.eventId, eventId)),
+
+								tx
+									.select({ r2Key: uploadIntents.r2Key })
+									.from(uploadIntents)
+									.where(eq(uploadIntents.eventId, eventId)),
+
+								tx
+									.select({ r2Key: logoUploadIntents.r2Key })
+									.from(logoUploadIntents)
+									.where(eq(logoUploadIntents.eventId, eventId)),
 
 								tx
 									.select({
@@ -134,23 +155,25 @@ export function hardDeleteEvents(
 							]);
 
 							// Collect all R2 keys (filter out nulls)
-							const r2Keys = [
-								eventData?.logoR2Key,
-								eventData?.qrCodeR2Key,
-								...eventPhotos.map((p) => p.r2Key),
-								...eventSearches.map((s) => s.selfieR2Key),
-							].filter((key): key is string => Boolean(key));
+							const r2Keys = Array.from(
+								new Set(
+									[
+										eventData?.logoR2Key,
+										eventData?.qrCodeR2Key,
+										...eventPhotos.map((p) => p.r2Key),
+										...eventSearches.map((s) => s.selfieR2Key),
+										...eventUploads.map((u) => u.r2Key),
+										...eventLogoUploads.map((u) => u.r2Key),
+									].filter((key): key is string => Boolean(key))
+								)
+							);
 
-							// Step 2: Delete from database in dependency order (all FKs are RESTRICT)
-							const photoIdList = eventPhotos.map((p) => p.id);
-
-							const facesDeleted =
-								photoIdList.length > 0
-									? await tx
-											.delete(faces)
-											.where(inArray(faces.photoId, photoIdList))
-											.returning({ id: faces.id })
-									: [];
+							// Step 2: Delete from database in dependency order
+							// face_embeddings cascade-delete with photos (ON DELETE CASCADE)
+							await tx
+								.update(feedback)
+								.set({ eventId: null })
+								.where(eq(feedback.eventId, eventId));
 
 							const photosDeleted = await tx
 								.delete(photos)
@@ -184,7 +207,6 @@ export function hardDeleteEvents(
 
 							return {
 								dbCounts: {
-									faces: facesDeleted.length,
 									photos: photosDeleted.length,
 									participantSearches: searchesDeleted.length,
 									uploadIntents: uploadsDeleted.length,
@@ -195,7 +217,7 @@ export function hardDeleteEvents(
 								r2Keys,
 							};
 						}),
-						(error) => databaseError('hard_delete', error, { eventId })
+						(error) => mapHardDeleteDatabaseError(error, eventId)
 					)
 						.andThen(({ dbCounts, r2Keys }) =>
 							// Step 3: Delete R2 objects (best effort - don't fail if R2 delete fails)
@@ -220,50 +242,23 @@ export function hardDeleteEvents(
 								(error) => storageFailed('delete', error, { eventId })
 							)
 								.orElse((error) => {
-									// R2 failure is non-fatal, log and continue with 0 count
 									console.warn('[HardDelete] R2 deletion failed (non-fatal)', {
 										eventId,
 										error: error.type,
 									});
 									return okAsync(0);
 								})
-								.map((r2Count) => ({ dbCounts, r2Count }))
-						)
-						.andThen(({ dbCounts, r2Count }) =>
-							// Step 4: Delete Rekognition collection (best effort)
-							ResultAsync.fromPromise(
-								rekognitionCollectionId
-									? deleteRekognition(rekognitionCollectionId).then(() => {
-											console.log('[HardDelete] Rekognition collection deleted', {
-												eventId,
-												collectionId: rekognitionCollectionId,
-											});
-											return true;
-										})
-									: Promise.resolve(false),
-								(error) => {
-									console.warn('[HardDelete] Rekognition deletion failed (non-fatal)', {
-										eventId,
-										collectionId: rekognitionCollectionId,
-										error: error instanceof Error ? error.message : String(error),
-									});
-									// Return false as error value (will be converted to Ok(false) by orElse)
-									return error;
-								}
-							)
-								.orElse(() => okAsync(false)) // Convert any error to success with false
-								.map((rekognitionDeleted) => ({
+								.map((r2Count) => ({
 									success: true as const,
 									eventId,
 									deleted: {
 										database: dbCounts,
 										r2Objects: r2Count,
-										rekognitionCollection: rekognitionDeleted,
 									},
 								}))
 						);
 
-					// Convert Result to HardDeleteResult (handle both success and error)
+					// Convert Result to HardDeleteResult
 					return result.match(
 						(success) => success,
 						(error) => {
@@ -278,7 +273,6 @@ export function hardDeleteEvents(
 								error,
 								deleted: {
 									database: {
-										faces: 0,
 										photos: 0,
 										participantSearches: 0,
 										uploadIntents: 0,
@@ -287,19 +281,16 @@ export function hardDeleteEvents(
 										events: 0,
 									},
 									r2Objects: 0,
-									rekognitionCollection: false,
 								},
 							};
 						}
 					);
 				})
 			).then((deletionResults) => {
-				// Map Promise.allSettled results to HardDeleteResult[]
 				return deletionResults.map((result, index) => {
 					if (result.status === 'fulfilled') {
 						return result.value;
 					} else {
-						// Unexpected rejection (shouldn't happen with our error handling)
 						const eventId = eventDetails[index]?.id || eventIds[index] || 'batch';
 						console.error('[HardDelete] Unexpected deletion failure', {
 							eventId,
@@ -318,7 +309,6 @@ export function hardDeleteEvents(
 							},
 							deleted: {
 								database: {
-									faces: 0,
 									photos: 0,
 									participantSearches: 0,
 									uploadIntents: 0,
@@ -327,7 +317,6 @@ export function hardDeleteEvents(
 									events: 0,
 								},
 								r2Objects: 0,
-								rekognitionCollection: false,
 							},
 						};
 					}
@@ -336,4 +325,48 @@ export function hardDeleteEvents(
 			(error) => databaseError('batch_delete', error, { eventId: eventIds[0] || 'batch' })
 		)
 	);
+}
+
+function mapHardDeleteDatabaseError(error: unknown, eventId: string): EventServiceError {
+	const pgError = findPostgresError(error);
+	if (pgError?.code === '23503') {
+		const relation = pgError.table ? `table ${pgError.table}` : 'a dependent table';
+		const constraint = pgError.constraint ? ` (${pgError.constraint})` : '';
+		return customError(
+			'FK_CONSTRAINT_BLOCKS_DELETE',
+			`Hard delete blocked by ${relation}${constraint}`,
+			false,
+			{ eventId }
+		);
+	}
+	return databaseError('hard_delete', error, { eventId });
+}
+
+function findPostgresError(
+	error: unknown
+): { code?: string; constraint?: string; table?: string; detail?: string } | null {
+	const candidates: unknown[] = [error];
+	if (error && typeof error === 'object' && 'cause' in error) {
+		candidates.push((error as { cause?: unknown }).cause);
+	}
+
+	for (const candidate of candidates) {
+		if (!candidate || typeof candidate !== 'object') continue;
+		const pg = candidate as {
+			code?: unknown;
+			constraint?: unknown;
+			table?: unknown;
+			detail?: unknown;
+		};
+		if (typeof pg.code === 'string') {
+			return {
+				code: pg.code,
+				constraint: typeof pg.constraint === 'string' ? pg.constraint : undefined,
+				table: typeof pg.table === 'string' ? pg.table : undefined,
+				detail: typeof pg.detail === 'string' ? pg.detail : undefined,
+			};
+		}
+	}
+
+	return null;
 }

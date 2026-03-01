@@ -1,0 +1,59 @@
+name: Deploy Production Admin
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/admin/**'
+      - 'src/shared/**'
+      - 'src/db/**'
+      - 'vite.admin.config.ts'
+      - 'vite.base.ts'
+      - 'wrangler.admin.jsonc'
+      - 'tsconfig.browser.json'
+      - 'tsconfig.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-production-admin.yml'
+
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production-admin
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Inject Secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.15
+        with:
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          project-slug: frame-fast-pu-xi
+          env-slug: prod
+
+      - run: pnpm install
+
+      - name: Create Admin Env
+        run: |
+          echo "VITE_API_URL=https://api.framefast.io" > src/admin/.env.production
+          echo "VITE_DASHBOARD_URL=https://app.framefast.io" >> src/admin/.env.production
+
+      - name: Build Admin
+        run: pnpm build:admin --mode production
+
+      - name: Deploy Admin
+        run: pnpm exec wrangler deploy --env production -c wrangler.admin.jsonc

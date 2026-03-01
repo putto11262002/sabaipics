@@ -155,7 +155,11 @@ export default function EventPhotosTab() {
                 deleteMutation.isPending
               }
             >
-              {downloadMutation.isPending ? <Spinner className="mr-1 size-3" /> : <Download className="mr-1 size-3" />}
+              {downloadMutation.isPending ? (
+                <Spinner className="mr-1 size-3" />
+              ) : (
+                <Download className="mr-1 size-3" />
+              )}
               Download
             </Button>
             <Button
@@ -168,7 +172,11 @@ export default function EventPhotosTab() {
                 deleteMutation.isPending
               }
             >
-              {deleteMutation.isPending ? <Spinner className="mr-1 size-3" /> : <Trash2 className="mr-1 size-3" />}
+              {deleteMutation.isPending ? (
+                <Spinner className="mr-1 size-3" />
+              ) : (
+                <Trash2 className="mr-1 size-3" />
+              )}
               Delete
             </Button>
           </>

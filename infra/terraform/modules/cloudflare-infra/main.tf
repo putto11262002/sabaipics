@@ -25,6 +25,31 @@ resource "cloudflare_r2_bucket" "photos" {
 }
 
 # ------------------------------------------------------------------------------
+# R2 Bucket Lifecycle
+# ------------------------------------------------------------------------------
+
+resource "cloudflare_r2_bucket_lifecycle" "photos" {
+  account_id  = var.account_id
+  bucket_name = cloudflare_r2_bucket.photos.name
+
+  rules = [{
+    id      = "Delete original uploads after 30 days"
+    enabled = true
+
+    conditions = {
+      prefix = "uploads/"
+    }
+
+    delete_objects_transition = {
+      condition = {
+        max_age = 30
+        type    = "Age"
+      }
+    }
+  }]
+}
+
+# ------------------------------------------------------------------------------
 # R2 Bucket CORS
 # ------------------------------------------------------------------------------
 
@@ -81,5 +106,37 @@ resource "cloudflare_r2_bucket_event_notification" "notifications" {
     prefix      = var.bucket_notifications[count.index].prefix
     actions     = ["PutObject", "CopyObject", "CompleteMultipartUpload"]
     description = var.bucket_notifications[count.index].description
+  }]
+}
+
+# ------------------------------------------------------------------------------
+# Cache Rules (via Rulesets)
+# ------------------------------------------------------------------------------
+
+resource "cloudflare_ruleset" "cache_rules" {
+  for_each = { for rule in var.cache_rules : rule.name => rule }
+
+  zone_id     = var.zone_id
+  name        = each.value.name
+  description = each.value.name
+  kind        = "zone"
+  phase       = "http_request_cache_settings"
+
+  rules = [{
+    action      = "set_cache_settings"
+    expression  = each.value.expression
+    enabled     = true
+    description = each.value.name
+
+    action_parameters = {
+      edge_ttl = {
+        mode    = "override_origin"
+        default = each.value.edge_ttl
+      }
+      browser_ttl = {
+        mode    = "override_origin"
+        default = each.value.browser_ttl
+      }
+    }
   }]
 }

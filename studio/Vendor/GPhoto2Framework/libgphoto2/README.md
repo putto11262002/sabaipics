@@ -7,11 +7,10 @@ drivers.
 If you miss a feature, would like to report success or failure, or have any
 questions, please don't hesitate to contact our mailing list.
 
-
 ## What is libgphoto2?
 
 libgphoto2 is a library that can be used by applications to access various
-digital cameras.  
+digital cameras.
 
 For more information on gphoto, see [gphoto project home page].
 
@@ -20,7 +19,6 @@ and availability of gphoto2. Another source of information is [gphoto github pro
 
 where you can access our SVN server to fetch the source code of
 gphoto2, gtkam and GnoCam (see below).
-
 
 ## What is libgphoto2 not?
 
@@ -44,7 +42,7 @@ For a more up to date list, you can consult [camera list with support status].
 
 Your operating system will tell you about that because it is likely to recognize
 the device as a SCSI disk that you can mount (for Linux 'dmesg' will tell you).
-Again, those cameras *cannot* be accessed through libgphoto2. Some of them can
+Again, those cameras _cannot_ be accessed through libgphoto2. Some of them can
 be switched to use a different communication protocol and might be in that case
 useable with libgphoto2.
 
@@ -61,12 +59,10 @@ will work as-is without any changes.
 MTP (Microsoft Transfer Protocol) capable devices will also be accessible,
 since MTP is based on PTP.
 
-
 ## Platforms
 
 libgphoto2 should compile and run on pretty much all Unix-like platforms.
 libgphoto2 has _not_ (yet?) been ported to any operating system from MicroSoft.
-
 
 ## Bindings
 
@@ -79,7 +75,6 @@ libgphoto2 has _not_ (yet?) been ported to any operating system from MicroSoft.
 - Ruby: [ffi-gphoto2](https://github.com/zaeleus/ffi-gphoto2)
 - Crystal: [gphoto2.cr](https://github.com/sija/gphoto2.cr)
 
-
 ## How to set up libgphoto2
 
 For information on how to set up libgphoto2 and its frontends, see
@@ -87,15 +82,14 @@ The gphoto2 Manual.
 
 It is available at the following places:
 
- - At the gphoto website: [gphoto project home page]
- - In the SVN module gphoto2-manual
+- At the gphoto website: [gphoto project home page]
+- In the SVN module gphoto2-manual
 
 The gphoto2 Manual includes information about setting up USB
 hotplugging.
 
 If you run into problems, you may also consult the FAQ (also included
 in The gphoto2 Manual).
-
 
 ## Frontends
 
@@ -110,16 +104,15 @@ capture ability.
 Additionally, there are plugins for other programs available like
 kio_camera (KDE - Konqueror) and a fuse plugin, gphotofs.
 
-
 ## Reporting Bugs
 
 Every piece of software contains errors and flaws. So does
 libgphoto2. When you encounter something that does not work, please do
 the following:
 
-1. Find out whether this is a known problem.
+1.  Find out whether this is a known problem.
 
-2. Reproduce the problem with debug output enabled and the language
+2.  Reproduce the problem with debug output enabled and the language
     set to English, so that the development team will understand the
     messages. You can do this by running:
 
@@ -131,10 +124,9 @@ the following:
 
     using the gphoto2 command line interface.
 
-3. Report the problem on the mailing list with the corresponding debug
+3.  Report the problem on the mailing list with the corresponding debug
     output if it is small. If it is more than a few kilobytes, please
     don't post the complete debug output on the list.
-
 
 [gphoto project home page]: http://www.gphoto.org/
 [gphoto github project page]: https://github.com/gphoto

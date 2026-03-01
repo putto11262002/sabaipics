@@ -1,9 +1,5 @@
 import { useMemo, useState } from 'react';
-import {
-  useReactTable,
-  getCoreRowModel,
-  createColumnHelper,
-} from '@tanstack/react-table';
+import { useReactTable, getCoreRowModel, createColumnHelper } from '@tanstack/react-table';
 import { Badge } from '@/shared/components/ui/badge';
 import {
   Card,
@@ -13,7 +9,13 @@ import {
   CardDescription,
 } from '@/shared/components/ui/card';
 import { Skeleton } from '@/shared/components/ui/skeleton';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/shared/components/ui/empty';
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from '@/shared/components/ui/empty';
 import { TrendingDown } from 'lucide-react';
 import {
   Select,
@@ -23,7 +25,7 @@ import {
   SelectValue,
 } from '@/shared/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/shared/components/ui/toggle-group';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Legend } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -34,12 +36,38 @@ import { format, parseISO, subDays, eachDayOfInterval } from 'date-fns';
 import { DataTable } from '../../components/events-table/data-table';
 import { DataTablePagination } from '../../components/events-table/data-table-pagination';
 import { useCreditHistory, type CreditEntry } from '../../hooks/credits/useCreditHistory';
-import { useUsageChart } from '../../hooks/credits/useUsageChart';
+import { useUsageBySource } from '../../hooks/credits/useUsageBySource';
+
+const SOURCE_COLORS: Record<string, string> = {
+  upload: 'var(--color-chart-1)',
+  image_enhancement: 'var(--color-chart-2)',
+  line_delivery: 'var(--color-chart-3)',
+  admin_adjustment: 'var(--color-chart-4)',
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  upload: 'Photo Upload',
+  image_enhancement: 'Image Enhancement',
+  line_delivery: 'LINE Delivery',
+  admin_adjustment: 'Admin',
+};
 
 const chartConfig = {
-  credits: {
-    label: 'Credits Used',
+  upload: {
+    label: 'Photo Upload',
     color: 'var(--color-chart-1)',
+  },
+  image_enhancement: {
+    label: 'Image Enhancement',
+    color: 'var(--color-chart-2)',
+  },
+  line_delivery: {
+    label: 'LINE Delivery',
+    color: 'var(--color-chart-3)',
+  },
+  admin_adjustment: {
+    label: 'Admin',
+    color: 'var(--color-chart-4)',
   },
 } satisfies ChartConfig;
 
@@ -56,11 +84,7 @@ const columns = [
     header: 'Source',
     cell: (info) => {
       const source = info.getValue();
-      const labels: Record<string, string> = {
-        upload: 'Photo Upload',
-        admin_adjustment: 'Admin',
-      };
-      return <Badge variant="secondary">{labels[source] ?? source}</Badge>;
+      return <Badge variant="secondary">{SOURCE_LABELS[source] ?? source}</Badge>;
     },
   }),
   columnHelper.accessor('amount', {
@@ -79,23 +103,40 @@ export default function CreditUsageTab() {
   const [pageSize, setPageSize] = useState(20);
 
   const days = parseInt(timeRange, 10);
-  const { data: chartData, isLoading: chartLoading } = useUsageChart(days);
+  const { data: sourceData, isLoading: chartLoading } = useUsageBySource(days);
   const { data: tableData, isLoading: tableLoading } = useCreditHistory(page, pageSize, 'debit');
 
-  // Fill zero-value days for the chart
-  const filledChartData = useMemo(() => {
-    if (!chartData) return [];
-    const dataMap = new Map(chartData.map((d) => [d.date, d.credits]));
+  // Transform source data into stacked bar format with all days filled
+  const stackedChartData = useMemo(() => {
+    if (!sourceData) return [];
+
+    // Group by date
+    const byDate = new Map<string, Record<string, number>>();
+    for (const row of sourceData) {
+      const existing = byDate.get(row.date) ?? {};
+      byDate.set(row.date, { ...existing, [row.source]: row.credits });
+    }
+
+    // Fill all days in range
     const today = new Date();
     const allDays = eachDayOfInterval({
       start: subDays(today, days - 1),
       end: today,
     });
+
     return allDays.map((d) => {
       const dateStr = format(d, 'yyyy-MM-dd');
-      return { date: dateStr, credits: dataMap.get(dateStr) ?? 0 };
+      const sources = byDate.get(dateStr) ?? {};
+      return { date: dateStr, ...sources };
     });
-  }, [chartData, days]);
+  }, [sourceData, days]);
+
+  // Get unique sources present in data for rendering bars
+  const activeSources = useMemo(() => {
+    if (!sourceData) return [];
+    const sources = new Set(sourceData.map((d) => d.source));
+    return Array.from(sources);
+  }, [sourceData]);
 
   const entries = tableData?.data?.entries ?? [];
   const pagination = tableData?.data?.pagination;
@@ -110,9 +151,7 @@ export default function CreditUsageTab() {
       pagination: { pageIndex: page, pageSize },
     },
     onPaginationChange: (updater) => {
-      const next = typeof updater === 'function'
-        ? updater({ pageIndex: page, pageSize })
-        : updater;
+      const next = typeof updater === 'function' ? updater({ pageIndex: page, pageSize }) : updater;
       setPage(next.pageIndex);
       setPageSize(next.pageSize);
     },
@@ -125,9 +164,7 @@ export default function CreditUsageTab() {
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Credit Usage</CardTitle>
-            <CardDescription>
-              Daily credits used over the last {timeRange} days
-            </CardDescription>
+            <CardDescription>Daily credits used over the last {timeRange} days</CardDescription>
           </div>
 
           {/* Time Range - Desktop */}
@@ -149,10 +186,7 @@ export default function CreditUsageTab() {
           </ToggleGroup>
 
           {/* Time Range - Mobile */}
-          <Select
-            value={timeRange}
-            onValueChange={(value) => setTimeRange(value as TimeRange)}
-          >
+          <Select value={timeRange} onValueChange={(value) => setTimeRange(value as TimeRange)}>
             <SelectTrigger className="w-[140px] sm:hidden">
               <SelectValue />
             </SelectTrigger>
@@ -168,10 +202,7 @@ export default function CreditUsageTab() {
             <Skeleton className="h-[300px] w-full" />
           ) : (
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <BarChart
-                data={filledChartData}
-                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-              >
+              <BarChart data={stackedChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis
                   dataKey="date"
@@ -185,15 +216,17 @@ export default function CreditUsageTab() {
                   }}
                 />
                 <YAxis tickLine={false} axisLine={false} tickMargin={8} />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent indicator="line" />}
-                />
-                <Bar
-                  dataKey="credits"
-                  fill="var(--color-credits)"
-                  radius={[4, 4, 0, 0]}
-                />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                <Legend />
+                {activeSources.map((source) => (
+                  <Bar
+                    key={source}
+                    dataKey={source}
+                    fill={SOURCE_COLORS[source] ?? 'var(--color-chart-5)'}
+                    stackId="a"
+                    radius={[0, 0, 0, 0]}
+                  />
+                ))}
               </BarChart>
             </ChartContainer>
           )}
@@ -214,7 +247,9 @@ export default function CreditUsageTab() {
       ) : entries.length === 0 ? (
         <Empty>
           <EmptyHeader>
-            <EmptyMedia variant="icon"><TrendingDown /></EmptyMedia>
+            <EmptyMedia variant="icon">
+              <TrendingDown />
+            </EmptyMedia>
             <EmptyTitle>No usage yet</EmptyTitle>
             <EmptyDescription>Credits are deducted when you upload photos.</EmptyDescription>
           </EmptyHeader>

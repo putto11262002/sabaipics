@@ -12,13 +12,14 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, and, gt, sql } from 'drizzle-orm';
-import { ftpCredentials, activeEvents, creditLedger, photographers, uploadIntents } from '@/db';
+import { ftpCredentials, activeEvents, photographers, uploadIntents } from '@/db';
 import { requirePhotographer, type PhotographerVariables } from '../middleware';
 import type { Env } from '../types';
 import { apiError, type HandlerError } from '../lib/error';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { createClerkAuth } from '@/auth/middleware';
 import { generatePresignedPutUrl } from '../lib/r2/presign';
+import { getBalance } from '../lib/credits';
 import { verifyPassword } from '../lib/password';
 import { signFtpToken } from '../lib/ftp/jwt';
 import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
@@ -120,20 +121,14 @@ export const ftpRouter = new Hono<Env>()
       }
 
       // 5. Check credit balance (fail-fast, no lock)
-      const balanceRows: any = yield* ResultAsync.fromPromise(
-        db
-          .select({ balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int` })
-          .from(creditLedger)
-          .where(
-            and(
-              eq(creditLedger.photographerId, credential.photographerId),
-              gt(creditLedger.expiresAt, sql`NOW()`),
-            ),
-          ),
-        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+      const creditsRemaining = yield* getBalance(db, credential.photographerId).mapErr(
+        (e): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Database error',
+          cause: e.cause,
+        }),
       );
 
-      const creditsRemaining = (balanceRows[0]?.balance ?? 0) as number;
       if (creditsRemaining < 1) {
         return err<never, HandlerError>({
           code: 'PAYMENT_REQUIRED',
@@ -216,20 +211,15 @@ export const ftpRouter = new Hono<Env>()
         }
 
         // 2. Check credit balance (fail-fast, no lock)
-        const balanceRows: any = yield* ResultAsync.fromPromise(
-          db
-            .select({ balance: sql<number>`COALESCE(SUM(${creditLedger.amount}), 0)::int` })
-            .from(creditLedger)
-            .where(
-              and(
-                eq(creditLedger.photographerId, ftpAuth.photographerId),
-                gt(creditLedger.expiresAt, sql`NOW()`),
-              ),
-            ),
-          (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+        const ftpBalance = yield* getBalance(db, ftpAuth.photographerId).mapErr(
+          (e): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Database error',
+            cause: e.cause,
+          }),
         );
 
-        if (((balanceRows[0]?.balance ?? 0) as number) < 1) {
+        if (ftpBalance < 1) {
           return err<never, HandlerError>({
             code: 'PAYMENT_REQUIRED',
             message: 'Insufficient credits',

@@ -1,8 +1,7 @@
 import { createDbTx, events } from '@/db';
-import { and, lt, sql, isNotNull } from 'drizzle-orm';
+import { and, lt, isNotNull } from 'drizzle-orm';
 import type { Bindings } from '../types';
 import { hardDeleteEvents } from '../lib/services/events/hard-delete';
-import { createFaceProvider } from '../lib/rekognition';
 
 interface HardDeleteCleanupResult {
 	eventsHardDeleted: number;
@@ -13,9 +12,8 @@ interface HardDeleteCleanupResult {
  * Hard Delete Cleanup (PERMANENT DELETE):
  * 1. Query soft-deleted events older than grace period (default: 30 days)
  * 2. Permanently delete events and all related data:
- *    - Database records (faces, photos, searches, uploads, ftp, events)
+ *    - Database records (face_embeddings cascade with photos, photos, searches, uploads, ftp, events)
  *    - R2 objects (photos, logos, QR codes, selfies)
- *    - AWS Rekognition collections
  * 3. Process in batches to avoid timeouts
  *
  * Runs daily at 3 AM Bangkok time (8 PM UTC)
@@ -33,10 +31,8 @@ export async function hardDeleteCleanup(env: Bindings): Promise<HardDeleteCleanu
 		batchSize,
 	});
 
-	const db = createDbTx(env.DATABASE_URL); // Use WebSocket adapter for transaction support
+	const db = createDbTx(env.DATABASE_URL);
 
-	// Find soft-deleted events older than grace period
-	// Calculate cutoff date in JavaScript to avoid SQL injection
 	const cutoffDate = new Date();
 	cutoffDate.setDate(cutoffDate.getDate() - graceDays);
 
@@ -45,8 +41,8 @@ export async function hardDeleteCleanup(env: Bindings): Promise<HardDeleteCleanu
 		.from(events)
 		.where(
 			and(
-				isNotNull(events.deletedAt), // Only soft-deleted events
-				lt(events.deletedAt, cutoffDate.toISOString()) // Older than grace period
+				isNotNull(events.deletedAt),
+				lt(events.deletedAt, cutoffDate.toISOString())
 			)
 		)
 		.limit(batchSize);
@@ -63,34 +59,18 @@ export async function hardDeleteCleanup(env: Bindings): Promise<HardDeleteCleanu
 		eventIds,
 	});
 
-	// Create Rekognition provider and deleteRekognition function
-	const provider = createFaceProvider(env);
-	const deleteRekognition = async (collectionId: string): Promise<void> => {
-		await provider.deleteCollection(collectionId).match(
-			() => undefined,
-			(error) => {
-				throw new Error(`Rekognition deletion failed: ${error.type}`);
-			}
-		);
-	};
-
-	// Hard delete all candidates (using neverthrow Result pattern)
 	const result = await hardDeleteEvents({
 		db,
 		eventIds,
 		r2Bucket: env.PHOTOS_BUCKET,
-		deleteRekognition,
 	});
 
-	// FIX Issue #2: Handle partial failures gracefully
 	return result.match(
 		(results) => {
-			// Separate successes and failures
 			const successes = results.filter((r) => r.success);
 			const failures = results.filter((r) => !r.success);
 			const duration = Date.now() - startTime;
 
-			// Log partial failures (non-fatal)
 			if (failures.length > 0) {
 				console.error('[HardDeleteCleanup] Partial failures', {
 					succeeded: successes.length,
@@ -104,7 +84,6 @@ export async function hardDeleteCleanup(env: Bindings): Promise<HardDeleteCleanu
 				});
 			}
 
-			// Log successes
 			if (successes.length > 0) {
 				console.log('[HardDeleteCleanup] Cron completed', {
 					eventsHardDeleted: successes.length,
@@ -117,21 +96,18 @@ export async function hardDeleteCleanup(env: Bindings): Promise<HardDeleteCleanu
 				});
 			}
 
-			// Only throw if ALL deletions failed (not just some)
 			if (successes.length === 0 && failures.length > 0) {
 				throw new Error(
 					`All deletions failed: ${failures.length} events failed to delete`
 				);
 			}
 
-			// Return success with stats (including partial failures)
 			return {
 				eventsHardDeleted: successes.length,
 				eventIds: successes.map((r) => r.eventId),
 			};
 		},
 		(error) => {
-			// Complete failure - entire operation couldn't proceed
 			const duration = Date.now() - startTime;
 			console.error('[HardDeleteCleanup] Cron failed completely', {
 				error,
@@ -139,7 +115,6 @@ export async function hardDeleteCleanup(env: Bindings): Promise<HardDeleteCleanu
 				durationMs: duration,
 			});
 
-			// Re-throw to mark cron as failed
 			throw new Error(`Hard delete cleanup failed: ${error.type}`);
 		}
 	);

@@ -12,10 +12,8 @@ struct CaptureStatusBarView: View {
 
     let status: Status
     let cameraName: String
-    let downloadsCount: Int
-    let lastFilename: String?
-    let uploadedCount: Int
     let eventName: String?
+    var isSyncing: Bool = false
     let onOpen: () -> Void
     let onDisconnect: () -> Void
 
@@ -27,12 +25,12 @@ struct CaptureStatusBarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(cameraName)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.Theme.foreground)
+                        .foregroundStyle(Color.primary)
                         .lineLimit(1)
 
                     Text(subtitleText)
                         .font(.caption)
-                        .foregroundStyle(Color.Theme.mutedForeground)
+                        .foregroundStyle(Color.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -40,37 +38,48 @@ struct CaptureStatusBarView: View {
 
             Spacer(minLength: 10)
 
-            PipelineCluster(downloadsCount: downloadsCount, uploadedCount: uploadedCount)
-
-            Button {
-                onDisconnect()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .padding(8)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.Theme.destructive)
-            .accessibilityLabel("Disconnect")
+            disconnectButton
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(
-            .ultraThinMaterial,
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.Theme.border, lineWidth: 1)
-        )
-        .shadow(color: Color.Theme.foreground.opacity(0.08), radius: 10, x: 0, y: 4)
+        .background(statusBarBackground)
+        .conditionalShadow()
         .contentShape(Rectangle())
         .onTapGesture {
             onOpen()
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    // MARK: - Disconnect Button
+
+    @ViewBuilder
+    private var disconnectButton: some View {
+        Button {
+            onDisconnect()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 12, weight: .semibold))
+                .padding(8)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.red)
+        .accessibilityLabel("Disconnect")
+    }
+
+    // MARK: - Background
+
+    @ViewBuilder
+    private var statusBarBackground: some View {
+        if #available(iOS 26.0, *) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.clear)
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
+        } else {
+            Color(uiColor: .secondarySystemGroupedBackground)
+        }
     }
 
     private var subtitleText: String {
@@ -96,11 +105,16 @@ struct CaptureStatusBarView: View {
         case .active:
             Image(systemName: "dot.radiowaves.left.and.right")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.Theme.success)
+                .foregroundStyle(Color.green)
+                .overlay {
+                    if isSyncing {
+                        SyncRingOverlay()
+                    }
+                }
         case .error:
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.Theme.destructive)
+                .foregroundStyle(Color.red)
         }
     }
 
@@ -109,94 +123,82 @@ struct CaptureStatusBarView: View {
         case .connecting:
             return "Capture session. Working."
         case .active:
-            return "Capture session active. \(downloadsCount) saved."
+            return "Capture session active."
         case .error(let message):
             return "Capture session error. \(message)"
         }
     }
 }
 
-private struct PipelineCluster: View {
-    let downloadsCount: Int
-    let uploadedCount: Int
+private struct SyncRingOverlay: View {
+    @State private var isRotating = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            clusterPill(icon: "arrow.down.circle.fill", text: "\(downloadsCount)")
-                .foregroundStyle(Color.Theme.primary)
-
-            uploadPill
-        }
+        Circle()
+            .trim(from: 0, to: 0.3)
+            .stroke(Color.green.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            .frame(width: 22, height: 22)
+            .rotationEffect(.degrees(isRotating ? 360 : 0))
+            .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isRotating)
+            .onAppear { isRotating = true }
     }
+}
 
-    private var uploadPill: some View {
-        let total = max(downloadsCount, 0)
-        let uploaded = min(max(uploadedCount, 0), total)
+// MARK: - Conditional Shadow Extension
 
-        guard total > 0 else {
-            return AnyView(EmptyView())
+extension View {
+    /// Applies shadow only on iOS < 26. Liquid Glass handles its own depth on iOS 26+.
+    @ViewBuilder
+    func conditionalShadow() -> some View {
+        if #available(iOS 26.0, *) {
+            self
+        } else {
+            self.shadow(color: Color.primary.opacity(0.08), radius: 10, x: 0, y: 4)
         }
-
-        let tint: Color = Color.Theme.primary
-        let isComplete = uploaded == total
-
-        return AnyView(
-            HStack(spacing: 6) {
-                if !isComplete {
-                    ProgressView()
-                        .controlSize(.mini)
-                } else {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                Text("\(uploaded)/\(total)")
-                    .font(.caption.weight(.semibold))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(tint.opacity(0.10))
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(tint.opacity(0.25), lineWidth: 1))
-            .foregroundStyle(tint)
-            .accessibilityLabel("Uploads \(uploaded) of \(total)")
-        )
-    }
-
-    private func clusterPill(icon: String, text: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-            Text(text)
-                .font(.caption.weight(.semibold))
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Color.Theme.primary.opacity(0.10))
-        .clipShape(Capsule())
-        .overlay(Capsule().stroke(Color.Theme.primary.opacity(0.25), lineWidth: 1))
     }
 }
 
 #if DEBUG
 
 #Preview("Capture Status Bar") {
-    VStack {
-        Spacer()
-        CaptureStatusBarView(
-            status: .active,
-            cameraName: "Sony A7 IV",
-            downloadsCount: 12,
-            lastFilename: "DSC01234.JPG",
-            uploadedCount: 9,
-            eventName: "Bangkok Wedding",
-            onOpen: {},
-            onDisconnect: {}
-        )
-        .padding(.horizontal, 16)
-        .padding(.bottom, 24)
+    TabView {
+        NavigationStack {
+            Color.clear
+                .navigationTitle("Capture")
+                .navigationBarTitleDisplayMode(.large)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 8) {
+                CaptureStatusBarView(
+                    status: .active,
+                    cameraName: "Sony A7 IV",
+                    eventName: "Bangkok Wedding",
+                    onOpen: {},
+                    onDisconnect: {}
+                )
+
+                CaptureStatusBarView(
+                    status: .active,
+                    cameraName: "Sony A7 IV",
+                    eventName: "Bangkok Wedding",
+                    isSyncing: true,
+                    onOpen: {},
+                    onDisconnect: {}
+                )
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+        }
+        .tabItem { Label("Capture", systemImage: "camera.circle.fill") }
+
+        Color.clear
+            .tabItem { Label("Events", systemImage: "calendar") }
+
+        Color.clear
+            .tabItem { Label("Profile", systemImage: "person.crop.circle") }
     }
-    .frame(maxWidth: .infinity)
-    .background(Color.Theme.background)
+    .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
 }
 
 #endif

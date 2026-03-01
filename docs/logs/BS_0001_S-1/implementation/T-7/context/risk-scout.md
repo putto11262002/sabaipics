@@ -26,15 +26,13 @@ WHERE photographer_id = ?
 - **Scenario 3:** All credits expired - returns 0 or NULL, need explicit COALESCE
 
 **Mitigation:** Use `COALESCE(SUM(amount), 0)` in query:
+
 ```typescript
 const [result] = await db
   .select({ balance: sql`COALESCE(SUM(${creditLedger.amount}), 0)` })
   .from(creditLedger)
   .where(
-    and(
-      eq(creditLedger.photographerId, photographer.id),
-      gt(creditLedger.expiresAt, sql`NOW()`)
-    )
+    and(eq(creditLedger.photographerId, photographer.id), gt(creditLedger.expiresAt, sql`NOW()`)),
   );
 ```
 
@@ -47,10 +45,10 @@ The response includes `nearestExpiry` - need to find the earliest `expires_at` f
 **[NEED_DECISION] How to calculate nearestExpiry?**
 
 Options:
+
 - **A) Simple approach:** Just return the earliest `expires_at` from any non-expired credit_ledger row with positive amount (purchase rows only)
   - Pros: Simple query, O(1) with index
   - Cons: Doesn't account for partial consumption - may show expiry date of fully-consumed purchase
-  
 - **B) Accurate FIFO approach:** Calculate running balance per expiry bucket, find first non-exhausted bucket
   - Pros: Accurate
   - Cons: Complex query, potential performance issues
@@ -73,6 +71,7 @@ WHERE photographer_id = ?
 ### Multiple Queries
 
 The endpoint needs to fetch:
+
 1. Credit balance (SUM on `credit_ledger`)
 2. Nearest expiry date (MIN on `credit_ledger`)
 3. Events list (SELECT from `events`)
@@ -81,6 +80,7 @@ The endpoint needs to fetch:
 **[RISK] N+1 queries for stats per event**
 
 If stats include per-event photo/face counts, naive implementation causes N+1:
+
 ```typescript
 // BAD: N+1
 const events = await db.select().from(events)...
@@ -98,7 +98,7 @@ const eventsWithCounts = await db
     name: events.name,
     createdAt: events.createdAt,
     photoCount: sql<number>`(SELECT COUNT(*) FROM photos WHERE event_id = ${events.id})`,
-    faceCount: sql<number>`(SELECT COALESCE(SUM(face_count), 0) FROM photos WHERE event_id = ${events.id})`
+    faceCount: sql<number>`(SELECT COALESCE(SUM(face_count), 0) FROM photos WHERE event_id = ${events.id})`,
   })
   .from(events)
   .where(eq(events.photographerId, photographer.id))
@@ -110,6 +110,7 @@ const eventsWithCounts = await db
 For photographers with many events/photos, computing `totalPhotos` and `totalFaces` requires table scans.
 
 **Existing indexes** (from migration `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/packages/db/drizzle/0001_ambiguous_the_liberteens.sql`):
+
 - `events_photographer_id_idx` ON `events(photographer_id)` - good for event filtering
 - `photos_event_id_idx` ON `photos(event_id)` - good for per-event counts
 - `credit_ledger_photographer_expires_idx` ON `credit_ledger(photographer_id, expires_at)` - good for credit queries
@@ -117,6 +118,7 @@ For photographers with many events/photos, computing `totalPhotos` and `totalFac
 **Missing index:** No direct index for `photographer_id -> photos` join. Stats query must go through events.
 
 **Mitigation options:**
+
 1. Use subquery with existing indexes (acceptable for MVP)
 2. Denormalize counts on `events` table (future optimization)
 3. Cache stats (overkill for MVP)
@@ -132,10 +134,12 @@ For photographers with many events/photos, computing `totalPhotos` and `totalFac
 **[RISK] Photographer can only see own data - must be enforced at query level**
 
 Existing patterns from `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/middleware/require-photographer.ts`:
+
 - `requirePhotographer()` middleware sets `c.var.photographer` with `{ id, pdpaConsentAt }`
 - Use `photographer.id` in all WHERE clauses
 
 **Critical:** Every query MUST filter by `photographer_id`:
+
 ```typescript
 // Credits - filter by photographer
 .where(eq(creditLedger.photographerId, photographer.id))
@@ -151,10 +155,10 @@ Existing patterns from `/Users/putsuthisrisinlpa/Develope/company/products/sabai
 **[NEED_DECISION] Should dashboard require PDPA consent?**
 
 Options:
+
 - **A) Yes, require consent** - Use `requireConsent()` middleware (already exists at `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/apps/api/src/middleware/require-consent.ts`)
   - Pros: Strict compliance, consistent with plan
   - Cons: Blocks new users from seeing empty dashboard
-  
 - **B) No, allow without consent** - Show dashboard with consent prompt banner
   - Pros: Better onboarding UX, user sees the empty state
   - Cons: Minor compliance risk (though no data processing happens yet)
@@ -162,6 +166,7 @@ Options:
 **Recommendation:** Option A - require consent. The consent modal is blocking per US-1 in plan. Dashboard access after consent is the expected flow.
 
 Middleware chain:
+
 ```typescript
 .get("/dashboard", requirePhotographer(), requireConsent(), async (c) => { ... })
 ```
@@ -175,11 +180,13 @@ Middleware chain:
 **[RISK] Empty state handling**
 
 A photographer who just signed up will have:
+
 - 0 credits (no ledger entries)
 - No events
 - 0 total photos, 0 total faces
 
 **Required behavior:**
+
 ```typescript
 // Response for new user
 {
@@ -190,6 +197,7 @@ A photographer who just signed up will have:
 ```
 
 **Implementation:**
+
 - `COALESCE(SUM(amount), 0)` for balance
 - `nearestExpiry: null` when no unexpired purchases
 - Empty array for events (natural result of query)
@@ -198,6 +206,7 @@ A photographer who just signed up will have:
 ### Events With No Photos
 
 An event created but not yet uploaded to should show:
+
 ```typescript
 { id, name, photoCount: 0, faceCount: 0, ... }
 ```
@@ -208,9 +217,10 @@ An event created but not yet uploaded to should show:
 
 **[GAP] Events.expires_at handling in dashboard**
 
-The plan mentions `events.expires_at = created_at + 30 days`. 
+The plan mentions `events.expires_at = created_at + 30 days`.
 
 **Questions:**
+
 1. Should expired events still show in dashboard list?
 2. If shown, should they be visually distinguished?
 3. Should stats include photos from expired events?
@@ -218,6 +228,7 @@ The plan mentions `events.expires_at = created_at + 30 days`.
 **[NEED_DECISION] Expired events in dashboard**
 
 Options:
+
 - **A) Show all events** - Expired events visible but marked
 - **B) Filter to non-expired only** - WHERE `expires_at > NOW()`
 - **C) Paginate with separate "expired" section** - More complex
@@ -241,22 +252,26 @@ Options:
 **[GAP] Missing fields in events response**
 
 The plan specifies `{ id, name, photoCount, faceCount, createdAt }` but may want:
+
 - `startDate`, `endDate` - for display
 - `expiresAt` or `isExpired` - for UI differentiation
 - `accessCode` - for QR display
 
 **Recommendation:** Include in response:
+
 ```typescript
-events: [{
-  id: string,
-  name: string,
-  photoCount: number,
-  faceCount: number,
-  createdAt: string,  // ISO 8601
-  expiresAt: string,  // ISO 8601
-  startDate: string | null,
-  endDate: string | null
-}]
+events: [
+  {
+    id: string,
+    name: string,
+    photoCount: number,
+    faceCount: number,
+    createdAt: string, // ISO 8601
+    expiresAt: string, // ISO 8601
+    startDate: string | null,
+    endDate: string | null,
+  },
+];
 ```
 
 Exclude `accessCode` and `qrCodeR2Key` from list (fetch in detail endpoint).
@@ -286,6 +301,7 @@ Exclude `accessCode` and `qrCodeR2Key` from list (fetch in detail endpoint).
 ## 7. Implementation Checklist
 
 ### Must Do
+
 - [ ] Use `requirePhotographer()` + `requireConsent()` middleware
 - [ ] Filter ALL queries by `photographer.id`
 - [ ] Use `COALESCE` for null-safe aggregations
@@ -293,11 +309,13 @@ Exclude `accessCode` and `qrCodeR2Key` from list (fetch in detail endpoint).
 - [ ] Use existing composite index for credit queries
 
 ### Should Do
+
 - [ ] Use subqueries for photo/face counts (avoid N+1)
 - [ ] Include `expiresAt` in events response
 - [ ] Add Zod schema for response type
 
 ### Consider
+
 - [ ] Add response time logging
 - [ ] Add cache headers (short TTL, user-specific)
 
@@ -306,6 +324,7 @@ Exclude `accessCode` and `qrCodeR2Key` from list (fetch in detail endpoint).
 ## 8. Test Cases
 
 ### Unit Tests
+
 1. Credit balance with no ledger entries -> 0
 2. Credit balance with expired entries only -> 0
 3. Credit balance with mix of expired/valid -> correct sum
@@ -315,6 +334,7 @@ Exclude `accessCode` and `qrCodeR2Key` from list (fetch in detail endpoint).
 7. Stats aggregation with no photos -> { totalPhotos: 0, totalFaces: 0 }
 
 ### Integration Tests
+
 1. Full flow: new user gets empty dashboard
 2. Full flow: user with credits, events, photos gets correct data
 3. Auth: unauthenticated request -> 401
@@ -325,21 +345,22 @@ Exclude `accessCode` and `qrCodeR2Key` from list (fetch in detail endpoint).
 
 ## Summary
 
-| Category | Item | Status |
-|----------|------|--------|
-| **[RISK]** | FIFO balance needs COALESCE | Mitigated - use COALESCE |
-| **[RISK]** | N+1 for event stats | Mitigated - use subqueries |
-| **[RISK]** | Authorization leakage | Mitigated - filter all queries by photographer_id |
-| **[NEED_DECISION]** | nearestExpiry calculation | Recommend: simple MIN of purchases |
-| **[NEED_DECISION]** | PDPA consent required? | Recommend: Yes, use requireConsent() |
-| **[NEED_DECISION]** | Show expired events? | Recommend: Yes, with isExpired flag |
-| **[GAP]** | Events response fields | Recommend: add expiresAt, startDate, endDate |
+| Category            | Item                        | Status                                            |
+| ------------------- | --------------------------- | ------------------------------------------------- |
+| **[RISK]**          | FIFO balance needs COALESCE | Mitigated - use COALESCE                          |
+| **[RISK]**          | N+1 for event stats         | Mitigated - use subqueries                        |
+| **[RISK]**          | Authorization leakage       | Mitigated - filter all queries by photographer_id |
+| **[NEED_DECISION]** | nearestExpiry calculation   | Recommend: simple MIN of purchases                |
+| **[NEED_DECISION]** | PDPA consent required?      | Recommend: Yes, use requireConsent()              |
+| **[NEED_DECISION]** | Show expired events?        | Recommend: Yes, with isExpired flag               |
+| **[GAP]**           | Events response fields      | Recommend: add expiresAt, startDate, endDate      |
 
 ---
 
 ## Provenance
 
 **Files read:**
+
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/docs/logs/BS_0001_S-1/tasks.md` - Task definition
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/docs/logs/BS_0001_S-1/plan/final.md` - Execution plan
 - `/Users/putsuthisrisinlpa/Develope/company/products/sabaipics/agent2/packages/db/src/schema/credit-ledger.ts` - Schema

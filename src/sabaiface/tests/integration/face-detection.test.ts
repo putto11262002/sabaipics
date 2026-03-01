@@ -215,17 +215,13 @@ describe('Face Detection Integration', () => {
     it('should handle invalid image data gracefully', async () => {
       const invalidBuffer = Buffer.from('not an image');
 
-      await expect(
-        detector.detectFaces(invalidBuffer.buffer)
-      ).rejects.toThrow();
+      await expect(detector.detectFaces(invalidBuffer.buffer)).rejects.toThrow();
     });
 
     it('should handle empty buffer gracefully', async () => {
       const emptyBuffer = Buffer.alloc(0);
 
-      await expect(
-        detector.detectFaces(emptyBuffer.buffer)
-      ).rejects.toThrow();
+      await expect(detector.detectFaces(emptyBuffer.buffer)).rejects.toThrow();
     });
   });
 });

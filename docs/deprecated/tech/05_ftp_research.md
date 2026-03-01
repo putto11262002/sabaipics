@@ -9,6 +9,7 @@
 ## Executive Summary
 
 **What SFTPGo Handles:**
+
 - Full FTP/FTPS server (RFC 959, all commands)
 - TLS encryption, passive mode, connection management
 - External authentication hook (validates against our API)
@@ -16,6 +17,7 @@
 - Built-in metrics, logging, brute force protection
 
 **What We Must Implement:**
+
 - `POST /ftp/auth` - Validate credentials, return user object
 - HTTPFs API (`/ftp/v1/*`) - 13 endpoints for file operations
 - Business logic (access control, quotas, validation)
@@ -28,13 +30,15 @@
 ### Supported Commands (Out of Box)
 
 **Standard FTP (RFC 959):**
+
 - USER, PASS - Authentication
-- CWD, PWD - Navigation  
+- CWD, PWD - Navigation
 - LIST, NLST - Listing
 - STOR, RETR - Upload/Download
 - DELE, MKD, RMD, RNFR, RNTO - File operations
 
 **Extensions:**
+
 - AUTH/PROT - TLS (RFC 2228, 4217)
 - EPRT/EPSV - IPv6 (RFC 2428)
 - MDTM, SIZE, REST - File info & resume (RFC 3659)
@@ -52,11 +56,12 @@
 ```
 
 **Config:**
+
 ```json
 {
   "ftpd": {
-    "passive_port_range": {"start": 50000, "end": 50100},
-    "force_passive_ip": "203.0.113.1"  // For NAT
+    "passive_port_range": { "start": 50000, "end": 50100 },
+    "force_passive_ip": "203.0.113.1" // For NAT
   }
 }
 ```
@@ -66,11 +71,13 @@
 ### FTPS Modes
 
 **Explicit FTPS (Recommended):**
+
 - Port 21, client sends `AUTH TLS`
 - Upgrade to TLS after connection
 - `tls_mode: 1`
 
 **Implicit FTPS (Legacy):**
+
 - Port 990, TLS from start
 - `tls_mode: 2`
 
@@ -86,18 +93,19 @@ FTP Client → SFTPGo → HTTP Calls → Our API → R2 Storage
 
 SFTPGo translates FTP commands to HTTP requests:
 
-| FTP Command | HTTP Call |
-|------------|-----------|
-| STOR file.jpg | `POST /ftp/v1/create/file.jpg` (body: binary) |
-| RETR file.jpg | `GET /ftp/v1/open/file.jpg` |
-| LIST /dir | `GET /ftp/v1/readdir/dir` |
-| DELE file.jpg | `DELETE /ftp/v1/remove/file.jpg` |
-| MKD /newdir | `POST /ftp/v1/mkdir/newdir` |
-| RNF old TO new | `PATCH /ftp/v1/rename/old?target=new` |
+| FTP Command    | HTTP Call                                     |
+| -------------- | --------------------------------------------- |
+| STOR file.jpg  | `POST /ftp/v1/create/file.jpg` (body: binary) |
+| RETR file.jpg  | `GET /ftp/v1/open/file.jpg`                   |
+| LIST /dir      | `GET /ftp/v1/readdir/dir`                     |
+| DELE file.jpg  | `DELETE /ftp/v1/remove/file.jpg`              |
+| MKD /newdir    | `POST /ftp/v1/mkdir/newdir`                   |
+| RNF old TO new | `PATCH /ftp/v1/rename/old?target=new`         |
 
 ### Required HTTPFs Endpoints
 
 **Essential (Must implement):**
+
 1. `GET /stat/{path}` - File metadata
 2. `GET /open/{path}?offset=N` - Download file
 3. `POST /create/{path}?flags=N` - Upload file
@@ -106,17 +114,12 @@ SFTPGo translates FTP commands to HTTP requests:
 6. `PATCH /rename/{path}?target=X` - Move/rename
 7. `GET /readdir/{path}` - List directory
 
-**Optional (Can return 501):**
-8. `PATCH /chmod/{path}?mode=N` - Change permissions
-9. `PATCH /chtimes/{path}?...` - Change timestamps
-10. `PATCH /truncate/{path}?size=N` - Resize file
-11. `GET /dirsize/{path}` - Directory size
-12. `GET /mimetype/{path}` - MIME type
-13. `GET /statvfs/{path}` - Filesystem stats
+**Optional (Can return 501):** 8. `PATCH /chmod/{path}?mode=N` - Change permissions 9. `PATCH /chtimes/{path}?...` - Change timestamps 10. `PATCH /truncate/{path}?size=N` - Resize file 11. `GET /dirsize/{path}` - Directory size 12. `GET /mimetype/{path}` - MIME type 13. `GET /statvfs/{path}` - Filesystem stats
 
 ### Request/Response Examples
 
 **stat - Get File Info:**
+
 ```http
 GET /ftp/v1/stat/event123/photo.jpg
 X-API-KEY: secret
@@ -131,6 +134,7 @@ Response 200:
 ```
 
 **open - Download File:**
+
 ```http
 GET /ftp/v1/open/event123/photo.jpg?offset=0
 X-API-KEY: secret
@@ -142,6 +146,7 @@ Content-Length: 2048576
 ```
 
 **create - Upload File:**
+
 ```http
 POST /ftp/v1/create/event123/photo.jpg?flags=66
 X-API-KEY: secret
@@ -153,6 +158,7 @@ Response 201:
 ```
 
 **readdir - List Directory:**
+
 ```http
 GET /ftp/v1/readdir/event123
 
@@ -175,14 +181,14 @@ Response 200:
 
 ### Error Mapping
 
-| HTTP Status | FTP Meaning |
-|------------|-------------|
-| 200/201 | Success |
-| 401 | Not authorized (invalid API key) |
-| 403 | Permission denied |
-| 404 | Not found |
-| 500 | Internal error |
-| 501 | Not implemented |
+| HTTP Status | FTP Meaning                      |
+| ----------- | -------------------------------- |
+| 200/201     | Success                          |
+| 401         | Not authorized (invalid API key) |
+| 403         | Permission denied                |
+| 404         | Not found                        |
+| 500         | Internal error                   |
+| 501         | Not implemented                  |
 
 ### File Mode Flags
 
@@ -210,7 +216,7 @@ Response 200:
 {
   "common": {
     "external_auth_hook": "http://api.sabaipics.com/ftp/auth",
-    "external_auth_scope": 1  // 1=password only
+    "external_auth_scope": 1 // 1=password only
   }
 }
 ```
@@ -230,6 +236,7 @@ Content-Type: application/json
 ```
 
 Fields sent by SFTPGo:
+
 - `username`, `password` - Credentials
 - `ip` - Client IP
 - `protocol` - "SSH", "FTP", "DAV", "HTTP"
@@ -239,6 +246,7 @@ Fields sent by SFTPGo:
 ### Auth Response
 
 **Success - Return User Object:**
+
 ```http
 200 OK
 Content-Type: application/json
@@ -263,12 +271,14 @@ Content-Type: application/json
 ```
 
 **Success - Use Existing User:**
+
 ```http
 200 OK
 Content-Length: 0
 ```
 
 **Failure:**
+
 ```http
 401 Unauthorized
 
@@ -278,6 +288,7 @@ Content-Length: 0
 ### User Object Structure
 
 **Key Fields:**
+
 - `status` - 1=enabled, 0=disabled
 - `username` - Unique username
 - `home_dir` - Virtual root (e.g., "/events")
@@ -288,6 +299,7 @@ Content-Length: 0
 - `external_auth_cache_time` - Cache duration (seconds)
 
 **Permission Values:**
+
 - `*` - All permissions
 - `list`, `download`, `upload`, `overwrite`, `delete`
 - `rename`, `create_dirs`, `create_symlinks`
@@ -300,6 +312,7 @@ Content-Length: 0
 ### SFTPGo Handles (Out of Box)
 
 **Protocol:**
+
 - ✅ Full FTP/FTPS server (RFC 959 + extensions)
 - ✅ All FTP commands (STOR, RETR, LIST, etc.)
 - ✅ Passive/active mode
@@ -308,6 +321,7 @@ Content-Length: 0
 - ✅ IPv6 support
 
 **Connection:**
+
 - ✅ Client connection handling
 - ✅ Session management
 - ✅ Connection limits
@@ -315,6 +329,7 @@ Content-Length: 0
 - ✅ Proxy protocol
 
 **Security:**
+
 - ✅ TLS/SSL
 - ✅ Password hashing
 - ✅ Auth delegation
@@ -323,6 +338,7 @@ Content-Length: 0
 - ✅ Rate limiting
 
 **Users:**
+
 - ✅ Virtual users
 - ✅ User caching
 - ✅ Per-user permissions
@@ -331,6 +347,7 @@ Content-Length: 0
 - ✅ Groups
 
 **Observability:**
+
 - ✅ Prometheus metrics
 - ✅ Event logging
 - ✅ Connection tracking
@@ -340,12 +357,14 @@ Content-Length: 0
 ### We Must Implement
 
 **Authentication API:**
+
 - ❌ `POST /ftp/auth` - Validate credentials
 - ❌ Map photographer → event permissions
 - ❌ Generate user object with HTTPFs config
 - ❌ Generate API keys for HTTPFs
 
 **HTTPFs API:**
+
 - ❌ `GET /stat/{path}` - File metadata from R2
 - ❌ `GET /open/{path}` - Stream download from R2
 - ❌ `POST /create/{path}` - Upload to R2
@@ -355,6 +374,7 @@ Content-Length: 0
 - ❌ `GET /readdir/{path}` - List R2 directory
 
 **Business Logic:**
+
 - ❌ Photographer authentication
 - ❌ Event access control
 - ❌ Path mapping (virtual → R2 keys)
@@ -363,6 +383,7 @@ Content-Length: 0
 - ❌ File validation (type, size)
 
 **API Key Management:**
+
 - ❌ Generate keys
 - ❌ Validate keys in HTTPFs endpoints
 - ❌ Map key → photographer → events
@@ -386,14 +407,16 @@ Content-Length: 0
     }
   },
   "ftpd": {
-    "bindings": [{
-      "port": 2121,
-      "tls_mode": 1,
-      "certificate_file": "/etc/sftpgo/certs/cert.pem",
-      "certificate_key_file": "/etc/sftpgo/certs/key.pem",
-      "min_tls_version": 12,
-      "force_passive_ip": "203.0.113.1"
-    }],
+    "bindings": [
+      {
+        "port": 2121,
+        "tls_mode": 1,
+        "certificate_file": "/etc/sftpgo/certs/cert.pem",
+        "certificate_key_file": "/etc/sftpgo/certs/key.pem",
+        "min_tls_version": 12,
+        "force_passive_ip": "203.0.113.1"
+      }
+    ],
     "passive_port_range": {
       "start": 50000,
       "end": 50100
@@ -422,18 +445,21 @@ SFTPGO_FTPD__PASSIVE_PORT_RANGE__END=50100
 ## 6. Implementation Roadmap
 
 ### Phase 1: External Auth API
+
 1. Create `POST /ftp/auth` endpoint
 2. Validate photographer credentials from DB
 3. Generate user object with event permissions
 4. Return HTTPFs config with API key
 
 ### Phase 2: HTTPFs Read-Only
+
 1. Implement `GET /stat/{path}`
 2. Implement `GET /readdir/{path}`
 3. Implement `GET /open/{path}`
 4. Test downloads with FTP client
 
 ### Phase 3: HTTPFs Write
+
 1. Implement `POST /create/{path}` - Upload to R2
 2. Implement `DELETE /remove/{path}`
 3. Implement `POST /mkdir/{path}`
@@ -441,6 +467,7 @@ SFTPGO_FTPD__PASSIVE_PORT_RANGE__END=50100
 5. Test uploads with FTP client
 
 ### Phase 4: SFTPGo Deployment
+
 1. Deploy SFTPGo container
 2. Configure external auth hook
 3. Configure FTPS certificates
@@ -448,6 +475,7 @@ SFTPGO_FTPD__PASSIVE_PORT_RANGE__END=50100
 5. Open firewall ports
 
 ### Phase 5: Testing & Hardening
+
 1. Test with FileZilla, WinSCP
 2. Test passive mode through NAT
 3. Load testing (concurrent uploads)
@@ -459,25 +487,30 @@ SFTPGO_FTPD__PASSIVE_PORT_RANGE__END=50100
 ## 7. Security Considerations
 
 ### Authentication
+
 - Use external hook (don't store passwords in SFTPGo)
 - Cache auth for 1 hour
 - Rotate API keys periodically
 
 ### Authorization
+
 - Photographer can only access assigned events
 - Enforce paths in HTTPFs API (prevent traversal)
 
 ### Network
+
 - Always use FTPS (TLS 1.2+)
 - Configure `force_passive_ip` for NAT
 - Firewall passive port range
 
 ### Rate Limiting
+
 - Enable SFTPGo Defender
 - Max concurrent sessions per user
 - API-level upload limits
 
 ### Validation
+
 - Validate file types in `/create`
 - Reject non-images
 - Enforce file size limits
@@ -488,6 +521,7 @@ SFTPGO_FTPD__PASSIVE_PORT_RANGE__END=50100
 ## 8. Path Mapping Example
 
 **FTP Client View:**
+
 ```
 /
 ├── event123/
@@ -498,6 +532,7 @@ SFTPGO_FTPD__PASSIVE_PORT_RANGE__END=50100
 ```
 
 **Our API Receives:**
+
 ```
 GET /ftp/v1/stat/event123/photo1.jpg
 GET /ftp/v1/readdir/event123
@@ -505,6 +540,7 @@ POST /ftp/v1/create/event123/photo2.jpg
 ```
 
 **R2 Keys:**
+
 ```
 events/event123/photo1.jpg
 events/event123/photo2.jpg

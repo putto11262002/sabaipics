@@ -1,10 +1,10 @@
 import * as React from 'react';
-import { LayoutDashboard, CalendarDays, Sparkles, Wallet } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Sparkles, Wallet, MessageCircle } from 'lucide-react';
 
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { NavMain } from './nav-main';
-import { NavSecondary } from './nav-secondary';
 import { NavUser } from './nav-user';
+import { FeedbackDialog } from './feedback-dialog';
 import {
   Sidebar,
   SidebarContent,
@@ -26,13 +26,28 @@ const data = {
     },
     {
       title: 'Studio',
-      url: '/studio/luts',
+      url: '/studio',
       icon: Sparkles,
+      items: [
+        {
+          title: 'LUTs',
+          url: '/studio/luts',
+        },
+        {
+          title: 'Auto Edit',
+          url: '/studio/auto-edit',
+        },
+      ],
     },
     {
       title: 'Credits',
       url: '/credits',
       icon: Wallet,
+    },
+    {
+      title: 'LINE Delivery',
+      url: '/line-delivery',
+      icon: MessageCircle,
     },
     // {
     // 	title: "Galleries",
@@ -55,19 +70,6 @@ const data = {
     // 	],
     // },
   ],
-  navSecondary: [
-    // Hidden until implemented
-    // {
-    // 	title: "Support",
-    // 	url: "/support",
-    // 	icon: LifeBuoy,
-    // },
-    // {
-    // 	title: "Feedback",
-    // 	url: "/feedback",
-    // 	icon: Send,
-    // },
-  ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -81,7 +83,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <FeedbackDialog className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

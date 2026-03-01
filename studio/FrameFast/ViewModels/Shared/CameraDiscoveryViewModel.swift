@@ -26,6 +26,7 @@ final class CameraDiscoveryViewModel: ObservableObject {
     private let timeoutSeconds: TimeInterval
 
     private var timeoutTask: Task<Void, Never>?
+    private var isContinuousMode = false
 
     init(
         scanner: PTPIPScanner? = nil,
@@ -62,6 +63,7 @@ final class CameraDiscoveryViewModel: ObservableObject {
     // MARK: - Public API
 
     func start(preferredIP: String?) async {
+        isContinuousMode = false
         autoSelectCamera = nil
         timeoutTask?.cancel()
 
@@ -94,9 +96,46 @@ final class CameraDiscoveryViewModel: ObservableObject {
         startTimeout()
     }
 
+    /// Start scanning continuously — no overall timeout, scans until a camera is found
+    /// or the user cancels via back/close. Cleanup is handled by `cleanupWithTimeout()`.
+    func startContinuous(preferredIP: String?) async {
+        isContinuousMode = true
+        autoSelectCamera = nil
+        timeoutTask?.cancel()
+
+        switch preflight() {
+        case .ok:
+            break
+        case .needsNetworkHelp:
+            state = .needsNetworkHelp
+            await scanner.stop()
+            return
+        }
+
+        let permission = await LocalNetworkPermissionChecker.probePermission()
+        switch permission {
+        case .granted:
+            break
+        case .denied, .unknown:
+            state = .error(.localNetworkDenied)
+            await scanner.stop()
+            return
+        }
+
+        state = .scanning
+        cameras = []
+
+        let targets = makeScanTargets(preferredIP)
+        await scanner.scanContinuously(targets: targets, config: scanConfig)
+    }
+
     func retry(preferredIP: String?) async {
         await scanner.stop()
-        await start(preferredIP: preferredIP)
+        if isContinuousMode {
+            await startContinuous(preferredIP: preferredIP)
+        } else {
+            await start(preferredIP: preferredIP)
+        }
     }
 
     func stop() async {

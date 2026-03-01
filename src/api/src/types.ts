@@ -9,11 +9,16 @@ export type Bindings = Cloudflare.Env & {
   FTP_JWT_SECRET_PREVIOUS?: string;
   DESKTOP_ACCESS_JWT_SECRET: string;
   DESKTOP_REFRESH_TOKEN_PEPPER: string;
+  CF_ACCESS_TEAM_DOMAIN: string;
+  CF_ACCESS_AUD: string;
+  LINE_LOGIN_CHANNEL_ID: string;
+  LINE_LOGIN_CHANNEL_SECRET: string;
 };
 
 export type Variables = AuthVariables & {
   db: () => Database; // HTTP adapter - fast, no transactions
   dbTx: () => DatabaseTx; // WebSocket adapter - with transaction support
+  adminEmail?: string; // Admin email from CF Access JWT
 };
 
 export type Env = { Bindings: Bindings; Variables: Variables };

@@ -37,7 +37,8 @@ struct SonyAPEntryView: View {
             Button("New camera") {
                 onNewCamera()
             }
-            .buttonStyle(PrimaryButtonStyle())
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
         }
@@ -58,7 +59,7 @@ struct SonyAPEntryView: View {
                     let ssidHint = record.ssid ?? "DIRECT-..."
                     Text("Join WiFi \"\(ssidHint)\" to connect.")
                         .font(.footnote)
-                        .foregroundColor(Color.Theme.mutedForeground)
+                        .foregroundColor(Color.secondary)
                 }
 
                 Button("Connect") {
@@ -106,12 +107,12 @@ struct SonyAPEntryView: View {
             Section {
                 if records.isEmpty {
                     Text("No saved cameras")
-                        .foregroundColor(Color.Theme.mutedForeground)
+                        .foregroundColor(Color.secondary)
                 } else {
                     ForEach(records) { record in
                         HStack(spacing: 10) {
                             Text(record.cameraName)
-                                .foregroundColor(Color.Theme.foreground)
+                                .foregroundColor(Color.primary)
 
                             Spacer(minLength: 0)
 
@@ -121,7 +122,7 @@ struct SonyAPEntryView: View {
                                     .frame(width: 8, height: 8)
                             } else {
                                 Circle()
-                                    .fill(Color.Theme.border)
+                                    .fill(Color(UIColor.separator))
                                     .frame(width: 8, height: 8)
                             }
                         }

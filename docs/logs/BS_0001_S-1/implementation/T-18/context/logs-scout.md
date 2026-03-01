@@ -14,13 +14,15 @@
    - File: `packages/db/src/schema/photos.ts`
 
 2. **Timestamp Helpers:** Use `timestamptz` from `common.ts`
+
    ```typescript
-   uploadedAt: timestamptz("uploaded_at").defaultNow().notNull()
+   uploadedAt: timestamptz('uploaded_at').defaultNow().notNull();
    ```
 
 3. **Text Enums:** Defined as arrays with type exports
+
    ```typescript
-   export const photoStatuses = ["processing", "indexed", "failed"] as const;
+   export const photoStatuses = ['processing', 'indexed', 'failed'] as const;
    export type PhotoStatus = (typeof photoStatuses)[number];
    ```
 
@@ -35,11 +37,13 @@
 1. **Middleware Location:** `apps/api/src/middleware/require-photographer.ts`
 
 2. **DB Access Pattern:**
+
    ```typescript
    const db = c.var.db();
    ```
 
 3. **Photographer Context Type:**
+
    ```typescript
    type PhotographerContext = {
      id: string;
@@ -49,23 +53,26 @@
 
 4. **Middleware Chaining:**
    ```typescript
-   app.get("/events/:id/photos", requirePhotographer(), handler);
+   app.get('/events/:id/photos', requirePhotographer(), handler);
    ```
 
 ### API Route Pattern (T-5, T-7, T-8)
 
 1. **Route Registration:** After Clerk auth middleware in `index.ts`
+
    ```typescript
    .use("/*", createClerkAuth())
    .route("/events", photosRouter)
    ```
 
 2. **Error Response Shape:**
+
    ```typescript
    { error: { code: string, message: string } }
    ```
 
 3. **Success Response Shape:**
+
    ```typescript
    // Lists
    c.json({ data: items, pagination: {...} });
@@ -80,6 +87,7 @@
 ### Dashboard API Pattern (T-7)
 
 1. **Env Type Definition:**
+
    ```typescript
    type Env = {
      Bindings: Bindings;
@@ -88,17 +96,22 @@
    ```
 
 2. **Router Setup:**
+
    ```typescript
-   export const router = new Hono<Env>()
-     .get("/:eventId/photos", requirePhotographer(), async (c) => {
+   export const router = new Hono<Env>().get(
+     '/:eventId/photos',
+     requirePhotographer(),
+     async (c) => {
        const photographer = c.var.photographer;
        const db = c.var.db();
-     });
+     },
+   );
    ```
 
 3. **Drizzle Query Patterns:**
+
    ```typescript
-   import { eq, and, desc, lt } from "drizzle-orm";
+   import { eq, and, desc, lt } from 'drizzle-orm';
 
    const items = await db
      .select()
@@ -106,8 +119,8 @@
      .where(
        and(
          eq(photos.eventId, eventId),
-         cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined
-       )
+         cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined,
+       ),
      )
      .orderBy(desc(photos.uploadedAt))
      .limit(limit + 1);
@@ -116,21 +129,26 @@
 ### Credit Packages API Pattern (T-8)
 
 1. **Zod Validation with @hono/zod-validator:**
-   ```typescript
-   import { zValidator } from "@hono/zod-validator";
 
-   export const router = new Hono<Env>()
-     .get("/:id", zValidator("param", paramSchema), async (c) => {
-       const { id } = c.req.valid("param");
-     });
+   ```typescript
+   import { zValidator } from '@hono/zod-validator';
+
+   export const router = new Hono<Env>().get(
+     '/:id',
+     zValidator('param', paramSchema),
+     async (c) => {
+       const { id } = c.req.valid('param');
+     },
+   );
    ```
 
 ### QR Code Library (T-14)
 
 1. **R2 Upload Pattern:**
+
    ```typescript
    await c.env.PHOTOS_BUCKET.put(key, data, {
-     httpMetadata: { contentType: "image/png" },
+     httpMetadata: { contentType: 'image/png' },
    });
    ```
 
@@ -142,18 +160,18 @@
 
 ## Known Limitations
 
-| Source | Limitation | Status |
-|--------|------------|--------|
-| T-7 | No transaction wrapping for multi-step operations | Accepted for MVP |
-| T-14 | QR code generation eager (not lazy) | Accepted per plan |
+| Source | Limitation                                        | Status            |
+| ------ | ------------------------------------------------- | ----------------- |
+| T-7    | No transaction wrapping for multi-step operations | Accepted for MVP  |
+| T-14   | QR code generation eager (not lazy)               | Accepted per plan |
 
 ---
 
 ## Follow-ups That May Impact T-18
 
-| Source | Follow-up | Impact |
-|--------|-----------|--------|
-| None | No follow-ups impact T-18 | — |
+| Source | Follow-up                 | Impact |
+| ------ | ------------------------- | ------ |
+| None   | No follow-ups impact T-18 | —      |
 
 ---
 
@@ -178,11 +196,11 @@ Based on established patterns, T-18 (Gallery API) should:
 
 From migration `packages/db/drizzle/0001_ambiguous_the_liberteens.sql`:
 
-| Index | Columns | Purpose |
-|-------|---------|---------|
-| `photos_event_id_idx` | `event_id` | Efficient filtering by event |
-| `events_photographer_id_idx` | `photographer_id` | Efficient ownership verification |
-| `photos_status_idx` | `status` | Not used by T-18, but available for filtering |
+| Index                        | Columns           | Purpose                                       |
+| ---------------------------- | ----------------- | --------------------------------------------- |
+| `photos_event_id_idx`        | `event_id`        | Efficient filtering by event                  |
+| `events_photographer_id_idx` | `photographer_id` | Efficient ownership verification              |
+| `photos_status_idx`          | `status`          | Not used by T-18, but available for filtering |
 
 ---
 
@@ -203,10 +221,7 @@ const photos = await db
   })
   .from(photos)
   .where(
-    and(
-      eq(photos.eventId, eventId),
-      cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined
-    )
+    and(eq(photos.eventId, eventId), cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined),
   )
   .orderBy(desc(photos.uploadedAt))
   .limit(cursorLimit);

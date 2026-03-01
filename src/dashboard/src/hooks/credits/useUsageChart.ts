@@ -14,8 +14,7 @@ export interface UsageChartEntry {
 export function useUsageChart(days: number = 30) {
   const query = useApiQuery<UsageChartApiResponse>({
     queryKey: ['credit-usage-chart', days],
-    apiFn: (opts) =>
-      getUsageChart({ query: { days } }, opts),
+    apiFn: (opts) => getUsageChart({ query: { days } }, opts),
     staleTime: 1000 * 60,
   });
 

@@ -35,7 +35,7 @@ private struct AppBackToolbarButtonModifier: ViewModifier {
                     } label: {
                         Label(title, systemImage: "chevron.left")
                     }
-                    .foregroundStyle(Color.Theme.primary)
+                    .foregroundStyle(Color.accentColor)
                 }
             }
             .alert(confirmation?.title ?? "", isPresented: $showConfirmation) {

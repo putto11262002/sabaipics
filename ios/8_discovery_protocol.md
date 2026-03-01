@@ -1,4 +1,5 @@
 # Canon Camera Discovery Protocol - Deep Dive
+
 ## Layer-by-Layer Breakdown
 
 **Last Updated:** 2026-01-08
@@ -21,9 +22,11 @@ Layer 3: PTP Capability Discovery (PTP/IP GetDeviceInfo)
 ## Layer 1: Network Discovery (UPnP/SSDP)
 
 ### Purpose
+
 Find Canon cameras on the local network and get their IP addresses.
 
 ### Protocol
+
 **SSDP (Simple Service Discovery Protocol)** - part of UPnP specification
 
 ### How It Works
@@ -53,15 +56,15 @@ USN: uuid:00000000-0000-0000-0001-60128B7CC240::urn:schemas-canon-com:service:IC
 
 **Key Fields Explained:**
 
-| Field | Value | Purpose |
-|-------|-------|---------|
-| `Host` | 239.255.255.250:1900 | Standard UPnP multicast address |
-| `Cache-Control` | max-age=1800 | How long to consider device "alive" (30 min) |
-| `Location` | http://192.168.0.120:49152/upnp/CameraDevDesc.xml | **URL to device description XML** |
-| `NT` | urn:schemas-canon-com:service:ICPO-WFTEOSSystemService:1 | Canon-specific service type |
-| `NTS` | ssdp:alive | Notification type (alive/byebye/update) |
-| `Server` | Camera OS/1.0 UPnP/1.0... | Server identification string |
-| `USN` | uuid:...:urn:... | Unique Service Name (device UUID + service) |
+| Field           | Value                                                    | Purpose                                      |
+| --------------- | -------------------------------------------------------- | -------------------------------------------- |
+| `Host`          | 239.255.255.250:1900                                     | Standard UPnP multicast address              |
+| `Cache-Control` | max-age=1800                                             | How long to consider device "alive" (30 min) |
+| `Location`      | http://192.168.0.120:49152/upnp/CameraDevDesc.xml        | **URL to device description XML**            |
+| `NT`            | urn:schemas-canon-com:service:ICPO-WFTEOSSystemService:1 | Canon-specific service type                  |
+| `NTS`           | ssdp:alive                                               | Notification type (alive/byebye/update)      |
+| `Server`        | Camera OS/1.0 UPnP/1.0...                                | Server identification string                 |
+| `USN`           | uuid:...:urn:...                                         | Unique Service Name (device UUID + service)  |
 
 #### Step 2: Your App Listens for Broadcasts
 
@@ -150,9 +153,11 @@ Camera will respond with similar NOTIFY-style message.
 ## Layer 2: Device Description (HTTP/XML)
 
 ### Purpose
+
 Get basic device information including friendly name, manufacturer, model number.
 
 ### Protocol
+
 **HTTP GET** to the Location URL from SSDP message
 
 ### How It Works
@@ -205,16 +210,16 @@ User-Agent: YourApp/1.0
 
 **Key Fields Explained:**
 
-| Field | Example Value | Purpose |
-|-------|---------------|---------|
-| `deviceType` | urn:schemas-canon-com:device:EOS-Device:1 | Identifies as Canon EOS device |
-| `friendlyName` | Canon EOS R5 | **Human-readable camera name** |
-| `manufacturer` | Canon Inc. | Manufacturer name |
-| `modelName` | EOS R5 | **Camera model** |
-| `modelNumber` | 3986C002 | Canon product code |
-| `serialNumber` | 012345678901 | Camera serial number |
-| `UDN` | uuid:... | Unique Device Name (same as SSDP USN) |
-| `serviceList` | ... | Available UPnP services (not used for PTP) |
+| Field          | Example Value                             | Purpose                                    |
+| -------------- | ----------------------------------------- | ------------------------------------------ |
+| `deviceType`   | urn:schemas-canon-com:device:EOS-Device:1 | Identifies as Canon EOS device             |
+| `friendlyName` | Canon EOS R5                              | **Human-readable camera name**             |
+| `manufacturer` | Canon Inc.                                | Manufacturer name                          |
+| `modelName`    | EOS R5                                    | **Camera model**                           |
+| `modelNumber`  | 3986C002                                  | Canon product code                         |
+| `serialNumber` | 012345678901                              | Camera serial number                       |
+| `UDN`          | uuid:...                                  | Unique Device Name (same as SSDP USN)      |
+| `serviceList`  | ...                                       | Available UPnP services (not used for PTP) |
 
 #### Step 3: Parse and Display to User
 
@@ -299,12 +304,15 @@ class UPnPXMLParserDelegate: NSObject, XMLParserDelegate {
 ## Layer 3: PTP Capability Discovery (GetDeviceInfo)
 
 ### Purpose
+
 Get detailed PTP capabilities: supported operations, events, properties, and image formats.
 
 ### Protocol
+
 **PTP/IP** - Picture Transfer Protocol over TCP/IP
 
 ### When This Happens
+
 After establishing PTP/IP connection (both command and event channels).
 
 ### How It Works
@@ -700,6 +708,7 @@ Canon cameras support standard PTP operations **plus** Canon EOS extensions (0x9
 ### 4. Critical Operations for Image Transfer
 
 Must check camera supports:
+
 - `0x1009` (GetObject) - Download images
 - `0x4002` (ObjectAdded event) - Notification of new images
 

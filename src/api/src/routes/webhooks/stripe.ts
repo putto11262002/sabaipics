@@ -15,22 +15,28 @@
  * - stripe:customer.created/updated/deleted: Customer changes
  */
 
-import { Hono } from "hono";
-import type Stripe from "stripe";
-import { addMonths } from "date-fns";
-import { creditLedger, promoCodeUsage, type Database, type DatabaseTx } from "@/db";
-import { eq } from "drizzle-orm";
-import { ResultAsync, ok, err } from "neverthrow";
+import { Hono } from 'hono';
+import type Stripe from 'stripe';
+import { addMonths } from 'date-fns';
+import { promoCodeUsage, type Database, type DatabaseTx } from '@/db';
+import {
+  grantCredits,
+  getStripeLedgerEntryBySession,
+  setStripeLedgerReceiptUrl,
+} from '../../lib/credits';
+import { ResultAsync, ok, err } from 'neverthrow';
 import {
   createStripeClient,
   verifyWebhookSignature,
   getSessionMetadata,
   extractCustomerId,
-} from "../../lib/stripe";
-import { eventBus } from "../../events";
-import type { StripeEvents } from "../../lib/stripe/events";
-import { safeHandler } from "../../lib/safe-handler";
-import type { HandlerError } from "../../lib/error";
+} from '../../lib/stripe';
+import { eventBus } from '../../events';
+import type { StripeEvents } from '../../lib/stripe/events';
+import { safeHandler } from '../../lib/safe-handler';
+import type { HandlerError } from '../../lib/error';
+import { reprocessInsufficientCredits } from '../../lib/services/uploads/reprocess';
+import { capturePostHogEvent } from '../../lib/posthog';
 
 /**
  * Environment bindings for Stripe webhook
@@ -38,6 +44,12 @@ import type { HandlerError } from "../../lib/error";
 type StripeWebhookBindings = {
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
+  POSTHOG_API_KEY: string;
+  // Needed for reprocessing insufficient_credits intents after credit top-up
+  DATABASE_URL: string;
+  PHOTOS_BUCKET: R2Bucket;
+  UPLOAD_QUEUE: Queue;
+  PHOTO_BUCKET_NAME: string;
 };
 
 type StripeWebhookVariables = {
@@ -63,15 +75,15 @@ export async function fulfillCheckout(
   dbTx: DatabaseTx,
   session: Stripe.Checkout.Session,
   metadata: Record<string, string>,
-  stripe?: Stripe
+  stripe?: Stripe,
 ): Promise<{ success: boolean; reason: string }> {
   // Check payment status - fulfill if paid or no payment required (gift codes)
-  const validStatuses = ["paid", "no_payment_required"];
+  const validStatuses = ['paid', 'no_payment_required'];
   if (!validStatuses.includes(session.payment_status)) {
     console.log(
-      `[Stripe Fulfillment] Skipping unpaid session: ${session.id} (status: ${session.payment_status})`
+      `[Stripe Fulfillment] Skipping unpaid session: ${session.id} (status: ${session.payment_status})`,
     );
-    return { success: false, reason: "unpaid" };
+    return { success: false, reason: 'unpaid' };
   }
 
   // Validate required metadata
@@ -80,59 +92,60 @@ export async function fulfillCheckout(
 
   if (!photographerId) {
     console.error(
-      `[Stripe Fulfillment] Missing photographer_id in metadata for session: ${session.id}`
+      `[Stripe Fulfillment] Missing photographer_id in metadata for session: ${session.id}`,
     );
-    return { success: false, reason: "missing_photographer_id" };
+    return { success: false, reason: 'missing_photographer_id' };
   }
 
   if (!creditsStr) {
-    console.error(
-      `[Stripe Fulfillment] Missing credits in metadata for session: ${session.id}`
-    );
-    return { success: false, reason: "missing_credits" };
+    console.error(`[Stripe Fulfillment] Missing credits in metadata for session: ${session.id}`);
+    return { success: false, reason: 'missing_credits' };
   }
 
   const credits = parseInt(creditsStr, 10);
   if (isNaN(credits) || credits <= 0) {
     console.error(
-      `[Stripe Fulfillment] Invalid credits value "${creditsStr}" for session: ${session.id}`
+      `[Stripe Fulfillment] Invalid credits value "${creditsStr}" for session: ${session.id}`,
     );
-    return { success: false, reason: "invalid_credits" };
+    return { success: false, reason: 'invalid_credits' };
   }
 
   // Transaction: check idempotency + insert credit ledger entry
   try {
     await dbTx.transaction(async (tx) => {
       // Check if session already processed (idempotency)
-      const existing = await tx
-        .select()
-        .from(creditLedger)
-        .where(eq(creditLedger.stripeSessionId, session.id))
-        .limit(1);
+      const existing = await getStripeLedgerEntryBySession(tx, session.id).match(
+        (value) => value,
+        (error) => {
+          throw error.cause ?? error;
+        },
+      );
 
-      if (existing.length > 0) {
-        console.log(
-          `[Stripe Fulfillment] Duplicate webhook ignored for session: ${session.id}`
-        );
+      if (existing) {
+        console.log(`[Stripe Fulfillment] Duplicate webhook ignored for session: ${session.id}`);
         return; // Exit transaction without inserting
       }
 
       // Extract promo code from metadata
       const promoCodeApplied = metadata.promo_code_applied;
 
-      // Insert credit ledger entry
-      await tx.insert(creditLedger).values({
+      // Grant credits via centralized module (ledger insert + balance increment)
+      const grantResult = await grantCredits(tx, {
         photographerId,
         amount: credits,
-        type: "credit",
-        source: "purchase",
-        promoCode: promoCodeApplied && typeof promoCodeApplied === 'string' ? promoCodeApplied : null,
-        stripeSessionId: session.id,
+        source: 'purchase',
         expiresAt: addMonths(new Date(), 6).toISOString(),
+        stripeSessionId: session.id,
+        promoCode:
+          promoCodeApplied && typeof promoCodeApplied === 'string' ? promoCodeApplied : null,
       });
 
+      if (grantResult.isErr()) {
+        throw grantResult.error.cause ?? new Error(`Grant failed: ${grantResult.error.type}`);
+      }
+
       console.log(
-        `[Stripe Fulfillment] Added ${credits} credits for photographer ${photographerId} (session: ${session.id})`
+        `[Stripe Fulfillment] Added ${credits} credits for photographer ${photographerId} (session: ${session.id})`,
       );
 
       // Record promo code usage if a code was applied
@@ -144,60 +157,64 @@ export async function fulfillCheckout(
         });
 
         console.log(
-          `[Stripe Fulfillment] Recorded promo code usage: ${promoCodeApplied} for photographer ${photographerId}`
+          `[Stripe Fulfillment] Recorded promo code usage: ${promoCodeApplied} for photographer ${photographerId}`,
         );
       }
     });
 
     // Check if actually fulfilled or skipped (duplicate)
-    const existing = await dbTx
-      .select()
-      .from(creditLedger)
-      .where(eq(creditLedger.stripeSessionId, session.id))
-      .limit(1);
+    const existing = await getStripeLedgerEntryBySession(dbTx, session.id).match(
+      (value) => value,
+      (error) => {
+        throw error.cause ?? error;
+      },
+    );
 
-    if (existing.length > 0) {
+    if (existing) {
       // Best-effort: fetch and store Stripe receipt URL
       if (stripe && session.payment_intent) {
         try {
-          const paymentIntentId = typeof session.payment_intent === 'string'
-            ? session.payment_intent
-            : session.payment_intent.id;
+          const paymentIntentId =
+            typeof session.payment_intent === 'string'
+              ? session.payment_intent
+              : session.payment_intent.id;
           const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
             expand: ['latest_charge'],
           });
           const charge = pi.latest_charge;
           const receiptUrl = charge && typeof charge === 'object' ? charge.receipt_url : null;
           if (receiptUrl) {
-            await dbTx
-              .update(creditLedger)
-              .set({ stripeReceiptUrl: receiptUrl })
-              .where(eq(creditLedger.id, existing[0].id));
+            await setStripeLedgerReceiptUrl(dbTx, existing.id, receiptUrl).match(
+              () => undefined,
+              (error) => {
+                throw error.cause ?? error;
+              },
+            );
           }
         } catch (receiptErr) {
           console.warn(
             `[Stripe Fulfillment] Failed to fetch receipt URL for session ${session.id}:`,
-            receiptErr instanceof Error ? receiptErr.message : receiptErr
+            receiptErr instanceof Error ? receiptErr.message : receiptErr,
           );
         }
       }
-      return { success: true, reason: "fulfilled" };
+      return { success: true, reason: 'fulfilled' };
     } else {
-      return { success: false, reason: "duplicate" };
+      return { success: false, reason: 'duplicate' };
     }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error(
-      `[Stripe Fulfillment] Transaction failed for session ${session.id}: ${errorMessage}`
+      `[Stripe Fulfillment] Transaction failed for session ${session.id}: ${errorMessage}`,
     );
-    return { success: false, reason: "db_error" };
+    return { success: false, reason: 'db_error' };
   }
 }
 
 export const stripeWebhookRouter = new Hono<{
   Bindings: StripeWebhookBindings;
   Variables: StripeWebhookVariables;
-}>().post("/", async (c) => {
+}>().post('/', async (c) => {
   return safeHandler(async function* () {
     // Validate environment
     if (!c.env.STRIPE_SECRET_KEY) {
@@ -215,7 +232,7 @@ export const stripeWebhookRouter = new Hono<{
     }
 
     // Get signature header
-    const signature = c.req.header("stripe-signature");
+    const signature = c.req.header('stripe-signature');
     if (!signature) {
       return err<never, HandlerError>({
         code: 'BAD_REQUEST',
@@ -234,15 +251,10 @@ export const stripeWebhookRouter = new Hono<{
     const event = yield* ResultAsync.fromPromise(
       (async (): Promise<Stripe.Event> => {
         const nodeEnv = process.env.NODE_ENV as string | undefined;
-        if (nodeEnv === "test" || signature === "test_signature") {
+        if (nodeEnv === 'test' || signature === 'test_signature') {
           return JSON.parse(rawBody) as Stripe.Event;
         }
-        return verifyWebhookSignature(
-          stripe,
-          rawBody,
-          signature,
-          c.env.STRIPE_WEBHOOK_SECRET
-        );
+        return verifyWebhookSignature(stripe, rawBody, signature, c.env.STRIPE_WEBHOOK_SECRET);
       })(),
       (cause): HandlerError => ({
         code: 'UNAUTHORIZED',
@@ -256,7 +268,7 @@ export const stripeWebhookRouter = new Hono<{
     // Route event to appropriate handler
     switch (event.type) {
       // Checkout events
-      case "checkout.session.completed": {
+      case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         const metadata = getSessionMetadata(session);
 
@@ -264,7 +276,7 @@ export const stripeWebhookRouter = new Hono<{
         const dbTx = c.var.dbTx();
         const result = await fulfillCheckout(dbTx, session, metadata, stripe);
         console.log(
-          `[Stripe Webhook] Fulfillment result: ${result.reason} (session: ${session.id})`
+          `[Stripe Webhook] Fulfillment result: ${result.reason} (session: ${session.id})`,
         );
 
         // If fulfillment failed, return error so Stripe retries
@@ -274,13 +286,50 @@ export const stripeWebhookRouter = new Hono<{
             code: 'INTERNAL_ERROR',
             message: `Fulfillment failed: ${result.reason}`,
             cause: new Error(
-              `Stripe fulfillment failed for session ${session.id}: ${result.reason}`
+              `Stripe fulfillment failed for session ${session.id}: ${result.reason}`,
             ),
           });
         }
 
+        // Best-effort: reprocess any insufficient_credits intents for this photographer
+        const photographerId = metadata.photographer_id;
+        if (photographerId) {
+          try {
+            c.executionCtx.waitUntil(
+              reprocessInsufficientCredits(c.env as any, photographerId).catch((err) => {
+                console.error('[Stripe Webhook] Reprocess failed', {
+                  photographerId,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              }),
+            );
+          } catch {
+            // Hono unit tests do not always provide ExecutionContext.
+          }
+        }
+
+        // Track credit purchase in PostHog
+        const clerkUserId = metadata.clerk_user_id;
+        if (clerkUserId) {
+          try {
+            c.executionCtx.waitUntil(
+              capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+                distinctId: clerkUserId,
+                event: 'credit_purchased',
+                properties: {
+                  credits: parseInt(metadata.credits, 10),
+                  amount_thb: session.amount_total ? session.amount_total / 100 : 0,
+                  currency: session.currency,
+                },
+              }),
+            );
+          } catch {
+            // Hono unit tests do not always provide ExecutionContext.
+          }
+        }
+
         // Emit event for logging/analytics (not for fulfillment)
-        stripeProducer.emit("stripe:checkout.completed", {
+        stripeProducer.emit('stripe:checkout.completed', {
           session,
           metadata,
           customerId: extractCustomerId(session),
@@ -288,9 +337,9 @@ export const stripeWebhookRouter = new Hono<{
         break;
       }
 
-      case "checkout.session.expired": {
+      case 'checkout.session.expired': {
         const session = event.data.object as Stripe.Checkout.Session;
-        stripeProducer.emit("stripe:checkout.expired", {
+        stripeProducer.emit('stripe:checkout.expired', {
           session,
           metadata: getSessionMetadata(session),
         });
@@ -298,19 +347,19 @@ export const stripeWebhookRouter = new Hono<{
       }
 
       // Payment Intent events
-      case "payment_intent.succeeded": {
+      case 'payment_intent.succeeded': {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        stripeProducer.emit("stripe:payment.succeeded", {
+        stripeProducer.emit('stripe:payment.succeeded', {
           paymentIntent,
           customerId: extractCustomerId(paymentIntent),
         });
         break;
       }
 
-      case "payment_intent.payment_failed": {
+      case 'payment_intent.payment_failed': {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         const lastError = paymentIntent.last_payment_error;
-        stripeProducer.emit("stripe:payment.failed", {
+        stripeProducer.emit('stripe:payment.failed', {
           paymentIntent,
           errorCode: lastError?.code ?? null,
           errorMessage: lastError?.message ?? null,
@@ -320,21 +369,21 @@ export const stripeWebhookRouter = new Hono<{
       }
 
       // Customer events
-      case "customer.created": {
+      case 'customer.created': {
         const customer = event.data.object as Stripe.Customer;
-        stripeProducer.emit("stripe:customer.created", { customer });
+        stripeProducer.emit('stripe:customer.created', { customer });
         break;
       }
 
-      case "customer.updated": {
+      case 'customer.updated': {
         const customer = event.data.object as Stripe.Customer;
-        stripeProducer.emit("stripe:customer.updated", { customer });
+        stripeProducer.emit('stripe:customer.updated', { customer });
         break;
       }
 
-      case "customer.deleted": {
+      case 'customer.deleted': {
         const customer = event.data.object as unknown as Stripe.DeletedCustomer;
-        stripeProducer.emit("stripe:customer.deleted", {
+        stripeProducer.emit('stripe:customer.deleted', {
           customerId: customer.id,
         });
         break;

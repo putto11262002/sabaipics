@@ -1,6 +1,6 @@
 ---
-url: "https://developer.apple.com/documentation/imagecapturecore/iccameradevice"
-title: "ICCameraDevice | Apple Developer Documentation"
+url: 'https://developer.apple.com/documentation/imagecapturecore/iccameradevice'
+title: 'ICCameraDevice | Apple Developer Documentation'
 ---
 
 [Skip Navigation](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#app-main)
@@ -40,12 +40,12 @@ Only search within “Documentation”
 
 [Open Menu](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#)
 
-- SwiftLanguage:  Swift  Objective-C
+- SwiftLanguage: Swift Objective-C
 
 Language:
 
-  - Swift
-  - [Objective-C](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#)
+- Swift
+- [Objective-C](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#)
 
 All Technologies
 
@@ -121,7 +121,7 @@ To navigate the symbols, press Up Arrow, Down Arrow, Left Arrow or Right Arrow
 
 M
 
-6 of 44 symbols inside -1117910936 [func requestReadData(from: ICCameraFile, atOffset: off\_t, length: off\_t, readDelegate: Any, didReadDataSelector: Selector, contextInfo: UnsafeMutableRawPointer?)](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/1508079-requestreaddata)
+6 of 44 symbols inside -1117910936 [func requestReadData(from: ICCameraFile, atOffset: off_t, length: off_t, readDelegate: Any, didReadDataSelector: Selector, contextInfo: UnsafeMutableRawPointer?)](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/1508079-requestreaddata)
 
 To navigate the symbols, press Up Arrow, Down Arrow, Left Arrow or Right Arrow
 
@@ -510,9 +510,9 @@ iOS 13.0+iPadOS 13.0+Mac Catalyst 13.1+macOS 10.4+visionOS 1.0+
 class ICCameraDevice
 ```
 
-## [Topics](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#topics)
+## [Topics](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#topics)
 
-### [Reading Files](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Reading-Files)
+### [Reading Files](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Reading-Files)
 
 [`var contents: [ICCameraItem]?`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/contents)
 
@@ -526,37 +526,37 @@ All image, movie and audio files stored on the camera, without regard to the cam
 
 The percentage of the camera’s content that has been catalogued.
 
-[`func files(ofType: String) -> [String]?`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/files(oftype:))
+[`func files(ofType: String) -> [String]?`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/files(oftype:)>)
 
 Returns an array of files of the selected type on the camera.
 
-[`func requestReadData(from: ICCameraFile, atOffset: off_t, length: off_t, readDelegate: Any, didReadDataSelector: Selector, contextInfo: UnsafeMutableRawPointer?)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestreaddata(from:atoffset:length:readdelegate:didreaddataselector:contextinfo:))
+[`func requestReadData(from: ICCameraFile, atOffset: off_t, length: off_t, readDelegate: Any, didReadDataSelector: Selector, contextInfo: UnsafeMutableRawPointer?)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestreaddata(from:atoffset:length:readdelegate:didreaddataselector:contextinfo:)>)
 
 Asynchronously reads data of a specified length from a specified offset.
 
-### [Uploading Files](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Uploading-Files)
+### [Uploading Files](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Uploading-Files)
 
 [`struct ICUploadOption`](https://developer.apple.com/documentation/imagecapturecore/icuploadoption)
 
 An option for uploading a file to the camera.
 
-[`func requestUploadFile(URL, options: [ICUploadOption : Any], uploadDelegate: Any, didUploadSelector: Selector, contextInfo: UnsafeMutableRawPointer?)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestuploadfile(_:options:uploaddelegate:diduploadselector:contextinfo:))
+[`func requestUploadFile(URL, options: [ICUploadOption : Any], uploadDelegate: Any, didUploadSelector: Selector, contextInfo: UnsafeMutableRawPointer?)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestuploadfile(_:options:uploaddelegate:diduploadselector:contextinfo:)>)
 
 Uploads a file to the camera.
 
 Deprecated
 
-### [Downloading Files](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Downloading-Files)
+### [Downloading Files](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Downloading-Files)
 
 [`struct ICDownloadOption`](https://developer.apple.com/documentation/imagecapturecore/icdownloadoption)
 
 An option for downloading a file from the camera.
 
-[`func cancelDownload()`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/canceldownload())
+[`func cancelDownload()`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/canceldownload()>)
 
 Cancels a download from the camera.
 
-[`func requestDownloadFile(ICCameraFile, options: [ICDownloadOption : Any], downloadDelegate: any ICCameraDeviceDownloadDelegate, didDownloadSelector: Selector, contextInfo: UnsafeMutableRawPointer?)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestdownloadfile(_:options:downloaddelegate:diddownloadselector:contextinfo:))
+[`func requestDownloadFile(ICCameraFile, options: [ICDownloadOption : Any], downloadDelegate: any ICCameraDeviceDownloadDelegate, didDownloadSelector: Selector, contextInfo: UnsafeMutableRawPointer?)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestdownloadfile(_:options:downloaddelegate:diddownloadselector:contextinfo:)>)
 
 Downloads a file from the camera.
 
@@ -564,7 +564,7 @@ Downloads a file from the camera.
 
 Methods for managing camera file downloads.
 
-### [Deleting Files](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Deleting-Files)
+### [Deleting Files](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Deleting-Files)
 
 [`var isLocked: Bool`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/islocked)
 
@@ -578,19 +578,19 @@ The result of a deletion request.
 
 An error resulting from a deletion request.
 
-[`func requestDeleteFiles([ICCameraItem])`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestdeletefiles(_:))
+[`func requestDeleteFiles([ICCameraItem])`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestdeletefiles(_:)>)
 
 Deletes files from the camera.
 
-[`func requestDeleteFiles([ICCameraItem], deleteFailed: ([ICDeleteError : ICCameraItem]) -> Void, completion: ([ICDeleteResult : [ICCameraItem]], (any Error)?) -> Void) -> Progress?`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestdeletefiles(_:deletefailed:completion:))
+[`func requestDeleteFiles([ICCameraItem], deleteFailed: ([ICDeleteError : ICCameraItem]) -> Void, completion: ([ICDeleteResult : [ICCameraItem]], (any Error)?) -> Void) -> Progress?`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestdeletefiles(_:deletefailed:completion:)>)
 
 Deletes files from the camera, with the ability to catch failures and execute a completion block.
 
-[`func cancelDelete()`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/canceldelete())
+[`func cancelDelete()`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/canceldelete()>)
 
 Cancels the current delete operation.
 
-### [Taking Pictures](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Taking-Pictures)
+### [Taking Pictures](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Taking-Pictures)
 
 [`var tetheredCaptureEnabled: Bool`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/tetheredcaptureenabled)
 
@@ -600,31 +600,31 @@ A Boolean value indicating whether tethered capture is enabled on the camera.
 
 A closure for handling PTP event packets.
 
-[`func requestEnableTethering()`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestenabletethering())
+[`func requestEnableTethering()`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestenabletethering()>)
 
 Enables tethered capture if the camera has the capability to take pictures while connected.
 
 Deprecated
 
-[`func requestTakePicture()`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requesttakepicture())
+[`func requestTakePicture()`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requesttakepicture()>)
 
 Captures a new image using the camera.
 
-[`func requestSendPTPCommand(Data, outData: Data?, sendCommandDelegate: Any, didSendCommand: Selector, contextInfo: UnsafeMutableRawPointer?)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestsendptpcommand(_:outdata:sendcommanddelegate:didsendcommand:contextinfo:))
+[`func requestSendPTPCommand(Data, outData: Data?, sendCommandDelegate: Any, didSendCommand: Selector, contextInfo: UnsafeMutableRawPointer?)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestsendptpcommand(_:outdata:sendcommanddelegate:didsendcommand:contextinfo:)>)
 
 Sends a Picture Transfer Protocol (PTP) command to a camera asynchronously.
 
-[`func requestSendPTPCommand(Data, outData: Data?, completion: (Data, Data, (any Error)?) -> Void)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestsendptpcommand(_:outdata:completion:))
+[`func requestSendPTPCommand(Data, outData: Data?, completion: (Data, Data, (any Error)?) -> Void)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestsendptpcommand(_:outdata:completion:)>)
 
 Sends a Picture Transfer Protocol (PTP) command to a camera asynchronously.
 
-[`func requestDisableTethering()`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestdisabletethering())
+[`func requestDisableTethering()`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestdisabletethering()>)
 
 Disables tethered capture on the camera.
 
 Deprecated
 
-### [Inspecting the Battery Charge Level](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Inspecting-the-Battery-Charge-Level)
+### [Inspecting the Battery Charge Level](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Inspecting-the-Battery-Charge-Level)
 
 [`var batteryLevelAvailable: Bool`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/batterylevelavailable)
 
@@ -634,17 +634,17 @@ A Boolean value that indicates whether the battery charge level is available.
 
 The battery charge level.
 
-### [Synchronizing the Clock](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Synchronizing-the-Clock)
+### [Synchronizing the Clock](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Synchronizing-the-Clock)
 
 [`var timeOffset: TimeInterval`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/timeoffset)
 
 The time offset, in seconds, between the camera’s clock and the computer’s clock.
 
-[`func requestSyncClock()`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestsyncclock())
+[`func requestSyncClock()`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevice/requestsyncclock()>)
 
 Synchronizes the camera’s clock with the computer’s clock.
 
-### [Detecting Apple Devices](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Detecting-Apple-Devices)
+### [Detecting Apple Devices](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Detecting-Apple-Devices)
 
 [`var isAccessRestrictedAppleDevice: Bool`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/isaccessrestrictedappledevice)
 
@@ -654,29 +654,29 @@ A Boolean value indicating whether the device is an Apple device, passcode-locke
 
 A Boolean value indicating whether the iCloud Photo Library is enabled on the device.
 
-### [Detecting Mass Storage Devices](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Detecting-Mass-Storage-Devices)
+### [Detecting Mass Storage Devices](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Detecting-Mass-Storage-Devices)
 
 [`var mountPoint: String?`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/mountpoint)
 
 The file system mount point for a camera using the mass storage transport type.
 
-### [Removing a Device](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Removing-a-Device)
+### [Removing a Device](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Removing-a-Device)
 
 [`var isEjectable: Bool`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/isejectable)
 
 A Boolean value indicating whether the device can be ‘soft’ removed or disconnected.
 
-### [Instance Properties](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Instance-Properties)
+### [Instance Properties](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Instance-Properties)
 
 [`var mediaPresentation: ICMediaPresentation`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/mediapresentation)
 
-## [Relationships](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#relationships)
+## [Relationships](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#relationships)
 
-### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#inherits-from)
+### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#inherits-from)
 
 - [`ICDevice`](https://developer.apple.com/documentation/imagecapturecore/icdevice)
 
-### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#conforms-to)
+### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#conforms-to)
 
 - [`CVarArg`](https://developer.apple.com/documentation/Swift/CVarArg)
 - [`CustomDebugStringConvertible`](https://developer.apple.com/documentation/Swift/CustomDebugStringConvertible)
@@ -685,9 +685,9 @@ A Boolean value indicating whether the device can be ‘soft’ removed or disco
 - [`Hashable`](https://developer.apple.com/documentation/Swift/Hashable)
 - [`NSObjectProtocol`](https://developer.apple.com/documentation/ObjectiveC/NSObjectProtocol)
 
-## [See Also](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#see-also)
+## [See Also](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#see-also)
 
-### [Cameras](https://developer.apple.com/documentation/imagecapturecore/iccameradevice\#Cameras)
+### [Cameras](https://developer.apple.com/documentation/imagecapturecore/iccameradevice#Cameras)
 
 [`protocol ICCameraDeviceDelegate`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate)
 

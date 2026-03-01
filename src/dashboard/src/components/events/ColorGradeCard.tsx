@@ -3,7 +3,13 @@ import { useNavigate } from 'react-router';
 import { Button } from '@/shared/components/ui/button';
 import { Switch } from '@/shared/components/ui/switch';
 import { Slider } from '@/shared/components/ui/slider';
-import { Field, FieldContent, FieldGroup, FieldLabel, FieldDescription } from '@/shared/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldGroup,
+  FieldLabel,
+  FieldDescription,
+} from '@/shared/components/ui/field';
 import {
   Select,
   SelectContent,
@@ -31,22 +37,22 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
     [studioLuts.data],
   );
 
-  const [enabled, setEnabled] = useState(false);
   const [lutId, setLutId] = useState<string | null>(null);
-  const [intensity, setIntensity] = useState(75);
+  const [lutIntensity, setLutIntensity] = useState(75);
   const [includeLuminance, setIncludeLuminance] = useState(false);
+
+  const lutEnabled = lutId !== null;
 
   useEffect(() => {
     if (!eventCg.data) return;
-    setEnabled(eventCg.data.data.enabled);
     setLutId(eventCg.data.data.lutId);
-    setIntensity(eventCg.data.data.intensity);
+    setLutIntensity(eventCg.data.data.lutIntensity);
     setIncludeLuminance(eventCg.data.data.includeLuminance);
   }, [eventCg.data]);
 
   const save = () => {
     update.mutate(
-      { eventId, enabled, lutId, intensity, includeLuminance },
+      { eventId, lutId, lutIntensity, includeLuminance },
       {
         onSuccess: () => toast.success('Color grade settings saved'),
         onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to save settings'),
@@ -54,39 +60,45 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
     );
   };
 
-  const disabledReason = enabled && !lutId ? 'Select a LUT to enable color grade' : null;
+  const disabledReason = null;
   const lutControlsDisabled =
-    !enabled ||
-    update.isPending ||
-    eventCg.isLoading ||
-    studioLuts.isLoading ||
-    studioLuts.isFetching;
+    update.isPending || eventCg.isLoading || studioLuts.isLoading || studioLuts.isFetching;
+
+  const handleLutEnabledChange = (enabled: boolean) => {
+    if (enabled && completedLuts.length > 0) {
+      setLutId(completedLuts[0]!.id);
+    } else {
+      setLutId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-medium">Color grade</h2>
-          <Button
-            variant="link"
-            size="sm"
-            onClick={() => {
-              if (!lutId) return;
-              const query = new URLSearchParams({
-                intensity: String(intensity),
-                includeLuminance: includeLuminance ? 'true' : 'false',
-              });
-              navigate(`/studio/luts/${lutId}/preview?${query.toString()}`);
-            }}
-            disabled={lutControlsDisabled || !lutId}
-          >
-            <Eye className="mr-1 size-3" />
-            Preview
-          </Button>
+      <section className="space-y-6">
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-medium">Color grade</h2>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => {
+                if (!lutId) return;
+                const query = new URLSearchParams({
+                  intensity: String(lutIntensity),
+                  includeLuminance: includeLuminance ? 'true' : 'false',
+                });
+                navigate(`/studio/luts/${lutId}/preview?${query.toString()}`);
+              }}
+              disabled={lutControlsDisabled || !lutEnabled || !lutId}
+            >
+              <Eye className="mr-1 size-3" />
+              Preview
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Apply a Studio LUT automatically to new uploads for this event.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Apply a Studio LUT automatically to new uploads for this event.
-        </p>
 
         {(eventCg.isError || studioLuts.isError) && (
           <Alert variant="destructive">Failed to load color grade settings.</Alert>
@@ -95,10 +107,10 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
         <FieldGroup>
           <Field orientation="responsive">
             <FieldContent>
-              <FieldLabel>Enable</FieldLabel>
+              <FieldLabel>Enable LUT</FieldLabel>
               <FieldDescription>Applies to new uploads only</FieldDescription>
             </FieldContent>
-            <Switch checked={enabled} onCheckedChange={setEnabled} />
+            <Switch checked={lutEnabled} onCheckedChange={handleLutEnabledChange} />
           </Field>
 
           <Field orientation="responsive">
@@ -107,11 +119,11 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
               <Select
                 value={lutId ?? ''}
                 onValueChange={(v) => setLutId(v ? v : null)}
-                disabled={lutControlsDisabled || completedLuts.length === 0}
+                disabled={!lutEnabled || lutControlsDisabled || completedLuts.length === 0}
               >
                 <SelectTrigger
                   className="w-full"
-                  disabled={lutControlsDisabled || completedLuts.length === 0}
+                  disabled={!lutEnabled || lutControlsDisabled || completedLuts.length === 0}
                 >
                   <SelectValue
                     placeholder={completedLuts.length === 0 ? 'No completed LUTs' : 'Select a LUT'}
@@ -126,7 +138,9 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
                 </SelectContent>
               </Select>
               <FieldDescription>
-                <a className="underline" href="/studio/luts">Create a new LUT in Studio</a>
+                <a className="underline" href="/studio/luts">
+                  Create a new LUT in Studio
+                </a>
               </FieldDescription>
             </FieldContent>
           </Field>
@@ -136,15 +150,17 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
             <FieldContent>
               <div className="flex items-center gap-4">
                 <Slider
-                  value={[intensity]}
+                  value={[lutIntensity]}
                   min={0}
                   max={100}
                   step={1}
-                  onValueChange={(v) => setIntensity(v[0] ?? 75)}
-                  disabled={lutControlsDisabled}
+                  onValueChange={(v) => setLutIntensity(v[0] ?? 100)}
+                  disabled={!lutEnabled || lutControlsDisabled}
                   className="flex-1"
                 />
-                <span className="w-10 text-right text-sm text-muted-foreground">{intensity}%</span>
+                <span className="w-10 text-right text-sm text-muted-foreground">
+                  {lutIntensity}%
+                </span>
               </div>
             </FieldContent>
           </Field>
@@ -157,14 +173,13 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
             <Switch
               checked={includeLuminance}
               onCheckedChange={setIncludeLuminance}
-              disabled={lutControlsDisabled}
+              disabled={!lutEnabled || lutControlsDisabled}
             />
           </Field>
         </FieldGroup>
 
         <div className="flex gap-2">
           <Button
-            variant="outline"
             size="sm"
             onClick={save}
             disabled={update.isPending || Boolean(disabledReason)}

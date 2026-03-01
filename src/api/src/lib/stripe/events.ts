@@ -35,7 +35,7 @@
  * ```
  */
 
-import type Stripe from "stripe";
+import type Stripe from 'stripe';
 
 /**
  * Stripe webhook events emitted to the event bus.
@@ -45,7 +45,7 @@ import type Stripe from "stripe";
  */
 export type StripeEvents =
   | {
-      type: "stripe:checkout.completed";
+      type: 'stripe:checkout.completed';
       /** The completed checkout session */
       session: Stripe.Checkout.Session;
       /** Extracted metadata from the session */
@@ -54,21 +54,21 @@ export type StripeEvents =
       customerId: string | null;
     }
   | {
-      type: "stripe:checkout.expired";
+      type: 'stripe:checkout.expired';
       /** The expired checkout session */
       session: Stripe.Checkout.Session;
       /** Extracted metadata from the session */
       metadata: Record<string, string>;
     }
   | {
-      type: "stripe:payment.succeeded";
+      type: 'stripe:payment.succeeded';
       /** The successful payment intent */
       paymentIntent: Stripe.PaymentIntent;
       /** Customer ID if available */
       customerId: string | null;
     }
   | {
-      type: "stripe:payment.failed";
+      type: 'stripe:payment.failed';
       /** The failed payment intent */
       paymentIntent: Stripe.PaymentIntent;
       /** Error code from Stripe */
@@ -79,17 +79,17 @@ export type StripeEvents =
       declineCode: string | null;
     }
   | {
-      type: "stripe:customer.created";
+      type: 'stripe:customer.created';
       /** The newly created customer */
       customer: Stripe.Customer;
     }
   | {
-      type: "stripe:customer.updated";
+      type: 'stripe:customer.updated';
       /** The updated customer */
       customer: Stripe.Customer;
     }
   | {
-      type: "stripe:customer.deleted";
+      type: 'stripe:customer.deleted';
       /** ID of the deleted customer */
       customerId: string;
     };
@@ -103,7 +103,7 @@ export type StripeEvents =
  * // { session: Stripe.Checkout.Session; metadata: Record<string, string>; customerId: string | null }
  * ```
  */
-export type StripeEventPayload<T extends StripeEvents["type"]> = Omit<
+export type StripeEventPayload<T extends StripeEvents['type']> = Omit<
   Extract<StripeEvents, { type: T }>,
-  "type"
+  'type'
 >;

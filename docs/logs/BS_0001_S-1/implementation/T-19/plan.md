@@ -6,6 +6,7 @@ Date: `2026-01-12`
 Owner: `Claude (implementv3)`
 
 ## Inputs
+
 - Task: `docs/logs/BS_0001_S-1/tasks.md` (section: `T-19`)
 - Upstream plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Context reports:
@@ -17,9 +18,11 @@ Owner: `Claude (implementv3)`
 ## Goal / non-goals
 
 ### Goal
+
 Implement photographer-facing UI for uploading event photos and viewing the gallery, enabling US-7 (Photo upload) and US-9 (Event gallery).
 
 ### Non-goals
+
 - Photo search/filtering (future enhancement)
 - Bulk download (future enhancement)
 - Photo editing/cropping (future enhancement)
@@ -29,6 +32,7 @@ Implement photographer-facing UI for uploading event photos and viewing the gall
 ## Approach (data-driven)
 
 ### Architecture
+
 Four-component system integrated into existing event detail page:
 
 1. **Upload dropzone** — Drag-and-drop + file picker with client-side validation
@@ -39,10 +43,12 @@ Four-component system integrated into existing event detail page:
 ### UI Flow Path
 
 **State 1: Initial / Empty**
+
 - Upload dropzone (prominent, "Drag photos or click to browse")
 - Empty state below ("No photos yet")
 
 **State 2: Files Selected → Upload Queue Appears**
+
 - Upload dropzone (collapses to smaller "Add more" button)
 - **Upload queue card** (shows file list with status: uploading/success/error)
   - Format: Card with list of files
@@ -51,6 +57,7 @@ Four-component system integrated into existing event detail page:
 - Gallery grid (live updates as uploads complete)
 
 **State 3: All Uploads Complete → Queue Auto-Hides**
+
 - Upload dropzone (returns to normal size)
 - Upload queue card (auto-hides after 3 seconds)
 - Gallery grid (shows all photos including new ones)
@@ -58,6 +65,7 @@ Four-component system integrated into existing event detail page:
 ### Technology choices (grounded in exemplars)
 
 **Component library:**
+
 - Use existing shadcn/ui components: `Dialog`, `Card`, `Button`, `Alert`, `Skeleton`, `Badge`
 - `[NEED_DECISION]` Add `Progress` component for upload status (not currently in packages/ui)
 - Pattern: Follow `CreateEventModal.tsx` (exemplar 1) for modal structure
@@ -65,6 +73,7 @@ Four-component system integrated into existing event detail page:
 - Pattern: Follow `credits/packages/index.tsx` (exemplar 4) for responsive grid
 
 **Drag-and-drop:**
+
 - `[NEED_DECISION]` **Option A (recommended):** Native HTML5 drag-and-drop API
   - Pros: Zero bundle cost, sufficient for use case, browser-native
   - Cons: More boilerplate code, less polished UX
@@ -74,6 +83,7 @@ Four-component system integrated into existing event detail page:
 - **Recommendation:** Start with native HTML5, evaluate if UX issues arise during testing
 
 **Lightbox:**
+
 - `[NEED_DECISION]` **Option A (recommended):** Custom implementation using shadcn `Dialog`
   - Pros: Minimal bundle size, full control, consistent with app styling
   - Cons: Need to implement keyboard navigation manually
@@ -83,6 +93,7 @@ Four-component system integrated into existing event detail page:
 - **Recommendation:** Use shadcn Dialog for MVP (follows exemplar 1 pattern)
 
 **Upload progress tracking:**
+
 - `[NEED_VALIDATION]` **Option A (recommended):** React Query mutation status only
   - Show "uploading" → "processing" → "indexed" states based on API response
   - No real-time progress bar (simpler, sufficient for 20MB max files)
@@ -94,6 +105,7 @@ Four-component system integrated into existing event detail page:
 ### File organization (follows tech-docs.md conventions)
 
 **New files to create:**
+
 ```
 apps/dashboard/src/
 ├── hooks/photos/
@@ -112,11 +124,13 @@ apps/dashboard/src/
 ### Implementation phases
 
 **Phase 1: API hooks** (foundation)
+
 1. Create `usePhotos` hook with cursor-based pagination (pattern: exemplar 6)
 2. Create `useUploadPhoto` hook with FormData handling (pattern: exemplar 2)
 3. Add TypeScript types for Photo entity matching API contract
 
 **Phase 2: Upload dropzone + queue**
+
 1. Create `PhotoUploadZone` component with:
    - File input (`accept="image/jpeg,image/png,image/heic,image/webp"`)
    - Drag-and-drop handlers (native HTML5 API)
@@ -137,6 +151,7 @@ apps/dashboard/src/
    - Remove from queue or mark complete when done
 
 **Phase 3: Gallery grid**
+
 1. Create `PhotoGalleryGrid` component with:
    - Responsive grid layout (`grid gap-4 md:grid-cols-2 lg:grid-cols-3` per exemplar 4)
    - Lazy loading (`loading="lazy"` on `<img>` tags)
@@ -150,6 +165,7 @@ apps/dashboard/src/
 4. `[NEED_VALIDATION]` Grid dimensions: Use `aspect-square` for consistent thumbnail layout
 
 **Phase 4: Lightbox**
+
 1. Create `PhotoLightbox` component using shadcn `Dialog`:
    - Display `previewUrl` (1200px) in dialog content
    - Download button fetches `downloadUrl` (presigned R2 URL)
@@ -158,6 +174,7 @@ apps/dashboard/src/
 2. `[NEED_VALIDATION]` Download URL expiry: Re-fetch photo data if download fails (15-minute expiry per logs-scout.md)
 
 **Phase 5: Integration**
+
 1. Modify `apps/dashboard/src/routes/events/[id]/index.tsx`:
    - Add "Photos" tab to existing event detail view
    - Mount `PhotoUploadZone` at top
@@ -165,6 +182,7 @@ apps/dashboard/src/
 2. Wire up query invalidation: Upload success → refetch gallery
 
 **Phase 6: Empty states and error handling**
+
 1. `[GAP]` Empty state for new events: **Propose:** "No photos yet. Upload photos to get started."
 2. Error states:
    - 402 Insufficient credits → Alert with link to `/credits/packages`
@@ -178,20 +196,24 @@ apps/dashboard/src/
 ### API (already implemented, no changes)
 
 **Upload API (T-16):**
+
 - `POST /events/:eventId/photos`
 - Request: `multipart/form-data` with `file` field
 - Response: `{ data: { id, status: "processing" } }`
 - Errors: 400 (validation), 402 (credits), 403 (expired), 404 (not found)
 
 **Gallery API (T-18):**
+
 - `GET /events/:eventId/photos?cursor=<timestamp>&limit=<number>`
 - Response: `{ data: Photo[], pagination: { nextCursor, hasMore } }`
 - Photo shape: `{ id, thumbnailUrl, previewUrl, downloadUrl, faceCount, status, uploadedAt }`
 
 ### DB
+
 No database changes (backend APIs complete).
 
 ### Jobs/events
+
 No changes (T-17 Rekognition consumer handles async indexing).
 
 ## Success path
@@ -211,6 +233,7 @@ No changes (T-17 Rekognition consumer handles async indexing).
 ## Failure modes / edge cases (major only)
 
 ### Upload failures
+
 1. **Insufficient credits (402):**
    - Show Alert: "Insufficient credits. Purchase more to continue."
    - Include link/button to `/credits/packages` route
@@ -229,6 +252,7 @@ No changes (T-17 Rekognition consumer handles async indexing).
    - Do not attempt upload
 
 ### Gallery failures
+
 1. **Network failure on load:**
    - Show Alert with "Try Again" button (pattern: exemplar 3)
 2. **Download URL expired (15 minutes):**
@@ -239,6 +263,7 @@ No changes (T-17 Rekognition consumer handles async indexing).
    - No retry action (requires backend investigation)
 
 ### Edge cases
+
 1. **Zero photos uploaded:**
    - Show empty state: Icon + "No photos yet" + "Upload photos to get started"
 2. **Pagination at end:**
@@ -254,6 +279,7 @@ No changes (T-17 Rekognition consumer handles async indexing).
 ### Manual tests (no UI test infrastructure)
 
 **Upload flow:**
+
 - [ ] Desktop Chrome: Drag-and-drop 3 photos → uploads succeed
 - [ ] Desktop Safari: File picker → uploads succeed
 - [ ] Mobile Safari: File picker opens camera option → upload succeeds
@@ -266,6 +292,7 @@ No changes (T-17 Rekognition consumer handles async indexing).
 - [ ] Network error: Kill API mid-upload → shows error with "Try Again" button
 
 **Gallery flow:**
+
 - [ ] Desktop: Grid shows 2-3 columns responsively
 - [ ] Mobile: Grid shows 1-2 columns
 - [ ] Lazy loading: Scroll triggers image loads (check Network tab)
@@ -276,6 +303,7 @@ No changes (T-17 Rekognition consumer handles async indexing).
 - [ ] Pagination end: "Load More" hidden when no more photos
 
 **Lightbox flow:**
+
 - [ ] Click thumbnail → lightbox opens with preview (1200px)
 - [ ] Click "Download" → downloads 4000px JPEG
 - [ ] Click backdrop → lightbox closes
@@ -283,10 +311,12 @@ No changes (T-17 Rekognition consumer handles async indexing).
 - [ ] Download URL expired: Re-fetch works (hard to test, may require mock)
 
 **Error states:**
+
 - [ ] Network failure on gallery load → shows Alert with retry
 - [ ] API returns 404 for event → shows error (should not happen if auth works)
 
 ### Build validation
+
 ```bash
 # Type check
 pnpm --filter=@sabaipics/dashboard check-types
@@ -300,6 +330,7 @@ pnpm --filter=@sabaipics/dashboard build --mode production
 ```
 
 ### Commands to run
+
 ```bash
 # Start dev server for manual testing
 pnpm dev
@@ -312,16 +343,19 @@ pnpm --filter=@sabaipics/dashboard preview
 ## Rollout / rollback
 
 ### Rollout
+
 1. Deploy dashboard to Cloudflare Pages (command: `pnpm --filter=@sabaipics/dashboard pages:deploy`)
 2. Test on staging environment with real event and photos
 3. Monitor browser console for errors on mobile devices (Thai market primarily mobile)
 
 ### Rollback
+
 - If critical UI issue: Revert PR, redeploy previous version
 - No database migrations required (zero-risk rollback)
 - No feature flags (all photographers see new UI immediately)
 
 ### Monitoring
+
 - Manual smoke test: Create event → upload photo → verify appears in gallery
 - User feedback: Check for upload failures via browser console logs (if users report issues)
 
@@ -380,6 +414,7 @@ pnpm --filter=@sabaipics/dashboard preview
     - Heuristic: If more than 10 minutes since gallery loaded, re-fetch before download
 
 ## Dependencies check
+
 - **T-16 (Upload API):** ✅ Done (PR #24)
 - **T-18 (Gallery API):** ✅ Done (PR #23)
 - **shadcn components:** Most available, may need to add `Progress` and verify `Badge` exists

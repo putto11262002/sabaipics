@@ -1,4 +1,5 @@
 # Implementation Readiness Checklist
+
 ## SabaiPics Pro - Complete Documentation Audit
 
 **Last Updated:** 2026-01-09
@@ -18,44 +19,44 @@
 
 ### ✅ Core Implementation Guides
 
-| File | Purpose | Status | Evidence |
-|------|---------|--------|----------|
-| **`findings/recommended_implementation_strategy.md`** | Master implementation plan | ✅ Complete | 3-phase roadmap, code examples, timeline |
-| **`findings/user_journeys_with_swiftui_mapping.md`** | UI flows → SwiftUI code mapping | ✅ Complete | Every screen, component, state mapped |
-| **`findings/sabaipics_pro_ui_design.md`** | Complete UI/UX design | ✅ Complete | All screens, SwiftUI code, data models |
-| **`findings/user_journeys_summary.md`** | All user scenarios | ✅ Complete | 8 journeys, error handling, edge cases |
+| File                                                  | Purpose                         | Status      | Evidence                                 |
+| ----------------------------------------------------- | ------------------------------- | ----------- | ---------------------------------------- |
+| **`findings/recommended_implementation_strategy.md`** | Master implementation plan      | ✅ Complete | 3-phase roadmap, code examples, timeline |
+| **`findings/user_journeys_with_swiftui_mapping.md`**  | UI flows → SwiftUI code mapping | ✅ Complete | Every screen, component, state mapped    |
+| **`findings/sabaipics_pro_ui_design.md`**             | Complete UI/UX design           | ✅ Complete | All screens, SwiftUI code, data models   |
+| **`findings/user_journeys_summary.md`**               | All user scenarios              | ✅ Complete | 8 journeys, error handling, edge cases   |
 
 ### ✅ Technical Deep Dives
 
-| File | Purpose | Status | Evidence |
-|------|---------|--------|----------|
-| **`technical-approach.md`** | Why PTP/IP, not SDK | ✅ Complete | Technical rationale, pros/cons |
-| **`discovery-protocol-deep-dive.md`** | UPnP/SSDP protocol breakdown | ✅ Complete | Layer-by-layer, packet examples |
-| **`ios-network-permissions-guide.md`** | iOS permissions & entitlements | ✅ Complete | Info.plist, entitlements, testing |
+| File                                                       | Purpose                              | Status      | Evidence                            |
+| ---------------------------------------------------------- | ------------------------------------ | ----------- | ----------------------------------- |
+| **`technical-approach.md`**                                | Why PTP/IP, not SDK                  | ✅ Complete | Technical rationale, pros/cons      |
+| **`discovery-protocol-deep-dive.md`**                      | UPnP/SSDP protocol breakdown         | ✅ Complete | Layer-by-layer, packet examples     |
+| **`ios-network-permissions-guide.md`**                     | iOS permissions & entitlements       | ✅ Complete | Info.plist, entitlements, testing   |
 | **`findings/imagecapturecore_wifi_discovery_research.md`** | Why ImageCaptureCore WiFi won't work | ✅ Complete | Research, evidence, recommendations |
 
 ### ✅ Research & Evidence
 
-| File | Purpose | Status | Evidence |
-|------|---------|--------|----------|
-| **`findings/ptpip_camera_support_research.md`** | 90+ compatible cameras | ✅ Complete | Full camera list, gPhoto2 database |
-| **`findings/entitlment_request_best_practices.md`** | Apple approval strategies | ✅ Complete | Timeline, tips, approval factors |
-| **`native-vs-expo-decision.md`** | Why Native Swift | ✅ Complete | Detailed comparison, code examples |
+| File                                                | Purpose                   | Status      | Evidence                           |
+| --------------------------------------------------- | ------------------------- | ----------- | ---------------------------------- |
+| **`findings/ptpip_camera_support_research.md`**     | 90+ compatible cameras    | ✅ Complete | Full camera list, gPhoto2 database |
+| **`findings/entitlment_request_best_practices.md`** | Apple approval strategies | ✅ Complete | Timeline, tips, approval factors   |
+| **`native-vs-expo-decision.md`**                    | Why Native Swift          | ✅ Complete | Detailed comparison, code examples |
 
 ### ✅ Ready-to-Use Resources
 
-| File | Purpose | Status | Evidence |
-|------|---------|--------|----------|
+| File                                    | Purpose                        | Status      | Evidence                             |
+| --------------------------------------- | ------------------------------ | ----------- | ------------------------------------ |
 | **`apple-entitlement-request-form.md`** | Pre-filled entitlement request | ✅ Complete | 700+ word justification, form fields |
-| **`overview.md`** | Navigation & quick start | ✅ Complete | Updated with current decisions |
+| **`overview.md`**                       | Navigation & quick start       | ✅ Complete | Updated with current decisions       |
 
 ### 📚 Reference Only
 
-| File | Purpose | Status | Notes |
-|------|---------|--------|-------|
-| **`application-data-requirements.md`** | Canon SDK requirements | ✅ Reference | Historical - decided NOT to use |
-| **`development-without-entitlement-guide.md`** | Manual IP workaround | ⚠️ Superseded | Covered in master strategy |
-| **`ios-expo-implementation-guide.md`** | Expo guide | ⚠️ Obsolete | Decided on Native Swift |
+| File                                           | Purpose                | Status        | Notes                           |
+| ---------------------------------------------- | ---------------------- | ------------- | ------------------------------- |
+| **`application-data-requirements.md`**         | Canon SDK requirements | ✅ Reference  | Historical - decided NOT to use |
+| **`development-without-entitlement-guide.md`** | Manual IP workaround   | ⚠️ Superseded | Covered in master strategy      |
+| **`ios-expo-implementation-guide.md`**         | Expo guide             | ⚠️ Obsolete   | Decided on Native Swift         |
 
 ---
 
@@ -64,6 +65,7 @@
 ### Phase 1: USB Connection (Week 1)
 
 #### ✅ Requirements
+
 - [x] ImageCaptureCore API documentation
 - [x] Tethered capture workflow
 - [x] File type filtering (RAW/JPEG)
@@ -74,6 +76,7 @@
 - [x] State management architecture
 
 #### 📄 Evidence Location
+
 ```
 USB Implementation:
 ├─ Technical: findings/imagecapturecore_wifi_discovery_research.md
@@ -85,6 +88,7 @@ USB Implementation:
 ```
 
 #### ✅ Code Examples Provided
+
 - [x] ICDeviceBrowser setup
 - [x] ICCameraDeviceDelegate implementation
 - [x] requestEnableTethering usage
@@ -97,6 +101,7 @@ USB Implementation:
 ### Phase 2: WiFi Manual IP (Week 2)
 
 #### ✅ Requirements
+
 - [x] GPhoto2Framework documentation
 - [x] Manual IP connection flow
 - [x] WiFi setup instructions
@@ -105,6 +110,7 @@ USB Implementation:
 - [x] Error handling
 
 #### 📄 Evidence Location
+
 ```
 WiFi Manual IP:
 ├─ Library: findings/recommended_implementation_strategy.md (GPhoto2Framework)
@@ -115,6 +121,7 @@ WiFi Manual IP:
 ```
 
 #### ✅ Code Examples Provided
+
 - [x] WiFiManualConnectionView (Form-based)
 - [x] IP address TextField
 - [x] Camera model Picker
@@ -125,6 +132,7 @@ WiFi Manual IP:
 ### Phase 3: WiFi Auto-Discovery (Week 3-4)
 
 #### ✅ Requirements
+
 - [x] UPnP/SSDP discovery protocol
 - [x] Multicast networking details
 - [x] Entitlement request form
@@ -133,6 +141,7 @@ WiFi Manual IP:
 - [x] Multiple camera selection
 
 #### 📄 Evidence Location
+
 ```
 WiFi Auto-Discovery:
 ├─ Protocol: discovery-protocol-deep-dive.md (Complete UPnP/SSDP breakdown)
@@ -144,6 +153,7 @@ WiFi Auto-Discovery:
 ```
 
 #### ✅ Technical Details
+
 - [x] UDP multicast to 239.255.255.250:1900
 - [x] M-SEARCH request format
 - [x] SSDP NOTIFY parsing
@@ -158,9 +168,11 @@ WiFi Auto-Discovery:
 ## Evidence Verification: Key Questions
 
 ### Q1: Can we connect to camera via USB?
+
 **Answer:** ✅ YES
 
 **Evidence:**
+
 - **API:** ImageCaptureCore framework (iOS 13.0+)
 - **Source:** [Apple Developer Documentation - ICCameraDevice](https://developer.apple.com/documentation/imagecapturecore/iccameradevice)
 - **Research:** findings/imagecapturecore_wifi_discovery_research.md
@@ -168,9 +180,11 @@ WiFi Auto-Discovery:
 - **Tested By:** PhotoSync (production app), Cascable Pro
 
 ### Q2: Can we download photos automatically when captured?
+
 **Answer:** ✅ YES
 
 **Evidence:**
+
 - **API:** requestEnableTethering() + didAdd delegate
 - **Source:** [Apple Developer Documentation - requestEnableTethering](https://developer.apple.com/documentation/imagecapturecore/iccameradevice/1508172-requestenabletethering)
 - **Conversation:** Detailed tethering explanation (2026-01-09)
@@ -178,9 +192,11 @@ WiFi Auto-Discovery:
 - **Code Example:** Provided in conversation and docs
 
 ### Q3: Can we filter RAW vs JPEG?
+
 **Answer:** ✅ YES
 
 **Evidence:**
+
 - **API:** ICCameraFile.isRaw property
 - **Source:** [Apple Developer Documentation - ICCameraItem.isRaw](https://developer.apple.com/documentation/imagecapturecore/iccameraitem/israw)
 - **Conversation:** Detailed filtering explanation (2026-01-09)
@@ -192,9 +208,11 @@ WiFi Auto-Discovery:
   ```
 
 ### Q4: Can we do WiFi with manual IP?
+
 **Answer:** ✅ YES (using GPhoto2Framework)
 
 **Evidence:**
+
 - **Library:** https://github.com/touchbyte/GPhoto2Framework
 - **Production Use:** PhotoSync 4.0+ on App Store
 - **Research:** findings/recommended_implementation_strategy.md
@@ -202,9 +220,11 @@ WiFi Auto-Discovery:
 - **Timeline:** Available immediately (no entitlement needed for manual IP)
 
 ### Q5: Can we do WiFi auto-discovery?
+
 **Answer:** ✅ YES (after Apple approval)
 
 **Evidence:**
+
 - **Protocol:** UPnP/SSDP (UDP multicast to 239.255.255.250:1900)
 - **Source:** discovery-protocol-deep-dive.md (complete packet breakdown)
 - **Entitlement:** com.apple.developer.networking.multicast (restricted)
@@ -213,9 +233,11 @@ WiFi Auto-Discovery:
 - **Similar Apps:** PhotoSync, Cascable, Canon Camera Connect (precedent)
 
 ### Q6: Which cameras are supported?
+
 **Answer:** ✅ 90+ camera models documented
 
 **Evidence:**
+
 - **File:** findings/ptpip_camera_support_research.md
 - **Brands:** Canon (40+ models), Nikon (20+), Sony (30+), Leica
 - **Database:** gPhoto2 (2,979+ PTP cameras)
@@ -223,9 +245,11 @@ WiFi Auto-Discovery:
 - **WiFi:** Cameras with PTP/IP (Canon, Nikon, Sony, Leica)
 
 ### Q7: What SwiftUI components do we use?
+
 **Answer:** ✅ Complete component list provided
 
 **Evidence:**
+
 - **File:** findings/user_journeys_with_swiftui_mapping.md
 - **Layouts:** VStack, HStack, ZStack, LazyVGrid, ScrollView, Form, NavigationStack
 - **Components:** Image, Text, Button, Label, ProgressView, TextField, Picker
@@ -233,9 +257,11 @@ WiFi Auto-Discovery:
 - **Code:** Complete implementation for all screens
 
 ### Q8: Do we have error handling?
+
 **Answer:** ✅ YES - All scenarios covered
 
 **Evidence:**
+
 - **File:** findings/user_journeys_summary.md (Journey 4)
 - **Scenarios:**
   - USB disconnected (reconnection flow)
@@ -293,12 +319,14 @@ WiFi Auto-Discovery:
 ## Critical Dependencies Checklist
 
 ### ✅ Apple Frameworks (Built-in)
+
 - [x] ImageCaptureCore (iOS 13.0+)
 - [x] SwiftUI (iOS 13.0+)
 - [x] Network framework (iOS 12.0+)
 - [x] Combine (iOS 13.0+)
 
 ### ✅ Third-Party Libraries
+
 - [x] **GPhoto2Framework** (WiFi PTP/IP)
   - Location: https://github.com/touchbyte/GPhoto2Framework
   - License: Check repo (likely LGPL like libgphoto2)
@@ -306,6 +334,7 @@ WiFi Auto-Discovery:
   - Integration: Add as framework to Xcode project
 
 ### ✅ Apple Approvals Needed
+
 - [x] **Multicast Networking Entitlement**
   - Form: apple-entitlement-request-form.md (ready)
   - Timeline: 3-10 days average
@@ -313,6 +342,7 @@ WiFi Auto-Discovery:
   - Fallback: Manual IP works without it
 
 ### ✅ Hardware Requirements
+
 - [x] iPhone (iOS 13.0+)
 - [x] USB-C to Lightning cable (for USB connection)
 - [x] Professional camera with PTP/IP support
@@ -326,48 +356,51 @@ WiFi Auto-Discovery:
 ## Implementation Readiness Score
 
 ### Phase 1: USB Connection (Week 1)
+
 **Readiness: 95%** ✅
 
-| Component | Status | Evidence | Missing |
-|-----------|--------|----------|---------|
-| Technical approach | ✅ Complete | ImageCaptureCore research | - |
-| API knowledge | ✅ Complete | All delegate methods documented | - |
-| UI design | ✅ Complete | All screens designed | - |
-| SwiftUI code | ✅ Complete | Complete implementations | - |
-| Data models | ✅ Complete | CapturedPhoto, ConnectionState | - |
-| Error handling | ✅ Complete | Reconnection flow | - |
-| Testing strategy | ✅ Complete | Test with real camera | - |
-| Info.plist | ✅ Complete | NSCameraUsageDescription | - |
-| Integration | ⚠️ 80% | Need GPhoto2Framework setup | Framework README |
+| Component          | Status      | Evidence                        | Missing          |
+| ------------------ | ----------- | ------------------------------- | ---------------- |
+| Technical approach | ✅ Complete | ImageCaptureCore research       | -                |
+| API knowledge      | ✅ Complete | All delegate methods documented | -                |
+| UI design          | ✅ Complete | All screens designed            | -                |
+| SwiftUI code       | ✅ Complete | Complete implementations        | -                |
+| Data models        | ✅ Complete | CapturedPhoto, ConnectionState  | -                |
+| Error handling     | ✅ Complete | Reconnection flow               | -                |
+| Testing strategy   | ✅ Complete | Test with real camera           | -                |
+| Info.plist         | ✅ Complete | NSCameraUsageDescription        | -                |
+| Integration        | ⚠️ 80%      | Need GPhoto2Framework setup     | Framework README |
 
 **Can start coding:** ✅ **YES, TODAY**
 
 ### Phase 2: WiFi Manual IP (Week 2)
+
 **Readiness: 90%** ✅
 
-| Component | Status | Evidence | Missing |
-|-----------|--------|----------|---------|
-| Technical approach | ✅ Complete | GPhoto2Framework identified | - |
-| Protocol knowledge | ✅ Complete | PTP/IP deep dive | - |
-| UI design | ✅ Complete | WiFi setup screens | - |
-| SwiftUI code | ✅ Complete | Form-based IP entry | - |
-| Library integration | ⚠️ 70% | Library location known | Exact API calls |
-| Error handling | ✅ Complete | Connection failures | - |
+| Component           | Status      | Evidence                    | Missing         |
+| ------------------- | ----------- | --------------------------- | --------------- |
+| Technical approach  | ✅ Complete | GPhoto2Framework identified | -               |
+| Protocol knowledge  | ✅ Complete | PTP/IP deep dive            | -               |
+| UI design           | ✅ Complete | WiFi setup screens          | -               |
+| SwiftUI code        | ✅ Complete | Form-based IP entry         | -               |
+| Library integration | ⚠️ 70%      | Library location known      | Exact API calls |
+| Error handling      | ✅ Complete | Connection failures         | -               |
 
 **Can start coding:** ✅ **YES** (may need library docs)
 
 ### Phase 3: WiFi Auto-Discovery (Week 3-4)
+
 **Readiness: 85%** ✅
 
-| Component | Status | Evidence | Missing |
-|-----------|--------|----------|---------|
-| Protocol knowledge | ✅ Complete | UPnP/SSDP deep dive | - |
-| Entitlement form | ✅ Complete | Ready to submit | - |
-| Permissions setup | ✅ Complete | Info.plist complete | - |
-| UI design | ✅ Complete | Discovery states | - |
-| Network code | ✅ 80% | Network framework examples | Full implementation |
-| XML parsing | ⚠️ 60% | Format documented | Parser code |
-| Testing | ⚠️ N/A | Needs entitlement approval | - |
+| Component          | Status      | Evidence                   | Missing             |
+| ------------------ | ----------- | -------------------------- | ------------------- |
+| Protocol knowledge | ✅ Complete | UPnP/SSDP deep dive        | -                   |
+| Entitlement form   | ✅ Complete | Ready to submit            | -                   |
+| Permissions setup  | ✅ Complete | Info.plist complete        | -                   |
+| UI design          | ✅ Complete | Discovery states           | -                   |
+| Network code       | ✅ 80%      | Network framework examples | Full implementation |
+| XML parsing        | ⚠️ 60%      | Format documented          | Parser code         |
+| Testing            | ⚠️ N/A      | Needs entitlement approval | -                   |
 
 **Can start coding:** ✅ **YES** (after entitlement approval)
 
@@ -427,6 +460,7 @@ WiFi Auto-Discovery:
 **Confidence Level: 95%**
 
 #### What We Have ✅
+
 - [x] Complete technical approach (USB + WiFi)
 - [x] All Apple APIs documented (ImageCaptureCore)
 - [x] Third-party library identified (GPhoto2Framework)
@@ -440,12 +474,14 @@ WiFi Auto-Discovery:
 - [x] Timeline and roadmap
 
 #### What We Need During Implementation ⚠️
+
 - GPhoto2Framework README (for exact API calls)
 - SabaiPics backend API docs (for upload)
 - Apple Developer account (standard)
 - Real camera for testing
 
 #### Missing Items That Won't Block Development ℹ️
+
 - Multi-camera support (defer)
 - Review/delete flow (defer)
 - Settings UI (defer)
@@ -456,23 +492,27 @@ WiFi Auto-Discovery:
 ## Recommended Next Steps
 
 ### Immediate (Today)
+
 1. ✅ Clone GPhoto2Framework repository
 2. ✅ Create new Xcode project (SwiftUI App)
 3. ✅ Integrate GPhoto2Framework
 4. ✅ Start with SearchingView (simplest screen)
 
 ### Week 1
+
 1. ✅ Implement USB connection (ImageCaptureCore)
 2. ✅ Build all SwiftUI screens (follow docs)
 3. ✅ Test with real camera
 4. ✅ Submit entitlement request (parallel)
 
 ### Week 2
+
 1. ✅ Add WiFi manual IP (GPhoto2Framework)
 2. ✅ Implement error handling
 3. ✅ TestFlight beta
 
 ### Week 3-4
+
 1. ⏳ Wait for entitlement approval
 2. ✅ Build auto-discovery (after approval)
 3. ✅ Production release
@@ -481,18 +521,18 @@ WiFi Auto-Discovery:
 
 ## Documentation Coverage Matrix
 
-| Topic | Files | Status | Evidence |
-|-------|-------|--------|----------|
-| **USB Connection** | 4 files | ✅ Complete | ImageCaptureCore research + code |
-| **WiFi Manual IP** | 3 files | ✅ Complete | GPhoto2Framework + protocol docs |
-| **WiFi Auto-Discovery** | 4 files | ✅ Complete | UPnP/SSDP + entitlement form |
-| **UI/UX Design** | 3 files | ✅ Complete | All journeys + SwiftUI mapping |
-| **SwiftUI Code** | 2 files | ✅ Complete | Every screen implemented |
-| **Error Handling** | 2 files | ✅ Complete | All scenarios covered |
-| **Camera Support** | 1 file | ✅ Complete | 90+ camera list |
-| **Permissions** | 2 files | ✅ Complete | Info.plist + entitlements |
-| **Timeline** | 2 files | ✅ Complete | 4-5 week roadmap |
-| **Backend Upload** | 0 files | ⚠️ Missing | Need SabaiPics API |
+| Topic                   | Files   | Status      | Evidence                         |
+| ----------------------- | ------- | ----------- | -------------------------------- |
+| **USB Connection**      | 4 files | ✅ Complete | ImageCaptureCore research + code |
+| **WiFi Manual IP**      | 3 files | ✅ Complete | GPhoto2Framework + protocol docs |
+| **WiFi Auto-Discovery** | 4 files | ✅ Complete | UPnP/SSDP + entitlement form     |
+| **UI/UX Design**        | 3 files | ✅ Complete | All journeys + SwiftUI mapping   |
+| **SwiftUI Code**        | 2 files | ✅ Complete | Every screen implemented         |
+| **Error Handling**      | 2 files | ✅ Complete | All scenarios covered            |
+| **Camera Support**      | 1 file  | ✅ Complete | 90+ camera list                  |
+| **Permissions**         | 2 files | ✅ Complete | Info.plist + entitlements        |
+| **Timeline**            | 2 files | ✅ Complete | 4-5 week roadmap                 |
+| **Backend Upload**      | 0 files | ⚠️ Missing  | Need SabaiPics API               |
 
 **Overall:** 9/10 topics complete = **90% ready**
 
@@ -503,6 +543,7 @@ WiFi Auto-Discovery:
 ### ✅ **READY TO START IMPLEMENTATION**
 
 **We have:**
+
 - ✅ Complete technical approach with evidence
 - ✅ All APIs documented with sources
 - ✅ Full UI/UX design with SwiftUI code
@@ -511,13 +552,16 @@ WiFi Auto-Discovery:
 - ✅ Week-by-week implementation plan
 
 **We need during implementation:**
+
 - GPhoto2Framework integration (library README)
 - SabaiPics backend API (for upload feature)
 
 **Blocking issues:**
+
 - ❌ None - Can start USB implementation today
 
 **Confidence to build:**
+
 - USB version: 95% ✅
 - WiFi manual IP: 90% ✅
 - WiFi auto-discovery: 85% ✅ (after entitlement)

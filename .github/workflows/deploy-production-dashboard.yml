@@ -35,6 +35,7 @@ jobs:
       - name: Create Dashboard Env
         run: |
           echo "VITE_API_URL=https://api.framefast.io" > src/dashboard/.env.production
+          echo "VITE_EVENT_URL=https://event.framefast.io" >> src/dashboard/.env.production
           echo "VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" >> src/dashboard/.env.production
 
       - name: Build Dashboard

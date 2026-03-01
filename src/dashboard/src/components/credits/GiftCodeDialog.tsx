@@ -8,55 +8,45 @@ import {
 } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
-import { Gift, Loader2, AlertCircle, Plus, Check, RefreshCw } from 'lucide-react';
-import { useTopUpCheckout } from '../../hooks/credits/useTopUpCheckout';
-import { useValidatePromoCode } from '../../hooks/credits/useValidatePromoCode';
+import { Input } from '@/shared/components/ui/input';
+import { Gift, Loader2, AlertCircle, Plus, Check } from 'lucide-react';
+import { useRedeemGiftCode } from '../../hooks/credits/useRedeemGiftCode';
 
 interface GiftCodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  giftCode: string;
+  /** Pre-filled code from URL ?code=XXX */
+  initialCode?: string;
 }
 
-export function GiftCodeDialog({
-  open,
-  onOpenChange,
-  giftCode,
-}: GiftCodeDialogProps) {
-  const [claiming, setClaiming] = useState(false);
-  const validateQuery = useValidatePromoCode(giftCode, open);
-  const checkoutMutation = useTopUpCheckout();
+export function GiftCodeDialog({ open, onOpenChange, initialCode = '' }: GiftCodeDialogProps) {
+  const [code, setCode] = useState(initialCode);
+  const [result, setResult] = useState<{ creditsGranted: number; expiresAt: string } | null>(null);
+  const redeemMutation = useRedeemGiftCode();
 
-  const promoData = validateQuery.data?.data;
-  const isGiftCode = promoData?.type === 'gift';
-  const giftData = isGiftCode ? promoData : null;
-  const isValid = validateQuery.isSuccess && isGiftCode;
-
-  // Clean URL when dialog closes (without claiming)
   const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen && !claiming) {
-      // User closed dialog without claiming - clean URL
-      window.history.replaceState({}, '', '/dashboard');
+    if (!newOpen) {
+      // Clean URL when closing
+      window.history.replaceState({}, '', '/credits');
+      // Reset state for next open
+      setResult(null);
+      redeemMutation.reset();
+      if (!initialCode) setCode('');
     }
     onOpenChange(newOpen);
   };
 
-  const handleClaimGift = async () => {
-    if (!giftData) return;
+  const handleRedeem = () => {
+    if (!code.trim()) return;
 
-    setClaiming(true);
-    try {
-      const result = await checkoutMutation.mutateAsync({
-        amount: giftData.maxAmountThb,
-        promoCode: giftCode,
-      });
-      // Don't clean URL - Stripe will redirect back to /dashboard?code=XXX on cancel
-      window.location.href = result.data.checkoutUrl;
-    } catch (error) {
-      setClaiming(false);
-      const message = error instanceof Error ? error.message : 'Failed to claim gift';
-      alert(message);
-    }
+    redeemMutation.mutate(
+      { code: code.trim().toUpperCase() },
+      {
+        onSuccess: (data) => {
+          setResult(data.data);
+        },
+      },
+    );
   };
 
   return (
@@ -67,62 +57,28 @@ export function GiftCodeDialog({
             <Gift className="size-5 text-primary" />
             Gift Credits
           </DialogTitle>
-          <DialogDescription>
-            Claim your free credits
-          </DialogDescription>
+          <DialogDescription>Enter a gift code to claim your free credits</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Loading State */}
-          {validateQuery.isLoading && (
-            <div className="flex flex-col items-center justify-center py-8">
-              <Loader2 className="size-8 animate-spin text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">Validating gift code...</p>
-            </div>
-          )}
-
-          {/* Error State */}
-          {validateQuery.isError && (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" />
-              <AlertDescription className="flex items-center justify-between">
-                <span>{validateQuery.error?.message ?? 'Invalid or expired gift code'}</span>
-                <Button variant="destructive" size="sm" onClick={() => validateQuery.refetch()}>
-                  <RefreshCw className="mr-1 size-3" />
-                  Retry
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Invalid Type (not a gift code) */}
-          {validateQuery.isSuccess && !isGiftCode && (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" />
-              <AlertDescription>
-                This code is not a gift code. Please use it in the credit top-up dialog instead.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Success - Show Gift Details */}
-          {isValid && giftData && (
+          {/* Success State */}
+          {result && (
             <>
               <div className="relative overflow-hidden rounded-xl p-8 bg-success/10 border border-success/30">
                 <div className="flex items-center justify-center gap-3">
                   <Plus className="size-10 text-success" strokeWidth={3} />
                   <div className="text-4xl font-bold text-success">
-                    {giftData.credits.toLocaleString()} Credits
+                    {result.creditsGranted.toLocaleString()} Credits
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <h4 className="font-medium text-sm">What you'll get:</h4>
+                <h4 className="font-medium text-sm">Credits added:</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li className="flex items-center gap-2">
                     <Check className="size-4 text-success" />
-                    {giftData.credits.toLocaleString()} image upload credits
+                    {result.creditsGranted.toLocaleString()} image upload credits
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="size-4 text-success" />
@@ -130,39 +86,64 @@ export function GiftCodeDialog({
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="size-4 text-success" />
-                    Credits expire in 365 days
+                    Expires{' '}
+                    {new Date(result.expiresAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
                   </li>
-                  {giftData.expiresAt && (
-                    <li className="flex items-center gap-2">
-                      <Check className="size-4 text-success" />
-                      Offer expires {new Date(giftData.expiresAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </li>
-                  )}
                 </ul>
               </div>
 
+              <Button onClick={() => handleOpenChange(false)} className="w-full" size="lg">
+                Done
+              </Button>
+            </>
+          )}
+
+          {/* Redeem Form */}
+          {!result && (
+            <>
+              {/* Error State */}
+              {redeemMutation.isError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="size-4" />
+                  <AlertDescription>
+                    {redeemMutation.error?.message ?? 'Failed to redeem gift code'}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Input
+                  placeholder="Enter gift code (e.g. GIFT-ABC123)"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && handleRedeem()}
+                  className="text-center font-mono text-lg tracking-wider"
+                  autoFocus
+                />
+              </div>
+
               <Button
-                onClick={handleClaimGift}
-                disabled={claiming}
+                onClick={handleRedeem}
+                disabled={!code.trim() || redeemMutation.isPending}
                 className="w-full"
                 size="lg"
               >
-                {claiming ? (
+                {redeemMutation.isPending ? (
                   <>
                     <Loader2 className="mr-1 size-4 animate-spin" />
                     Claiming...
                   </>
                 ) : (
-                  <>Claim</>
+                  'Claim'
                 )}
               </Button>
 
               <p className="text-xs text-center text-muted-foreground">
-                No payment required. You'll be redirected to confirm.
+                No payment required. Credits are added instantly.
               </p>
             </>
           )}

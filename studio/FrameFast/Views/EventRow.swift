@@ -14,11 +14,11 @@ struct EventRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(event.name)
                 .font(.headline)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
 
             Text(event.createdAt.relativeTime())
                 .font(.caption)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -50,5 +50,5 @@ struct EventRow: View {
     }
     .listStyle(.insetGrouped)
     .scrollContentBackground(.hidden)
-    .background(Color.Theme.background)
+    .background(Color(UIColor.systemBackground))
 }

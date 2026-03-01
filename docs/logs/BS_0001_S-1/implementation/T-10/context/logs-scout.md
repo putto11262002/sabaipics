@@ -35,12 +35,12 @@ case "checkout.session.completed": {
 ### 2. Event Bus Consumer Pattern (from `apps/api/src/events/`)
 
 ```typescript
-import { eventBus } from "../../events";
-import type { StripeEvents } from "../lib/stripe/events";
+import { eventBus } from '../../events';
+import type { StripeEvents } from '../lib/stripe/events';
 
 export function registerStripeHandlers() {
   return eventBus.handle<StripeEvents>({
-    "stripe:checkout.completed": async (event) => {
+    'stripe:checkout.completed': async (event) => {
       // Business logic here
     },
   });
@@ -50,13 +50,16 @@ export function registerStripeHandlers() {
 ### 3. Idempotency Pattern (from T-4 Clerk Webhook, T-9 Checkout)
 
 **Critical:** T-9 summary states:
+
 > "Webhook handler (T-10) will use `stripe_session_id` as idempotency key"
 
 The `credit_ledger` table has:
+
 - `stripe_session_id` column (nullable, unique via index)
 - Index: `credit_ledger_stripe_session_idx` for fast lookup
 
 **Idempotency check pattern (from T-4):**
+
 ```typescript
 // Check if already processed
 const [existing] = await db
@@ -66,7 +69,7 @@ const [existing] = await db
   .limit(1);
 
 if (existing) {
-  console.log("  -> Already fulfilled, skipping (idempotent)");
+  console.log('  -> Already fulfilled, skipping (idempotent)');
   return;
 }
 ```
@@ -74,11 +77,12 @@ if (existing) {
 ### 4. Error Handling in Webhooks (from T-4)
 
 **Pattern:** Log errors but allow request to succeed to prevent Svix/Stripe retries on bad data:
+
 ```typescript
 try {
   // Handler logic
 } catch (handlerError) {
-  console.error("[Stripe Handler] Error:", handlerError);
+  console.error('[Stripe Handler] Error:', handlerError);
   // Don't rethrow - let webhook succeed
 }
 ```
@@ -104,6 +108,7 @@ export const creditLedger = pgTable("credit_ledger", {
 ### 6. Checkout Session Metadata (from T-9)
 
 T-9 stores this metadata in checkout sessions:
+
 ```typescript
 {
   photographer_id: string,  // UUID
@@ -136,16 +141,19 @@ T-10 handler needs to create its own DB connection or receive it as a parameter.
 ## Known Limitations / Technical Debt
 
 ### From T-5 (PDPA Consent)
+
 > `[KNOWN_LIMITATION]` No transaction wrapping insert + update (acceptable for MVP, both are idempotent-safe)
 
 Same applies to T-10: single insert into `credit_ledger` is atomic and idempotent.
 
 ### From T-9 (Stripe Checkout)
+
 > `[ENG_DEBT]` T-10: Implement webhook fulfillment handler for `checkout.session.completed`
 
 This is the task at hand.
 
 ### From T-9 (Stripe Checkout) - Follow-ups
+
 > `[PM_FOLLOWUP]` T-12: Implement success/cancel page UI
 
 Frontend success page is separate work.
@@ -155,21 +163,26 @@ Frontend success page is separate work.
 ## Conventions
 
 ### Naming
+
 - Handler file: `apps/api/src/handlers/stripe.ts` (suggested, to follow event bus pattern)
 - Types in: `apps/api/src/lib/stripe/events.ts` (already exists)
 
 ### Logging
+
 - Pattern: `[Module Name] Message` e.g., `[Stripe Handler] Processing checkout.session.completed`
 
 ### UUID vs Text
+
 - All IDs use native Postgres `uuid` type (from T-1 iter-002)
 - FK columns also use `uuid`
 
 ### Timestamp Convention
+
 - Use `timestamptz()` helper from `packages/db/src/schema/common.ts`
 - All timestamps are `mode: "string", withTimezone: true`
 
 ### Testing Pattern (from T-3, T-8)
+
 - Use Hono's `testClient` for type-safe testing
 - Mock DB with `@sabaipics/db` types
 
@@ -177,13 +190,13 @@ Frontend success page is separate work.
 
 ## Key Files for T-10 Implementation
 
-| File | Purpose |
-|------|---------|
-| `apps/api/src/routes/webhooks/stripe.ts` | **Producer** - already emits `stripe:checkout.completed` |
-| `apps/api/src/lib/stripe/events.ts` | Event type definitions (already has `StripeEvents`) |
-| `apps/api/src/events/index.ts` | Event bus singleton |
-| `packages/db/src/schema/credit-ledger.ts` | Credit ledger table schema |
-| `apps/api/src/index.ts` | App wiring (may need handler registration) |
+| File                                      | Purpose                                                  |
+| ----------------------------------------- | -------------------------------------------------------- |
+| `apps/api/src/routes/webhooks/stripe.ts`  | **Producer** - already emits `stripe:checkout.completed` |
+| `apps/api/src/lib/stripe/events.ts`       | Event type definitions (already has `StripeEvents`)      |
+| `apps/api/src/events/index.ts`            | Event bus singleton                                      |
+| `packages/db/src/schema/credit-ledger.ts` | Credit ledger table schema                               |
+| `apps/api/src/index.ts`                   | App wiring (may need handler registration)               |
 
 ---
 
@@ -202,6 +215,7 @@ Frontend success page is separate work.
 ## Open Question
 
 **DB access in event handlers:** The current webhook route fires events synchronously but handlers run in a "fire and forget" manner. The handler will need to:
+
 - Either receive DB connection as part of event payload (non-standard)
 - Or create its own DB connection using env vars
 

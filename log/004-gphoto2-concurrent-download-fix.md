@@ -24,6 +24,7 @@ When photographer takes photos, the app detects them but **all downloads fail** 
 ### Root Cause
 
 **Error Code Confusion:**
+
 - Log shows "code: 1003" - this is `WiFiCameraManagerErrorDownloadFailed` (custom app error)
 - **Actual GPhoto2 error: -110** (`GP_ERROR_CAMERA_BUSY`)
 - Error message: "I/O in progress"
@@ -93,6 +94,7 @@ From [libgphoto2 GitHub Issue #1038](https://github.com/gphoto/libgphoto2/issues
 > "To avoid concurrent access to the camera, I protect my Camera object with a mutex and set the timeout argument of `gp_camera_wait_for_event()` to 0."
 
 **libgphoto2 is NOT thread-safe without external synchronization:**
+
 - ✅ Multiple cameras on separate threads - OK (each has its own Camera object)
 - ❌ Same camera from multiple threads - NOT OK (requires mutex or sequential access)
 - ❌ Event monitoring + download concurrently - NOT OK (same camera)
@@ -104,9 +106,11 @@ From [libgphoto2 GitHub Issue #1038](https://github.com/gphoto/libgphoto2/issues
 **This is actually correct** for Canon PTP/IP WiFi mode:
 
 From PTP protocol documentation:
+
 > When set to PTP mode, the PC will only be shown the images on the CF card, **regardless of which folder they are in, and it will appear as if they are all in the Root Folder** of the card.
 
 **Canon tethered capture naming:**
+
 - Files named `capt0000.jpg`, `capt0001.jpg`, etc.
 - Created in RAM buffer (not SD card initially)
 - Appear in root folder `/`
@@ -136,6 +140,7 @@ Thread 1: Continue monitoring → Next event
 ### Why Sequential is Better Than Mutex
 
 **Option A: Sequential (Recommended)**
+
 - ✅ Simpler implementation
 - ✅ No deadlock risk
 - ✅ Predictable behavior
@@ -143,6 +148,7 @@ Thread 1: Continue monitoring → Next event
 - ✅ Works perfectly for event photography
 
 **Option B: Mutex Locking**
+
 - ❌ More complex
 - ❌ Risk of deadlocks
 - ❌ Harder to debug
@@ -182,6 +188,7 @@ Thread 1: Continue monitoring → Next event
 **File:** `apps/studio/SabaiPicsStudio/WiFiCameraManager.m`
 
 **Before:**
+
 ```objc
 - (void)monitoringLoop {
     while (_isMonitoring) {
@@ -204,6 +211,7 @@ Thread 1: Continue monitoring → Next event
 ```
 
 **After:**
+
 ```objc
 - (void)monitoringLoop {
     NSLog(@"📡 Event monitoring loop started");
@@ -523,10 +531,12 @@ wifiService.$detectedPhotos
 ### Phase 1: Core Download Queue (45 min)
 
 **Files to modify:**
+
 - `apps/studio/SabaiPicsStudio/WiFiCameraManager.m`
 - `apps/studio/SabaiPicsStudio/WiFiCameraManager.h`
 
 **Tasks:**
+
 - [ ] Add `downloadQueue` property to WiFiCameraManager
 - [ ] Initialize queue in `init` method
 - [ ] Update `monitoringLoop` to queue downloads
@@ -538,9 +548,11 @@ wifiService.$detectedPhotos
 ### Phase 2: Swift Service Update (30 min)
 
 **Files to modify:**
+
 - `apps/studio/SabaiPicsStudio/WiFiCameraService.swift`
 
 **Tasks:**
+
 - [ ] Add `downloadedPhotos` published property
 - [ ] Implement `didDownloadPhoto` delegate method
 - [ ] Remove old `downloadPhoto()` method
@@ -549,9 +561,11 @@ wifiService.$detectedPhotos
 ### Phase 3: ViewModel Integration (30 min)
 
 **Files to modify:**
+
 - `apps/studio/SabaiPicsStudio/CameraViewModel.swift`
 
 **Tasks:**
+
 - [ ] Remove concurrent download code
 - [ ] Add binding to `downloadedPhotos`
 - [ ] Create UIImage from downloaded data
@@ -562,9 +576,11 @@ wifiService.$detectedPhotos
 ### Phase 4: UI Cleanup (15 min)
 
 **Files to modify:**
+
 - `apps/studio/SabaiPicsStudio/LiveCaptureView.swift`
 
 **Tasks:**
+
 - [ ] Remove "Downloading" counter from StatsHeader (optional)
 - [ ] Update to show just "Detected" and "Captured"
 - [ ] Test UI updates correctly
@@ -572,6 +588,7 @@ wifiService.$detectedPhotos
 ### Phase 5: Testing & Validation (30 min)
 
 **Test scenarios:**
+
 1. **Single photo:**
    - Take one photo
    - Verify detection → download → appears in grid
@@ -621,16 +638,19 @@ Success rate: 100% ✅
 ### Performance Metrics
 
 **Single Photo:**
+
 - Detection: < 1 second
 - Download: 1-2 seconds (JPEG ~3-5 MB)
 - Total: < 3 seconds from shutter to grid ✅
 
 **Rapid Shooting (5 photos in 10 seconds):**
+
 - All photos downloaded sequentially
 - Total time: ~15 seconds (3s per photo)
 - Acceptable for event photography ✅
 
 **No Blocking:**
+
 - UI remains responsive
 - Monitoring continues during downloads
 - Next events queued properly
@@ -640,6 +660,7 @@ Success rate: 100% ✅
 ### 1. Camera Disconnects During Download
 
 **Behavior:**
+
 - `gp_camera_file_get()` returns error
 - Download fails gracefully
 - Queue continues with next photo
@@ -650,6 +671,7 @@ Success rate: 100% ✅
 ### 2. Rapid Shooting Fills Queue
 
 **Behavior:**
+
 - Queue grows (5-10 photos)
 - Downloads process sequentially
 - All eventually complete
@@ -661,6 +683,7 @@ Success rate: 100% ✅
 ### 3. Download Takes Long Time (Slow WiFi)
 
 **Behavior:**
+
 - Event monitoring paused during download
 - Next event detection delayed
 
@@ -669,6 +692,7 @@ Success rate: 100% ✅
 ### 4. Duplicate Detection
 
 **Behavior:**
+
 - Same photo detected multiple times (GPhoto2 quirk)
 - Each queued for download
 
@@ -750,22 +774,26 @@ if (!alreadyQueued) {
 ### Option A: Sequential Downloads on Monitoring Thread ✅ CHOSEN
 
 **Pros:**
+
 - ✅ Simple implementation
 - ✅ No locking complexity
 - ✅ No deadlock risk
 - ✅ Fast enough for event photography
 
 **Cons:**
+
 - ❌ Monitoring paused briefly during downloads
 - ❌ Slower for burst shooting (but acceptable)
 
 ### Option B: NSLock Mutex Protection
 
 **Pros:**
+
 - ✅ Event monitoring continues during downloads
 - ✅ Better for high-throughput scenarios
 
 **Cons:**
+
 - ❌ More complex code
 - ❌ Risk of deadlocks
 - ❌ Harder to debug
@@ -776,9 +804,11 @@ if (!alreadyQueued) {
 ### Option C: Separate Camera Instance for Downloads
 
 **Pros:**
+
 - ✅ True concurrent operation
 
 **Cons:**
+
 - ❌ Canon cameras may not support multiple PTP/IP connections
 - ❌ Double connection overhead
 - ❌ More complex
@@ -788,9 +818,11 @@ if (!alreadyQueued) {
 ### Option D: gphoto2 CLI Instead of libgphoto2
 
 **Pros:**
+
 - ✅ Handles locking automatically
 
 **Cons:**
+
 - ❌ Requires spawning processes
 - ❌ Slower
 - ❌ Harder to integrate
@@ -829,6 +861,7 @@ if (!alreadyQueued) {
 ### If Sequential Becomes Too Slow
 
 **Symptoms:**
+
 - Photographer shoots 10+ photos rapidly
 - Queue grows faster than downloads complete
 - UI shows stale "Detected" vs "Captured" counts
@@ -846,10 +879,12 @@ if (!alreadyQueued) {
 ### If Download Speed is Too Slow
 
 **Symptoms:**
+
 - Each download takes 5+ seconds
 - Weak WiFi signal
 
 **Solutions:**
+
 1. Download thumbnails first (GP_FILE_TYPE_PREVIEW) for instant preview
 2. Full download in background
 3. Progressive JPEG rendering

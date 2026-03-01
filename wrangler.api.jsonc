@@ -5,7 +5,7 @@
   "compatibility_date": "2025-12-06",
   "compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
   "alias": {
-    "@": "./src"
+    "@": "./src",
   },
   "dev": {
     "port": 8081,
@@ -16,7 +16,8 @@
     "NODE_ENV": "development",
     "DASHBOARD_FRONTEND_URL": "http://localhost:5173",
     "EVENT_FRONTEND_URL": "http://localhost:5174",
-    "CORS_ORIGIN": "http://localhost:5173,http://localhost:5174",
+    "API_BASE_URL": "http://localhost:8081",
+    "CORS_ORIGIN": "http://localhost:5173,http://localhost:5174,http://localhost:5175",
     "AUTHORIZED_PARTIES": "http://localhost:5173",
     "AWS_REGION": "us-west-2",
     "CF_ZONE": "framefast.io",
@@ -28,6 +29,10 @@
     "HARD_DELETE_GRACE_DAYS": "30",
     "HARD_DELETE_BATCH_SIZE": "5",
     "SENTRY_DSN": "",
+    "CF_ACCESS_TEAM_DOMAIN": "https://framefast.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "505392355047ad894d5d55809c271e356dcfb45ba1123ed5ede28daf543e58d7",
+    "RECOGNITION_ENDPOINT": "http://localhost:8082",
+    "POSTHOG_API_KEY": "",
   },
 
   // R2 bucket for photo storage
@@ -73,7 +78,7 @@
         "queue": "photo-processing-dev",
         "max_batch_size": 50,
         "max_batch_timeout": 5,
-        "max_retries": 3,
+        "max_retries": 1,
         "max_concurrency": 3,
         "dead_letter_queue": "photo-processing-dlq-dev",
       },
@@ -87,10 +92,12 @@
       },
       {
         "queue": "upload-processing-dev",
+        // CF Images handles the heavy decode externally; Photon is only used for
+        // LUT grading on the already-resized output (~14 MB RGBA). Safe to batch.
         "max_batch_size": 10,
         "max_batch_timeout": 5,
-        "max_retries": 3,
-        "max_concurrency": 4,
+        "max_retries": 1,
+        "max_concurrency": 8,
         "dead_letter_queue": "upload-processing-dlq-dev",
       },
       {
@@ -112,21 +119,15 @@
     ],
   },
 
-  // Durable Objects
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "AWS_REKOGNITION_RATE_LIMITER",
-        "class_name": "RekognitionRateLimiter",
-      },
-    ],
-  },
-
-  // DO migrations
+  // DO migrations (v2 deletes the old RekognitionRateLimiter)
   "migrations": [
     {
       "tag": "v1",
       "new_classes": ["RekognitionRateLimiter"],
+    },
+    {
+      "tag": "v2",
+      "deleted_classes": ["RekognitionRateLimiter"],
     },
   ],
 
@@ -147,13 +148,11 @@
         "simple": { "limit": 30, "period": 60 },
       },
       {
-        // AWS Rekognition SearchFacesByImage quota enforcement (20 TPS globally)
-        // Note: IndexFaces + SearchFacesByImage share 50 TPS in us-west-2
-        // Allocation: 30 TPS for IndexFaces (DO), 20 TPS for SearchFaces (this limiter)
+        // Face search rate limiting (self-hosted, no AWS quota constraints)
         "name": "SEARCH_RATE_LIMITER",
         "type": "ratelimit",
         "namespace_id": "1002",
-        "simple": { "limit": 200, "period": 10 }, // 200 req/10s = 20 TPS
+        "simple": { "limit": 200, "period": 10 },
       },
     ],
   },
@@ -168,7 +167,8 @@
         "NODE_ENV": "staging",
         "DASHBOARD_FRONTEND_URL": "https://app-staging.framefast.io",
         "EVENT_FRONTEND_URL": "https://event-staging.framefast.io",
-        "CORS_ORIGIN": "https://app-staging.framefast.io,https://event-staging.framefast.io,http://localhost:5175",
+        "API_BASE_URL": "https://api-staging.framefast.io",
+        "CORS_ORIGIN": "https://app-staging.framefast.io,https://event-staging.framefast.io,https://admin-staging.framefast.io,http://localhost:5175",
         "AUTHORIZED_PARTIES": "https://app-staging.framefast.io,https://event-staging.framefast.io",
         "AWS_REGION": "us-west-2",
         "CF_ZONE": "framefast.io",
@@ -180,6 +180,10 @@
         "HARD_DELETE_GRACE_DAYS": "30",
         "HARD_DELETE_BATCH_SIZE": "5",
         "SENTRY_DSN": "https://fa797a451625d1341a655aabbc83ff6c@o4508085109850112.ingest.us.sentry.io/4510853502402560",
+        "CF_ACCESS_TEAM_DOMAIN": "https://framefast.cloudflareaccess.com",
+        "CF_ACCESS_AUD": "505392355047ad894d5d55809c271e356dcfb45ba1123ed5ede28daf543e58d7",
+        "RECOGNITION_ENDPOINT": "https://putto11262002--framefast-recognition-serve.modal.run",
+        "POSTHOG_API_KEY": "",
       },
       "routes": [
         {
@@ -222,7 +226,7 @@
             "queue": "photo-processing-staging",
             "max_batch_size": 50,
             "max_batch_timeout": 5,
-            "max_retries": 3,
+            "max_retries": 1,
             "max_concurrency": 3,
             "dead_letter_queue": "photo-processing-dlq-staging",
           },
@@ -236,10 +240,11 @@
           },
           {
             "queue": "upload-processing-staging",
+            // CF Images handles heavy decode — see dev comment above
             "max_batch_size": 10,
             "max_batch_timeout": 5,
-            "max_retries": 3,
-            "max_concurrency": 4,
+            "max_retries": 1,
+            "max_concurrency": 8,
             "dead_letter_queue": "upload-processing-dlq-staging",
           },
           {
@@ -260,14 +265,6 @@
           },
         ],
       },
-      "durable_objects": {
-        "bindings": [
-          {
-            "name": "AWS_REKOGNITION_RATE_LIMITER",
-            "class_name": "RekognitionRateLimiter",
-          },
-        ],
-      },
       "unsafe": {
         "bindings": [
           {
@@ -284,18 +281,25 @@
             "simple": { "limit": 30, "period": 60 },
           },
           {
-            // AWS Rekognition SearchFacesByImage quota enforcement (20 TPS globally)
-            // Note: IndexFaces + SearchFacesByImage share 50 TPS in us-west-2
-            // Allocation: 30 TPS for IndexFaces (DO), 20 TPS for SearchFaces (this limiter)
+            // Face search rate limiting (self-hosted, no AWS quota constraints)
             "name": "SEARCH_RATE_LIMITER",
             "type": "ratelimit",
             "namespace_id": "1002",
-            "simple": { "limit": 200, "period": 10 }, // 200 req/10s = 20 TPS
+            "simple": { "limit": 200, "period": 10 },
           },
         ],
       },
       "triggers": {
-        "crons": ["0 20 * * *", "0 21 * * *", "0 22 * * *"],
+        "crons": [
+          "0 20 * * *",
+          "0 21 * * *",
+          "0 22 * * *",
+          "0 23 * * *",
+          "10 23 * * *",
+          "20 23 * * *",
+          "30 23 * * *",
+          "40 23 * * *",
+        ],
       },
       "observability": {
         "enabled": true,
@@ -311,7 +315,8 @@
         "NODE_ENV": "production",
         "DASHBOARD_FRONTEND_URL": "https://app.framefast.io",
         "EVENT_FRONTEND_URL": "https://event.framefast.io",
-        "CORS_ORIGIN": "https://app.framefast.io,https://event.framefast.io",
+        "API_BASE_URL": "https://api.framefast.io",
+        "CORS_ORIGIN": "https://app.framefast.io,https://event.framefast.io,https://admin.framefast.io",
         "AUTHORIZED_PARTIES": "https://app.framefast.io,https://event.framefast.io",
         "AWS_REGION": "us-west-2",
         "CF_ZONE": "framefast.io",
@@ -323,6 +328,10 @@
         "HARD_DELETE_GRACE_DAYS": "30",
         "HARD_DELETE_BATCH_SIZE": "5",
         "SENTRY_DSN": "",
+        "CF_ACCESS_TEAM_DOMAIN": "https://framefast.cloudflareaccess.com",
+        "CF_ACCESS_AUD": "505392355047ad894d5d55809c271e356dcfb45ba1123ed5ede28daf543e58d7",
+        "RECOGNITION_ENDPOINT": "https://putto11262002--framefast-recognition-serve.modal.run",
+        "POSTHOG_API_KEY": "",
       },
       "routes": [
         {
@@ -365,7 +374,7 @@
             "queue": "photo-processing",
             "max_batch_size": 50,
             "max_batch_timeout": 5,
-            "max_retries": 3,
+            "max_retries": 1,
             "max_concurrency": 3,
             "dead_letter_queue": "photo-processing-dlq",
           },
@@ -379,10 +388,11 @@
           },
           {
             "queue": "upload-processing",
+            // CF Images handles heavy decode — see dev comment above
             "max_batch_size": 10,
             "max_batch_timeout": 5,
-            "max_retries": 3,
-            "max_concurrency": 4,
+            "max_retries": 1,
+            "max_concurrency": 8,
             "dead_letter_queue": "upload-processing-dlq",
           },
           {
@@ -403,14 +413,6 @@
           },
         ],
       },
-      "durable_objects": {
-        "bindings": [
-          {
-            "name": "AWS_REKOGNITION_RATE_LIMITER",
-            "class_name": "RekognitionRateLimiter",
-          },
-        ],
-      },
       "unsafe": {
         "bindings": [
           {
@@ -427,18 +429,25 @@
             "simple": { "limit": 30, "period": 60 },
           },
           {
-            // AWS Rekognition SearchFacesByImage quota enforcement (20 TPS globally)
-            // Note: IndexFaces + SearchFacesByImage share 50 TPS in us-west-2
-            // Allocation: 30 TPS for IndexFaces (DO), 20 TPS for SearchFaces (this limiter)
+            // Face search rate limiting (self-hosted, no AWS quota constraints)
             "name": "SEARCH_RATE_LIMITER",
             "type": "ratelimit",
             "namespace_id": "1002",
-            "simple": { "limit": 200, "period": 10 }, // 200 req/10s = 20 TPS
+            "simple": { "limit": 200, "period": 10 },
           },
         ],
       },
       "triggers": {
-        "crons": ["0 20 * * *", "0 21 * * *", "0 22 * * *"],
+        "crons": [
+          "0 20 * * *",
+          "0 21 * * *",
+          "0 22 * * *",
+          "0 23 * * *",
+          "10 23 * * *",
+          "20 23 * * *",
+          "30 23 * * *",
+          "40 23 * * *",
+        ],
       },
       "preview_urls": false,
       "observability": {

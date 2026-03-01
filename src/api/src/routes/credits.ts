@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
-import { eq, asc, and, desc, sql, gte } from 'drizzle-orm';
-import { creditPackages, photographers, creditLedger, promoCodeUsage } from '@/db';
+import { z } from 'zod';
+import { eq, and, desc, sql } from 'drizzle-orm';
+import { photographers, promoCodeUsage, giftCodes, giftCodeRedemptions } from '@/db';
 import { requirePhotographer } from '../middleware';
+import { zValidator } from '@hono/zod-validator';
 import type { Env } from '../types';
 import {
   createStripeClient,
@@ -13,6 +15,8 @@ import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../lib/error';
 import { calculateTieredDiscount, getDiscountTiers } from '../lib/pricing/discounts';
 import { topUpSchema } from '../lib/pricing/validation';
+import { getCreditHistory, getPurchaseFulfillmentBySession, getUsageChart, getUsageBySource } from '../lib/credits';
+import { grantCredits } from '../lib/credits/grant';
 
 /**
  * Credits API
@@ -34,7 +38,10 @@ export const creditsRouter = new Hono<Env>()
       const code = c.req.query('code');
 
       if (!code) {
-        return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'code parameter is required' });
+        return err<never, HandlerError>({
+          code: 'BAD_REQUEST',
+          message: 'code parameter is required',
+        });
       }
 
       const stripe = createStripeClient(c.env);
@@ -140,39 +147,6 @@ export const creditsRouter = new Hono<Env>()
    */
   .get('/tiers', async (c) => {
     return c.json({ tiers: getDiscountTiers() });
-  })
-  /**
-   * GET /credit-packages
-   *
-   * [DEPRECATED] Returns all active credit packages sorted by sortOrder.
-   * Public endpoint - no authentication required.
-   * Keep for backward compatibility during migration.
-   */
-  .get('/', async (c) => {
-    return safeTry(async function* () {
-      const db = c.var.db();
-
-      const packages = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            id: creditPackages.id,
-            name: creditPackages.name,
-            credits: creditPackages.credits,
-            priceThb: creditPackages.priceThb,
-          })
-          .from(creditPackages)
-          .where(eq(creditPackages.active, true))
-          .orderBy(asc(creditPackages.sortOrder)),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-      );
-
-      return ok(packages);
-    })
-      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
-      .match(
-        (data) => c.json({ data }),
-        (e) => apiError(c, e),
-      );
   })
   /**
    * POST /credit-packages/checkout
@@ -435,6 +409,7 @@ export const creditsRouter = new Hono<Env>()
           cancelUrl,
           metadata: {
             photographer_id: photographer.id,
+            clerk_user_id: c.get('auth')!.userId,
             credits: discount.creditAmount.toString(), // Webhook expects 'credits' key
             original_amount: discount.originalAmount.toString(),
             discount_percent: discount.discountPercent.toString(),
@@ -486,24 +461,12 @@ export const creditsRouter = new Hono<Env>()
         return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'sessionId is required' });
       }
 
-      // Query credit_ledger by stripeSessionId AND photographerId (security)
-      const [purchase] = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            credits: creditLedger.amount,
-            expiresAt: creditLedger.expiresAt,
-          })
-          .from(creditLedger)
-          .where(
-            and(
-              eq(creditLedger.stripeSessionId, sessionId),
-              eq(creditLedger.photographerId, photographer.id),
-              eq(creditLedger.type, 'credit'),
-              eq(creditLedger.source, 'purchase'),
-            ),
-          )
-          .limit(1),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      const purchase = yield* getPurchaseFulfillmentBySession(
+        db,
+        photographer.id,
+        sessionId,
+      ).mapErr(
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
       );
 
       if (!purchase) {
@@ -538,71 +501,21 @@ export const creditsRouter = new Hono<Env>()
       const page = Math.max(0, parseInt(c.req.query('page') || '0', 10));
       const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10)));
       const typeFilter = c.req.query('type') as 'credit' | 'debit' | undefined;
-      const offset = page * limit;
 
-      // Build where conditions
-      const conditions = [eq(creditLedger.photographerId, photographer.id)];
-      if (typeFilter === 'credit' || typeFilter === 'debit') {
-        conditions.push(eq(creditLedger.type, typeFilter));
-      }
-
-      // Paginated entries
-      const entries = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            id: creditLedger.id,
-            amount: creditLedger.amount,
-            type: creditLedger.type,
-            source: creditLedger.source,
-            promoCode: creditLedger.promoCode,
-            stripeReceiptUrl: creditLedger.stripeReceiptUrl,
-            expiresAt: creditLedger.expiresAt,
-            createdAt: creditLedger.createdAt,
-          })
-          .from(creditLedger)
-          .where(and(...conditions))
-          .orderBy(desc(creditLedger.createdAt))
-          .limit(limit)
-          .offset(offset),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      const result = yield* getCreditHistory(db, {
+        photographerId: photographer.id,
+        page,
+        limit,
+        typeFilter,
+      }).mapErr(
+        (e): HandlerError => ({
+          code: 'INTERNAL_ERROR',
+          message: 'Database error',
+          cause: e.cause,
+        }),
       );
 
-      // Total count for pagination
-      const [countResult] = yield* ResultAsync.fromPromise(
-        db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(creditLedger)
-          .where(and(...conditions)),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-      );
-      const totalCount = countResult?.count ?? 0;
-
-      // Summary stats (always for all types)
-      const [summary] = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            balance: sql<number>`coalesce(sum(case when ${creditLedger.expiresAt} > now() then ${creditLedger.amount} else 0 end), 0)::int`,
-            expiringSoon: sql<number>`coalesce(sum(case when ${creditLedger.expiresAt} > now() and ${creditLedger.expiresAt} <= now() + interval '30 days' then ${creditLedger.amount} else 0 end), 0)::int`,
-            usedThisMonth: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'debit' and ${creditLedger.createdAt} >= date_trunc('month', now()) then abs(${creditLedger.amount}) else 0 end), 0)::int`,
-          })
-          .from(creditLedger)
-          .where(eq(creditLedger.photographerId, photographer.id)),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-      );
-
-      const totalPages = Math.ceil(totalCount / limit);
-
-      return ok({
-        entries,
-        summary: summary ?? { balance: 0, expiringSoon: 0, usedThisMonth: 0 },
-        pagination: {
-          page,
-          limit,
-          totalCount,
-          totalPages,
-          hasNextPage: page < totalPages - 1,
-        },
-      });
+      return ok(result);
     })
       .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
       .match(
@@ -625,23 +538,8 @@ export const creditsRouter = new Hono<Env>()
       const sinceDate = new Date();
       sinceDate.setDate(sinceDate.getDate() - days);
 
-      const rows = yield* ResultAsync.fromPromise(
-        db
-          .select({
-            date: sql<string>`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`,
-            credits: sql<number>`coalesce(sum(abs(${creditLedger.amount})), 0)::int`,
-          })
-          .from(creditLedger)
-          .where(
-            and(
-              eq(creditLedger.photographerId, photographer.id),
-              eq(creditLedger.type, 'debit'),
-              gte(creditLedger.createdAt, sinceDate.toISOString()),
-            ),
-          )
-          .groupBy(sql`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`)
-          .orderBy(sql`to_char(${creditLedger.createdAt}, 'YYYY-MM-DD')`),
-        (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+      const rows = yield* getUsageChart(db, photographer.id, sinceDate.toISOString()).mapErr(
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
       );
 
       return ok(rows);
@@ -651,4 +549,165 @@ export const creditsRouter = new Hono<Env>()
         (data) => c.json({ data }),
         (e) => apiError(c, e),
       );
-  });
+  })
+  /**
+   * GET /credit-packages/usage/by-source?days=30
+   *
+   * Returns daily debit amounts grouped by source for stacked bar chart.
+   * Requires authenticated photographer.
+   */
+  .get('/usage/by-source', requirePhotographer(), async (c) => {
+    return safeTry(async function* () {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+
+      const days = Math.min(90, Math.max(1, parseInt(c.req.query('days') || '30', 10)));
+      const sinceDate = new Date();
+      sinceDate.setDate(sinceDate.getDate() - days);
+
+      const rows = yield* getUsageBySource(db, photographer.id, sinceDate.toISOString()).mapErr(
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e.cause }),
+      );
+
+      return ok(rows);
+    })
+      .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
+  })
+  /**
+   * POST /credit-packages/redeem
+   *
+   * Redeem an in-house gift code for instant credits.
+   * No Stripe involved — direct DB transaction.
+   */
+  .post(
+    '/redeem',
+    requirePhotographer(),
+    zValidator('json', z.object({ code: z.string().min(1).max(30) })),
+    async (c) => {
+      const { code } = c.req.valid('json');
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const dbTx = c.var.dbTx();
+
+      return safeTry(async function* () {
+        // 1. Code exists and active (read via HTTP adapter — no transaction needed)
+        const [giftCode] = yield* ResultAsync.fromPromise(
+          db
+            .select()
+            .from(giftCodes)
+            .where(and(eq(giftCodes.code, code), eq(giftCodes.active, true)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!giftCode) {
+          return err<never, HandlerError>({
+            code: 'NOT_FOUND',
+            message: 'Invalid or inactive gift code',
+          });
+        }
+
+        // 2. Not expired
+        if (giftCode.expiresAt && new Date(giftCode.expiresAt) < new Date()) {
+          return err<never, HandlerError>({ code: 'GONE', message: 'This gift code has expired' });
+        }
+
+        // 3. User eligible (targetPhotographerIds)
+        if (
+          giftCode.targetPhotographerIds &&
+          giftCode.targetPhotographerIds.length > 0 &&
+          !giftCode.targetPhotographerIds.includes(photographer.id)
+        ) {
+          return err<never, HandlerError>({
+            code: 'FORBIDDEN',
+            message: 'This gift code is not available for your account',
+          });
+        }
+
+        // Transaction: check limits + grant credits + record redemption (atomic)
+        const creditExpiresAt = new Date();
+        creditExpiresAt.setDate(creditExpiresAt.getDate() + giftCode.creditExpiresInDays);
+
+        const txResult = yield* ResultAsync.fromPromise(
+          dbTx.transaction(async (tx) => {
+            // 4. Per-user limit (inside transaction for atomicity)
+            const [userRedemptions] = await tx
+              .select({ count: sql<number>`count(*)`.mapWith(Number) })
+              .from(giftCodeRedemptions)
+              .where(
+                and(
+                  eq(giftCodeRedemptions.giftCodeId, giftCode.id),
+                  eq(giftCodeRedemptions.photographerId, photographer.id),
+                ),
+              );
+
+            if (userRedemptions.count >= giftCode.maxRedemptionsPerUser) {
+              throw Object.assign(new Error('You have already redeemed this gift code'), {
+                handlerCode: 'CONFLICT' as const,
+              });
+            }
+
+            // 5. Global limit (inside transaction for atomicity)
+            if (giftCode.maxRedemptions != null) {
+              const [totalRedemptions] = await tx
+                .select({ count: sql<number>`count(*)`.mapWith(Number) })
+                .from(giftCodeRedemptions)
+                .where(eq(giftCodeRedemptions.giftCodeId, giftCode.id));
+
+              if (totalRedemptions.count >= giftCode.maxRedemptions) {
+                throw Object.assign(
+                  new Error('This gift code has reached its maximum redemptions'),
+                  { handlerCode: 'CONFLICT' as const },
+                );
+              }
+            }
+
+            // Grant credits
+            const grantResult = await grantCredits(tx, {
+              photographerId: photographer.id,
+              amount: giftCode.credits,
+              source: 'gift',
+              expiresAt: creditExpiresAt.toISOString(),
+              promoCode: giftCode.code,
+            }).match(
+              (r) => r,
+              (e) => {
+                throw new Error(`Grant failed: ${e.type}`);
+              },
+            );
+
+            // Record redemption
+            await tx.insert(giftCodeRedemptions).values({
+              giftCodeId: giftCode.id,
+              photographerId: photographer.id,
+              creditsGranted: giftCode.credits,
+              creditLedgerEntryId: grantResult.ledgerEntryId,
+            });
+
+            return grantResult;
+          }),
+          (cause): HandlerError => {
+            const err = cause as Error & { handlerCode?: string };
+            if (err.handlerCode === 'CONFLICT') {
+              return { code: 'CONFLICT', message: err.message };
+            }
+            return { code: 'INTERNAL_ERROR', message: 'Failed to grant credits', cause };
+          },
+        );
+
+        return ok({
+          creditsGranted: giftCode.credits,
+          expiresAt: creditExpiresAt.toISOString(),
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Credits]', e.code, e.cause))
+        .match(
+          (data) => c.json({ data }),
+          (e) => apiError(c, e),
+        );
+    },
+  );

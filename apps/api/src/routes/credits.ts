@@ -34,7 +34,10 @@ export const creditsRouter = new Hono<Env>()
       const code = c.req.query('code');
 
       if (!code) {
-        return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'code parameter is required' });
+        return err<never, HandlerError>({
+          code: 'BAD_REQUEST',
+          message: 'code parameter is required',
+        });
       }
 
       const stripe = createStripeClient(c.env);

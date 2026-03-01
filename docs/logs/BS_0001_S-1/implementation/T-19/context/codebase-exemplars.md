@@ -10,6 +10,7 @@ Date: `2026-01-11`
 **Lines:** 1-176
 
 **Pattern:**
+
 - Dialog wrapper with controlled open/close state
 - React Hook Form with Zod resolver for validation
 - Controller pattern for form fields with inline error display
@@ -19,6 +20,7 @@ Date: `2026-01-11`
 - Success callback closes modal and resets form
 
 **Key takeaways:**
+
 - Use `Dialog` + `DialogContent` + `DialogHeader` + `DialogFooter` from `@sabaipics/ui`
 - Validation schema lives in separate file (`lib/event-form-schema.ts`)
 - Form errors displayed inline below each field: `{fieldState.error && <p className="text-sm text-destructive">{fieldState.error.message}</p>}`
@@ -32,6 +34,7 @@ Date: `2026-01-11`
 **Lines:** 1-63
 
 **Pattern:**
+
 - `useMutation` from `@tanstack/react-query` for POST requests
 - `useApiClient` hook provides `getToken()` for auth
 - Error envelope extraction from API response
@@ -40,6 +43,7 @@ Date: `2026-01-11`
 - Structured error handling with fallback messages
 
 **Key takeaways:**
+
 - Auth token from `getToken()` passed in `Authorization: Bearer ${token}` header
 - API URL from `import.meta.env.VITE_API_URL`
 - Error shape: `{ error: { code: string, message: string } }`
@@ -52,6 +56,7 @@ Date: `2026-01-11`
 **Lines:** 116-166, 220-258
 
 **Pattern:**
+
 - Three-state rendering: loading → error → data
 - Skeleton loaders match layout structure
 - Error state with retry button
@@ -59,6 +64,7 @@ Date: `2026-01-11`
 - "No results" state separate from "no data" state
 
 **Key takeaways:**
+
 - **Loading state:** Render `Skeleton` components matching final layout
   ```tsx
   if (isLoading) {
@@ -85,12 +91,14 @@ Date: `2026-01-11`
 **Lines:** 127-211
 
 **Pattern:**
+
 - Grid container: `grid w-full max-w-5xl gap-6 md:grid-cols-3`
 - Responsive card grid with consistent spacing
 - Card highlight pattern (border-primary for featured item)
 - Skeleton grid during loading matches final grid layout
 
 **Key takeaways:**
+
 - Grid wrapper: `<div className="mx-auto grid w-full max-w-5xl gap-6 md:grid-cols-3">`
 - Loading skeletons mirror grid: `<Skeleton className="h-96 w-full rounded-xl" />` repeated 3 times
 - Card structure: `Card` + `CardHeader` + `CardContent` + `CardFooter`
@@ -102,12 +110,14 @@ Date: `2026-01-11`
 **Lines:** 59-100
 
 **Pattern:**
+
 - Cursor-based pagination using timestamp/ID
 - Fetch `limit + 1` to determine if more data exists
 - Return `nextCursor` and `hasMore` in response
 - Client passes `cursor` query param for next page
 
 **Key takeaways:**
+
 - **API contract:**
   ```typescript
   {
@@ -129,12 +139,14 @@ Date: `2026-01-11`
 **Lines:** 1-42
 
 **Pattern:**
+
 - `useQuery` with typed response
 - Conditional execution with `enabled` flag
 - Error handling for specific HTTP status codes
 - Stale time configuration
 
 **Key takeaways:**
+
 - Query key includes params: `queryKey: ["event", id]`
 - Only run when data available: `enabled: !!id`
 - Status-specific errors: `if (response.status === 404) throw new Error("Event not found")`
@@ -146,12 +158,14 @@ Date: `2026-01-11`
 **Lines:** 82-114, 189-219
 
 **Pattern:**
+
 - Client-side filtering with `useMemo`
 - Search input with icon
 - Toggle group for status filters
 - Filter combinations (search + status)
 
 **Key takeaways:**
+
 - Search input wrapper: `<div className="relative flex-1 max-w-md">`
 - Icon positioning: `<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />`
 - Input with icon: `<Input className="pl-10" />`
@@ -161,6 +175,7 @@ Date: `2026-01-11`
 ## Gaps (no exemplar found)
 
 ### File Upload / Dropzone
+
 - `[NEED_VALIDATION]` No existing file upload implementation in the dashboard
 - Need to implement:
   - Drag-and-drop zone
@@ -171,6 +186,7 @@ Date: `2026-01-11`
   - FormData construction for multipart upload
 
 ### Gallery Grid with Images
+
 - `[NEED_VALIDATION]` No photo grid/gallery component exists yet
 - The credits packages page has a card grid (Exemplar 4) but not an image grid
 - Need to implement:
@@ -181,6 +197,7 @@ Date: `2026-01-11`
   - Selection state (if needed)
 
 ### Photo Upload API Call Pattern
+
 - `[NEED_PATTERN]` No existing photo upload hook
 - The photo GET endpoint exists (`/apps/api/src/routes/photos.ts`) but upload is separate
 - Need to create:
@@ -193,6 +210,7 @@ Date: `2026-01-11`
 ## Additional Notes
 
 **API Response Shape (from photos.ts):**
+
 ```typescript
 {
   data: Array<{
@@ -212,6 +230,7 @@ Date: `2026-01-11`
 ```
 
 **Available UI Components (from packages/ui):**
+
 - `Empty` + variations (for empty states)
 - `Skeleton` (for loading)
 - `Alert` (for errors)
@@ -221,6 +240,7 @@ Date: `2026-01-11`
 - `Button`, `Input`, `Spinner` (primitives)
 
 **State Management Pattern:**
+
 - React Query for server state
 - Local `useState` for UI state (modals, filters, pagination)
 - No global state library used

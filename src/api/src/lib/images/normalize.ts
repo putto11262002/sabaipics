@@ -35,8 +35,10 @@ export type PhotonPostProcessHook = (
 // Constants
 // =============================================================================
 
-const MAX_WIDTH = 4000;
+const MAX_WIDTH = 2500;
 const JPEG_QUALITY = 90;
+const FALLBACK_QUALITY = 75;
+const MAX_OUTPUT_SIZE = 5 * 1024 * 1024; // 5 MB — Rekognition IndexFaces limit
 
 // =============================================================================
 // Photon (Wasm) Normalizer
@@ -53,8 +55,8 @@ const safeResize = Result.fromThrowable(
 );
 
 const safeEncodeJpeg = Result.fromThrowable(
-  (img: PhotonImage) => {
-    const jpegView = img.get_bytes_jpeg(JPEG_QUALITY);
+  (img: PhotonImage, quality: number) => {
+    const jpegView = img.get_bytes_jpeg(quality);
     // Copy bytes out of Wasm memory before freeing — the Uint8Array from
     // get_bytes_jpeg is a view into the Wasm linear memory and becomes
     // invalid once the PhotonImage is freed.
@@ -136,7 +138,82 @@ export function normalizeWithPhoton(
         return out;
       });
     })
-    .andThen((img) => safeEncodeJpeg(img))
+    .andThen((img) =>
+      safeEncodeJpeg(img, JPEG_QUALITY).andThen((result) => {
+        if (result.bytes.byteLength <= MAX_OUTPUT_SIZE) return ok(result);
+        // Re-encode at lower quality — img is still alive, slice() already
+        // copied the first encode's bytes out of Wasm memory.
+        return safeEncodeJpeg(img, FALLBACK_QUALITY);
+      }),
+    )
+    .map((result) => {
+      cleanup();
+      return result;
+    })
+    .mapErr((error) => {
+      cleanup();
+      return error;
+    });
+}
+
+// =============================================================================
+// Photon Post-Process (LUT-only, no resize)
+// =============================================================================
+
+/**
+ * Apply a post-process hook (e.g. LUT color grade) to an already-normalized JPEG.
+ * Decodes → applies hook → re-encodes. No resize step.
+ */
+export function applyPostProcessPhoton(
+  jpegBytes: ArrayBuffer,
+  postProcess: PhotonPostProcessHook,
+): Result<NormalizeResult, NormalizeError> {
+  let inputImage: PhotonImage | null = null;
+  let processedImage: PhotonImage | null = null;
+
+  const cleanup = () => {
+    if (processedImage) {
+      safeFree(processedImage);
+      processedImage = null;
+    }
+    if (inputImage) {
+      safeFree(inputImage);
+      inputImage = null;
+    }
+  };
+
+  return safeNewFromBytes(new Uint8Array(jpegBytes))
+    .andThen((img) => {
+      inputImage = img;
+      const width = img.get_width();
+      const height = img.get_height();
+
+      const safeApply = Result.fromThrowable(
+        () => {
+          const pixels = img.get_raw_pixels().slice();
+          const outPixels = postProcess(pixels, width, height);
+          const expected = width * height * 4;
+          if (outPixels.length !== expected) {
+            throw new Error(
+              `postProcess returned invalid buffer length (got ${outPixels.length}, expected ${expected})`,
+            );
+          }
+          return new PhotonImage(outPixels, width, height);
+        },
+        (cause): NormalizeError => ({ stage: 'post_process', cause }),
+      );
+
+      return safeApply().map((out) => {
+        processedImage = out;
+        return out;
+      });
+    })
+    .andThen((img) =>
+      safeEncodeJpeg(img, JPEG_QUALITY).andThen((result) => {
+        if (result.bytes.byteLength <= MAX_OUTPUT_SIZE) return ok(result);
+        return safeEncodeJpeg(img, FALLBACK_QUALITY);
+      }),
+    )
     .map((result) => {
       cleanup();
       return result;
@@ -163,7 +240,11 @@ const safeExtractDimensions = Result.fromThrowable(
 export function normalizeWithCfImages(
   imageBytes: ArrayBuffer,
   images: ImagesBinding,
+  options?: { width?: number; quality?: number },
 ): ResultAsync<NormalizeResult, NormalizeError> {
+  const targetWidth = options?.width ?? MAX_WIDTH;
+  const targetQuality = options?.quality ?? JPEG_QUALITY;
+
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(new Uint8Array(imageBytes));
@@ -174,8 +255,8 @@ export function normalizeWithCfImages(
   return ResultAsync.fromPromise(
     images
       .input(stream)
-      .transform({ width: MAX_WIDTH, fit: 'scale-down' })
-      .output({ format: 'image/jpeg', quality: JPEG_QUALITY }),
+      .transform({ width: targetWidth, fit: 'scale-down' })
+      .output({ format: 'image/jpeg', quality: targetQuality }),
     (cause): NormalizeError => ({ stage: 'cf_images_transform', cause }),
   )
     .andThen((transformResponse) =>

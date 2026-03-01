@@ -1,9 +1,6 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { usePresignedUpload } from './usePresignedUpload';
-import {
-  useUploadIntentStatus,
-  type MappedUploadIntent,
-} from './useUploadIntentStatus';
+import { useUploadIntentStatus, type MappedUploadIntent } from './useUploadIntentStatus';
 import { usePhotos, type Photo } from './usePhotos';
 import { usePhotosStatus, type PhotoStatus } from './usePhotoStatus';
 
@@ -74,7 +71,11 @@ export function useUploadQueue(eventId: string | undefined) {
   // =========================================================================
   // Phase 1: Poll upload intents until completed (get photoId)
   // =========================================================================
-  const pendingIntentIds = Array.from(pendingIntentIdsRef.current);
+  const pendingIntentIdsKey = Array.from(pendingIntentIdsRef.current).sort().join(',');
+  const pendingIntentIds = useMemo(
+    () => Array.from(pendingIntentIdsRef.current),
+    [pendingIntentIdsKey],
+  );
 
   const { data: intentStatuses } = useUploadIntentStatus(pendingIntentIds, {
     refetchInterval: pendingIntentIds.length > 0 ? 2000 : false,
@@ -83,6 +84,8 @@ export function useUploadQueue(eventId: string | undefined) {
   // Process intent status updates
   useEffect(() => {
     if (!intentStatuses) return;
+
+    let hasChanges = false;
 
     intentStatuses.forEach((intent: MappedUploadIntent) => {
       const logEntryId = uploadIdToLogIdRef.current.get(intent.uploadId);
@@ -106,6 +109,7 @@ export function useUploadQueue(eventId: string | undefined) {
           fileSize: existing.fileSize,
           uploadedAt: existing.uploadedAt,
         });
+        hasChanges = true;
       } else if (intent.status === 'failed') {
         // Intent failed - update log entry
         uploadLogRef.current.set(logEntryId, {
@@ -115,23 +119,42 @@ export function useUploadQueue(eventId: string | undefined) {
         });
         pendingIntentIdsRef.current.delete(intent.uploadId);
         uploadIdToLogIdRef.current.delete(intent.uploadId);
+        hasChanges = true;
       }
       // intent.status === 'uploading' - no action needed, keep polling
     });
 
-    setUploadLogVersion((v) => v + 1);
+    if (hasChanges) {
+      setUploadLogVersion((v) => v + 1);
+    }
   }, [intentStatuses]);
 
   // =========================================================================
   // Phase 2: Poll photo statuses for face indexing (existing behavior)
   // =========================================================================
-  const pollablePhotoIds = Array.from(uploadLogRef.current.values())
+  const pollablePhotoIdsKey = Array.from(uploadLogRef.current.values())
     .filter((e) => {
       const isOptimistic = /^\d+-/.test(e.id);
       const hasPendingIntent = e.uploadId && pendingIntentIdsRef.current.has(e.uploadId);
       return !isOptimistic && !hasPendingIntent && e.status !== 'indexed' && e.status !== 'failed';
     })
-    .map((e) => e.id);
+    .map((e) => e.id)
+    .sort()
+    .join(',');
+
+  const pollablePhotoIds = useMemo(
+    () =>
+      Array.from(uploadLogRef.current.values())
+        .filter((e) => {
+          const isOptimistic = /^\d+-/.test(e.id);
+          const hasPendingIntent = e.uploadId && pendingIntentIdsRef.current.has(e.uploadId);
+          return (
+            !isOptimistic && !hasPendingIntent && e.status !== 'indexed' && e.status !== 'failed'
+          );
+        })
+        .map((e) => e.id),
+    [pollablePhotoIdsKey],
+  );
 
   const { data: photoStatuses } = usePhotosStatus(pollablePhotoIds, {
     refetchInterval: pollablePhotoIds.length > 0 ? 2000 : false,
@@ -140,6 +163,8 @@ export function useUploadQueue(eventId: string | undefined) {
   // Update upload log from photo status polling
   useEffect(() => {
     if (!photoStatuses) return;
+
+    let hasChanges = false;
 
     photoStatuses.forEach((status: PhotoStatus) => {
       const existing = uploadLogRef.current.get(status.id);
@@ -152,9 +177,12 @@ export function useUploadQueue(eventId: string | undefined) {
         ...existing,
         ...status,
       });
+      hasChanges = true;
     });
 
-    setUploadLogVersion((v) => v + 1);
+    if (hasChanges) {
+      setUploadLogVersion((v) => v + 1);
+    }
   }, [photoStatuses]);
 
   // Remove indexed entries from upload log after 3 second delay

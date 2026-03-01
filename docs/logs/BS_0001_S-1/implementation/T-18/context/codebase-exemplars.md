@@ -12,6 +12,7 @@
 **File:** `/apps/api/src/routes/dashboard/route.ts`
 
 **Pattern:**
+
 - Uses `requirePhotographer()` middleware for Clerk-based auth
 - Accesses authenticated photographer via `c.var.photographer`
 - Uses `c.var.db()` for database access
@@ -19,28 +20,27 @@
 - Uses Drizzle ORM with proper imports
 
 ```typescript
-import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
-import { eq, and, desc, gt, sql, count, sum } from "drizzle-orm";
-import { events, photos, creditLedger } from "@sabaipics/db";
-import { requirePhotographer, type PhotographerVariables } from "../../middleware";
-import type { Bindings } from "../../types";
+import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
+import { eq, and, desc, gt, sql, count, sum } from 'drizzle-orm';
+import { events, photos, creditLedger } from '@sabaipics/db';
+import { requirePhotographer, type PhotographerVariables } from '../../middleware';
+import type { Bindings } from '../../types';
 
 type Env = {
   Bindings: Bindings;
   Variables: PhotographerVariables;
 };
 
-export const dashboardRouter = new Hono<Env>()
-  .get("/", requirePhotographer(), async (c) => {
-    const photographer = c.var.photographer;
-    const db = c.var.db();
+export const dashboardRouter = new Hono<Env>().get('/', requirePhotographer(), async (c) => {
+  const photographer = c.var.photographer;
+  const db = c.var.db();
 
-    // Database queries here...
+  // Database queries here...
 
-    return c.json({ data: result });
-  });
+  return c.json({ data: result });
+});
 ```
 
 **Why it matters:** This is the exact pattern T-18 should follow for authenticated photographer routes.
@@ -52,13 +52,14 @@ export const dashboardRouter = new Hono<Env>()
 **File:** `/apps/api/src/routes/admin/credit-packages.ts`
 
 **Pattern:**
+
 - Zod schemas for parameter validation
 - Uses `zValidator("param", schema)` and `zValidator("query", schema)`
 - Proper error handling with status codes
 
 ```typescript
-import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 
 const paramSchema = z.object({
   id: z.string().uuid(),
@@ -68,12 +69,16 @@ const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export const router = new Hono<Env>()
-  .get("/:id", zValidator("param", paramSchema), zValidator("query", querySchema), async (c) => {
-    const { id } = c.req.valid("param");
-    const { limit } = c.req.valid("query");
+export const router = new Hono<Env>().get(
+  '/:id',
+  zValidator('param', paramSchema),
+  zValidator('query', querySchema),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const { limit } = c.req.valid('query');
     // Use validated params
-  });
+  },
+);
 ```
 
 **Why it matters:** T-18 needs to validate `eventId` parameter and `cursor`/`limit` query params.
@@ -85,6 +90,7 @@ export const router = new Hono<Env>()
 **File:** `/apps/api/src/routes/consent.ts`
 
 **Pattern:**
+
 - Consistent error response: `{ error: { code, message } }`
 - Proper status codes (401, 403, 404, 409)
 
@@ -115,20 +121,21 @@ if (!existing) {
 **File:** `/apps/api/src/routes/dashboard/route.test.ts`
 
 **Pattern:**
+
 - Vitest with `describe/it/expect`
 - Hono `testClient` for type-safe testing
 - Mock DB with chainable methods
 - Test app factory with dependency injection
 
 ```typescript
-import { describe, it, expect, vi } from "vitest";
-import { Hono } from "hono";
-import { testClient } from "hono/testing";
-import { dashboardRouter } from "./route";
-import type { Database } from "@sabaipics/db";
-import type { PhotographerVariables } from "../../middleware";
+import { describe, it, expect, vi } from 'vitest';
+import { Hono } from 'hono';
+import { testClient } from 'hono/testing';
+import { dashboardRouter } from './route';
+import type { Database } from '@sabaipics/db';
+import type { PhotographerVariables } from '../../middleware';
 
-const MOCK_PHOTOGRAPHER_ID = "11111111-1111-1111-1111-111111111111";
+const MOCK_PHOTOGRAPHER_ID = '11111111-1111-1111-1111-111111111111';
 
 // Mock DB factory
 function createMockDb(overrides = {}) {
@@ -148,28 +155,32 @@ function createTestApp(options: {
   photographer?: { id: string; pdpaConsentAt: string | null } | null;
   hasAuth?: boolean;
 }) {
-  const { mockDb = createMockDb(), photographer = { id: MOCK_PHOTOGRAPHER_ID, pdpaConsentAt: new Date().toISOString() }, hasAuth = true } = options;
+  const {
+    mockDb = createMockDb(),
+    photographer = { id: MOCK_PHOTOGRAPHER_ID, pdpaConsentAt: new Date().toISOString() },
+    hasAuth = true,
+  } = options;
 
   const app = new Hono<Env>()
-    .use("/*", (c, next) => {
-      if (hasAuth) c.set("auth", { userId: "clerk_123", sessionId: "session_123" });
+    .use('/*', (c, next) => {
+      if (hasAuth) c.set('auth', { userId: 'clerk_123', sessionId: 'session_123' });
       return next();
     })
-    .use("/*", (c, next) => {
-      c.set("db", () => mockDb as unknown as Database);
+    .use('/*', (c, next) => {
+      c.set('db', () => mockDb as unknown as Database);
       return next();
     })
-    .use("/*", (c, next) => {
-      if (photographer) c.set("photographer", photographer);
+    .use('/*', (c, next) => {
+      if (photographer) c.set('photographer', photographer);
       return next();
     })
-    .route("/dashboard", dashboardRouter);
+    .route('/dashboard', dashboardRouter);
 
   return { app, mockDb };
 }
 
-describe("GET /dashboard", () => {
-  it("returns dashboard data for authenticated photographer", async () => {
+describe('GET /dashboard', () => {
+  it('returns dashboard data for authenticated photographer', async () => {
     const { app } = createTestApp({});
     const client = testClient(app);
     const res = await client.dashboard.$get();
@@ -187,32 +198,32 @@ describe("GET /dashboard", () => {
 **File:** `/packages/db/src/schema/photos.ts`
 
 ```typescript
-import { pgTable, text, integer, index, uuid } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
-import { timestamptz } from "./common";
-import { events } from "./events";
+import { pgTable, text, integer, index, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { timestamptz } from './common';
+import { events } from './events';
 
-export const photoStatuses = ["processing", "indexed", "failed"] as const;
+export const photoStatuses = ['processing', 'indexed', 'failed'] as const;
 export type PhotoStatus = (typeof photoStatuses)[number];
 
 export const photos = pgTable(
-  "photos",
+  'photos',
   {
-    id: uuid("id")
+    id: uuid('id')
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    eventId: uuid("event_id")
+    eventId: uuid('event_id')
       .notNull()
-      .references(() => events.id, { onDelete: "restrict" }),
-    r2Key: text("r2_key").notNull(),
-    status: text("status", { enum: photoStatuses }).notNull().default("processing"),
-    faceCount: integer("face_count").default(0),
-    uploadedAt: timestamptz("uploaded_at").defaultNow().notNull(),
+      .references(() => events.id, { onDelete: 'restrict' }),
+    r2Key: text('r2_key').notNull(),
+    status: text('status', { enum: photoStatuses }).notNull().default('processing'),
+    faceCount: integer('face_count').default(0),
+    uploadedAt: timestamptz('uploaded_at').defaultNow().notNull(),
   },
   (table) => [
-    index("photos_event_id_idx").on(table.eventId),
-    index("photos_status_idx").on(table.status),
-  ]
+    index('photos_event_id_idx').on(table.eventId),
+    index('photos_status_idx').on(table.status),
+  ],
 );
 
 export type Photo = typeof photos.$inferSelect;
@@ -220,6 +231,7 @@ export type NewPhoto = typeof photos.$inferInsert;
 ```
 
 **Key fields for T-18:**
+
 - `id` - Photo UUID
 - `eventId` - FK to events (for filtering)
 - `r2Key` - R2 storage path (for URL generation)
@@ -234,33 +246,33 @@ export type NewPhoto = typeof photos.$inferInsert;
 **File:** `/packages/db/src/schema/events.ts`
 
 ```typescript
-import { pgTable, text, index, uuid } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
-import { timestamptz, createdAtCol } from "./common";
-import { photographers } from "./photographers";
+import { pgTable, text, index, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { timestamptz, createdAtCol } from './common';
+import { photographers } from './photographers';
 
 export const events = pgTable(
-  "events",
+  'events',
   {
-    id: uuid("id")
+    id: uuid('id')
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    photographerId: uuid("photographer_id")
+    photographerId: uuid('photographer_id')
       .notNull()
-      .references(() => photographers.id, { onDelete: "restrict" }),
-    name: text("name").notNull(),
-    startDate: timestamptz("start_date"),
-    endDate: timestamptz("end_date"),
-    accessCode: text("access_code").notNull().unique(),
-    qrCodeR2Key: text("qr_code_r2_key"),
-    rekognitionCollectionId: text("rekognition_collection_id"),
-    expiresAt: timestamptz("expires_at").notNull(),
+      .references(() => photographers.id, { onDelete: 'restrict' }),
+    name: text('name').notNull(),
+    startDate: timestamptz('start_date'),
+    endDate: timestamptz('end_date'),
+    accessCode: text('access_code').notNull().unique(),
+    qrCodeR2Key: text('qr_code_r2_key'),
+    rekognitionCollectionId: text('rekognition_collection_id'),
+    expiresAt: timestamptz('expires_at').notNull(),
     createdAt: createdAtCol(),
   },
   (table) => [
-    index("events_photographer_id_idx").on(table.photographerId),
-    index("events_access_code_idx").on(table.accessCode),
-  ]
+    index('events_photographer_id_idx').on(table.photographerId),
+    index('events_access_code_idx').on(table.accessCode),
+  ],
 );
 
 export type Event = typeof events.$inferSelect;
@@ -268,6 +280,7 @@ export type NewEvent = typeof events.$inferInsert;
 ```
 
 **Key fields for T-18 ownership check:**
+
 - `id` - Event UUID (from route param)
 - `photographerId` - For ownership verification
 
@@ -287,6 +300,7 @@ export type NewEvent = typeof events.$inferInsert;
 ```
 
 **Usage in code:**
+
 ```typescript
 // Access via c.env.PHOTOS_BUCKET
 const object = await c.env.PHOTOS_BUCKET.get(r2Key);
@@ -299,8 +313,8 @@ const object = await c.env.PHOTOS_BUCKET.get(r2Key);
 **File:** `/apps/api/src/types.ts`
 
 ```typescript
-import type { AuthVariables } from "@sabaipics/auth/types";
-import type { Database } from "@sabaipics/db";
+import type { AuthVariables } from '@sabaipics/auth/types';
+import type { Database } from '@sabaipics/db';
 
 export type Bindings = CloudflareBindings & {
   ADMIN_API_KEY: string;
@@ -314,13 +328,14 @@ export type Env = { Bindings: Bindings; Variables: Variables };
 ```
 
 **PhotographerVariables** (from middleware):
+
 ```typescript
 export type PhotographerVariables = AuthVariables & {
   db: () => Database;
   photographer: PhotographerContext;
 };
 
-type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
+type PhotographerContext = Pick<Photographer, 'id' | 'pdpaConsentAt'>;
 ```
 
 ---
@@ -330,18 +345,22 @@ type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
 ### DO NOT:
 
 1. **Skip ownership verification** - Always verify event belongs to photographer:
+
    ```typescript
    // BAD - returns photos for any event
    const photos = await db.select().from(photos).where(eq(photos.eventId, eventId));
 
    // GOOD - verify ownership first
-   const [event] = await db.select().from(events)
+   const [event] = await db
+     .select()
+     .from(events)
      .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
      .limit(1);
-   if (!event) return c.json({ error: { code: "NOT_FOUND", message: "Event not found" } }, 404);
+   if (!event) return c.json({ error: { code: 'NOT_FOUND', message: 'Event not found' } }, 404);
    ```
 
 2. **Use offset-based pagination** - Cursor is more efficient:
+
    ```typescript
    // BAD - offset becomes slow with large offsets
    .limit(limit).offset(offset)
@@ -351,15 +370,16 @@ type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
    ```
 
 3. **Generate URLs incorrectly** - Follow CF Images format:
+
    ```typescript
    // BAD - missing transform parameters
    `https://photos.sabaipics.com/${r2Key}`
-
    // GOOD - CF Images transform URL
-   `https://sabaipics.com/cdn-cgi/image/width=400,fit=cover,format=auto,quality=75/https://photos.sabaipics.com/${r2Key}`
+   `https://sabaipics.com/cdn-cgi/image/width=400,fit=cover,format=auto,quality=75/https://photos.sabaipics.com/${r2Key}`;
    ```
 
 4. **Return all photos without limit** - Always paginate:
+
    ```typescript
    // BAD - could return thousands of photos
    .select().from(photos).where(eq(photos.eventId, eventId))
@@ -369,6 +389,7 @@ type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
    ```
 
 5. **Forget to handle empty results** - Return appropriate response:
+
    ```typescript
    // BAD - inconsistent response shape
    if (photos.length === 0) return c.json(null);
@@ -384,13 +405,13 @@ type PhotographerContext = Pick<Photographer, "id" | "pdpaConsentAt">;
 **File:** `/apps/api/src/index.ts`
 
 ```typescript
-import { photosRouter } from "./routes/photos";
+import { photosRouter } from './routes/photos';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
   // ... existing middleware and routes ...
-  .use("/*", createClerkAuth())
-  .route("/dashboard", dashboardRouter)
-  .route("/events", photosRouter);  // NEW - register photos router
+  .use('/*', createClerkAuth())
+  .route('/dashboard', dashboardRouter)
+  .route('/events', photosRouter); // NEW - register photos router
 
 export type AppType = typeof app;
 ```
@@ -404,7 +425,7 @@ export type AppType = typeof app;
 ### Select with cursor pagination
 
 ```typescript
-import { eq, and, desc, lt } from "drizzle-orm";
+import { eq, and, desc, lt } from 'drizzle-orm';
 
 const photoRows = await db
   .select({
@@ -416,10 +437,7 @@ const photoRows = await db
   })
   .from(photos)
   .where(
-    and(
-      eq(photos.eventId, eventId),
-      cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined
-    )
+    and(eq(photos.eventId, eventId), cursor ? lt(photos.uploadedAt, new Date(cursor)) : undefined),
   )
   .orderBy(desc(photos.uploadedAt))
   .limit(limit + 1);
@@ -431,12 +449,7 @@ const photoRows = await db
 const [event] = await db
   .select({ id: events.id })
   .from(events)
-  .where(
-    and(
-      eq(events.id, eventId),
-      eq(events.photographerId, photographer.id)
-    )
-  )
+  .where(and(eq(events.id, eventId), eq(events.photographerId, photographer.id)))
   .limit(1);
 ```
 

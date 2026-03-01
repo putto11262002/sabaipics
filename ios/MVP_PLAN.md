@@ -9,17 +9,17 @@
 
 ## Final Architecture Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| **USB Code** | Keep but disable | Future-proofing, minimal cost |
-| **Bridge** | Full Service Layer | Clean architecture |
-| **UI Flow** | Simple WiFi setup (IP entry) | Canon-focused, fast to implement |
-| **Download** | Auto-download JPEG only | Fast, photographer-friendly |
-| **RAW Warning** | Connection guide only | No popups, documented upfront |
-| **Photo Display** | List view (filename + size + time) | Better for workflow |
-| **ViewModel** | Unified | Single source of truth |
-| **Camera Brand** | Canon only | MVP, expandable later |
-| **Connection Error** | Stay on sheet with retry | Better UX |
+| Decision             | Choice                             | Rationale                        |
+| -------------------- | ---------------------------------- | -------------------------------- |
+| **USB Code**         | Keep but disable                   | Future-proofing, minimal cost    |
+| **Bridge**           | Full Service Layer                 | Clean architecture               |
+| **UI Flow**          | Simple WiFi setup (IP entry)       | Canon-focused, fast to implement |
+| **Download**         | Auto-download JPEG only            | Fast, photographer-friendly      |
+| **RAW Warning**      | Connection guide only              | No popups, documented upfront    |
+| **Photo Display**    | List view (filename + size + time) | Better for workflow              |
+| **ViewModel**        | Unified                            | Single source of truth           |
+| **Camera Brand**     | Canon only                         | MVP, expandable later            |
+| **Connection Error** | Stay on sheet with retry           | Better UX                        |
 
 ---
 
@@ -68,6 +68,7 @@ Each phase is independently testable and can be demonstrated/shipped.
 ✅ No errors or warnings
 
 **Test:**
+
 ```bash
 cd apps/studio
 xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
@@ -121,12 +122,14 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 ✅ Connection success/failure feedback works
 
 **Test on iPad:**
+
 1. Launch app → see WiFi setup screen
 2. Enter Canon camera IP (192.168.1.1)
 3. Tap "Connect Camera"
 4. Should see "Connecting..." → "Connected!" or error message
 
 **Acceptance Criteria:**
+
 - App builds and runs on iPad
 - WiFi setup screen displays correctly
 - Connection to Canon camera succeeds within 3 seconds
@@ -168,6 +171,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 ✅ UI updates when photo detected
 
 **Test on iPad:**
+
 1. Connect to Canon camera (Phase 2)
 2. Camera enters LiveCaptureView
 3. Take photo with camera shutter button
@@ -175,6 +179,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 5. UI shows photo was detected
 
 **Acceptance Criteria:**
+
 - Event monitoring starts automatically after connection
 - Photo detection happens within 2 seconds of shutter press
 - Multiple rapid photos all detected correctly
@@ -219,6 +224,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 ✅ Download progress visible
 
 **Test on iPad:**
+
 1. Connect to Canon camera
 2. Take 1 photo → appears in app within 3 seconds
 3. Take 5 photos rapid-fire → all appear in order
@@ -226,6 +232,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 5. Set camera to JPEG+RAW → only JPEG downloads
 
 **Acceptance Criteria:**
+
 - JPEG photos download automatically
 - RAW files silently ignored
 - Photos display in list view
@@ -239,6 +246,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 **Goal:** Premium connection experience with pre-flight permission check and auto-retry
 
 **Related Documentation:**
+
 - `log/003-local-network-permission-precheck.md` - Technical implementation plan
 - `log/003-connection-flow-summary.md` - UI flow and scenarios
 
@@ -284,6 +292,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 ✅ Auto-retry handles transient network issues
 
 **Test on iPad:**
+
 1. Fresh install → Permission prompt → Connect → Success in ~8s
 2. Deny permission → See help text on WiFiSetupView → Follow instructions
 3. Subsequent connections → Fast (~3s, no pre-flight)
@@ -291,6 +300,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 5. Weak network → First attempt fails → Auto-retry succeeds
 
 **Acceptance Criteria:**
+
 - Pre-flight permission check triggers before connection
 - Connection timeout is 15 seconds (not 90s)
 - Auto-retry with max 3 attempts, backoff delays
@@ -341,6 +351,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 ✅ Empty state looks good
 
 **Test on iPad:**
+
 1. Connect to camera → see empty state with message
 2. Take photo → photo appears with metadata
 3. Verify filename shows correctly
@@ -348,6 +359,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 5. Verify relative time updates ("2m ago" → "3m ago")
 
 **Acceptance Criteria:**
+
 - List view looks professional
 - All metadata displays correctly
 - Animations smooth (no janky inserts)
@@ -397,6 +409,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 ✅ Can reconnect after ending session
 
 **Test on iPad:**
+
 1. Connect to camera, take 3 photos
 2. Tap "End Session" → confirm → return to setup
 3. Reconnect → works again
@@ -404,6 +417,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 5. Turn camera back on → can reconnect
 
 **Acceptance Criteria:**
+
 - End session button works
 - Disconnect completes within 1 second
 - No memory leaks (test with Instruments)
@@ -467,6 +481,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 ✅ App ready for field testing
 
 **Test on iPad:**
+
 1. All error scenarios show helpful messages
 2. Setup instructions clear and accurate
 3. 30-minute session with 30 photos → no crashes
@@ -474,6 +489,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 5. App feels polished and professional
 
 **Acceptance Criteria:**
+
 - All errors handled gracefully
 - No crashes during 30-minute session
 - Memory usage < 200 MB with 50 photos
@@ -529,6 +545,7 @@ xcodebuild -project SabaiPicsStudio.xcodeproj -scheme SabaiPicsStudio build
 ✅ Known limitations documented
 
 **Acceptance Criteria:**
+
 - All 13 test cases pass
 - Changelog updated
 - Quick start guide created
@@ -568,6 +585,7 @@ apps/studio/SabaiPicsStudio/
 Use this checklist to track overall progress:
 
 ### Implementation Progress
+
 - [x] Phase 1: Framework Setup & Bridge Foundation (2h) ✅
 - [x] Phase 2: WiFi Connection (Canon Only) (2h) ✅
 - [x] Phase 3: Photo Event Monitoring (2h) ✅
@@ -582,6 +600,7 @@ Use this checklist to track overall progress:
 **Completed:** 12 hours | **Remaining:** 5 hours
 
 ### Milestone Checkpoints
+
 - [x] **Milestone 1:** Project builds with GPhoto2 (after Phase 1) ✅
 - [x] **Milestone 2:** Can connect to Canon camera (after Phase 2) ✅
 - [x] **Milestone 3:** Can detect new photos (after Phase 3) ✅
@@ -596,14 +615,14 @@ Use this checklist to track overall progress:
 
 ## Risk Mitigation
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| GPhoto2 build issues | Medium | High | Test Phase 1 first, use GPhoto2Example as reference |
-| Canon connection fails | Low | High | Tested in GPhoto2Example already |
-| Event monitoring unreliable | Low | Medium | Proven working in test app |
-| Download too slow | Low | Low | WiFi ~5 MB/s, acceptable |
-| Memory leaks | Medium | High | Test with Instruments in Phase 7 |
-| iPad WiFi disconnect | Medium | Medium | Handle in error cases, allow reconnect |
+| Risk                        | Likelihood | Impact | Mitigation                                          |
+| --------------------------- | ---------- | ------ | --------------------------------------------------- |
+| GPhoto2 build issues        | Medium     | High   | Test Phase 1 first, use GPhoto2Example as reference |
+| Canon connection fails      | Low        | High   | Tested in GPhoto2Example already                    |
+| Event monitoring unreliable | Low        | Medium | Proven working in test app                          |
+| Download too slow           | Low        | Low    | WiFi ~5 MB/s, acceptable                            |
+| Memory leaks                | Medium     | High   | Test with Instruments in Phase 7                    |
+| iPad WiFi disconnect        | Medium     | Medium | Handle in error cases, allow reconnect              |
 
 ---
 
@@ -637,6 +656,7 @@ Use this checklist to track overall progress:
 ## Success Criteria
 
 **MVP is successful if:**
+
 - ✅ App runs on iPad with Canon camera
 - ✅ WiFi connection works reliably
 - ✅ Photos appear in app within 5 seconds of capture
@@ -646,6 +666,7 @@ Use this checklist to track overall progress:
 - ✅ Ready to demo to stakeholders
 
 **Ready for production if:**
+
 - ✅ All 8 phases complete
 - ✅ All test checklists pass
 - ✅ No critical bugs

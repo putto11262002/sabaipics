@@ -24,6 +24,7 @@ packages/auth/
 ```
 
 **Exports:**
+
 - `@sabaipics/auth/middleware` - Server-side (Hono)
 - `@sabaipics/auth/react` - Client-side (React)
 - `@sabaipics/auth/types` - Shared types
@@ -39,9 +40,9 @@ const app = new Hono<{ Bindings; Variables }>()
   .use('/*', cors())
   .use('/*', createClerkAuth())
   .get('/', handler)
-  .route('/auth', authRouter)
+  .route('/auth', authRouter);
 
-export type AppType = typeof app  // Captures full router type
+export type AppType = typeof app; // Captures full router type
 ```
 
 ---
@@ -51,11 +52,13 @@ export type AppType = typeof app  // Captures full router type
 Uses `createClerkClient` + `authenticateRequest` for edge-compatible auth.
 
 **Required Keys:**
+
 - `CLERK_SECRET_KEY` - For creating Clerk client
 - `CLERK_PUBLISHABLE_KEY` - For creating Clerk client
 - `CLERK_JWT_KEY` - PEM public key for networkless verification
 
 **JWT Key Format:**
+
 ```bash
 # Single line with \n escapes
 CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\nMIIBIjANBg...\n-----END PUBLIC KEY-----"
@@ -68,6 +71,7 @@ CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\nMIIBIjANBg...\n-----END PUBLIC KEY---
 Clerk webhooks sync user data to database.
 
 **Events:**
+
 - `user.created` - Create photographer/participant record
 - `user.updated` - Sync profile changes
 - `user.deleted` - Soft delete user record
@@ -75,21 +79,23 @@ Clerk webhooks sync user data to database.
 **Endpoint:** `/webhooks/clerk`
 
 **Route Order (IMPORTANT):**
+
 ```typescript
 const app = new Hono()
-  .route("/webhooks", webhookRouter)  // First - no auth
-  .use("/*", cors())                   // Then CORS
-  .use("/*", createClerkAuth())        // Then auth
-  .route("/auth", authRouter);
+  .route('/webhooks', webhookRouter) // First - no auth
+  .use('/*', cors()) // Then CORS
+  .use('/*', createClerkAuth()) // Then auth
+  .route('/auth', authRouter);
 ```
 
 **Svix Verification:**
+
 ```typescript
 const wh = new Webhook(secret);
 const event = wh.verify(body, {
-  "svix-id": headers.get("svix-id"),
-  "svix-timestamp": headers.get("svix-timestamp"),
-  "svix-signature": headers.get("svix-signature"),
+  'svix-id': headers.get('svix-id'),
+  'svix-timestamp': headers.get('svix-timestamp'),
+  'svix-signature': headers.get('svix-signature'),
 });
 ```
 
@@ -100,6 +106,7 @@ const event = wh.verify(body, {
 `apps/api/scripts/dev-tunnel.js` starts wrangler + ngrok together.
 
 **Usage:**
+
 ```bash
 pnpm dev              # API + dashboard + ngrok tunnel
 pnpm --filter=@sabaipics/api dev:local  # API only, no tunnel
@@ -115,13 +122,14 @@ Only `packages/auth` imports from `@clerk/*`. Apps import from `@sabaipics/auth`
 
 ```typescript
 // Before (tightly coupled)
-import { ClerkProvider, useAuth } from "@clerk/clerk-react";
+import { ClerkProvider, useAuth } from '@clerk/clerk-react';
 
 // After (abstracted)
-import { AuthProvider, useAuth } from "@sabaipics/auth/react";
+import { AuthProvider, useAuth } from '@sabaipics/auth/react';
 ```
 
 **Benefits:**
+
 - Single source of truth for Clerk
 - Can swap auth providers without changing app code
 - Clean React/server boundaries

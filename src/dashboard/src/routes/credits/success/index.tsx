@@ -1,22 +1,19 @@
-import { useSearchParams, useNavigate } from "react-router";
-import { useEffect } from "react";
-import {
-  CheckCircle2,
-  AlertCircle,
-} from "lucide-react";
-import { Spinner } from "@/shared/components/ui/spinner";
-import { Alert, AlertDescription } from "@/shared/components/ui/alert";
-import { api } from "../../../lib/api";
-import type { InferResponseType } from "hono/client";
-import type { SuccessStatusCode } from "hono/utils/http-status";
-import { useApiQuery } from "@/shared/hooks/rq/use-api-query";
+import { useSearchParams, useNavigate } from 'react-router';
+import { useEffect } from 'react';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { Spinner } from '@/shared/components/ui/spinner';
+import { Alert, AlertDescription } from '@/shared/components/ui/alert';
+import { api } from '../../../lib/api';
+import type { InferResponseType } from 'hono/client';
+import type { SuccessStatusCode } from 'hono/utils/http-status';
+import { useApiQuery } from '@/shared/hooks/rq/use-api-query';
 
-const getPurchaseStatus = api["credit-packages"].purchase[":sessionId"].$get;
+const getPurchaseStatus = api['credit-packages'].purchase[':sessionId'].$get;
 type PurchaseApiResponse = InferResponseType<typeof getPurchaseStatus, SuccessStatusCode>;
 
 export function CreditSuccessPage() {
   const [searchParams] = useSearchParams();
-  const sessionId = searchParams.get("session_id");
+  const sessionId = searchParams.get('session_id');
   const navigate = useNavigate();
 
   // Use React Query for automatic polling
@@ -25,12 +22,8 @@ export function CreditSuccessPage() {
     isLoading,
     error,
   } = useApiQuery<PurchaseApiResponse>({
-    queryKey: ["credit-purchase", sessionId],
-    apiFn: (opts) =>
-      getPurchaseStatus(
-        { param: { sessionId: sessionId! } },
-        opts,
-      ),
+    queryKey: ['credit-purchase', sessionId],
+    apiFn: (opts) => getPurchaseStatus({ param: { sessionId: sessionId! } }, opts),
     enabled: !!sessionId,
     // Poll every 2 seconds until fulfilled
     refetchInterval: (query) => {
@@ -49,7 +42,7 @@ export function CreditSuccessPage() {
   useEffect(() => {
     if (purchaseStatus?.fulfilled && purchaseStatus.credits !== null) {
       const timer = setTimeout(() => {
-        navigate("/dashboard");
+        navigate('/dashboard');
       }, 3000); // Redirect after 3 seconds
 
       return () => clearTimeout(timer);
@@ -67,8 +60,8 @@ export function CreditSuccessPage() {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">Invalid session</h1>
             <p className="text-muted-foreground">
-              No checkout session found. If you completed a purchase, your
-              credits will still be added to your account.
+              No checkout session found. If you completed a purchase, your credits will still be
+              added to your account.
             </p>
           </div>
         </div>
@@ -89,9 +82,7 @@ export function CreditSuccessPage() {
             <p className="text-lg text-muted-foreground">
               +{purchaseStatus.credits.toLocaleString()} credits added to your account
             </p>
-            <p className="text-sm text-muted-foreground">
-              Redirecting to dashboard...
-            </p>
+            <p className="text-sm text-muted-foreground">Redirecting to dashboard...</p>
           </div>
         </div>
       </div>

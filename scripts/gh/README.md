@@ -4,8 +4,8 @@ Reusable `gh` CLI scripts for agents and automation.
 
 ## Scripts
 
-| Script | Description |
-|--------|-------------|
+| Script                                      | Description                                                |
+| ------------------------------------------- | ---------------------------------------------------------- |
 | `get-unresolved-pr-comments.sh <pr_number>` | Get unresolved PR review comments as LLM-friendly markdown |
 
 ## Usage

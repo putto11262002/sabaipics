@@ -1,4 +1,5 @@
 # Apple Multicast Networking Entitlement Request
+
 ## For SabaiPics Camera Upload Feature
 
 **Last Updated:** 2026-01-08
@@ -11,16 +12,19 @@
 ### Company/Team Information
 
 **Apple Developer Team Name:**
+
 ```
 [Your Team Name]
 ```
 
 **Team ID:**
+
 ```
 [Your 10-character Team ID - find in Apple Developer account]
 ```
 
 **Contact Email:**
+
 ```
 [Your registered Apple Developer email]
 ```
@@ -30,17 +34,20 @@
 ### App Information
 
 **App Name:**
+
 ```
 SabaiPics Pro
 ```
 
 **App Bundle ID:**
+
 ```
 com.sabaiscale.sabaipics.pro
 (or your actual bundle ID)
 ```
 
 **App Apple ID:**
+
 ```
 [Leave blank if not yet released]
 OR
@@ -48,6 +55,7 @@ OR
 ```
 
 **App Store URL:**
+
 ```
 [Leave blank if not yet released - add note explaining pre-release]
 OR
@@ -55,6 +63,7 @@ https://apps.apple.com/app/[your-app-id]
 ```
 
 **Note if pre-release:**
+
 ```
 This app is currently in development and not yet published to the App Store.
 We are requesting this entitlement to enable development and testing on
@@ -263,6 +272,7 @@ Before submitting this form, ensure you have:
 ## Tips for Approval
 
 ### ✅ Do:
+
 - Be specific about the protocol (UPnP/SSDP)
 - Explain why alternatives don't work
 - Reference similar approved apps
@@ -271,6 +281,7 @@ Before submitting this form, ensure you have:
 - Provide technical details
 
 ### ❌ Don't:
+
 - Be vague about the need
 - Just say "need multicast"
 - Ignore security concerns
@@ -290,6 +301,7 @@ App Store Launch: May 2026
 ```
 
 **Adjust based on your actual plans, but allow:**
+
 - 2-4 weeks for entitlement approval
 - 2-3 weeks for development after approval
 - 2-4 weeks for beta testing
@@ -318,24 +330,24 @@ If Apple requests more information, be prepared to explain:
 
 **Q: Why not use Bonjour instead of UPnP?**
 A: Professional cameras don't support Bonjour - they only support UPnP/SSDP as
-   per the PTP/IP specification (ISO 15740). We cannot change camera firmware.
-   This is an industry-wide standard, not manufacturer-specific.
+per the PTP/IP specification (ISO 15740). We cannot change camera firmware.
+This is an industry-wide standard, not manufacturer-specific.
 
 **Q: Can users manually enter camera IP address?**
 A: Yes, technically possible, but severely degrades professional workflow.
-   Photographers work in time-sensitive environments and expect instant
-   connectivity like manufacturer apps provide.
+Photographers work in time-sensitive environments and expect instant
+connectivity like manufacturer apps provide.
 
 **Q: What about privacy/security?**
 A: We only scan the photographer's trusted local network (usually their iPhone
-   hotspot or venue WiFi). We don't scan public networks. User must explicitly
-   grant local network permission. We only connect to professional cameras with
-   known PTP/IP service signatures.
+hotspot or venue WiFi). We don't scan public networks. User must explicitly
+grant local network permission. We only connect to professional cameras with
+known PTP/IP service signatures.
 
 **Q: Why not build Android-only?**
 A: Our target market of Thai photographers predominantly uses iPhones (65%+ market
-   share in Thailand for smartphones in professional segment). An iOS app is
-   essential for market viability.
+share in Thailand for smartphones in professional segment). An iOS app is
+essential for market viability.
 
 ---
 

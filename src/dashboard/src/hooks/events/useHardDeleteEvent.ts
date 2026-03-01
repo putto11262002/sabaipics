@@ -5,7 +5,7 @@ import { useApiMutation } from '@/shared/hooks/rq/use-api-mutation';
 import { useQueryClient } from '@tanstack/react-query';
 
 type HardDeleteEventResponse = InferResponseType<
-  typeof api.events[':id']['hard']['$delete'],
+  (typeof api.events)[':id']['hard']['$delete'],
   SuccessStatusCode
 >;
 

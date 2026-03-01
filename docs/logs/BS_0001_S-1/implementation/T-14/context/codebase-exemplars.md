@@ -14,6 +14,7 @@ Surface: API (utility library)
 **Purpose:** External SDK wrapper for Stripe with typed interfaces, error handling, and Cloudflare Workers compatibility.
 
 **Relevant patterns:**
+
 - **Structure:** Organized as a library module under `apps/api/src/lib/<vendor>/`
 - **Entry point:** `index.ts` re-exports all public APIs for clean imports
 - **Client factory:** `client.ts` provides typed factory function (`createStripeClient`)
@@ -25,15 +26,15 @@ Surface: API (utility library)
 
 ```typescript
 // index.ts - Clean barrel exports
-export { createStripeClient, webCrypto, type StripeEnv } from "./client";
+export { createStripeClient, webCrypto, type StripeEnv } from './client';
 export {
   isRetryableError,
   isRateLimitError,
   getBackoffDelay,
   formatStripeError,
   type FormattedStripeError,
-} from "./errors";
-export type { default as Stripe } from "stripe";
+} from './errors';
+export type { default as Stripe } from 'stripe';
 ```
 
 ```typescript
@@ -44,9 +45,9 @@ export interface StripeEnv {
 
 export function createStripeClient(env: StripeEnv): Stripe {
   if (!env.STRIPE_SECRET_KEY) {
-    throw new Error("STRIPE_SECRET_KEY is required");
+    throw new Error('STRIPE_SECRET_KEY is required');
   }
-  
+
   return new Stripe(env.STRIPE_SECRET_KEY, {
     httpClient: Stripe.createFetchHttpClient(), // Cloudflare Workers compat
     maxNetworkRetries: 2,
@@ -67,12 +68,9 @@ export function isRetryableError(error: unknown): boolean {
 export function getBackoffDelay(
   attempt: number,
   baseDelayMs: number = 1000,
-  maxDelayMs: number = 30000
+  maxDelayMs: number = 30000,
 ): number {
-  const exponentialDelay = Math.min(
-    baseDelayMs * Math.pow(2, attempt - 1),
-    maxDelayMs
-  );
+  const exponentialDelay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
   const jitter = Math.random() * 1000; // Prevent thundering herd
   return exponentialDelay + jitter;
 }
@@ -88,6 +86,7 @@ export interface FormattedStripeError {
 ```
 
 **Why it matters for T-14:**
+
 - Shows exact file structure pattern for wrapping external libraries
 - Demonstrates typed environment interface pattern
 - Shows how to handle platform-specific requirements (Cloudflare Workers)
@@ -102,6 +101,7 @@ export interface FormattedStripeError {
 **Purpose:** AWS SDK wrapper with typed operations, comprehensive error handling, and retry classification.
 
 **Relevant patterns:**
+
 - **Same directory structure** as Stripe (`client.ts`, `errors.ts`, `index.ts`)
 - **Typed results:** Custom interfaces wrapping SDK types (`IndexFacesResult`)
 - **Error classification:** Separate retryable vs non-retryable error sets
@@ -139,40 +139,41 @@ export type {
   UnindexedFace,
   FaceDetail,
   // ... more types
-} from "@aws-sdk/client-rekognition";
+} from '@aws-sdk/client-rekognition';
 ```
 
 ```typescript
 // errors.ts - Set-based error classification
 const NON_RETRYABLE_ERROR_NAMES = new Set([
-  "InvalidImageFormatException",
-  "ImageTooLargeException",
-  "InvalidParameterException",
+  'InvalidImageFormatException',
+  'ImageTooLargeException',
+  'InvalidParameterException',
   // ...
 ]);
 
 const RETRYABLE_ERROR_NAMES = new Set([
-  "ProvisionedThroughputExceededException",
-  "ThrottlingException",
-  "InternalServerError",
+  'ProvisionedThroughputExceededException',
+  'ThrottlingException',
+  'InternalServerError',
   // ...
 ]);
 
 export function isRetryableError(error: unknown): boolean {
   if (!isError(error)) return false;
   if (RETRYABLE_ERROR_NAMES.has(error.name)) return true;
-  
+
   // Check AWS SDK metadata
   const awsError = error as { $metadata?: { httpStatusCode?: number } };
   if (awsError.$metadata?.httpStatusCode && awsError.$metadata.httpStatusCode >= 500) {
     return true;
   }
-  
+
   return false;
 }
 ```
 
 **Why it matters for T-14:**
+
 - Shows pattern for wrapping synchronous utility operations (QR generation)
 - Demonstrates typed result interfaces
 - Shows comprehensive error classification approach
@@ -187,6 +188,7 @@ export function isRetryableError(error: unknown): boolean {
 **Purpose:** Minimal SDK wrapper with just factory function and env typing.
 
 **Relevant patterns:**
+
 - **Simpler structure** for libraries with no special error handling needs
 - **Single client.ts** when operations are straightforward
 - **Typed env interface** consistently used
@@ -199,9 +201,7 @@ export interface LineEnv {
   LINE_CHANNEL_ACCESS_TOKEN: string;
 }
 
-export function createLineClient(
-  env: LineEnv,
-): messagingApi.MessagingApiClient {
+export function createLineClient(env: LineEnv): messagingApi.MessagingApiClient {
   return new messagingApi.MessagingApiClient({
     channelAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
   });
@@ -209,6 +209,7 @@ export function createLineClient(
 ```
 
 **Why it matters for T-14:**
+
 - Shows that simple libraries don't need complex structure
 - QR generation (synchronous, no network) likely closer to this pattern
 - Can expand to Stripe-like structure if error handling becomes complex
@@ -218,6 +219,7 @@ export function createLineClient(
 ## Test patterns
 
 ### Location
+
 - Co-located with source: `src/lib/<library>/<library>.test.ts`
 - Separate fixtures: `tests/fixtures/` for reusable test data
 - Config: `vitest.node.config.ts` for unit tests (Node.js environment)
@@ -228,42 +230,38 @@ export function createLineClient(
 
 ```typescript
 // tests/stripe.test.ts
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import Stripe from "stripe";
-import {
-  isRetryableError,
-  getBackoffDelay,
-  formatStripeError,
-} from "../src/lib/stripe/errors";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import Stripe from 'stripe';
+import { isRetryableError, getBackoffDelay, formatStripeError } from '../src/lib/stripe/errors';
 
-describe("Error Classification", () => {
-  describe("isRetryableError", () => {
-    it("identifies rate limit errors as retryable", () => {
+describe('Error Classification', () => {
+  describe('isRetryableError', () => {
+    it('identifies rate limit errors as retryable', () => {
       const error = new Stripe.errors.StripeRateLimitError({
-        message: "Rate limit exceeded",
+        message: 'Rate limit exceeded',
       });
       expect(isRetryableError(error)).toBe(true);
     });
 
-    it("handles null/undefined", () => {
+    it('handles null/undefined', () => {
       expect(isRetryableError(null)).toBe(false);
       expect(isRetryableError(undefined)).toBe(false);
     });
   });
 });
 
-describe("Backoff Calculation", () => {
-  it("calculates exponential backoff with base delay", () => {
+describe('Backoff Calculation', () => {
+  it('calculates exponential backoff with base delay', () => {
     const delay1 = getBackoffDelay(1);
     const delay2 = getBackoffDelay(2);
-    
+
     expect(delay1).toBeGreaterThanOrEqual(1000);
     expect(delay1).toBeLessThanOrEqual(2000);
     expect(delay2).toBeGreaterThanOrEqual(2000);
     expect(delay2).toBeLessThanOrEqual(3000);
   });
 
-  it("caps at maximum delay", () => {
+  it('caps at maximum delay', () => {
     const delay = getBackoffDelay(100);
     expect(delay).toBeLessThanOrEqual(45000);
   });
@@ -274,32 +272,35 @@ describe("Backoff Calculation", () => {
 
 ```typescript
 // Rekognition tests with AWS SDK mock
-import { mockClient } from "aws-sdk-client-mock";
-import { RekognitionClient, IndexFacesCommand } from "@aws-sdk/client-rekognition";
+import { mockClient } from 'aws-sdk-client-mock';
+import { RekognitionClient, IndexFacesCommand } from '@aws-sdk/client-rekognition';
 
 const rekognitionMock = mockClient(RekognitionClient);
 
-describe("Rekognition Client (Mocked)", () => {
+describe('Rekognition Client (Mocked)', () => {
   beforeEach(() => {
     rekognitionMock.reset();
   });
 
-  it("indexFaces returns face records", async () => {
+  it('indexFaces returns face records', async () => {
     rekognitionMock.on(IndexFacesCommand).resolves({
-      FaceRecords: [{ Face: { FaceId: "face-001", Confidence: 99.5 } }],
+      FaceRecords: [{ Face: { FaceId: 'face-001', Confidence: 99.5 } }],
       UnindexedFaces: [],
     });
 
-    const client = createRekognitionClient({ /* env */ });
-    const result = await indexFaces(client, "event-123", buffer, "photo-456");
+    const client = createRekognitionClient({
+      /* env */
+    });
+    const result = await indexFaces(client, 'event-123', buffer, 'photo-456');
 
     expect(result.faceRecords).toHaveLength(1);
-    expect(result.faceRecords[0].Face?.FaceId).toBe("face-001");
+    expect(result.faceRecords[0].Face?.FaceId).toBe('face-001');
   });
 });
 ```
 
 ### Assertions
+
 - Error type guards: `expect(isRetryableError(error)).toBe(true)`
 - Range checks for backoff: `toBeGreaterThanOrEqual`, `toBeLessThanOrEqual`
 - Null/undefined safety: Always test edge cases
@@ -310,42 +311,43 @@ describe("Rekognition Client (Mocked)", () => {
 ## Error handling patterns
 
 ### Classification approach
+
 1. **Type guards** for specific error types (e.g., `isRetryableError`, `isCardError`)
 2. **Set-based lookup** for known error names/codes (Rekognition pattern)
 3. **HTTP status code checking** for SDK errors with metadata
 4. **Always handle unknown errors** with fallback behavior
 
 ### Error response shape
+
 From `stripe/errors.ts`:
 
 ```typescript
 export interface FormattedStripeError {
-  code: string;           // Error code (e.g., "card_declined")
-  message: string;        // Human-readable message
-  type: string;           // Error type category
-  retryable: boolean;     // Whether safe to retry
-  declineCode?: string;   // Optional decline reason
-  param?: string;         // Optional invalid parameter name
+  code: string; // Error code (e.g., "card_declined")
+  message: string; // Human-readable message
+  type: string; // Error type category
+  retryable: boolean; // Whether safe to retry
+  declineCode?: string; // Optional decline reason
+  param?: string; // Optional invalid parameter name
 }
 ```
 
 ### Retry logic
+
 - **Exponential backoff** with jitter to prevent thundering herd
 - **Max delay cap** to prevent excessive waits
 - **Attempt-based calculation**: `baseDelay * 2^(attempt-1)`
 - **Special handling** for rate limits (longer backoff)
 
 ### Utility error helper
+
 From `utils/error.ts`:
 
 ```typescript
 export function isError(value: unknown): value is Error {
   return (
     value instanceof Error ||
-    (typeof value === "object" &&
-      value !== null &&
-      "name" in value &&
-      "message" in value)
+    (typeof value === 'object' && value !== null && 'name' in value && 'message' in value)
   );
 }
 ```
@@ -381,21 +383,24 @@ export function isError(value: unknown): value is Error {
 ### Export conventions
 
 **Barrel exports from index.ts:**
+
 ```typescript
 // Clean public API
-export { createClient, type ClientEnv } from "./client";
-export { operation1, operation2, type Result } from "./operations";
-export { isRetryableError, formatError } from "./errors";
-export type { SdkType } from "external-sdk"; // Re-export SDK types
+export { createClient, type ClientEnv } from './client';
+export { operation1, operation2, type Result } from './operations';
+export { isRetryableError, formatError } from './errors';
+export type { SdkType } from 'external-sdk'; // Re-export SDK types
 ```
 
 **Import usage:**
+
 ```typescript
 // Consumers use barrel import
-import { createStripeClient, isRetryableError } from "../lib/stripe";
+import { createStripeClient, isRetryableError } from '../lib/stripe';
 ```
 
 ### Testing conventions
+
 - **Unit tests:** Node.js environment, mocked SDKs
 - **Location:** `tests/<library>.test.ts` OR co-located `src/lib/<library>/<library>.test.ts`
 - **Mocking:** Use `aws-sdk-client-mock`, `vitest.mock()`, or manual mocks
@@ -406,21 +411,25 @@ import { createStripeClient, isRetryableError } from "../lib/stripe";
 ## Gaps
 
 ### [GAP] QR generation is simpler than these exemplars
+
 - QR generation is **synchronous** (no network calls, no retry logic)
 - No complex error classification needed
 - Likely closer to LINE's minimal pattern than Stripe's complex one
 
 ### [GAP] No existing pure-utility exemplar
+
 - All exemplars wrap external **network services** (Stripe, AWS, LINE)
 - QR generation is a **pure utility** (input → output, no external state)
 - May need simpler structure: just `qr.ts` or `qr/index.ts`
 
 ### [GAP] Unclear if QR lib needs client factory pattern
+
 - Factory pattern (`createClient`) makes sense for stateful/configured clients
 - QR generation might just be a function: `generateQrCode(data: string): Buffer`
 - Need to check if chosen QR library requires configuration/state
 
 ### Recommendation for T-14
+
 **Start with minimal pattern (LINE-style), expand if needed:**
 
 ```
@@ -440,6 +449,7 @@ If QR library needs config or complex error handling, expand to:
 ```
 
 **Key decisions needed:**
+
 1. Which QR library to use (impacts structure)
 2. Does it need configuration? (impacts factory pattern need)
 3. What error modes exist? (impacts error handling complexity)

@@ -51,6 +51,7 @@ export function PhotosGridView({
         fileSize: photo.fileSize,
         faceCount: photo.faceCount,
         exif: photo.exif ?? null,
+        pipelineApplied: photo.pipelineApplied ?? null,
       })),
     [_photos],
   );

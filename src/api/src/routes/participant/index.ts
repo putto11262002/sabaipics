@@ -11,20 +11,22 @@
  * - POST /participant/events/:eventId/search                   - Face search (rate limited)
  * - GET  /participant/events/:eventId/photos/:photoId/download - Single photo download
  * - POST /participant/events/:eventId/photos/download          - Bulk download as zip
+ * - POST /participant/feedback                                 - Submit anonymous feedback
  */
 
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, and, inArray, isNull, desc, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { activeEvents, photos, participantSearches, DEFAULT_SLIDESHOW_CONFIG, events } from '@/db';
+import { activeEvents, photos, participantSearches, events, feedback, feedbackCategories, type EventSettings } from '@/db';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
-import { createFaceProvider } from '../../lib/rekognition/provider';
-import type { FaceServiceError } from '../../lib/rekognition/types';
+import { createExtractor, searchByFace, type RecognitionError } from '../../lib/recognition';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { createZip } from 'littlezipper';
 import { slideshowPhotosQuerySchema } from '../events/slideshow-schema';
+import { slideshowSettingsSchema } from '../events/slideshow-settings-schema';
+import { capturePostHogEvent } from '../../lib/posthog';
 
 // =============================================================================
 // Schemas
@@ -46,11 +48,7 @@ const bulkDownloadSchema = z.object({
     .max(15, 'Maximum 15 photos per download'),
 });
 
-const ALLOWED_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-] as const;
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 const MAX_SELFIE_SIZE = 5 * 1024 * 1024; // 5 MB
 
@@ -102,109 +100,40 @@ function generateDownloadUrl(r2Key: string, r2BaseUrl: string): string {
 // Error Mapping
 // =============================================================================
 
-function mapFaceServiceError(e: FaceServiceError): HandlerError {
+function mapRecognitionError(e: RecognitionError): HandlerError {
   switch (e.type) {
-    case 'not_found':
-      return {
-        code: 'NOT_FOUND',
-        message:
-          e.resource === 'collection'
-            ? 'Event has no photos available for search'
-            : 'No matching faces found in the event',
-        cause: e,
-      };
-
-    case 'invalid_input':
+    case 'no_face_detected':
       return {
         code: 'UNPROCESSABLE',
-        message: `Invalid search data: ${e.reason}`,
+        message: 'No face detected in the uploaded image. Please try a clearer photo.',
         cause: e,
       };
 
-    case 'provider_failed':
-      switch (e.provider) {
-        case 'aws': {
-          const errorName = e.errorName;
+    case 'invalid_image':
+      return {
+        code: 'UNPROCESSABLE',
+        message: `Invalid image: ${e.reason}`,
+        cause: e,
+      };
 
-          if (
-            errorName &&
-            [
-              'ThrottlingException',
-              'ProvisionedThroughputExceededException',
-              'LimitExceededException',
-            ].includes(errorName)
-          ) {
-            return {
-              code: 'RATE_LIMITED',
-              message: 'Too many searches. Please wait and try again.',
-              cause: e,
-            };
-          }
-
-          if (
-            errorName &&
-            [
-              'ResourceNotFoundException',
-              'InvalidImageFormatException',
-              'ImageTooLargeException',
-              'InvalidParameterException',
-              'AccessDeniedException',
-            ].includes(errorName)
-          ) {
-            return {
-              code: 'SERVICE_UNAVAILABLE',
-              message: 'Face search service unavailable due to invalid request',
-              cause: e,
-            };
-          }
-
-          if (
-            errorName &&
-            ['InternalServerError', 'ServiceUnavailableException', 'ServiceException'].includes(
-              errorName,
-            )
-          ) {
-            return {
-              code: 'SERVICE_UNAVAILABLE',
-              message: 'Face search temporarily unavailable',
-              cause: e,
-            };
-          }
-
-          return {
-            code: 'SERVICE_UNAVAILABLE',
-            message: 'Face search temporarily unavailable',
-            cause: e,
-          };
-        }
-
-        case 'sabaiface':
-          if (e.throttle) {
-            return {
-              code: 'RATE_LIMITED',
-              message: 'Too many searches. Please wait and try again.',
-              cause: e,
-            };
-          }
-
-          return {
-            code: 'SERVICE_UNAVAILABLE',
-            message: 'Face search temporarily unavailable',
-            cause: e,
-          };
+    case 'extraction_failed':
+      if (e.throttle) {
+        return {
+          code: 'RATE_LIMITED',
+          message: 'Too many searches. Please wait and try again.',
+          cause: e,
+        };
       }
+      return {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Face search temporarily unavailable',
+        cause: e,
+      };
 
     case 'database':
       return {
         code: 'INTERNAL_ERROR',
         message: 'Temporary database error',
-        cause: e,
-      };
-
-    default:
-      return {
-        code: 'SERVICE_UNAVAILABLE',
-        message: 'Face search temporarily unavailable',
         cause: e,
       };
   }
@@ -277,7 +206,11 @@ export const participantRouter = new Hono<Env>()
 
         // Step 1: Validate eventId exists
         const [event] = yield* ResultAsync.fromPromise(
-          db.select({ id: activeEvents.id }).from(activeEvents).where(eq(activeEvents.id, eventId)).limit(1),
+          db
+            .select({ id: activeEvents.id })
+            .from(activeEvents)
+            .where(eq(activeEvents.id, eventId))
+            .limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 
@@ -306,10 +239,10 @@ export const participantRouter = new Hono<Env>()
           }),
         );
 
-        // Step 5: Transform selfie via CF Images (best effort, fallback to original)
-        const MAX_REKOGNITION_SIZE = 5 * 1024 * 1024;
+        // Step 5: Transform selfie via CF Images if too large (best effort, fallback to original)
+        const MAX_EXTRACTION_SIZE = 5 * 1024 * 1024;
         let transformedBytes = originalBytes;
-        if (originalBytes.byteLength > MAX_REKOGNITION_SIZE) {
+        if (originalBytes.byteLength > MAX_EXTRACTION_SIZE) {
           transformedBytes = yield* ResultAsync.fromPromise(
             (async () => {
               const stream = new ReadableStream({
@@ -336,19 +269,29 @@ export const participantRouter = new Hono<Env>()
           });
         }
 
-        // Step 6: Call provider.findImagesByFace({ eventId, imageData })
-        const provider = createFaceProvider(c.env);
-        const searchResult = yield* provider
-          .findImagesByFace({
-            eventId,
-            imageData: transformedBytes,
-            maxResults: 50,
-            minSimilarity: 0.8,
-          })
-          .mapErr(mapFaceServiceError);
+        // Step 6: Extract face embedding from selfie
+        const extractor = createExtractor({
+          endpoint: c.env.RECOGNITION_ENDPOINT,
+          modalKey: c.env.MODAL_KEY!,
+          modalSecret: c.env.MODAL_SECRET!,
+        });
+        const extractResult = yield* extractor
+          .extractFaces(transformedBytes)
+          .mapErr(mapRecognitionError);
 
-        // Step 7: Handle empty response - return 200 with empty array (NOT an error)
-        if (searchResult.photos.length === 0) {
+        // Use first face's embedding for search
+        const queryEmbedding = extractResult.faces[0].embedding;
+
+        // Step 7: Search pgvector for similar faces in the event
+        const searchMatches = yield* searchByFace(c.var.db(), {
+          eventId,
+          embedding: queryEmbedding,
+          maxResults: 50,
+          minSimilarity: 0.8,
+        }).mapErr(mapRecognitionError);
+
+        // Step 8: Handle empty response - return 200 with empty array (NOT an error)
+        if (searchMatches.length === 0) {
           yield* ResultAsync.fromPromise(
             db
               .insert(participantSearches)
@@ -366,15 +309,23 @@ export const participantRouter = new Hono<Env>()
             (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
           );
 
+          c.executionCtx.waitUntil(
+            capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+              distinctId: `search_${searchId}`,
+              event: 'search_completed',
+              properties: { event_id: eventId, match_count: 0, has_matches: false },
+            }),
+          );
+
           return ok({
             searchId,
             photos: [],
           });
         }
 
-        // Step 8: Extract photo IDs and similarities directly from search result
+        // Step 9: Extract photo IDs and similarities from pgvector results
         const photoIdToSimilarity = new Map(
-          searchResult.photos.map((p) => [p.photoId, p.similarity]),
+          searchMatches.map((p) => [p.photoId, p.similarity]),
         );
         const matchedPhotoIds = Array.from(photoIdToSimilarity.keys());
 
@@ -386,7 +337,7 @@ export const participantRouter = new Hono<Env>()
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 
-        // Step 9: Create participant_searches record
+        // Step 10: Create participant_searches record
         yield* ResultAsync.fromPromise(
           db
             .insert(participantSearches)
@@ -404,7 +355,20 @@ export const participantRouter = new Hono<Env>()
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 
-        // Step 10: Generate photo URLs
+        // Step 11: Track search completion
+        c.executionCtx.waitUntil(
+          capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+            distinctId: `search_${searchId}`,
+            event: 'search_completed',
+            properties: {
+              event_id: eventId,
+              match_count: photoRecords.length,
+              has_matches: photoRecords.length > 0,
+            },
+          }),
+        );
+
+        // Step 12: Generate photo URLs
         const isDev = c.env.NODE_ENV === 'development';
         const responsePhotos = photoRecords.map((photo) => ({
           photoId: photo.id,
@@ -490,6 +454,18 @@ export const participantRouter = new Hono<Env>()
         }
 
         const downloadUrl = generateDownloadUrl(photo.r2Key, c.env.PHOTO_R2_BASE_URL);
+
+        c.executionCtx.waitUntil(
+          capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+            distinctId: `participant_${eventId}`,
+            event: 'photos_delivered',
+            properties: {
+              event_id: eventId,
+              delivery_method: 'download',
+              photo_count: 1,
+            },
+          }),
+        );
 
         return ok({ redirectUrl: downloadUrl });
       })
@@ -589,6 +565,18 @@ export const participantRouter = new Hono<Env>()
           }),
         );
 
+        c.executionCtx.waitUntil(
+          capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+            distinctId: `participant_${eventId}`,
+            event: 'photos_delivered',
+            properties: {
+              event_id: eventId,
+              delivery_method: 'download',
+              photo_count: photoRows.length,
+            },
+          }),
+        );
+
         return ok({ zipData, photoCount: photoRows.length });
       })
         .orTee((e) => e.cause && console.error(`[${c.req.url}] ${e.code}:`, e.cause))
@@ -620,14 +608,14 @@ export const participantRouter = new Hono<Env>()
       const db = c.var.db();
       const { eventId } = c.req.valid('param');
 
-      // Fetch event with slideshow config and logo
+      // Fetch event with settings and logo
       const [result] = yield* ResultAsync.fromPromise(
         db
           .select({
             name: activeEvents.name,
             subtitle: activeEvents.subtitle,
             logoR2Key: activeEvents.logoR2Key,
-            slideshowConfig: activeEvents.slideshowConfig,
+            settings: activeEvents.settings,
             photoCount: sql<number>`(
               SELECT COUNT(*)::int
               FROM ${photos}
@@ -654,8 +642,24 @@ export const participantRouter = new Hono<Env>()
       // Generate logo URL if logo exists
       const logoUrl = result.logoR2Key ? `${c.env.PHOTO_R2_BASE_URL}/${result.logoR2Key}` : null;
 
-      // Use default config if none set
-      const config = result.slideshowConfig ?? DEFAULT_SLIDESHOW_CONFIG;
+      // Extract settings with defaults
+      const settings = (result.settings ?? {}) as EventSettings;
+
+      // Validate settings at API boundary - use defaults if invalid
+      const rawConfig = {
+        template: settings?.slideshow?.template ?? 'carousel',
+        primaryColor: settings?.theme?.primary ?? '#ff6320',
+        background: settings?.theme?.background ?? '#fdfdfd',
+      };
+
+      const parseResult = slideshowSettingsSchema.safeParse(rawConfig);
+      const config = parseResult.success
+        ? parseResult.data
+        : {
+            template: 'carousel' as const,
+            primaryColor: '#ff6320',
+            background: '#fdfdfd',
+          };
 
       return ok({
         event: {
@@ -692,7 +696,11 @@ export const participantRouter = new Hono<Env>()
 
         // Verify event exists
         const [event] = yield* ResultAsync.fromPromise(
-          db.select({ id: activeEvents.id }).from(activeEvents).where(eq(activeEvents.id, eventId)).limit(1),
+          db
+            .select({ id: activeEvents.id })
+            .from(activeEvents)
+            .where(eq(activeEvents.id, eventId))
+            .limit(1),
           (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
         );
 
@@ -757,6 +765,52 @@ export const participantRouter = new Hono<Env>()
         .orTee((e) => e.cause && console.error(`[${c.req.url}] ${e.code}:`, e.cause))
         .match(
           (result) => c.json(result),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // =========================================================================
+  // POST /participant/feedback - Submit anonymous feedback
+  // =========================================================================
+  .post(
+    '/feedback',
+    zValidator(
+      'json',
+      z.object({
+        content: z.string().min(1).max(2000),
+        category: z.enum(feedbackCategories).optional().default('general'),
+        eventId: z.string().uuid().optional(),
+      }),
+    ),
+    async (c) => {
+      const input = c.req.valid('json');
+      const db = c.var.db();
+
+      return safeTry(async function* () {
+        const [created] = yield* ResultAsync.fromPromise(
+          db
+            .insert(feedback)
+            .values({
+              content: input.content,
+              category: input.category,
+              source: 'event_app',
+              eventId: input.eventId,
+              photographerId: null,
+            })
+            .returning(),
+          (cause): HandlerError => ({
+            code: 'INTERNAL_ERROR',
+            message: 'Failed to submit feedback',
+            cause,
+          }),
+        );
+
+        return ok(created);
+      })
+        .orTee((e) => e.cause && console.error('[Participant/Feedback]', e.code, e.cause))
+        .match(
+          (data) => c.json({ data }, 201),
           (e) => apiError(c, e),
         );
     },

@@ -19,9 +19,11 @@ import EventPhotosTab from './routes/events/[id]/photos';
 import EventColorTab from './routes/events/[id]/color';
 import EventFtpTab from './routes/events/[id]/ftp';
 import EventSlideshowTab from './routes/events/[id]/slideshow';
-import SlideshowPreviewPage from './routes/events/[id]/slideshow/preview';
 import StudioLutsPage from './routes/studio/luts';
 import StudioLutPreviewPage from './routes/studio/luts/preview';
+import LineDeliveryPage from './routes/line-delivery';
+import StudioAutoEditPage from './routes/studio/auto-edit';
+import StudioAutoEditNewPage from './routes/studio/auto-edit/new';
 import { SidebarLayout } from './components/shell/sidebar-layout';
 export const router = createBrowserRouter([
   // Public routes
@@ -44,15 +46,6 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <EventSlideshowTab />
-      </ProtectedRoute>
-    ),
-  },
-  // Slideshow preview (auth required, no sidebar)
-  {
-    path: '/events/:id/slideshow-preview',
-    element: (
-      <ProtectedRoute>
-        <SlideshowPreviewPage />
       </ProtectedRoute>
     ),
   },
@@ -96,6 +89,22 @@ export const router = createBrowserRouter([
       {
         path: '/studio/luts/:id/preview',
         element: <StudioLutPreviewPage />,
+      },
+      {
+        path: '/line-delivery',
+        element: <LineDeliveryPage />,
+      },
+      {
+        path: '/studio/auto-edit',
+        element: <StudioAutoEditPage />,
+      },
+      {
+        path: '/studio/auto-edit/new',
+        element: <StudioAutoEditNewPage />,
+      },
+      {
+        path: '/studio/auto-edit/:id/edit',
+        element: <StudioAutoEditNewPage />,
       },
       {
         path: '/credits',

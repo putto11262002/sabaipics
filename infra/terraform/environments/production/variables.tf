@@ -109,3 +109,18 @@ variable "infisical_project_id" {
   description = "Infisical project (workspace) ID"
   default     = "315a1831-a394-47fb-856b-e791dd7e9f9e"
 }
+
+# ------------------------------------------------------------------------------
+# Cache Rules Configuration
+# ------------------------------------------------------------------------------
+
+variable "cache_rules" {
+  type = list(object({
+    name        = string
+    expression  = string
+    edge_ttl    = number
+    browser_ttl = number
+  }))
+  description = "Cloudflare cache rules for edge caching"
+  default     = []
+}

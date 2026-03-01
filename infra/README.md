@@ -55,18 +55,19 @@ External secrets live in Infisical and are never stored in Terraform state as pl
 
 ### What Terraform manages vs. what it doesn't
 
-| Managed by Terraform | NOT managed by Terraform |
-|---|---|
+| Managed by Terraform             | NOT managed by Terraform                     |
+| -------------------------------- | -------------------------------------------- |
 | R2 buckets, CORS, custom domains | Worker scripts (deployed by wrangler via CI) |
-| Queues + event notifications | DNS records (Cloudflare dashboard) |
-| Worker secrets (pushed via API) | Pages projects (deployed by wrangler via CI) |
-| R2 API tokens | FTP server (Docker/SSH, separate workflow) |
+| Queues + event notifications     | DNS records (Cloudflare dashboard)           |
+| Worker secrets (pushed via API)  | Pages projects (deployed by wrangler via CI) |
+| R2 API tokens                    | FTP server (Docker/SSH, separate workflow)   |
 
 ### CI integration
 
 CI workflows use `Infisical/secrets-action` to inject env vars (CLOUDFLARE_API_TOKEN, DATABASE_URL, etc.) at deploy time. Worker secrets are **not** set by CI — Terraform owns them.
 
 Only two GitHub secrets are needed per environment:
+
 - `INFISICAL_CLIENT_ID` — Infisical Machine Identity
 - `INFISICAL_CLIENT_SECRET` — Infisical Machine Identity
 
@@ -76,11 +77,11 @@ Only two GitHub secrets are needed per environment:
 
 State is stored remotely in the `framefast-tf-state` R2 bucket using Terraform's S3-compatible backend. Each environment has a separate state key:
 
-| Environment | Key |
-|---|---|
-| dev | `cloudflare/dev.tfstate` |
-| staging | `cloudflare/staging.tfstate` |
-| production | `cloudflare/production.tfstate` |
+| Environment | Key                             |
+| ----------- | ------------------------------- |
+| dev         | `cloudflare/dev.tfstate`        |
+| staging     | `cloudflare/staging.tfstate`    |
+| production  | `cloudflare/production.tfstate` |
 
 R2 does not support state locking — avoid concurrent `terraform apply` runs.
 

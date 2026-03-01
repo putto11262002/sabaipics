@@ -7,7 +7,7 @@
  * NO hardcoded packages or prices - designed for maximum flexibility.
  */
 
-import type Stripe from "stripe";
+import type Stripe from 'stripe';
 
 // =============================================================================
 // Types
@@ -48,7 +48,7 @@ export interface CreateCheckoutParams {
   /** Custom metadata attached to the session */
   metadata?: Record<string, string>;
   /** Checkout mode: 'payment' (one-time), 'subscription', or 'setup' */
-  mode?: "payment" | "subscription" | "setup";
+  mode?: 'payment' | 'subscription' | 'setup';
   /** Currency code (default: 'thb') */
   currency?: string;
   /** Pre-applied discounts (promotion codes or coupons) */
@@ -107,8 +107,8 @@ export async function createCheckoutSession({
   successUrl,
   cancelUrl,
   metadata = {},
-  mode = "payment",
-  currency = "thb",
+  mode = 'payment',
+  currency = 'thb',
   discounts,
 }: CreateCheckoutParams): Promise<CheckoutSessionResult> {
   const session = await stripe.checkout.sessions.create({
@@ -127,19 +127,19 @@ export async function createCheckoutSession({
       quantity: item.quantity,
     })),
     // Append session ID to success URL for retrieval
-    success_url: `${successUrl}${successUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${successUrl}${successUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: cancelUrl,
     metadata,
     // Collect billing address for invoices
-    billing_address_collection: "auto",
+    billing_address_collection: 'auto',
     // Pre-apply discounts (promotion codes or coupons)
     ...(discounts && discounts.length > 0 && { discounts }),
     // Allow manual promotion code entry (only if not pre-applying a discount)
-    ...(!discounts || discounts.length === 0) && { allow_promotion_codes: true },
+    ...((!discounts || discounts.length === 0) && { allow_promotion_codes: true }),
   });
 
   if (!session.url) {
-    throw new Error("Checkout session created but URL is missing");
+    throw new Error('Checkout session created but URL is missing');
   }
 
   return {
@@ -168,10 +168,10 @@ export async function createCheckoutSession({
  */
 export async function getCheckoutSession(
   stripe: Stripe,
-  sessionId: string
+  sessionId: string,
 ): Promise<Stripe.Checkout.Session> {
   return stripe.checkout.sessions.retrieve(sessionId, {
-    expand: ["line_items", "customer"],
+    expand: ['line_items', 'customer'],
   });
 }
 
@@ -184,7 +184,7 @@ export async function getCheckoutSession(
  */
 export async function getCheckoutLineItems(
   stripe: Stripe,
-  sessionId: string
+  sessionId: string,
 ): Promise<Stripe.LineItem[]> {
   const lineItems = await stripe.checkout.sessions.listLineItems(sessionId);
   return lineItems.data;

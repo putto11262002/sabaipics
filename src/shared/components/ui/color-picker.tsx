@@ -67,6 +67,11 @@ function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
 
+  // Sync internal state when value prop changes externally
+  React.useEffect(() => {
+    setHsv(hexToHsv(value));
+  }, [value]);
+
   const handleHueChange = (h: number[]) => {
     const newHsv = { ...hsv, h: h[0] };
     setHsv(newHsv);

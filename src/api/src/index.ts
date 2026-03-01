@@ -13,9 +13,13 @@ import { photosRouter } from './routes/photos';
 import { uploadsRouter } from './routes/uploads';
 import { r2Router } from './routes/r2';
 import { participantRouter } from './routes/participant';
+import { lineParticipantRouter } from './routes/participant/line';
+import { publicAnnouncementsRouter } from './routes/announcements';
 import { ftpRouter } from './routes/ftp';
 import { desktopAuthRouter } from './routes/desktop-auth';
 import { studioRouter } from './routes/studio';
+import { feedbackRouter } from './routes/feedback';
+import { lineDeliveryRouter } from './routes/line-delivery';
 import type { Env, Bindings } from './types';
 
 // Queue consumers
@@ -31,8 +35,6 @@ import { scheduled } from './crons';
 // Event handlers - registered at module load time
 import { registerStripeHandlers } from './handlers/stripe';
 
-// Durable Objects - must be exported for wrangler
-export { RekognitionRateLimiter } from './durable-objects/rate-limiter';
 
 // =============================================================================
 // Event Bus Initialization
@@ -73,6 +75,10 @@ const app = new Hono<Env>()
   .get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))
   // Participant routes (public, no auth - for event participants)
   .route('/participant', participantRouter)
+  // LINE participant routes (public, no auth - LINE Login OAuth + delivery)
+  .route('/participant/line', lineParticipantRouter)
+  // Public announcements (no auth - for www/dashboard)
+  .route('/announcements', publicAnnouncementsRouter)
   // Admin routes - API key auth, no Clerk (must be before Clerk middleware)
   .route('/admin', adminRouter)
   // FTP routes - FTP JWT auth, no Clerk (must be before Clerk middleware)
@@ -83,8 +89,10 @@ const app = new Hono<Env>()
   .route('/auth', authRouter)
   .route('/dashboard', dashboardRouter)
   .route('/studio', studioRouter)
+  .route('/line-delivery', lineDeliveryRouter)
   .route('/events', eventsRouter)
   .route('/uploads', uploadsRouter)
+  .route('/feedback', feedbackRouter)
   .route('/', photosRouter);
 
 // =============================================================================

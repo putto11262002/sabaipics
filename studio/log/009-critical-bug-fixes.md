@@ -6,6 +6,7 @@
 ## Summary
 
 Fixed two critical bugs that were causing app crashes and UI unresponsiveness after disconnect:
+
 1. **Thread race condition** causing `EXC_BAD_ACCESS` crashes
 2. **iOS 17 RTI bug** causing TextField unresponsiveness (mitigated with custom alert)
 
@@ -18,6 +19,7 @@ When disconnecting from camera, the event monitoring background thread was still
 **Crash location**: `CHECK_PTP_RC(params->sendreq_func (params, ptp, flags))`
 
 **Sequence**:
+
 ```
 Main Thread:                  Background Thread (event monitoring):
 stopEventMonitoring()         [Running, polling for new photos]
@@ -56,6 +58,7 @@ Added proper thread synchronization in `WiFiCameraManager.m:stopEventMonitoring`
 ```
 
 **Impact**:
+
 - No more `EXC_BAD_ACCESS` crashes during disconnect
 - Clean thread shutdown before resource cleanup
 - Prevents state corruption
@@ -69,6 +72,7 @@ iOS 17 has a known bug where `UITextField` doesn't properly deinit when removed 
 **Error**: `-[RTIInputSystemClient remoteTextInputSessionWithID:performInputOperation:] perform input operation requires a valid sessionID`
 
 **Sequence**:
+
 1. WiFiSetupView TextField becomes first responder (keyboard opens)
 2. User connects → navigate to LiveCaptureView
 3. TextField doesn't deinit (iOS 17 bug) → orphaned RTI session
@@ -82,19 +86,23 @@ iOS 17 has a known bug where `UITextField` doesn't properly deinit when removed 
 Replaced native `.alert()` with custom SwiftUI overlay to avoid UIKit window management.
 
 **Files Created**:
+
 - `SabaiPicsStudio/Views/CustomConfirmationOverlay.swift` (192 lines)
 
 **Files Modified**:
+
 - `SabaiPicsStudio/ContentView.swift` - Uses `.customConfirmationDialog()` instead of `.alert()`
 - `SabaiPicsStudio/Stores/AppCoordinator.swift` - Added `showDisconnectAlert` and disconnect methods
 - `SabaiPicsStudio/LiveCaptureView.swift` - Delegates to coordinator, added `.onDisappear` cleanup
 - `SabaiPicsStudio/Stores/ConnectionStore.swift` - Added `withAnimation` wrapper
 
 **Why it works**:
+
 - Native `.alert()` → UIKit window → global resignFirstResponder → RTI bug
 - Custom overlay → Pure SwiftUI ZStack → No UIKit windows → No RTI trigger
 
 **Impact**:
+
 - WiFiSetupView TextField works after disconnect
 - No RTI errors in console
 - Cleaner, more maintainable code
@@ -104,6 +112,7 @@ Replaced native `.alert()` with custom SwiftUI overlay to avoid UIKit window man
 ### Emoji Removal
 
 Removed all emojis from log statements (56 total across 8 files):
+
 - `print()` statements in Swift
 - `NSLog()` statements in Objective-C
 - Kept all component names and messages intact
@@ -113,16 +122,19 @@ Removed all emojis from log statements (56 total across 8 files):
 ## Files Modified
 
 ### Objective-C
+
 - `SabaiPicsStudio/WiFiCameraManager.m`
   - Fixed thread race condition in `stopEventMonitoring`
   - Removed emojis from logs
 
 ### Swift - New Files
+
 - `SabaiPicsStudio/Views/CustomConfirmationOverlay.swift` (NEW)
   - Custom alert overlay component
   - View modifier `.customConfirmationDialog()`
 
 ### Swift - Modified
+
 - `SabaiPicsStudio/ContentView.swift`
   - Replaced `.alert()` with `.customConfirmationDialog()`
   - Removed emojis
@@ -161,6 +173,7 @@ Removed all emojis from log statements (56 total across 8 files):
 **Tested on**: Real iPhone with real Canon camera
 
 **Results**:
+
 - ✅ No crashes during disconnect
 - ✅ No `EXC_BAD_ACCESS` errors
 - ✅ No RTI errors in console
@@ -172,6 +185,7 @@ Removed all emojis from log statements (56 total across 8 files):
 ### Thread Synchronization Pattern
 
 The fix uses a busy-wait pattern which is appropriate here because:
+
 1. Thread shutdown is fast (milliseconds)
 2. Only happens during disconnect (infrequent)
 3. 10ms poll interval is negligible
@@ -182,6 +196,7 @@ Alternative considered: `pthread_join` but NSThread doesn't expose the pthread h
 ### SwiftUI Alert Gotcha
 
 This is a documented iOS 17 issue affecting multiple frameworks:
+
 - React Native (GitHub issue #41801)
 - SwiftUI (Apple Developer Forums FB13727682)
 - Compose Multiplatform

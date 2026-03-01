@@ -5,6 +5,8 @@ on:
     branches: [master]
     paths:
       - 'src/www/**'
+      - 'src/auth/**'
+      - 'src/shared/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/deploy-www.yml'
@@ -29,10 +31,27 @@ jobs:
         with:
           version: 9.0.0
 
+      - name: Inject Secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.15
+        with:
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          project-slug: frame-fast-pu-xi
+          env-slug: prod
+
       - run: pnpm install
+
+      - name: Create WWW Env
+        run: |
+          echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY" > src/www/.env.production
+          echo "NEXT_PUBLIC_DASHBOARD_BASE_URL=https://app.framefast.io" >> src/www/.env.production
 
       - name: Build and Deploy
         run: pnpm deploy:www
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Purge Cloudflare Edge Cache
+        run: |
+          curl -f -X POST "https://api.cloudflare.com/client/v4/zones/cad9739a62904eeef1eaf4a2c0ab13ce/purge_cache" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"files":["https://framefast.io/","https://framefast.io/en","https://framefast.io/en/","https://framefast.io/th","https://framefast.io/th/","https://www.framefast.io/","https://www.framefast.io/en","https://www.framefast.io/en/","https://www.framefast.io/th","https://www.framefast.io/th/"]}'

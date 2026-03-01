@@ -1,7 +1,7 @@
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
 import { parseResponse, type ClientResponse } from 'hono/client';
 import { useAuth } from '@/auth/react';
-import { toRequestError, type RequestError } from '@/shared/lib/api-error';
+import { toRequestError, isAccountSuspended, type RequestError } from '@/shared/lib/api-error';
 
 type ClientOpts = { headers: Record<string, string> };
 
@@ -26,7 +26,7 @@ type UseApiQueryOptions<TData> = {
  */
 export function useApiQuery<TData>(options: UseApiQueryOptions<TData>) {
   const { apiFn, withAuth: needsAuth = true, ...rest } = options;
-  const { getToken } = useAuth();
+  const { getToken, signOut } = useAuth();
 
   return useQuery<TData, RequestError>({
     ...rest,
@@ -39,7 +39,9 @@ export function useApiQuery<TData>(options: UseApiQueryOptions<TData>) {
       try {
         return (await parseResponse(apiFn({ headers }))) as TData;
       } catch (e) {
-        throw toRequestError(e);
+        const error = toRequestError(e);
+        if (isAccountSuspended(error)) signOut();
+        throw error;
       }
     },
   });

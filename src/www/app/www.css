@@ -1,1 +1,5 @@
-@plugin "@tailwindcss/typography";
+@import "../../shared/styles/globals.css";
+
+/* WWW-specific Tailwind sources - only scan what www needs */
+@source "../**/*.{js,ts,jsx,tsx,md,mdx}";
+@source "../../shared/**/*.{js,ts,jsx,tsx}";

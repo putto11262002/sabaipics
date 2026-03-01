@@ -1,37 +1,19 @@
 import type { Metadata } from 'next';
-import { DM_Sans, Geist, Geist_Mono, Noto_Sans_Thai } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
-import '@/shared/styles/globals.css';
+import { OrganizationJsonLd } from '@/components/seo/json-ld';
 import '../www.css';
 
-const dmSans = DM_Sans({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  weight: ['400', '500', '600', '700'],
-});
-
-const notoSansThai = Noto_Sans_Thai({
-  subsets: ['thai'],
-  variable: '--font-thai',
-  weight: ['400', '500', '600', '700'],
-});
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
-
 export const metadata: Metadata = {
-  title: 'FrameFast',
-  description: 'AI face recognition photo distribution for events.',
+  metadataBase: new URL('https://framefast.io'),
+  title: {
+    template: '%s | FrameFast',
+    default: 'FrameFast - AI Face Recognition Photo Distribution for Events',
+  },
+  description: 'Deliver event photos instantly with AI face search. Guests find their photos in seconds via QR code or LINE.',
+  keywords: ['event photo distribution', 'AI face recognition', 'photo sharing', 'QR code photos', 'LINE photo delivery'],
   icons: {
     icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
   },
@@ -58,9 +40,15 @@ export default async function LocaleLayout({ children, params }: Props) {
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={`${dmSans.variable} ${notoSansThai.variable}`}>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
+    <html lang={locale}>
+      <head>
+        <OrganizationJsonLd />
+      </head>
+      <body className="antialiased">
+        <NextIntlClientProvider messages={messages}>
+          <div className="h-14 md:h-20" aria-hidden="true" />
+          {children}
+        </NextIntlClientProvider>
       </body>
     </html>
   );

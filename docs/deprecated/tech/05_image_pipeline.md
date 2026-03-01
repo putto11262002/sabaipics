@@ -18,6 +18,7 @@ Upload → Validate → Store → Queue → [Process → Index → Ready]
 **For processing:** See `10_aws_rekognition_integration.md` (async path)
 
 **Components:**
+
 - **R2** - Object storage (original photos)
 - **Cloudflare Images** - On-demand transforms (thumbnails, resizing)
 - **Cloudflare Queues** - Async processing handoff
@@ -27,12 +28,12 @@ Upload → Validate → Store → Queue → [Process → Index → Ready]
 
 ## Critical Decision 1: Upload Sources
 
-| Source | Protocol | Flow |
-|--------|----------|------|
-| **Web Dashboard** | HTTP POST | Direct to API |
-| **Desktop App** | HTTP POST | Direct to API |
-| **FTP (Pro cameras)** | FTP | VPS proxy → API |
-| **Lightroom Plugin** | HTTP POST | Direct to API |
+| Source                | Protocol  | Flow            |
+| --------------------- | --------- | --------------- |
+| **Web Dashboard**     | HTTP POST | Direct to API   |
+| **Desktop App**       | HTTP POST | Direct to API   |
+| **FTP (Pro cameras)** | FTP       | VPS proxy → API |
+| **Lightroom Plugin**  | HTTP POST | Direct to API   |
 
 **All paths converge to same API endpoint:** `POST /api/events/:id/photos`
 
@@ -63,6 +64,7 @@ Client                    API                     R2                Queue
 ```
 
 **Validation order:**
+
 1. Auth (photographer owns event)
 2. Event published
 3. Upload window open (between start/end datetime)
@@ -79,6 +81,7 @@ Client                    API                     R2                Queue
 **R2 bucket:** `sabaipics-photos`
 
 **Key format:**
+
 ```
 {event_id}/{photo_id}.{ext}
 
@@ -87,6 +90,7 @@ Example:
 ```
 
 **Why this structure:**
+
 - Event-scoped for easy bulk deletion on expiry
 - UUID prevents enumeration
 - Extension preserved for content-type
@@ -100,6 +104,7 @@ Example:
 **Queue:** `photo-processing`
 
 **Job payload:**
+
 ```json
 {
   "photo_id": "uuid",
@@ -109,26 +114,29 @@ Example:
 ```
 
 **Why queue?**
+
 - AWS Rekognition has 50 TPS limit (us-west-2)
 - Direct calls from Workers would burst and get throttled
 - Queue smooths traffic, handles backpressure
 - See `10_aws_rekognition_integration.md` for rate limiting details
 
 **Wrangler config (producer side):**
+
 ```jsonc
 {
   "queues": {
     "producers": [
       {
         "queue": "photo-processing",
-        "binding": "PHOTO_QUEUE"
-      }
-    ]
-  }
+        "binding": "PHOTO_QUEUE",
+      },
+    ],
+  },
 }
 ```
 
 **Enqueue code:**
+
 ```typescript
 await env.PHOTO_QUEUE.send({
   photo_id: photo.id,
@@ -142,15 +150,18 @@ await env.PHOTO_QUEUE.send({
 ## Critical Decision 5: Image Delivery
 
 **Original downloads:**
+
 - Generate R2 signed URL (1 hour expiry)
 - Client downloads directly from R2
 
 **Thumbnails/gallery display:**
+
 - Cloudflare Images on-demand transforms
 - URL pattern: `/cdn-cgi/image/width=400,quality=80/{r2_url}`
 - No signed URL (Cloudflare Images has internal R2 access)
 
 **CDN caching:**
+
 - Signed URLs: Cache 1 day (private)
 - Transforms: Cache 30 days (immutable)
 
@@ -165,6 +176,7 @@ await env.PHOTO_QUEUE.send({
 **Input:** Selfie image + event access code
 
 **Flow:**
+
 ```
 1. Validate event access
 2. Check cache (event_id + selfie_hash)
@@ -177,6 +189,7 @@ await env.PHOTO_QUEUE.send({
 ```
 
 **Rekognition SearchFacesByImage:**
+
 ```
 Input: Selfie image, CollectionId
 MaxFaces: 100
@@ -185,6 +198,7 @@ Output: Array of {FaceId, Similarity}
 ```
 
 **Cache:**
+
 - Key: `search:{event_id}:{selfie_hash}`
 - TTL: Until event expires (1 month from start)
 - Storage: KV or D1
@@ -198,10 +212,12 @@ Output: Array of {FaceId, Similarity}
 **Role:** Thin proxy, no storage
 
 **Auth:**
+
 - Username: `{photographer_id}_{event_id}`
 - Password: Generated token (stored in DB, per-event)
 
 **Flow:**
+
 ```
 Camera → FTP Server → Validate creds with API → Stream to API upload endpoint
 ```
@@ -215,14 +231,17 @@ Camera → FTP Server → Validate creds with API → Stream to API upload endpo
 ## Critical Decision 8: Upload Failure Handling
 
 **Upload failure (before R2):**
+
 - No credit charged
 - Return error to client
 
 **Upload failure (after credit, before R2):**
+
 - Shouldn't happen (credit + R2 in same transaction)
 - If it does: credit already deducted, no refund
 
 **Processing failure (after queue):**
+
 - See `10_aws_rekognition_integration.md` for retry/DLQ handling
 
 ---
@@ -234,6 +253,7 @@ Camera → FTP Server → Validate creds with API → Stream to API upload endpo
 **When:** 1 month after event start_datetime
 
 **Actions:**
+
 1. Delete Rekognition collection
 2. List all R2 objects with prefix `{event_id}/`
 3. Bulk delete R2 objects
@@ -252,23 +272,23 @@ pending → processing → ready
                     ↘ failed
 ```
 
-| Status | Meaning | Set By |
-|--------|---------|--------|
-| `pending` | Uploaded to R2, queued | Upload endpoint |
-| `processing` | Consumer picked up | Queue consumer |
-| `ready` | Faces indexed, searchable | Queue consumer |
-| `failed` | Processing failed after retries | Queue consumer |
+| Status       | Meaning                         | Set By          |
+| ------------ | ------------------------------- | --------------- |
+| `pending`    | Uploaded to R2, queued          | Upload endpoint |
+| `processing` | Consumer picked up              | Queue consumer  |
+| `ready`      | Faces indexed, searchable       | Queue consumer  |
+| `failed`     | Processing failed after retries | Queue consumer  |
 
 ---
 
 ## Performance Targets
 
-| Metric | Target | Notes |
-|--------|--------|-------|
-| Upload response | < 2s | Return `pending` status immediately |
-| Processing time | See `10_aws_rekognition_integration.md` | |
-| Search response | < 3s | SearchFacesByImage + DB lookup |
-| Thumbnail generation | < 500ms | Cloudflare Images on-demand transform |
+| Metric               | Target                                  | Notes                                 |
+| -------------------- | --------------------------------------- | ------------------------------------- |
+| Upload response      | < 2s                                    | Return `pending` status immediately   |
+| Processing time      | See `10_aws_rekognition_integration.md` |                                       |
+| Search response      | < 3s                                    | SearchFacesByImage + DB lookup        |
+| Thumbnail generation | < 500ms                                 | Cloudflare Images on-demand transform |
 
 ---
 

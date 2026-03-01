@@ -1,6 +1,6 @@
 ---
-url: "https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate"
-title: "ICCameraDeviceDelegate | Apple Developer Documentation"
+url: 'https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate'
+title: 'ICCameraDeviceDelegate | Apple Developer Documentation'
 ---
 
 [Skip Navigation](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#app-main)
@@ -40,12 +40,12 @@ Only search within “Documentation”
 
 [Open Menu](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#)
 
-- SwiftLanguage:  Swift  Objective-C
+- SwiftLanguage: Swift Objective-C
 
 Language:
 
-  - Swift
-  - [Objective-C](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#)
+- Swift
+- [Objective-C](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#)
 
 All Technologies
 
@@ -402,124 +402,124 @@ iOSiPadOSMac CatalystmacOSvisionOS
 protocol ICCameraDeviceDelegate : ICDeviceDelegate
 ```
 
-## [Topics](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#topics)
+## [Topics](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#topics)
 
-### [Determining Device Readiness](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#Determining-Device-Readiness)
+### [Determining Device Readiness](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#Determining-Device-Readiness)
 
-[`func deviceDidBecomeReady(withCompleteContentCatalog: ICCameraDevice)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/devicedidbecomeready(withcompletecontentcatalog:))
+[`func deviceDidBecomeReady(withCompleteContentCatalog: ICCameraDevice)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/devicedidbecomeready(withcompletecontentcatalog:)>)
 
 Tells the client that the camera device is done enumerating its content and is ready to receive requests.
 
 **Required**
 
-### [Adding Objects](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#Adding-Objects)
+### [Adding Objects](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#Adding-Objects)
 
-[`func cameraDevice(ICCameraDevice, didAdd: [ICCameraItem])`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didadd:)-8oukd)
+[`func cameraDevice(ICCameraDevice, didAdd: [ICCameraItem])`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didadd:)-8oukd>)
 
 Tells the client when objects are added to the device.
 
 **Required**
 
-[`func cameraDevice(ICCameraDevice, didAdd: ICCameraItem)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didadd:)-9pnzo)
+[`func cameraDevice(ICCameraDevice, didAdd: ICCameraItem)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didadd:)-9pnzo>)
 
 Tells the client when an object is added to the device.
 
-### [Removing Objects](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#Removing-Objects)
+### [Removing Objects](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#Removing-Objects)
 
-[`func cameraDevice(ICCameraDevice, didRemove: [ICCameraItem])`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didremove:)-4m5al)
+[`func cameraDevice(ICCameraDevice, didRemove: [ICCameraItem])`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didremove:)-4m5al>)
 
 Tells the client when objects are removed from the device.
 
 **Required**
 
-[`func cameraDevice(ICCameraDevice, didCompleteDeleteFilesWithError: (any Error)?)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didcompletedeletefileswitherror:))
+[`func cameraDevice(ICCameraDevice, didCompleteDeleteFilesWithError: (any Error)?)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didcompletedeletefileswitherror:)>)
 
 Tells the client when the camera completes a delete operation.
 
-[`func cameraDevice(ICCameraDevice, didRemove: ICCameraItem)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didremove:)-9rz34)
+[`func cameraDevice(ICCameraDevice, didRemove: ICCameraItem)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didremove:)-9rz34>)
 
 Tells the client when an object is removed from the device.
 
-### [Renaming Objects](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#Renaming-Objects)
+### [Renaming Objects](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#Renaming-Objects)
 
-[`func cameraDevice(ICCameraDevice, didRenameItems: [ICCameraItem])`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didrenameitems:))
+[`func cameraDevice(ICCameraDevice, didRenameItems: [ICCameraItem])`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didrenameitems:)>)
 
 Tells the client when one or more objects are renamed on the device.
 
 **Required**
 
-### [Receiving Metadata](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#Receiving-Metadata)
+### [Receiving Metadata](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#Receiving-Metadata)
 
-[`func cameraDevice(ICCameraDevice, didReceiveMetadata: [AnyHashable : Any]?, for: ICCameraItem, error: (any Error)?)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didreceivemetadata:for:error:))
+[`func cameraDevice(ICCameraDevice, didReceiveMetadata: [AnyHashable : Any]?, for: ICCameraItem, error: (any Error)?)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didreceivemetadata:for:error:)>)
 
 Tells the client when the metadata requested for an item on a camera is available.
 
 **Required**
 
-[`func cameraDevice(ICCameraDevice, shouldGetMetadataOf: ICCameraItem) -> Bool`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:shouldgetmetadataof:))
+[`func cameraDevice(ICCameraDevice, shouldGetMetadataOf: ICCameraItem) -> Bool`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:shouldgetmetadataof:)>)
 
 Tells the client when the camera is about to execute queued requests for the metadata of a specific item.
 
-[`func cameraDevice(ICCameraDevice, didReceiveMetadataFor: ICCameraItem)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didreceivemetadatafor:))
+[`func cameraDevice(ICCameraDevice, didReceiveMetadataFor: ICCameraItem)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didreceivemetadatafor:)>)
 
 Tells the client when the metadata requested for an item on a camera is available.
 
-### [Receiving Thumbnails](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#Receiving-Thumbnails)
+### [Receiving Thumbnails](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#Receiving-Thumbnails)
 
-[`func cameraDevice(ICCameraDevice, didReceiveThumbnail: CGImage?, for: ICCameraItem, error: (any Error)?)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didreceivethumbnail:for:error:))
+[`func cameraDevice(ICCameraDevice, didReceiveThumbnail: CGImage?, for: ICCameraItem, error: (any Error)?)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didreceivethumbnail:for:error:)>)
 
 Tells the client when the requested thumbnail is available.
 
 **Required**
 
-[`func cameraDevice(ICCameraDevice, didReceiveThumbnailFor: ICCameraItem)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didreceivethumbnailfor:))
+[`func cameraDevice(ICCameraDevice, didReceiveThumbnailFor: ICCameraItem)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didreceivethumbnailfor:)>)
 
 Tells the client when the requested thumbnail is available.
 
-[`func cameraDevice(ICCameraDevice, shouldGetThumbnailOf: ICCameraItem) -> Bool`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:shouldgetthumbnailof:))
+[`func cameraDevice(ICCameraDevice, shouldGetThumbnailOf: ICCameraItem) -> Bool`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:shouldgetthumbnailof:)>)
 
 Tells the client when the camera is about to execute queued requests for the thumbnail of a specific item.
 
-### [Responding to Capability Changes](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#Responding-to-Capability-Changes)
+### [Responding to Capability Changes](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#Responding-to-Capability-Changes)
 
-[`func cameraDeviceDidChangeCapability(ICCameraDevice)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevicedidchangecapability(_:))
+[`func cameraDeviceDidChangeCapability(ICCameraDevice)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevicedidchangecapability(_:)>)
 
 Tells the client when a capability of a camera changes.
 
 **Required**
 
-### [Responding to Access Restrictions](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#Responding-to-Access-Restrictions)
+### [Responding to Access Restrictions](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#Responding-to-Access-Restrictions)
 
-[`func cameraDeviceDidEnableAccessRestriction(ICDevice)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevicedidenableaccessrestriction(_:))
+[`func cameraDeviceDidEnableAccessRestriction(ICDevice)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevicedidenableaccessrestriction(_:)>)
 
 Tells the client when an Apple device has been locked, and media is unavailable until the restriction has been removed.
 
 **Required**
 
-[`func cameraDeviceDidRemoveAccessRestriction(ICDevice)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevicedidremoveaccessrestriction(_:))
+[`func cameraDeviceDidRemoveAccessRestriction(ICDevice)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevicedidremoveaccessrestriction(_:)>)
 
 Tells the client when an Apple device has been unlocked, paired to the host, and media is available.
 
 **Required**
 
-### [Responding to PTP Events](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#Responding-to-PTP-Events)
+### [Responding to PTP Events](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#Responding-to-PTP-Events)
 
-[`func cameraDevice(ICCameraDevice, didReceivePTPEvent: Data)`](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didreceiveptpevent:))
+[`func cameraDevice(ICCameraDevice, didReceivePTPEvent: Data)`](<https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate/cameradevice(_:didreceiveptpevent:)>)
 
 Tells the client about a PTP event.
 
 **Required**
 
-## [Relationships](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#relationships)
+## [Relationships](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#relationships)
 
-### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#inherits-from)
+### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#inherits-from)
 
 - [`ICDeviceDelegate`](https://developer.apple.com/documentation/imagecapturecore/icdevicedelegate)
 - [`NSObjectProtocol`](https://developer.apple.com/documentation/ObjectiveC/NSObjectProtocol)
 
-## [See Also](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#see-also)
+## [See Also](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#see-also)
 
-### [Cameras](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate\#Cameras)
+### [Cameras](https://developer.apple.com/documentation/imagecapturecore/iccameradevicedelegate#Cameras)
 
 [`class ICCameraDevice`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice)
 

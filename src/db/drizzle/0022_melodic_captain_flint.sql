@@ -1,0 +1,2 @@
+CREATE INDEX "events_deleted_at_expires_at_idx" ON "events" USING btree ("deleted_at","expires_at");--> statement-breakpoint
+CREATE INDEX "photos_event_id_deleted_at_idx" ON "photos" USING btree ("event_id","deleted_at");

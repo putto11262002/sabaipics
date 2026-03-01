@@ -23,6 +23,7 @@ go run ./cmd/ftp-server
 ```
 
 Default ports:
+
 - Explicit FTPS: `2121`
 - Implicit FTPS: `990` (enabled by default)
 - Passive data ports: `5000-5099`

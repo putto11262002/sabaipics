@@ -6,6 +6,7 @@ Date: `2026-01-11`
 Owner: `implementv3 agent`
 
 ## Inputs
+
 - Task: `docs/logs/BS_0001_S-1/tasks.md` (section: T-16, lines 395-423)
 - Upstream plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Context reports:
@@ -20,6 +21,7 @@ Owner: `implementv3 agent`
 
 **Goal:**
 Create `POST /events/:id/photos` endpoint that:
+
 1. Validates file (format, size, ownership, event status)
 2. Checks credit balance (≥ 1)
 3. Deducts 1 credit using FIFO expiry inheritance
@@ -28,6 +30,7 @@ Create `POST /events/:id/photos` endpoint that:
 6. Enqueues job for face detection (T-17)
 
 **Non-goals:**
+
 - Face detection processing (T-17)
 - UI implementation (T-19)
 - Rate limiting (defer to post-MVP)
@@ -40,6 +43,7 @@ Create `POST /events/:id/photos` endpoint that:
 There is a conflict between the execution plan and implementation research:
 
 **Option A: Store Original Files (Research-Backed)**
+
 - Upload endpoint: Store original file as-is in R2 (HEIC/WebP/JPEG/PNG)
 - Queue consumer (T-17): Fetch via CF Images Transform with `format=jpeg` before Rekognition
 - Pros: Preserves original quality, simpler upload, faster
@@ -47,6 +51,7 @@ There is a conflict between the execution plan and implementation research:
 - Evidence: `heic-rekognition.md` recommends this approach
 
 **Option B: Normalize on Upload (Plan-Specified)**
+
 - Upload endpoint: Transform to JPEG during upload, store normalized only
 - Queue consumer (T-17): Direct fetch from R2, no transformation needed
 - Pros: Simpler consumer, matches original plan
@@ -56,6 +61,7 @@ There is a conflict between the execution plan and implementation research:
 **Recommendation: Option A (Store Originals)**
 
 Rationale:
+
 1. Research completed after planning uncovered better approach
 2. Preserves original quality for future use cases
 3. Faster upload experience (no transformation latency)
@@ -69,6 +75,7 @@ Rationale:
 **Route:** `POST /events/:id/photos`
 
 **Middleware chain:**
+
 ```typescript
 requirePhotographer()
   → requireConsent()
@@ -125,6 +132,7 @@ requirePhotographer()
     - Body: `{ data: { id, eventId, r2Key, status, uploadedAt } }`
 
 **Error handling after credit deduction:**
+
 - R2 upload fails → Log error, return 500, NO refund (per plan)
 - Queue enqueue fails → Log error, return 500, NO refund (per plan)
 - All post-deduction failures logged for manual reconciliation
@@ -132,10 +140,11 @@ requirePhotographer()
 ### File Validation Implementation
 
 **Magic bytes detection:**
+
 ```typescript
 const MAGIC_BYTES = {
-  'image/jpeg': [0xFF, 0xD8, 0xFF],
-  'image/png': [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+  'image/jpeg': [0xff, 0xd8, 0xff],
+  'image/png': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
   'image/webp': [0x52, 0x49, 0x46, 0x46], // 'RIFF' at start, 'WEBP' at offset 8
 };
 // HEIC detection is complex (multiple variants), use file-type library or accept Content-Type
@@ -146,6 +155,7 @@ const MAGIC_BYTES = {
 ### Credit Deduction with Race Condition Prevention
 
 **Transaction with row locking:**
+
 ```typescript
 await db.transaction(async (tx) => {
   // 1. Lock photographer row to serialize uploads
@@ -159,10 +169,9 @@ await db.transaction(async (tx) => {
   const [{ balance }] = await tx
     .select({ balance: sql`COALESCE(SUM(${creditLedger.amount}), 0)::int` })
     .from(creditLedger)
-    .where(and(
-      eq(creditLedger.photographerId, photographerId),
-      gt(creditLedger.expiresAt, sql`NOW()`)
-    ));
+    .where(
+      and(eq(creditLedger.photographerId, photographerId), gt(creditLedger.expiresAt, sql`NOW()`)),
+    );
 
   if (balance < 1) {
     throw new InsufficientCreditsError();
@@ -172,11 +181,13 @@ await db.transaction(async (tx) => {
   const [oldestCredit] = await tx
     .select({ expiresAt: creditLedger.expiresAt })
     .from(creditLedger)
-    .where(and(
-      eq(creditLedger.photographerId, photographerId),
-      gt(creditLedger.amount, 0),
-      gt(creditLedger.expiresAt, sql`NOW()`)
-    ))
+    .where(
+      and(
+        eq(creditLedger.photographerId, photographerId),
+        gt(creditLedger.amount, 0),
+        gt(creditLedger.expiresAt, sql`NOW()`),
+      ),
+    )
     .orderBy(asc(creditLedger.expiresAt))
     .limit(1);
 
@@ -194,12 +205,15 @@ await db.transaction(async (tx) => {
   });
 
   // 5. Insert photo record
-  const [photo] = await tx.insert(photos).values({
-    eventId,
-    r2Key,
-    status: 'processing',
-    faceCount: 0,
-  }).returning();
+  const [photo] = await tx
+    .insert(photos)
+    .values({
+      eventId,
+      r2Key,
+      status: 'processing',
+      faceCount: 0,
+    })
+    .returning();
 
   return photo;
 });
@@ -214,11 +228,13 @@ await db.transaction(async (tx) => {
 **Endpoint:** `POST /events/:id/photos`
 
 **Request:**
+
 - Content-Type: `multipart/form-data`
 - Body: `file` field (binary)
 - Param: `id` (event UUID)
 
 **Response (201):**
+
 ```json
 {
   "data": {
@@ -233,6 +249,7 @@ await db.transaction(async (tx) => {
 ```
 
 **Errors:**
+
 - 400: `VALIDATION_ERROR` - Invalid request format
 - 402: `INSUFFICIENT_CREDITS` - Credit balance < 1
 - 404: `NOT_FOUND` - Event doesn't exist or not owned
@@ -244,10 +261,12 @@ await db.transaction(async (tx) => {
 ### Database
 
 **Touched tables:**
+
 - `credit_ledger`: INSERT (deduction row)
 - `photos`: INSERT (processing status)
 
 **credit_ledger insert:**
+
 ```typescript
 {
   photographerId: uuid,
@@ -259,6 +278,7 @@ await db.transaction(async (tx) => {
 ```
 
 **photos insert:**
+
 ```typescript
 {
   id: <db-generated uuid>,
@@ -275,6 +295,7 @@ await db.transaction(async (tx) => {
 **Bucket:** `PHOTOS_BUCKET` binding → `sabaipics-photos` (dev/prod), `sabaipics-photos-staging` (staging)
 
 **Key format:** `{eventId}/{photoId}.{ext}`
+
 - Preserves original extension (`.heic`, `.jpg`, `.png`, `.webp`)
 - Example: `550e8400-e29b-41d4-a716-446655440000/7c9e6679-7425-40de-944b-e07fc1f90ae7.heic`
 
@@ -285,6 +306,7 @@ await db.transaction(async (tx) => {
 **Binding:** `PHOTO_QUEUE` → `photo-processing` queue
 
 **Message payload:**
+
 ```typescript
 {
   photo_id: "uuid",
@@ -309,6 +331,7 @@ await db.transaction(async (tx) => {
 ## Failure Modes / Edge Cases (Major Only)
 
 ### Pre-Credit-Deduction Failures (Safe)
+
 1. **Invalid format** → 415 error, no credit deducted
 2. **File too large** → 413 error, no credit deducted
 3. **Event not found** → 404 error, no credit deducted
@@ -316,13 +339,16 @@ await db.transaction(async (tx) => {
 5. **Insufficient credits** → 402 error, no transaction attempted
 
 ### Post-Credit-Deduction Failures (No Refund)
+
 6. **R2 upload fails** → Credit deducted, photo row exists (status='processing'), return 500, log for manual refund
 7. **Queue enqueue fails** → Credit deducted, photo in R2, row exists, return 500, log for manual refund
 
 ### Race Conditions (Mitigated)
+
 8. **Concurrent uploads** → Photographer row lock serializes transactions, prevents negative balance
 
 ### Data Integrity
+
 9. **FIFO expiry NULL** → Transaction aborts if no unexpired credits found, prevents constraint violation
 
 ## Validation Plan
@@ -330,6 +356,7 @@ await db.transaction(async (tx) => {
 ### Tests to Add
 
 **Unit tests** (`apps/api/src/routes/events/upload.test.ts`):
+
 1. Auth: Returns 401 without authentication
 2. Ownership: Returns 404 for non-owned event
 3. Expired event: Returns 410 for expired event
@@ -341,11 +368,13 @@ await db.transaction(async (tx) => {
 9. Queue failure: Returns 500, logs error (mock queue to throw)
 
 **Integration tests:**
+
 1. Full flow: Upload → credit deduction → R2 → DB → queue
 2. Race condition: Two concurrent uploads don't create negative balance (mock DB transaction)
 3. FIFO expiry: Credit deduction inherits correct expiry date
 
 **Manual testing:**
+
 1. Upload JPEG from desktop
 2. Upload PNG with transparency
 3. Upload HEIC from iPhone
@@ -374,6 +403,7 @@ pnpm --filter=@sabaipics/api dev
 ## Rollout / Rollback
 
 ### Rollout Strategy
+
 1. Deploy to staging environment (auto-deploy from master)
 2. Test with real HEIC files from iPhone
 3. Monitor logs for credit deduction errors
@@ -381,12 +411,14 @@ pnpm --filter=@sabaipics/api dev
 5. Monitor upload success rate (target: >95%)
 
 ### Monitoring
+
 - Log all credit deductions with before/after balance
 - Log all post-deduction failures (require manual review)
 - Track upload success rate by format (JPEG, PNG, HEIC, WebP)
 - Alert on credit balance anomalies (negative balance, NULL expiry)
 
 ### Rollback Plan
+
 - If critical issues: revert PR, return 503 from upload endpoint
 - Credits already deducted: NOT rolled back (manual refunds if needed)
 - Photos in R2: Remain (cleanup job not in scope)
@@ -397,6 +429,7 @@ pnpm --filter=@sabaipics/api dev
 ### Blocking Decisions
 
 **1. `[NEED_DECISION]` File Storage Strategy**
+
 - **Option A (Recommended):** Store original files, transform in consumer (T-17)
 - **Option B:** Transform on upload, store JPEG only
 - **Impact:** Affects T-16 scope, T-17 implementation, and original quality preservation
@@ -405,16 +438,19 @@ pnpm --filter=@sabaipics/api dev
 ### Non-Blocking (Can Proceed with Defaults)
 
 **2. `[NEED_VALIDATION]` Rate Limiting**
+
 - Current plan: No rate limiting for MVP
 - Default: Proceed without rate limiting, defer to post-MVP
 - Risk: Abuse possible, but mitigated by credit system
 
 **3. `[NEED_VALIDATION]` Event Expiration Date**
+
 - Should expired events allow uploads?
 - Default: Reject uploads to expired events (410 Gone)
 - Assumption: Event expiration is a hard cutoff
 
 **4. `[NEED_VALIDATION]` PDPA Consent for Upload**
+
 - Should upload require PDPA consent, or only credit purchase?
 - Default: Require consent (use `requireConsent()` middleware)
 - Assumption: Uploading photos with faces is PDPA-relevant activity
@@ -422,50 +458,57 @@ pnpm --filter=@sabaipics/api dev
 ## Key Files to Modify
 
 ### Create New Files
+
 - `apps/api/src/routes/events/upload.ts` - Upload route handler (or add to existing `index.ts`)
 - `apps/api/src/routes/events/upload.test.ts` - Unit tests
 
 ### Modify Existing Files
+
 - `apps/api/src/routes/events/index.ts` - Add upload route to router
 - `apps/api/src/routes/events/schema.ts` - Add upload validation schema
 
 ## Dependencies Verified
 
 **Upstream (Complete):**
+
 - T-1: Database schema ✓ (photos, credit_ledger tables exist)
 - T-2: Auth middleware ✓ (requirePhotographer, requireConsent)
 - T-13: Events API ✓ (event ownership validation pattern)
 
 **Downstream (Blocked on T-16):**
+
 - T-17: Queue consumer (will add face detection + CF Images fetching)
 - T-19: Upload UI (will call this endpoint)
 
 **External Services:**
+
 - R2: `PHOTOS_BUCKET` binding configured in wrangler.jsonc ✓
 - Queue: `PHOTO_QUEUE` binding configured in wrangler.jsonc ✓
 - CF Images: Required for T-17 (consumer transformation), not T-16 ✓
 
 ## Risk Mitigation Summary
 
-| Risk | Mitigation | Status |
-|------|------------|--------|
-| Credit race condition | Transaction with row lock | Implemented in plan |
-| FIFO expiry NULL | Explicit NULL check, abort transaction | Implemented in plan |
-| R2 upload failure | Log error, no refund, return 500 | Implemented in plan |
-| Queue enqueue failure | Log error, no refund, return 500 | Implemented in plan |
-| Magic bytes bypass | Secondary MIME type check | Implemented in plan |
-| File size spoofing | Server-side size validation | Implemented in plan |
-| Event ownership bypass | DB query with photographer ID filter | Implemented in plan |
-| Expired event uploads | Check `expiresAt` before deduction | Implemented in plan |
+| Risk                   | Mitigation                             | Status              |
+| ---------------------- | -------------------------------------- | ------------------- |
+| Credit race condition  | Transaction with row lock              | Implemented in plan |
+| FIFO expiry NULL       | Explicit NULL check, abort transaction | Implemented in plan |
+| R2 upload failure      | Log error, no refund, return 500       | Implemented in plan |
+| Queue enqueue failure  | Log error, no refund, return 500       | Implemented in plan |
+| Magic bytes bypass     | Secondary MIME type check              | Implemented in plan |
+| File size spoofing     | Server-side size validation            | Implemented in plan |
+| Event ownership bypass | DB query with photographer ID filter   | Implemented in plan |
+| Expired event uploads  | Check `expiresAt` before deduction     | Implemented in plan |
 
 ## Implementation Checklist
 
 **Pre-implementation:**
+
 - [x] Context gathered (upstream, logs, tech docs, exemplars, risks)
 - [ ] HI decision on storage strategy (Option A vs B)
 - [ ] HI approval of this plan
 
 **Implementation:**
+
 - [ ] Add upload schema to `events/schema.ts`
 - [ ] Implement credit balance check function
 - [ ] Implement FIFO credit deduction with row lock
@@ -479,6 +522,7 @@ pnpm --filter=@sabaipics/api dev
 - [ ] Write integration tests (3 test cases)
 
 **Validation:**
+
 - [ ] Run unit tests (all pass)
 - [ ] Run type checking (no errors)
 - [ ] Run linter (no errors)
@@ -487,6 +531,7 @@ pnpm --filter=@sabaipics/api dev
 - [ ] Manual test: Concurrent uploads
 
 **Deployment:**
+
 - [ ] Commit code with conventional message
 - [ ] Open PR with implementation summary
 - [ ] Deploy to staging

@@ -42,12 +42,14 @@ Date: `2026-01-11`
 ### Key approach (from final.md)
 
 **US-7 Upload Flow (client-side):**
+
 1. UI: Drag photos or file picker
 2. UI: Client validation (format, size ≤ 20MB)
 3. API: `POST /events/:id/photos`
 4. UI: Show "Processing..." badge
 
 **US-9 Gallery Display:**
+
 1. UI: Open event detail
 2. API: `GET /events/:id/photos?cursor=X&limit=50`
 3. UI: Grid with CF Images thumbnails (400px)
@@ -55,6 +57,7 @@ Date: `2026-01-11`
 5. UI: Download → presigned R2 URL (4000px JPEG)
 
 **URL structure for images:**
+
 ```
 Thumbnail: /cdn-cgi/image/width=400,fit=cover,format=auto/photos.sabaipics.com/{r2_key}
 Preview:   /cdn-cgi/image/width=1200,fit=contain,format=auto/photos.sabaipics.com/{r2_key}
@@ -64,6 +67,7 @@ Download:  Presigned R2 URL (normalized JPEG, ~4000px)
 ### Validation constraints
 
 **Client-side validation requirements:**
+
 - Accepted formats: JPEG, PNG, HEIC, WebP (no RAW)
 - Max size: 20 MB
 - Clear error messages for rejection
@@ -81,6 +85,7 @@ Download:  Presigned R2 URL (normalized JPEG, ~4000px)
 **Endpoint:** `GET /events/:id/photos`
 
 **Response shape:**
+
 ```typescript
 {
   photos: Array<{
@@ -96,6 +101,7 @@ Download:  Presigned R2 URL (normalized JPEG, ~4000px)
 ```
 
 **Pagination:**
+
 - Cursor-based
 - Limit: 50 photos per page
 - Sorted by uploaded_at desc
@@ -107,14 +113,16 @@ Download:  Presigned R2 URL (normalized JPEG, ~4000px)
 **Request:** multipart/form-data (file)
 
 **Response:**
+
 ```typescript
 {
   photoId: string;
-  status: "processing";
+  status: 'processing';
 }
 ```
 
 **Error responses:**
+
 - 400: Validation errors (format, size, expired event)
 - 402: Insufficient credits
 - 404: Event not found
@@ -138,13 +146,13 @@ Download:  Presigned R2 URL (normalized JPEG, ~4000px)
 
 ### Decisions (from final.md)
 
-| # | Decision | Resolution |
-|---|----------|------------|
-| 2 | Image format handling | Normalize to JPEG (4000px max width) |
-| 5 | Thumbnails | CF Images on-demand (400px / 1200px) |
-| 15 | Storage strategy | Normalized JPEG only (no original) |
-| 16 | Accepted formats | JPEG, PNG, HEIC, WebP (no RAW) |
-| 17 | Max upload size | 20 MB |
+| #   | Decision              | Resolution                           |
+| --- | --------------------- | ------------------------------------ |
+| 2   | Image format handling | Normalize to JPEG (4000px max width) |
+| 5   | Thumbnails            | CF Images on-demand (400px / 1200px) |
+| 15  | Storage strategy      | Normalized JPEG only (no original)   |
+| 16  | Accepted formats      | JPEG, PNG, HEIC, WebP (no RAW)       |
+| 17  | Max upload size       | 20 MB                                |
 
 ## Key constraints from upstream
 

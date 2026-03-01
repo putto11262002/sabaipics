@@ -16,6 +16,7 @@ Currently the photo UI uses mock data (`USE_MOCK_DATA = true`). This plan outlin
 **Hook:** `usePhotos` in `apps/dashboard/src/hooks/photos/usePhotos.ts`
 
 **Request:**
+
 ```
 GET /events/:eventId/photos?cursor=<timestamp>&limit=<number>
 Headers:
@@ -23,10 +24,12 @@ Headers:
 ```
 
 **Query Parameters:**
+
 - `cursor` (optional): ISO timestamp for pagination (e.g., "2026-01-11T12:00:00Z")
 - `limit` (optional): Number of photos per page, default 20, max 50
 
 **Response (200):**
+
 ```json
 {
   "data": [
@@ -48,16 +51,19 @@ Headers:
 ```
 
 **Error Responses:**
+
 - 401: Unauthorized (no/invalid token)
 - 403: Forbidden (not event owner)
 - 404: Event not found
 
 **Used By:**
+
 - Photos tab (Grid View)
 - Photos tab (List View)
 - React Query infinite query for pagination
 
 **Current Implementation:**
+
 - Real API code exists in `else` block
 - Mock data used when `USE_MOCK_DATA = true`
 - Uses React Query's `useInfiniteQuery` for pagination
@@ -71,6 +77,7 @@ Headers:
 **Hook:** `useUploadPhoto` in `apps/dashboard/src/hooks/photos/useUploadPhoto.ts`
 
 **Request:**
+
 ```
 POST /events/:eventId/photos
 Headers:
@@ -81,6 +88,7 @@ Body:
 ```
 
 **Response (201):**
+
 ```json
 {
   "data": {
@@ -96,6 +104,7 @@ Body:
 ```
 
 **Error Responses:**
+
 - 400: Validation error (invalid format, too large, missing file)
   ```json
   {
@@ -127,11 +136,13 @@ Body:
 - 413: Payload too large
 
 **Used By:**
+
 - Upload dropzone (file selection/drag-drop)
 - Uploading tab (table with progress)
 - Upload queue management in event detail page
 
 **Current Implementation:**
+
 - Real API code exists in `else` block
 - Mock upload simulation when `USE_MOCK_DATA = true`
 - Returns full photo object (extended in mock to match real API)
@@ -165,6 +176,7 @@ Body:
 **File:** `apps/dashboard/src/hooks/photos/usePhotos.ts`
 
 **Change:**
+
 ```typescript
 // Line 4: Change this
 const USE_MOCK_DATA = true;
@@ -174,12 +186,14 @@ const USE_MOCK_DATA = false;
 ```
 
 **What happens:**
+
 - Uses real `fetch()` call to API
 - Gets real photos from database
 - Pagination uses real cursor values
 - No more stable cache needed
 
 **Expected behavior:**
+
 - Empty gallery if no photos uploaded yet
 - Real photos appear after upload
 - Real face counts from Rekognition (T-17)
@@ -192,6 +206,7 @@ const USE_MOCK_DATA = false;
 **File:** `apps/dashboard/src/hooks/photos/useUploadPhoto.ts`
 
 **Change:**
+
 ```typescript
 // Line 4: Change this
 const USE_MOCK_DATA = true;
@@ -201,6 +216,7 @@ const USE_MOCK_DATA = false;
 ```
 
 **What happens:**
+
 - Uses real `fetch()` call to upload endpoint
 - Real FormData upload with progress
 - Real error handling (402, 403, 400)
@@ -208,6 +224,7 @@ const USE_MOCK_DATA = false;
 - Real photo processing
 
 **Expected behavior:**
+
 - Upload shows in "Uploading" tab
 - Credit deducted from account
 - Photo appears with "processing" status
@@ -220,6 +237,7 @@ const USE_MOCK_DATA = false;
 **File:** `apps/dashboard/src/routes/events/[id]/index.tsx`
 
 **Change:**
+
 ```typescript
 // Lines 296-343: Remove or comment out this entire useEffect
 useEffect(() => {
@@ -234,11 +252,13 @@ useEffect(() => {
 ```
 
 **What happens:**
+
 - No fake uploads in Uploading/Failed tabs
 - Tabs start empty
 - Only real uploads appear
 
 **Expected behavior:**
+
 - "Uploading" tab shows empty state initially
 - "Failed" tab shows empty state initially
 - Real uploads appear when user selects files
@@ -252,6 +272,7 @@ useEffect(() => {
 **Optional:** Remove the mock data cache entirely (lines 28-76) since it won't be used.
 
 **Keep or Remove?**
+
 - **Keep:** Useful for quick testing without backend
 - **Remove:** Cleaner code, no unused constants
 
@@ -262,6 +283,7 @@ useEffect(() => {
 ## Testing After Integration
 
 ### Prerequisites
+
 1. Backend API running and accessible at `VITE_API_URL`
 2. Clerk authentication working
 3. Event exists in database with valid eventId
@@ -271,12 +293,14 @@ useEffect(() => {
 ### Test Cases
 
 #### 1. Empty Gallery
+
 - Navigate to event with no photos
 - Verify Photos tab shows empty state: "No photos uploaded yet"
 - Verify Uploading tab shows empty state
 - Verify Failed tab shows empty state
 
 #### 2. Upload Flow
+
 - Select/drag 3 photos
 - Verify files appear in Uploading tab with progress bars
 - Verify credit balance decreases by 3
@@ -285,11 +309,13 @@ useEffect(() => {
 - Verify status badges show "Processing"
 
 #### 3. Face Detection (requires T-17)
+
 - Wait ~10 seconds after upload
 - Verify status changes from "Processing" → "Indexed"
 - Verify face count badges appear with numbers
 
 #### 4. Pagination
+
 - Upload 60+ photos (to exceed page limit)
 - Scroll to bottom of Photos tab
 - Click "Load More"
@@ -297,16 +323,19 @@ useEffect(() => {
 - Verify no duplicates
 
 #### 5. Error Handling
+
 - Upload with 0 credits → verify 402 error in Failed tab, no retry button
 - Upload invalid file (PDF) → verify 400 error in Failed tab, retry button shows
 - Upload 30MB file → verify 413/400 error
 
 #### 6. Bulk Download
+
 - Select multiple photos in grid view
 - Click "Download Selected"
 - Verify all photos download sequentially
 
 #### 7. Lightbox
+
 - Click photo thumbnail
 - Verify lightbox opens with full-size image
 - Use arrow keys to navigate
@@ -319,6 +348,7 @@ useEffect(() => {
 If real API integration has issues:
 
 1. **Quick rollback to mock data:**
+
    ```typescript
    // In both hooks:
    const USE_MOCK_DATA = true;
@@ -337,12 +367,14 @@ If real API integration has issues:
 ## Environment Variables Required
 
 ### Dashboard (.env)
+
 ```bash
 VITE_API_URL=http://localhost:8787  # or production URL
 VITE_CLERK_PUBLISHABLE_KEY=pk_...
 ```
 
 ### API (wrangler.toml or .dev.vars)
+
 ```bash
 DATABASE_URL=...
 CLOUDFLARE_ACCOUNT_ID=...
@@ -355,6 +387,7 @@ REKOGNITION_QUEUE_NAME=...
 ## Known Limitations (from T-16, T-18)
 
 ### From Upload API (T-16)
+
 1. No upload progress percentage (API limitation)
    - Frontend shows indeterminate progress
    - Completed = success response received
@@ -366,6 +399,7 @@ REKOGNITION_QUEUE_NAME=...
    - Frontend limits to 5 concurrent uploads
 
 ### From Gallery API (T-18)
+
 1. Download URLs expire in 15 minutes
    - May need to re-fetch if user delays download
 2. Status polling required

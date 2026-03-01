@@ -10,7 +10,10 @@ import { safeTry, ok, err, ResultAsync } from 'neverthrow';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
 import { createStripeClient } from '../../lib/stripe';
-import type { CreateDiscountCodeRequest, CreateDiscountCodeResponse } from '../../types/promo-codes';
+import type {
+  CreateDiscountCodeRequest,
+  CreateDiscountCodeResponse,
+} from '../../types/promo-codes';
 
 export const discountCodesRouter = new Hono<Env>()
   /**
@@ -50,7 +53,16 @@ export const discountCodesRouter = new Hono<Env>()
       );
 
       // Validate required fields
-      const { code, discountType, discountValue, duration, maxRedemptions, expiresInDays, minAmountThb, customerId } = body as CreateDiscountCodeRequest;
+      const {
+        code,
+        discountType,
+        discountValue,
+        duration,
+        maxRedemptions,
+        expiresInDays,
+        minAmountThb,
+        customerId,
+      } = body as CreateDiscountCodeRequest;
 
       if (!code || typeof code !== 'string' || code.trim().length === 0) {
         return err<never, HandlerError>({
@@ -76,7 +88,8 @@ export const discountCodesRouter = new Hono<Env>()
       if (discountType === 'percent' && (discountValue < 1 || discountValue > 99)) {
         return err<never, HandlerError>({
           code: 'BAD_REQUEST',
-          message: 'discountValue for percent type must be between 1-99 (use gift codes for 100% off)',
+          message:
+            'discountValue for percent type must be between 1-99 (use gift codes for 100% off)',
         });
       }
 
@@ -88,7 +101,10 @@ export const discountCodesRouter = new Hono<Env>()
       }
 
       // Validate optional fields
-      if (maxRedemptions !== undefined && (!Number.isInteger(maxRedemptions) || maxRedemptions < 1)) {
+      if (
+        maxRedemptions !== undefined &&
+        (!Number.isInteger(maxRedemptions) || maxRedemptions < 1)
+      ) {
         return err<never, HandlerError>({
           code: 'BAD_REQUEST',
           message: 'maxRedemptions must be a positive integer',

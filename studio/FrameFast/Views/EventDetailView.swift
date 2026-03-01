@@ -31,7 +31,7 @@ struct EventDetailView: View {
         contentView
             .navigationTitle("Event Details")
             .navigationBarTitleDisplayMode(.inline)
-            .tint(Color.Theme.primary)
+            .tint(Color.accentColor)
             .task {
                 await loadEvent()
             }
@@ -53,7 +53,7 @@ struct EventDetailView: View {
             eventContentView(event: event)
         } else {
             Text("No event data")
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -77,10 +77,10 @@ struct EventDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Subtitle")
                         .font(.caption)
-                        .foregroundStyle(Color.Theme.mutedForeground)
+                        .foregroundStyle(Color.secondary)
                     Text(event.subtitle ?? "No subtitle")
                         .font(.body)
-                        .foregroundStyle(event.subtitle != nil ? Color.Theme.foreground : Color.Theme.mutedForeground)
+                        .foregroundStyle(event.subtitle != nil ? Color.primary : Color.secondary)
                 }
                 .padding(.vertical, 4)
 
@@ -113,7 +113,7 @@ struct EventDetailView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(Color.Theme.primary)
+                        .foregroundStyle(Color.accentColor)
                 }
             }
         }
@@ -126,15 +126,15 @@ struct EventDetailView: View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.Theme.destructive)
+                .foregroundStyle(Color.red)
 
             Text("Error Loading Event")
                 .font(.headline)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
 
             Text(error.localizedDescription)
                 .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
@@ -145,7 +145,8 @@ struct EventDetailView: View {
             } label: {
                 Text("Retry")
             }
-            .buttonStyle(.primary)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -214,15 +215,15 @@ struct CopyConfirmationView: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Color.Theme.primary)
+                .foregroundStyle(Color.accentColor)
             Text("Copied to clipboard")
                 .font(.subheadline)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
         }
         .padding()
-        .background(Color.Theme.card)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(10)
-        .shadow(color: Color.Theme.foreground.opacity(0.1), radius: 8, x: 0, y: 2)
+        .shadow(color: Color.primary.opacity(0.1), radius: 8, x: 0, y: 2)
         .padding(.top, 8)
     }
 }
@@ -303,10 +304,10 @@ private struct EventDetailSkeletonPreview: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Subtitle")
                         .font(.caption)
-                        .foregroundStyle(Color.Theme.mutedForeground)
+                        .foregroundStyle(Color.secondary)
                     Text("Loading subtitle text here")
                         .font(.body)
-                        .foregroundStyle(Color.Theme.foreground)
+                        .foregroundStyle(Color.primary)
                 }
                 .padding(.vertical, 4)
 
@@ -335,10 +336,10 @@ private struct EventDetailPreview: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Subtitle")
                         .font(.caption)
-                        .foregroundStyle(Color.Theme.mutedForeground)
+                        .foregroundStyle(Color.secondary)
                     Text(event.subtitle ?? "No subtitle")
                         .font(.body)
-                        .foregroundStyle(event.subtitle != nil ? Color.Theme.foreground : Color.Theme.mutedForeground)
+                        .foregroundStyle(event.subtitle != nil ? Color.primary : Color.secondary)
                 }
                 .padding(.vertical, 4)
 
@@ -368,7 +369,7 @@ private struct EventDetailPreview: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(Color.Theme.primary)
+                        .foregroundStyle(Color.accentColor)
                 }
             }
         }
@@ -380,15 +381,15 @@ private struct EventDetailErrorPreview: View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.Theme.destructive)
+                .foregroundStyle(Color.red)
 
             Text("Error Loading Event")
                 .font(.headline)
-                .foregroundStyle(Color.Theme.foreground)
+                .foregroundStyle(Color.primary)
 
             Text("The network connection was lost.")
                 .font(.subheadline)
-                .foregroundStyle(Color.Theme.mutedForeground)
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
@@ -397,7 +398,8 @@ private struct EventDetailErrorPreview: View {
             } label: {
                 Text("Retry")
             }
-            .buttonStyle(.primary)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)

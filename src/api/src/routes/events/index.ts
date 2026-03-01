@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { eq, desc, sql, and, isNull } from 'drizzle-orm';
+import { eq, desc, sql, and, or, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   events,
   activeEvents,
   photoLuts,
+  autoEditPresets,
   DEFAULT_SLIDESHOW_CONFIG,
   logoUploadIntents,
   ftpCredentials,
@@ -18,41 +19,84 @@ import { createEventSchema, eventParamsSchema, listEventsQuerySchema } from './s
 import { slideshowConfigSchema } from './slideshow-schema';
 import { logoPresignSchema, logoStatusQuerySchema } from './logo-schema';
 import { eventColorGradeSchema } from './color-grade-schema';
+import { slideshowSettingsSchema } from './slideshow-settings-schema';
+import { eventImagePipelineSchema } from './image-pipeline-schema';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { apiError, type HandlerError } from '../../lib/error';
 import { safeHandler } from '../../lib/safe-handler';
 import { generatePresignedPutUrl } from '../../lib/r2/presign';
 import { createFtpCredentialsWithRetry } from '../../lib/ftp/credentials';
 import { hardDeleteEvents } from '../../lib/services/events/hard-delete';
-import { createFaceProvider } from '../../lib/rekognition';
+import { capturePostHogEvent } from '../../lib/posthog';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
 const DEFAULT_COLOR_GRADE_SETTINGS = {
-  enabled: false,
+  autoEdit: false,
+  autoEditPresetId: null as string | null,
+  autoEditIntensity: 75,
   lutId: null as string | null,
-  intensity: 75,
+  lutIntensity: 75,
+  includeLuminance: false,
+};
+
+const DEFAULT_IMAGE_PIPELINE_SETTINGS = {
+  autoEdit: false,
+  autoEditPresetId: null as string | null,
+  autoEditIntensity: 75,
+  lutId: null as string | null,
+  lutIntensity: 75,
   includeLuminance: false,
 };
 
 function normalizeColorGradeSettings(colorGrade: EventSettings['colorGrade'] | undefined): {
-  enabled: boolean;
   lutId: string | null;
-  intensity: number;
+  lutIntensity: number;
   includeLuminance: boolean;
 } {
-  const intensityRaw = colorGrade?.intensity;
-  const intensity =
-    typeof intensityRaw === 'number' && Number.isFinite(intensityRaw)
-      ? intensityRaw
-      : DEFAULT_COLOR_GRADE_SETTINGS.intensity;
+  const lutIntensityRaw = colorGrade?.lutIntensity;
+  const lutIntensity =
+    typeof lutIntensityRaw === 'number' && Number.isFinite(lutIntensityRaw)
+      ? lutIntensityRaw
+      : DEFAULT_COLOR_GRADE_SETTINGS.lutIntensity;
 
   return {
-    enabled: colorGrade?.enabled ?? DEFAULT_COLOR_GRADE_SETTINGS.enabled,
     lutId: colorGrade?.lutId ?? DEFAULT_COLOR_GRADE_SETTINGS.lutId,
-    intensity: Math.max(0, Math.min(100, Math.round(intensity))),
+    lutIntensity: Math.max(0, Math.min(100, Math.round(lutIntensity))),
     includeLuminance: colorGrade?.includeLuminance ?? DEFAULT_COLOR_GRADE_SETTINGS.includeLuminance,
+  };
+}
+
+function normalizeImagePipelineSettings(colorGrade: EventSettings['colorGrade'] | undefined): {
+  autoEdit: boolean;
+  autoEditPresetId: string | null;
+  autoEditIntensity: number;
+  lutId: string | null;
+  lutIntensity: number;
+  includeLuminance: boolean;
+} {
+  const lutIntensityRaw = colorGrade?.lutIntensity;
+  const lutIntensity =
+    typeof lutIntensityRaw === 'number' && Number.isFinite(lutIntensityRaw)
+      ? lutIntensityRaw
+      : DEFAULT_IMAGE_PIPELINE_SETTINGS.lutIntensity;
+
+  const autoEditIntensityRaw = colorGrade?.autoEditIntensity;
+  const autoEditIntensity =
+    typeof autoEditIntensityRaw === 'number' && Number.isFinite(autoEditIntensityRaw)
+      ? autoEditIntensityRaw
+      : DEFAULT_IMAGE_PIPELINE_SETTINGS.autoEditIntensity;
+
+  return {
+    autoEdit: colorGrade?.autoEdit ?? DEFAULT_IMAGE_PIPELINE_SETTINGS.autoEdit,
+    autoEditPresetId:
+      colorGrade?.autoEditPresetId ?? DEFAULT_IMAGE_PIPELINE_SETTINGS.autoEditPresetId,
+    autoEditIntensity: Math.max(0, Math.min(100, Math.round(autoEditIntensity))),
+    lutId: colorGrade?.lutId ?? DEFAULT_IMAGE_PIPELINE_SETTINGS.lutId,
+    lutIntensity: Math.max(0, Math.min(100, Math.round(lutIntensity))),
+    includeLuminance:
+      colorGrade?.includeLuminance ?? DEFAULT_IMAGE_PIPELINE_SETTINGS.includeLuminance,
   };
 }
 
@@ -117,9 +161,8 @@ export const eventsRouter = new Hono<Env>()
 
         return ok({
           data: {
-            enabled: cg.enabled,
             lutId: cg.lutId,
-            intensity: cg.intensity,
+            lutIntensity: cg.lutIntensity,
             includeLuminance: cg.includeLuminance,
           },
         });
@@ -138,6 +181,305 @@ export const eventsRouter = new Hono<Env>()
     requirePhotographer(),
     zValidator('param', eventParamsSchema),
     zValidator('json', eventColorGradeSchema),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id } = c.req.valid('param');
+      const body = c.req.valid('json');
+
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: activeEvents.id, settings: activeEvents.settings })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const presetId = (body as { autoEditPresetId?: string }).autoEditPresetId;
+        if (presetId) {
+          const [preset] = yield* ResultAsync.fromPromise(
+            db
+              .select({ id: autoEditPresets.id })
+              .from(autoEditPresets)
+              .where(
+                and(
+                  eq(autoEditPresets.id, presetId),
+                  or(
+                    eq(autoEditPresets.photographerId, photographer.id),
+                    eq(autoEditPresets.isBuiltin, true),
+                  ),
+                ),
+              )
+              .limit(1),
+            (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+          );
+
+          if (!preset) {
+            return err<never, HandlerError>({
+              code: 'NOT_FOUND',
+              message: 'Auto-edit preset not found',
+            });
+          }
+        }
+
+        // Validate LUT ownership if provided
+        if (body.lutId) {
+          const [lut] = yield* ResultAsync.fromPromise(
+            db
+              .select({ id: photoLuts.id, status: photoLuts.status })
+              .from(photoLuts)
+              .where(
+                and(eq(photoLuts.id, body.lutId), eq(photoLuts.photographerId, photographer.id)),
+              )
+              .limit(1),
+            (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+          );
+
+          if (!lut) {
+            return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'LUT not found' });
+          }
+
+          if (lut.status !== 'completed') {
+            return err<never, HandlerError>({
+              code: 'CONFLICT',
+              message: 'LUT is not ready',
+            });
+          }
+        }
+
+        const prev = (event.settings ?? null) as EventSettings | null;
+        const next: EventSettings = {
+          ...(prev ?? {}),
+          colorGrade: {
+            autoEdit: prev?.colorGrade?.autoEdit ?? false,
+            autoEditPresetId: prev?.colorGrade?.autoEditPresetId ?? null,
+            autoEditIntensity: prev?.colorGrade?.autoEditIntensity ?? 75,
+            lutId: body.lutId,
+            lutIntensity: body.lutIntensity,
+            includeLuminance: body.includeLuminance,
+          },
+        };
+
+        const [updated] = yield* ResultAsync.fromPromise(
+          db
+            .update(events)
+            .set({ settings: next })
+            .where(
+              and(
+                eq(events.id, id),
+                eq(events.photographerId, photographer.id),
+                isNull(events.deletedAt),
+              ),
+            )
+            .returning({ settings: events.settings }),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!updated) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const normalized = normalizeColorGradeSettings(updated.settings?.colorGrade);
+
+        return ok({
+          data: {
+            lutId: normalized.lutId,
+            lutIntensity: normalized.lutIntensity,
+            includeLuminance: normalized.includeLuminance,
+          },
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] PUT /:id/color-grade', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // GET /events/:id/slideshow-settings - Get event slideshow settings (template + theme)
+  .get(
+    '/:id/slideshow-settings',
+    requirePhotographer(),
+    zValidator('param', eventParamsSchema),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id } = c.req.valid('param');
+
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: activeEvents.id, settings: activeEvents.settings })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const settings = (event.settings ?? null) as EventSettings | null;
+
+        // Validate settings at API boundary - use defaults if invalid
+        const rawConfig = {
+          template: settings?.slideshow?.template ?? 'carousel',
+          primaryColor: settings?.theme?.primary ?? '#ff6320',
+          background: settings?.theme?.background ?? '#fdfdfd',
+        };
+
+        const parseResult = slideshowSettingsSchema.safeParse(rawConfig);
+        const config = parseResult.success
+          ? parseResult.data
+          : {
+              template: 'carousel' as const,
+              primaryColor: '#ff6320',
+              background: '#fdfdfd',
+            };
+
+        return ok({ data: config });
+      })
+        .orTee((e) => e.cause && console.error('[Events] GET /:id/slideshow-settings', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // PUT /events/:id/slideshow-settings - Update event slideshow settings
+  .put(
+    '/:id/slideshow-settings',
+    requirePhotographer(),
+    zValidator('param', eventParamsSchema),
+    zValidator('json', slideshowSettingsSchema),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id } = c.req.valid('param');
+      const body = c.req.valid('json');
+
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: activeEvents.id, settings: activeEvents.settings })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const prev = (event.settings ?? null) as EventSettings | null;
+        const next: EventSettings = {
+          ...(prev ?? {}),
+          theme: {
+            primary: body.primaryColor,
+            background: body.background,
+          },
+          slideshow: {
+            template: body.template,
+          },
+        };
+
+        const [updated] = yield* ResultAsync.fromPromise(
+          db
+            .update(events)
+            .set({ settings: next })
+            .where(
+              and(
+                eq(events.id, id),
+                eq(events.photographerId, photographer.id),
+                isNull(events.deletedAt),
+              ),
+            )
+            .returning({ settings: events.settings }),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!updated) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        return ok({
+          data: {
+            template: updated.settings?.slideshow?.template ?? 'carousel',
+            primaryColor: updated.settings?.theme?.primary ?? '#ff6320',
+            background: updated.settings?.theme?.background ?? '#fdfdfd',
+          },
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] PUT /:id/slideshow-settings', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // GET /events/:id/image-pipeline - Get event image pipeline settings
+  .get(
+    '/:id/image-pipeline',
+    requirePhotographer(),
+    zValidator('param', eventParamsSchema),
+    async (c) => {
+      const photographer = c.var.photographer;
+      const db = c.var.db();
+      const { id } = c.req.valid('param');
+
+      return safeTry(async function* () {
+        const [event] = yield* ResultAsync.fromPromise(
+          db
+            .select({ id: activeEvents.id, settings: activeEvents.settings })
+            .from(activeEvents)
+            .where(and(eq(activeEvents.id, id), eq(activeEvents.photographerId, photographer.id)))
+            .limit(1),
+          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+        );
+
+        if (!event) {
+          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
+        }
+
+        const settings = (event.settings ?? null) as EventSettings | null;
+        const pipeline = normalizeImagePipelineSettings(settings?.colorGrade);
+
+        return ok({
+          data: {
+            autoEdit: pipeline.autoEdit,
+            autoEditPresetId: pipeline.autoEditPresetId,
+            autoEditIntensity: pipeline.autoEditIntensity,
+            lutId: pipeline.lutId,
+            lutIntensity: pipeline.lutIntensity,
+            includeLuminance: pipeline.includeLuminance,
+          },
+        });
+      })
+        .orTee((e) => e.cause && console.error('[Events] GET /:id/image-pipeline', e.code, e.cause))
+        .match(
+          (data) => c.json(data),
+          (e) => apiError(c, e),
+        );
+    },
+  )
+
+  // PUT /events/:id/image-pipeline - Update event image pipeline settings
+  .put(
+    '/:id/image-pipeline',
+    requirePhotographer(),
+    zValidator('param', eventParamsSchema),
+    zValidator('json', eventImagePipelineSchema),
     async (c) => {
       const photographer = c.var.photographer;
       const db = c.var.db();
@@ -187,9 +529,11 @@ export const eventsRouter = new Hono<Env>()
         const next: EventSettings = {
           ...(prev ?? {}),
           colorGrade: {
-            enabled: body.enabled,
+            autoEdit: body.autoEdit,
+            autoEditPresetId: body.autoEditPresetId,
+            autoEditIntensity: body.autoEditIntensity,
             lutId: body.lutId,
-            intensity: body.intensity,
+            lutIntensity: body.lutIntensity,
             includeLuminance: body.includeLuminance,
           },
         };
@@ -213,18 +557,20 @@ export const eventsRouter = new Hono<Env>()
           return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
         }
 
-        const normalized = normalizeColorGradeSettings(updated.settings?.colorGrade);
+        const normalized = normalizeImagePipelineSettings(updated.settings?.colorGrade);
 
         return ok({
           data: {
-            enabled: normalized.enabled,
+            autoEdit: normalized.autoEdit,
+            autoEditPresetId: normalized.autoEditPresetId,
+            autoEditIntensity: normalized.autoEditIntensity,
             lutId: normalized.lutId,
-            intensity: normalized.intensity,
+            lutIntensity: normalized.lutIntensity,
             includeLuminance: normalized.includeLuminance,
           },
         });
       })
-        .orTee((e) => e.cause && console.error('[Events] PUT /:id/color-grade', e.code, e.cause))
+        .orTee((e) => e.cause && console.error('[Events] PUT /:id/image-pipeline', e.code, e.cause))
         .match(
           (data) => c.json(data),
           (e) => apiError(c, e),
@@ -242,75 +588,89 @@ export const eventsRouter = new Hono<Env>()
       const db = c.var.db();
       const body = c.req.valid('json');
 
-      return safeHandler(async function* () {
-        // Validate date range
-        if (body.startDate && body.endDate && body.startDate > body.endDate) {
-          return err<never, HandlerError>({
-            code: 'BAD_REQUEST',
-            message: 'Start date must be before or equal to end date',
-          });
-        }
-
-        // Calculate expiry date (30 days from now)
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30);
-
-        const encryptionKey = (c.env as unknown as Record<string, string>)
-          .FTP_PASSWORD_ENCRYPTION_KEY;
-        if (!encryptionKey) {
-          return err<never, HandlerError>({
-            code: 'INTERNAL_ERROR',
-            message: 'FTP password encryption key missing',
-          });
-        }
-
-        const created = yield* ResultAsync.fromPromise(
-          (async () => {
-            const dbTx = c.var.dbTx();
-
-            return await dbTx.transaction(async (tx) => {
-              const [event] = await tx
-                .insert(events)
-                .values({
-                  photographerId: photographer.id,
-                  name: body.name,
-                  startDate: body.startDate,
-                  endDate: body.endDate,
-                  qrCodeR2Key: null, // No longer storing QR codes
-                  rekognitionCollectionId: null,
-                  expiresAt: expiresAt.toISOString(),
-                })
-                .returning();
-
-              await createFtpCredentialsWithRetry(encryptionKey, (payload) =>
-                tx.insert(ftpCredentials).values({
-                  eventId: event.id,
-                  photographerId: photographer.id,
-                  username: payload.username,
-                  passwordHash: payload.passwordHash,
-                  passwordCiphertext: payload.passwordCiphertext,
-                  expiresAt: event.expiresAt,
-                }),
-              );
-
-              return event;
+      return safeHandler(
+        async function* () {
+          // Validate date range
+          if (body.startDate && body.endDate && body.startDate > body.endDate) {
+            return err<never, HandlerError>({
+              code: 'BAD_REQUEST',
+              message: 'Start date must be before or equal to end date',
             });
-          })(),
-          (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
-        );
+          }
 
-        return ok({
-          id: created.id,
-          photographerId: created.photographerId,
-          name: created.name,
-          startDate: created.startDate,
-          endDate: created.endDate,
-          qrCodeUrl: null, // Client-side generation
-          rekognitionCollectionId: created.rekognitionCollectionId,
-          expiresAt: created.expiresAt,
-          createdAt: created.createdAt,
-        });
-      }, c, { status: 201 });
+          // Calculate expiry date (30 days from now)
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 30);
+
+          const encryptionKey = (c.env as unknown as Record<string, string>)
+            .FTP_PASSWORD_ENCRYPTION_KEY;
+          if (!encryptionKey) {
+            return err<never, HandlerError>({
+              code: 'INTERNAL_ERROR',
+              message: 'FTP password encryption key missing',
+            });
+          }
+
+          const created = yield* ResultAsync.fromPromise(
+            (async () => {
+              const dbTx = c.var.dbTx();
+
+              return await dbTx.transaction(async (tx) => {
+                const [event] = await tx
+                  .insert(events)
+                  .values({
+                    photographerId: photographer.id,
+                    name: body.name,
+                    startDate: body.startDate,
+                    endDate: body.endDate,
+                    qrCodeR2Key: null, // No longer storing QR codes
+                    expiresAt: expiresAt.toISOString(),
+                  })
+                  .returning();
+
+                await createFtpCredentialsWithRetry(encryptionKey, (payload) =>
+                  tx.insert(ftpCredentials).values({
+                    eventId: event.id,
+                    photographerId: photographer.id,
+                    username: payload.username,
+                    passwordHash: payload.passwordHash,
+                    passwordCiphertext: payload.passwordCiphertext,
+                    expiresAt: event.expiresAt,
+                  }),
+                );
+
+                return event;
+              });
+            })(),
+            (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
+          );
+
+          try {
+            c.executionCtx.waitUntil(
+              capturePostHogEvent(c.env.POSTHOG_API_KEY, {
+                distinctId: c.get('auth')!.userId,
+                event: 'event_created',
+                properties: { event_id: created.id },
+              }),
+            );
+          } catch {
+            // Hono unit tests do not always provide ExecutionContext.
+          }
+
+          return ok({
+            id: created.id,
+            photographerId: created.photographerId,
+            name: created.name,
+            startDate: created.startDate,
+            endDate: created.endDate,
+            qrCodeUrl: null, // Client-side generation
+            expiresAt: created.expiresAt,
+            createdAt: created.createdAt,
+          });
+        },
+        c,
+        { status: 201 },
+      );
     },
   )
 
@@ -420,7 +780,6 @@ export const eventsRouter = new Hono<Env>()
           startDate: event.startDate,
           endDate: event.endDate,
           qrCodeUrl: null, // Client-side generation
-          rekognitionCollectionId: event.rekognitionCollectionId,
           expiresAt: event.expiresAt,
           createdAt: event.createdAt,
         });
@@ -482,7 +841,6 @@ export const eventsRouter = new Hono<Env>()
             startDate: updated.startDate,
             endDate: updated.endDate,
             qrCodeUrl: null,
-            rekognitionCollectionId: updated.rekognitionCollectionId,
             expiresAt: updated.expiresAt,
             createdAt: updated.createdAt,
           },
@@ -904,23 +1262,11 @@ export const eventsRouter = new Hono<Env>()
         return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
       }
 
-      // Create Rekognition provider and deleteRekognition function
-      const provider = createFaceProvider(c.env);
-      const deleteRekognition = async (collectionId: string): Promise<void> => {
-        await provider.deleteCollection(collectionId).match(
-          () => undefined,
-          (error) => {
-            throw new Error(`Rekognition deletion failed: ${error.type}`);
-          },
-        );
-      };
-
       // Hard delete all related data (batch function with single ID)
       const results = yield* hardDeleteEvents({
         db,
         eventIds: [id],
         r2Bucket: c.env.PHOTOS_BUCKET,
-        deleteRekognition,
       }).mapErr(
         (serviceError): HandlerError => ({
           code: 'INTERNAL_ERROR',

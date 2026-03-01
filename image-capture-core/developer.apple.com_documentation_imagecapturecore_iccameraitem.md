@@ -1,6 +1,6 @@
 ---
-url: "https://developer.apple.com/documentation/imagecapturecore/iccameraitem"
-title: "ICCameraItem | Apple Developer Documentation"
+url: 'https://developer.apple.com/documentation/imagecapturecore/iccameraitem'
+title: 'ICCameraItem | Apple Developer Documentation'
 ---
 
 [Skip Navigation](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#app-main)
@@ -40,12 +40,12 @@ Only search within “Documentation”
 
 [Open Menu](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#)
 
-- SwiftLanguage:  Swift  Objective-C
+- SwiftLanguage: Swift Objective-C
 
 Language:
 
-  - Swift
-  - [Objective-C](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#)
+- Swift
+- [Objective-C](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#)
 
 All Technologies
 
@@ -432,13 +432,13 @@ iOS 13.0+iPadOS 13.0+Mac Catalyst 13.1+macOS 10.4+visionOS 1.0+
 class ICCameraItem
 ```
 
-## [Overview](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#overview)
+## [Overview](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#overview)
 
 The ImageCaptureCore framework defines two concrete subclasses of camera items: [`ICCameraFolder`](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder) and [`ICCameraFile`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile).
 
-## [Topics](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#topics)
+## [Topics](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#topics)
 
-### [Inspecting an Item’s Name and Type](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#Inspecting-an-Items-Name-and-Type)
+### [Inspecting an Item’s Name and Type](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#Inspecting-an-Items-Name-and-Type)
 
 [`var uti: String?`](https://developer.apple.com/documentation/imagecapturecore/iccameraitem/uti)
 
@@ -456,7 +456,7 @@ The item’s `PTP` object handle value, if the camera uses the `PTP` protocol.
 
 A Boolean value indicating whether the item is a raw image file.
 
-### [Determining an Item’s Change Dates](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#Determining-an-Items-Change-Dates)
+### [Determining an Item’s Change Dates](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#Determining-an-Items-Change-Dates)
 
 [`var creationDate: Date?`](https://developer.apple.com/documentation/imagecapturecore/iccameraitem/creationdate)
 
@@ -470,7 +470,7 @@ The item’s modification date, usually the same as its `EXIF` modification date
 
 A Boolean value indicating whether the item was captured on the camera after the camera’s content had been fully enumerated.
 
-### [Locating an Item](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#Locating-an-Item)
+### [Locating an Item](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#Locating-an-Item)
 
 [`var device: ICCameraDevice?`](https://developer.apple.com/documentation/imagecapturecore/iccameraitem/device)
 
@@ -488,9 +488,9 @@ This item’s parent folder.
 
 A Boolean value that indicates whether this item is in a temporary store.
 
-### [Requesting Metadata](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#Requesting-Metadata)
+### [Requesting Metadata](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#Requesting-Metadata)
 
-[`func requestMetadata()`](https://developer.apple.com/documentation/imagecapturecore/iccameraitem/requestmetadata())
+[`func requestMetadata()`](<https://developer.apple.com/documentation/imagecapturecore/iccameraitem/requestmetadata()>)
 
 Requests metadata for the item.
 
@@ -502,7 +502,7 @@ The item’s metadata.
 
 The item’s metadata if it is readily available.
 
-[`func flushMetadataCache()`](https://developer.apple.com/documentation/imagecapturecore/iccameraitem/flushmetadatacache())
+[`func flushMetadataCache()`](<https://developer.apple.com/documentation/imagecapturecore/iccameraitem/flushmetadatacache()>)
 
 Deletes the item’s cached metadata.
 
@@ -510,9 +510,9 @@ Deletes the item’s cached metadata.
 
 An option for the item’s metadata.
 
-### [Requesting Thumbnails](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#Requesting-Thumbnails)
+### [Requesting Thumbnails](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#Requesting-Thumbnails)
 
-[`func requestThumbnail()`](https://developer.apple.com/documentation/imagecapturecore/iccameraitem/requestthumbnail())
+[`func requestThumbnail()`](<https://developer.apple.com/documentation/imagecapturecore/iccameraitem/requestthumbnail()>)
 
 Requests a thumbnail for the item.
 
@@ -528,7 +528,7 @@ The item’s thumbnail if it is readily available.
 
 A large thumbnail for the item if one is readily available.
 
-[`func flushThumbnailCache()`](https://developer.apple.com/documentation/imagecapturecore/iccameraitem/flushthumbnailcache())
+[`func flushThumbnailCache()`](<https://developer.apple.com/documentation/imagecapturecore/iccameraitem/flushthumbnailcache()>)
 
 Deletes the item’s cached thumbnail.
 
@@ -536,30 +536,30 @@ Deletes the item’s cached thumbnail.
 
 An option for the item’s thumbnail.
 
-### [Accessing a Protected Item](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#Accessing-a-Protected-Item)
+### [Accessing a Protected Item](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#Accessing-a-Protected-Item)
 
 [`var isLocked: Bool`](https://developer.apple.com/documentation/imagecapturecore/iccameraitem/islocked)
 
 A Boolean value that indicates whether the storage card in the camera is locked.
 
-### [Storing Information](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#Storing-Information)
+### [Storing Information](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#Storing-Information)
 
 [`var userData: NSMutableDictionary?`](https://developer.apple.com/documentation/imagecapturecore/iccameraitem/userdata)
 
 A mutable dictionary to store arbitrary key-value pairs associated with a camera item.
 
-## [Relationships](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#relationships)
+## [Relationships](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#relationships)
 
-### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#inherits-from)
+### [Inherits From](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#inherits-from)
 
 - [`NSObject`](https://developer.apple.com/documentation/ObjectiveC/NSObject-swift.class)
 
-### [Inherited By](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#inherited-by)
+### [Inherited By](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#inherited-by)
 
 - [`ICCameraFile`](https://developer.apple.com/documentation/imagecapturecore/iccamerafile)
 - [`ICCameraFolder`](https://developer.apple.com/documentation/imagecapturecore/iccamerafolder)
 
-### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#conforms-to)
+### [Conforms To](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#conforms-to)
 
 - [`CVarArg`](https://developer.apple.com/documentation/Swift/CVarArg)
 - [`CustomDebugStringConvertible`](https://developer.apple.com/documentation/Swift/CustomDebugStringConvertible)
@@ -568,9 +568,9 @@ A mutable dictionary to store arbitrary key-value pairs associated with a camera
 - [`Hashable`](https://developer.apple.com/documentation/Swift/Hashable)
 - [`NSObjectProtocol`](https://developer.apple.com/documentation/ObjectiveC/NSObjectProtocol)
 
-## [See Also](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#see-also)
+## [See Also](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#see-also)
 
-### [Cameras](https://developer.apple.com/documentation/imagecapturecore/iccameraitem\#Cameras)
+### [Cameras](https://developer.apple.com/documentation/imagecapturecore/iccameraitem#Cameras)
 
 [`class ICCameraDevice`](https://developer.apple.com/documentation/imagecapturecore/iccameradevice)
 

@@ -34,21 +34,22 @@ Implement the `handleUserCreated` function in the Clerk webhook handler to creat
 ## Implementation Steps
 
 ### Step 1: Update index.ts to inject DB before webhooks
+
 Add DB injection middleware BEFORE the webhook router so webhooks can use `c.var.db()`.
 
 **File:** `apps/api/src/index.ts`
 
 **Before:**
+
 ```typescript
-const app = new Hono()
-  .route("/webhooks", webhookRouter)
-  .use("/*", (c, next) => {
-    c.set("db", () => createDb(c.env.DATABASE_URL));
-    return next();
-  })
+const app = new Hono().route('/webhooks', webhookRouter).use('/*', (c, next) => {
+  c.set('db', () => createDb(c.env.DATABASE_URL));
+  return next();
+});
 ```
 
 **After:**
+
 ```typescript
 const app = new Hono()
   // DB injection for webhooks (no auth, no CORS)
@@ -66,6 +67,7 @@ const app = new Hono()
 ```
 
 ### Step 2: Update WebhookBindings and Variables
+
 Add `db` function to webhook context variables.
 
 **File:** `apps/api/src/routes/webhooks/clerk.ts`
@@ -89,17 +91,20 @@ export const clerkWebhookRouter = new Hono<{
 ```
 
 ### Step 3: Import Dependencies
+
 Add imports for database operations.
 
 ```typescript
-import { photographers } from "@sabaipics/db/schema";
-import { eq } from "drizzle-orm";
+import { photographers } from '@sabaipics/db/schema';
+import { eq } from 'drizzle-orm';
 ```
 
 ### Step 4: Implement handleUserCreated
+
 Replace the stub implementation with actual database insertion.
 
 **Logic:**
+
 1. Get DB client: `const db = c.var.db();`
 2. Extract `clerk_id`, `email`, and `name` from Clerk webhook event data
 3. Check if photographer already exists by `clerkId` (idempotency check)
@@ -111,6 +116,7 @@ Replace the stub implementation with actual database insertion.
 6. Log success or errors appropriately
 
 **Key Design Decisions:**
+
 - **Idempotency:** Check if photographer exists by `clerkId` before inserting
 - **Error Handling:** Log errors but return 200 to prevent Svix retries on bad data
 - **User Type:** Per plan decision #4, only photographers sign up - no user_type check needed
@@ -118,7 +124,9 @@ Replace the stub implementation with actual database insertion.
 - **Name:** Optional, constructed from first_name + last_name
 
 ### Step 5: Clean Up
+
 Remove TODO comments and unused code:
+
 - Remove `user_type` metadata extraction (decision #4)
 - Remove `participant`-related logic
 - Remove `line_user_id` extraction (can be added later if needed)
@@ -134,6 +142,7 @@ Remove TODO comments and unused code:
 ## Testing
 
 **Testing with ngrok + Clerk Dashboard:**
+
 1. Start dev server with ngrok tunnel
 2. Register ngrok URL in Clerk dashboard webhook settings (`https://xxx.ngrok.io/webhooks/clerk`)
 3. Trigger signup via Clerk to test `user.created` event

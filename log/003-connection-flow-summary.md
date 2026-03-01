@@ -11,6 +11,7 @@
 **Goal:** Eliminate first-connection failures by pre-triggering iOS permission + auto-retry on timeout
 
 **Key Components:**
+
 1. **Pre-Flight Permission Check** (5s max)
 2. **Connection Attempt** (90s timeout)
 3. **Auto-Retry Logic** (3 attempts with exponential backoff)
@@ -326,12 +327,14 @@ Page 1: WiFiSetupView (with error message)
 ## ⏱️ Timeout & Backoff Summary
 
 ### Pre-Flight Permission Check
+
 - **Timeout:** 5 seconds max
 - **What happens:** Dummy UDP connection to `169.254.255.255:1` (link-local broadcast)
 - **Success:** Permission granted or denied (both are results)
 - **Failure:** Timeout after 5s (continues anyway - better to try than block)
 
 ### Connection Attempts
+
 - **Timeout per attempt:** 15 seconds (refined from 90s - much better UX!)
 - **Number of attempts:** 3 maximum
 - **Backoff delays:**
@@ -341,13 +344,13 @@ Page 1: WiFiSetupView (with error message)
 
 ### Total Time Scenarios
 
-| Scenario | Time | UX |
-|----------|------|-----|
-| **First time success** | 5s + 3s = **8s** | ✅ Smooth |
-| **Subsequent success** | **3s** | ✅ Fast |
-| **Success on retry 2** | 15s + 2s + 3s = **20s** | ✅ Auto-recovers quickly |
-| **Success on retry 3** | 15s + 2s + 15s + 5s + 3s = **40s** | ✅ Still responsive |
-| **All retries fail** | 15s + 2s + 15s + 5s + 15s = **52s** | ✅ Fast failure, clear error |
+| Scenario               | Time                                | UX                           |
+| ---------------------- | ----------------------------------- | ---------------------------- |
+| **First time success** | 5s + 3s = **8s**                    | ✅ Smooth                    |
+| **Subsequent success** | **3s**                              | ✅ Fast                      |
+| **Success on retry 2** | 15s + 2s + 3s = **20s**             | ✅ Auto-recovers quickly     |
+| **Success on retry 3** | 15s + 2s + 15s + 5s + 3s = **40s**  | ✅ Still responsive          |
+| **All retries fail**   | 15s + 2s + 15s + 5s + 15s = **52s** | ✅ Fast failure, clear error |
 
 **Note:** Original design had 90s timeout = 277s total. Refined to 15s = **52s total (5x faster!)** ⚡
 
@@ -360,6 +363,7 @@ Page 1: WiFiSetupView (with error message)
 **Detection:** Pre-flight completes, but all connection attempts fail
 **User sees:** "Local network access required. Enable in Settings > Privacy > Local Network."
 **User action:**
+
 1. Open Settings app
 2. Privacy → Local Network
 3. Find "SabaiPics Studio"
@@ -367,6 +371,7 @@ Page 1: WiFiSetupView (with error message)
 5. Return to app and try again
 
 **Technical:**
+
 - iOS blocks all local network access when denied
 - No way to detect denial directly (iOS limitation)
 - Inferred from connection failures
@@ -376,6 +381,7 @@ Page 1: WiFiSetupView (with error message)
 **Detection:** All 3 attempts timeout (270 seconds total)
 **User sees:** "Connection failed after 3 attempts. Please check camera WiFi settings."
 **User action:**
+
 - Verify camera WiFi is enabled
 - Verify camera shows correct IP address (e.g., 172.20.10.2)
 - Verify iPhone is connected to correct network
@@ -383,6 +389,7 @@ Page 1: WiFiSetupView (with error message)
 - Try connecting again manually
 
 **Technical:**
+
 - `gp_camera_init()` times out
 - No connection established
 - Camera may be off, wrong IP, or wrong WiFi mode
@@ -391,6 +398,7 @@ Page 1: WiFiSetupView (with error message)
 
 **Detection:** First attempt fails, retry succeeds
 **User sees:**
+
 1. "Connecting..." (attempt 1, fails)
 2. "Retrying... (Attempt 2/3)" (2s delay)
 3. "Connected" ✅
@@ -398,6 +406,7 @@ Page 1: WiFiSetupView (with error message)
 **User action:** None needed (auto-recovery) ✅
 
 **Technical:**
+
 - Temporary network issues
 - Camera WiFi just initialized
 - iOS network stack settling
@@ -411,6 +420,7 @@ Page 1: WiFiSetupView (with error message)
 **User sees:** Normal connection attempt (no error)
 
 **Technical:**
+
 - Rare edge case
 - iOS might be slow to show prompt
 - Don't block entire flow on this
@@ -435,6 +445,7 @@ LocalNetworkPermissionChecker.triggerPermissionPrompt {
 ```
 
 **How it works:**
+
 1. Creates NWConnection to `169.254.255.255:1` (UDP)
 2. iOS detects local network access → shows permission prompt
 3. User approves/denies → completion called
@@ -442,6 +453,7 @@ LocalNetworkPermissionChecker.triggerPermissionPrompt {
 5. Does NOT block if timeout occurs
 
 **Why link-local broadcast?**
+
 - `169.254.255.255` is link-local broadcast address (RFC 3927)
 - Never routes outside local network
 - Won't accidentally connect to real device
@@ -485,11 +497,13 @@ private func attemptConnection(config: CameraConfig) {
 ```
 
 **Retry delays:**
+
 - Attempt 1 fails → Wait **2 seconds** → Attempt 2
 - Attempt 2 fails → Wait **5 seconds** → Attempt 3
 - Attempt 3 fails → **Show error**
 
 **Why exponential backoff?**
+
 - **2s:** Quick recovery for transient issues (iOS settling, WiFi connecting)
 - **5s:** Longer stabilization for network issues
 - **Not geometric (2-4-8):** We don't need extreme delays, 2-5 is enough
@@ -517,11 +531,13 @@ private var retryTimer: Timer? = nil      // Scheduled retry (for cancellation)
 ```
 
 **UserDefaults:**
+
 ```swift
 UserDefaults.standard.set(true, forKey: "LocalNetworkPermissionGranted")
 ```
 
 **Why UserDefaults?**
+
 - iOS provides no API to check permission status directly
 - We track it ourselves using heuristic: "if connection ever succeeded, permission was granted"
 - Allows skipping pre-flight on subsequent launches
@@ -533,6 +549,7 @@ UserDefaults.standard.set(true, forKey: "LocalNetworkPermissionGranted")
 **New:** 15 seconds (refined for responsive UX)
 
 **Why 15s?**
+
 - Long enough for PTP/IP TCP handshake + camera init
 - Short enough to feel responsive (not stuck)
 - With 3 retries = 52s max (vs 277s with 90s timeout)
@@ -586,6 +603,7 @@ Success rate: 100% on first attempt
 ```
 
 **Improvement:**
+
 - ✅ **10x faster** (8s vs 80s)
 - ✅ **No manual retry** needed
 - ✅ **100% success** on first attempt
@@ -623,12 +641,14 @@ Success rate: 100% on first attempt
 ## 🚀 Implementation Phases
 
 ### Phase 1: Core Permission Checker (30 min)
+
 - Create `LocalNetworkPermissionChecker.swift`
 - Implement `triggerPermissionPrompt()`
 - Add UserDefaults tracking
 - Test on device - verify iOS prompt appears
 
 ### Phase 2: Retry Logic with 15s Timeout (45 min)
+
 - Update `WiFiCameraService.swift`
 - Add retry state properties
 - Implement `connectWithRetry()` method with **15s timeout**
@@ -636,6 +656,7 @@ Success rate: 100% on first attempt
 - Test retry behavior with timeout scenarios
 
 ### Phase 3: New UI Components (1.5 hours)
+
 - Create `ConnectingView.swift` - Searching/connecting screen
 - Create `ConnectedView.swift` - Success celebration (1s pause)
 - Update `ErrorView.swift` - Connection failed screen
@@ -643,6 +664,7 @@ Success rate: 100% on first attempt
 - Add smooth transitions between views
 
 ### Phase 4: ViewModel State Machine (45 min)
+
 - Update `CameraViewModel.swift`
 - Add new app states: `.connecting`, `.connected`
 - Implement state transitions
@@ -650,6 +672,7 @@ Success rate: 100% on first attempt
 - Test end-to-end flow
 
 ### Phase 5: Testing & Validation (30 min)
+
 - Fresh install → Permission prompt → Success → 1s pause → Main screen
 - Permission denied → Error on WiFiSetupView with help
 - Subsequent connections → Fast (skip pre-flight)
@@ -743,6 +766,7 @@ Success rate: 100% on first attempt
 **Scenario:** User taps Connect, switches to Settings, returns to app
 
 **Behavior:**
+
 - Connection continues in background
 - Retry timer continues
 - User returns → sees current state (connecting/retrying/error)
@@ -754,6 +778,7 @@ Success rate: 100% on first attempt
 **Scenario:** User taps away from permission prompt without choosing
 
 **Behavior:**
+
 - iOS treats as "not determined" (neither granted nor denied)
 - Pre-flight completes with timeout
 - Connection attempt proceeds
@@ -766,6 +791,7 @@ Success rate: 100% on first attempt
 **Scenario:** User taps Connect button multiple times rapidly
 
 **Behavior:**
+
 - Only one connection active at a time
 - Subsequent taps ignored while connecting
 - Or: Cancel previous attempt and start new one
@@ -777,6 +803,7 @@ Success rate: 100% on first attempt
 **Scenario:** Attempt 1 fails, camera turns off during 2s backoff delay
 
 **Behavior:**
+
 - Attempt 2 proceeds as scheduled
 - Times out after 90s
 - Attempt 3 proceeds
@@ -789,6 +816,7 @@ Success rate: 100% on first attempt
 **Scenario:** iPhone switches from WiFi to cellular during connection
 
 **Behavior:**
+
 - Connection fails (lost network)
 - Auto-retry may succeed if network restored
 - Or shows error after max retries
@@ -802,17 +830,20 @@ Success rate: 100% on first attempt
 ### Why iOS Requires Local Network Permission
 
 **iOS 14+ Privacy Enhancement:**
+
 - Apps must request permission to access local network
 - Prevents apps from scanning local network without user knowledge
 - Similar to Location, Camera, Microphone permissions
 - But: Triggered by activity, not pre-requested
 
 **Trigger conditions:**
+
 - Multicast/broadcast packets (Bonjour, mDNS, UPnP)
 - Connections to link-local addresses (169.254.x.x)
 - Connections to private IP addresses (192.168.x.x, 172.16.x.x-172.31.x.x, 10.x.x.x)
 
 **Our case:**
+
 - Connecting to camera at `172.20.10.2` (iPhone hotspot range)
 - Or `192.168.1.1` (camera WiFi network)
 - Both are private IP addresses → triggers permission
@@ -820,6 +851,7 @@ Success rate: 100% on first attempt
 ### Why Pre-Flight Works
 
 **The Trick:**
+
 1. Connect to `169.254.255.255:1` (link-local broadcast)
 2. iOS detects: "This app wants to access local network!"
 3. iOS shows permission prompt
@@ -828,6 +860,7 @@ Success rate: 100% on first attempt
 6. Now camera connection works without prompting again
 
 **Why this address?**
+
 - `169.254.0.0/16` is link-local range (APIPA)
 - `.255.255` is broadcast (all hosts)
 - Won't actually connect to anything
@@ -876,15 +909,15 @@ Success rate: 100% on first attempt
 
 ### Before vs After Comparison
 
-| Aspect | Before (Current) | After (Refined) | Improvement |
-|--------|-----------------|-----------------|-------------|
-| First connection | 0% success, manual retry | 100% success, automatic | ✅ Huge |
-| Time (success) | 80+ seconds | 8 seconds | **10x faster** |
-| Time (failure) | 75s × manual retries | 52s max | **Faster feedback** |
-| Timeout/attempt | 90s | 15s | **6x more responsive** |
-| UI feedback | Single screen, spinner | 4-page flow, clear progress | **Premium feel** |
-| Permission UX | Confusing timeout | Preflight + help text | **Clear** |
-| Error messages | Generic | Specific, actionable | **Helpful** |
+| Aspect           | Before (Current)         | After (Refined)             | Improvement            |
+| ---------------- | ------------------------ | --------------------------- | ---------------------- |
+| First connection | 0% success, manual retry | 100% success, automatic     | ✅ Huge                |
+| Time (success)   | 80+ seconds              | 8 seconds                   | **10x faster**         |
+| Time (failure)   | 75s × manual retries     | 52s max                     | **Faster feedback**    |
+| Timeout/attempt  | 90s                      | 15s                         | **6x more responsive** |
+| UI feedback      | Single screen, spinner   | 4-page flow, clear progress | **Premium feel**       |
+| Permission UX    | Confusing timeout        | Preflight + help text       | **Clear**              |
+| Error messages   | Generic                  | Specific, actionable        | **Helpful**            |
 
 ---
 
@@ -904,7 +937,8 @@ Success rate: 100% on first attempt
 **Estimated Impact:** High (fixes #1 user complaint + premium UX)
 **Estimated Time:** 4 hours
 <mark data-comment="3"></mark>
-<!-- COMMENT-3: The ui flow should be like this. 
+
+<!-- COMMENT-3: The ui flow should be like this.
 
 First page the connect page right when plese connect go to another page just showing search camera ... right this is where the preflight and connection happes
 

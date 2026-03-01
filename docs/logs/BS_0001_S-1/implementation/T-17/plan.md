@@ -6,6 +6,7 @@ Date: `2026-01-12`
 Owner: `Claude (implementv3)`
 
 ## Inputs
+
 - Task: `docs/logs/BS_0001_S-1/tasks.md` (section: T-17)
 - Upstream plan: `docs/logs/BS_0001_S-1/plan/final.md`
 - Context reports:
@@ -18,6 +19,7 @@ Owner: `Claude (implementv3)`
 ## Goal / non-goals
 
 **Goal:**
+
 - Update the existing queue consumer to create Rekognition collections on first photo, call IndexFaces API, and persist face data to the database
 - Handle success (0+ faces), retryable errors, and non-retryable errors appropriately
 - Update photo status from 'uploading' → 'indexing' → 'indexed' or 'failed'
@@ -25,6 +27,7 @@ Owner: `Claude (implementv3)`
 - **Update T-16 to use 'uploading' status** (clearer UX than 'processing')
 
 **Non-goals:**
+
 - DLQ consumer implementation (out of scope - can be separate task)
 - Cost monitoring/alerting infrastructure (ops concern, not part of MVP)
 - PDPA compliance verification (legal review, not technical implementation)
@@ -35,12 +38,14 @@ Owner: `Claude (implementv3)`
 ### Evidence-Based Design
 
 **Key discovery from context gathering:**
+
 - T-16 was modified to normalize images to JPEG on upload (confirmed in alignment-changes.md)
 - Queue consumer infrastructure already exists at `apps/api/src/queue/photo-consumer.ts` with lines 152-154 marked as TODO
 - Rate limiter DO, Rekognition client, and error classification already implemented
 - T-17 is primarily about **filling the application layer gap** (database persistence)
 
 **Schema changes required (feedback from review):**
+
 - Change T-16 status from 'processing' to **'uploading'** (clearer UX)
 - Add `'indexing'` status to photo statuses enum
 - Add `retryable` field (boolean | null, default null) to track error retryability
@@ -58,13 +63,14 @@ T-17 fail:    'failed'      → Non-retryable error, retryable=false, error_mess
 
 ### Retryable Field Logic
 
-| Scenario | status | retryable | error_message |
-|----------|--------|-----------|---------------|
-| Success | 'indexed' | null | null |
-| Retryable error | 'indexing' | true | 'ThrottlingException: ...' |
-| Non-retryable error | 'failed' | false | 'InvalidImageFormatException: ...' |
+| Scenario            | status     | retryable | error_message                      |
+| ------------------- | ---------- | --------- | ---------------------------------- |
+| Success             | 'indexed'  | null      | null                               |
+| Retryable error     | 'indexing' | true      | 'ThrottlingException: ...'         |
+| Non-retryable error | 'failed'   | false     | 'InvalidImageFormatException: ...' |
 
 **Benefits:**
+
 - `null` = no error (clean success state)
 - `true` = failed but will retry (temp issue)
 - `false` = permanent failure (bad image, etc.)
@@ -77,16 +83,18 @@ T-17 fail:    'failed'      → Non-retryable error, retryable=false, error_mess
 File: `packages/db/src/schema/photos.ts`
 
 Update status enum (add 'uploading' + 'indexing'):
+
 ```typescript
 export const photoStatuses = [
-  'uploading',   // T-16: Upload phase (CHANGED from 'processing')
-  'indexing',    // T-17: Face detection phase (NEW)
-  'indexed',     // Success
-  'failed',      // Non-retryable error
+  'uploading', // T-16: Upload phase (CHANGED from 'processing')
+  'indexing', // T-17: Face detection phase (NEW)
+  'indexed', // Success
+  'failed', // Non-retryable error
 ] as const;
 ```
 
 Add `retryable` field:
+
 ```typescript
 export const photos = pgTable('photos', {
   // ... existing fields
@@ -94,7 +102,7 @@ export const photos = pgTable('photos', {
     .notNull()
     .check(sql`status = ANY(ARRAY['uploading', 'indexing', 'indexed', 'failed'])`),
 
-  retryable: boolean('retryable'),  // null=success, true=retryable, false=non-retryable
+  retryable: boolean('retryable'), // null=success, true=retryable, false=non-retryable
 
   errorMessage: text('error_message'),
   // ...
@@ -102,6 +110,7 @@ export const photos = pgTable('photos', {
 ```
 
 **Migration steps:**
+
 1. Run `pnpm --filter=@sabaipics/db db:generate` to create migration
 2. User will run `db:push` or `db:migrate` manually
 
@@ -112,18 +121,19 @@ export const photos = pgTable('photos', {
 File: `apps/api/src/routes/photos.ts` (upload endpoint)
 
 Change status from 'processing' to 'uploading':
+
 ```typescript
 // OLD:
 const photo = await tx.insert(photos).values({
   // ...
-  status: 'processing',  // OLD
+  status: 'processing', // OLD
   // ...
 });
 
 // NEW:
 const photo = await tx.insert(photos).values({
   // ...
-  status: 'uploading',  // NEW - clearer UX
+  status: 'uploading', // NEW - clearer UX
   // ...
 });
 ```
@@ -135,6 +145,7 @@ const photo = await tx.insert(photos).values({
 File: `apps/api/src/queue/photo-consumer.ts` (lines 152-154)
 
 Replace:
+
 ```typescript
 } else {
   // TODO: Application layer will handle DB writes here
@@ -143,6 +154,7 @@ Replace:
 ```
 
 With:
+
 ```typescript
 } else {
   // SUCCESS: IndexFaces completed
@@ -178,6 +190,7 @@ With:
 Location: `apps/api/src/queue/photo-consumer.ts` (same file, keep cohesive)
 
 Responsibilities:
+
 1. Update photo status to 'indexing' (start of processing)
 2. Check if event has Rekognition collection (if NULL, create collection)
 3. Insert face records into `faces` table (sequential, no transaction)
@@ -191,13 +204,10 @@ async function persistFacesAndUpdatePhoto(
   db: Database,
   job: PhotoJob,
   data: IndexFacesResult,
-  client: RekognitionClient
+  client: RekognitionClient,
 ): Promise<void> {
   // STEP 1: Mark as 'indexing' (in progress)
-  await db
-    .update(photos)
-    .set({ status: 'indexing' })
-    .where(eq(photos.id, job.photo_id));
+  await db.update(photos).set({ status: 'indexing' }).where(eq(photos.id, job.photo_id));
 
   // STEP 2: Ensure collection exists
   const event = await db
@@ -205,7 +215,7 @@ async function persistFacesAndUpdatePhoto(
     .from(events)
     .where(eq(events.id, job.event_id))
     .limit(1)
-    .then(rows => rows[0]);
+    .then((rows) => rows[0]);
 
   if (!event.collectionId) {
     try {
@@ -236,7 +246,7 @@ async function persistFacesAndUpdatePhoto(
 
   // STEP 3: Insert faces (if any) - NO TRANSACTION
   if (data.faceRecords.length > 0) {
-    const faceRows = data.faceRecords.map(faceRecord => ({
+    const faceRows = data.faceRecords.map((faceRecord) => ({
       photoId: job.photo_id,
       eventId: job.event_id,
       rekognitionFaceId: faceRecord.Face?.FaceId ?? null,
@@ -254,8 +264,8 @@ async function persistFacesAndUpdatePhoto(
     .set({
       status: 'indexed',
       faceCount: data.faceRecords.length,
-      retryable: null,        // Clear retryable flag
-      errorMessage: null,     // Clear error message
+      retryable: null, // Clear retryable flag
+      errorMessage: null, // Clear error message
     })
     .where(eq(photos.id, job.photo_id));
 
@@ -263,13 +273,14 @@ async function persistFacesAndUpdatePhoto(
   if (data.unindexedFaces.length > 0) {
     console.warn(
       `[Queue] ${data.unindexedFaces.length} faces not indexed in photo ${job.photo_id}`,
-      { reasons: data.unindexedFaces.map(f => f.Reasons).flat() }
+      { reasons: data.unindexedFaces.map((f) => f.Reasons).flat() },
     );
   }
 }
 ```
 
 **Note on sequential operations (no transactions):**
+
 - Insert faces first
 - Then update photo status
 - If photo update fails, retry will see status='indexing' and re-insert faces
@@ -378,6 +389,7 @@ if (isThrottlingError(error)) {
 ### File Changes Summary
 
 **Files to modify:**
+
 1. `packages/db/src/schema/photos.ts` - Change 'processing' to 'uploading', add 'indexing' status, add retryable field
 2. `apps/api/src/routes/photos.ts` - Update T-16 upload endpoint to use 'uploading' status
 3. `apps/api/src/queue/photo-consumer.ts` - Add database persistence logic (~150 lines)
@@ -386,6 +398,7 @@ if (isThrottlingError(error)) {
 None (keep everything in photo-consumer.ts for cohesion)
 
 **Files to read for imports:**
+
 - `packages/db/src/schema/events.ts` - events table schema
 - `packages/db/src/schema/photos.ts` - photos table schema (will modify)
 - `packages/db/src/schema/faces.ts` - faces table schema
@@ -395,12 +408,14 @@ None (keep everything in photo-consumer.ts for cohesion)
 ### DB
 
 **Photos table (SCHEMA CHANGES):**
+
 - **Changed status value:** `'uploading'` - Replaces 'processing' (T-16 sets this)
 - **New status value:** `'indexing'` - Photo is being processed by queue consumer (T-17)
 - **New field:** `retryable: boolean | null` - null=success, true=retryable error, false=non-retryable error
 - **Existing field:** `error_message: text | null` - Error details (truncated to 500 chars)
 
 **Status transitions:**
+
 - T-16: Sets `status='uploading'` on upload (CHANGED from 'processing')
 - T-17 start: Updates to `status='indexing'` before IndexFaces
 - T-17 success: Updates to `status='indexed'`, `retryable=null`, `error_message=null`
@@ -408,10 +423,12 @@ None (keep everything in photo-consumer.ts for cohesion)
 - T-17 non-retryable error: Updates to `status='failed'`, `retryable=false`, `error_message='...'`
 
 **Events table:**
+
 - Read: `rekognition_collection_id` field
 - Write: Set `rekognition_collection_id` to `event-{eventId}` on first photo
 
 **Faces table:**
+
 - Write: Insert rows with:
   - `photo_id` (FK to photos.id)
   - `event_id` (FK to events.id)
@@ -423,17 +440,20 @@ None (keep everything in photo-consumer.ts for cohesion)
 ### API
 
 **Rekognition CreateCollection:**
+
 - Input: `CollectionId` (string) = `event-{eventId}`
 - Output: `CollectionArn` (string)
 - Errors: `ResourceAlreadyExistsException` (handle gracefully)
 
 **Rekognition IndexFaces:**
+
 - Already handled by existing consumer
 - Returns: `{ faceRecords: FaceRecord[], unindexedFaces: UnindexedFace[] }`
 
 ### Queue
 
 **No changes to queue contract:**
+
 - Message payload: `{ photo_id: string, event_id: string, r2_key: string }`
 - Consumer already handles batch processing, rate limiting, ack/retry
 
@@ -455,9 +475,11 @@ None (keep everything in photo-consumer.ts for cohesion)
 ## Failure modes / edge cases (major only)
 
 ### 1. Zero faces detected
+
 **Scenario:** IndexFaces returns empty faceRecords array
 
 **Handling:**
+
 - Update status to 'indexing' first
 - Do NOT insert any faces rows
 - Update photo: status='indexed', face_count=0, retryable=null, error_message=null
@@ -465,9 +487,11 @@ None (keep everything in photo-consumer.ts for cohesion)
 - Log: `[Queue] No faces detected in photo {photo_id}`
 
 ### 2. Concurrent first photos (collection race condition)
+
 **Scenario:** Two photos from same event processed simultaneously, both see NULL collection_id
 
 **Handling:**
+
 - Both try to create collection
 - One succeeds, other gets `ResourceAlreadyExistsException`
 - Catch exception, log warning, update event record (idempotent)
@@ -475,17 +499,21 @@ None (keep everything in photo-consumer.ts for cohesion)
 - Both update their own photo status
 
 ### 3. Collection created but event update fails
+
 **Scenario:** CreateCollection succeeds, but DB update fails
 
 **Handling:**
+
 - On retry, catch AlreadyExistsException and continue
 - Collection ID is deterministic (event_id), so can re-associate later
 - Not critical (T-20 cleanup cron handles orphaned collections after 30 days)
 
 ### 4. Database timeout during face insert
+
 **Scenario:** Network issue causes face insert to timeout
 
 **Handling:**
+
 - Catch database error in application layer
 - Mark photo with retryable=true, error_message
 - Retry message with exponential backoff
@@ -493,9 +521,11 @@ None (keep everything in photo-consumer.ts for cohesion)
 - Potential duplicate faces if insert partially committed (acceptable for MVP)
 
 ### 5. Photo update fails after faces inserted
+
 **Scenario:** Faces inserted successfully, but photo status update fails
 
 **Handling:**
+
 - Database error caught in application layer
 - Mark photo with retryable=true, error_message
 - Retry message
@@ -503,26 +533,32 @@ None (keep everything in photo-consumer.ts for cohesion)
 - Eventually succeeds and updates status to 'indexed'
 
 ### 6. Non-retryable Rekognition error
+
 **Scenario:** InvalidImageFormatException (should not happen, but defensive)
 
 **Handling:**
+
 - Update photo: status='failed', retryable=false, error_message='InvalidImageFormatException: ...'
 - Ack message (don't retry)
 - Photo visible to photographer as failed in gallery UI
 
 ### 7. Retryable Rekognition error
+
 **Scenario:** ThrottlingException from AWS
 
 **Handling:**
+
 - Keep photo: status='indexing', retryable=true, error_message='ThrottlingException: ...'
 - Retry message with longer backoff
 - On retry, status still 'indexing', so will re-process
 - Eventually succeeds
 
 ### 8. Unindexed faces
+
 **Scenario:** Rekognition rejects some faces (low quality, not a face, etc.)
 
 **Handling:**
+
 - Store only successfully indexed faces
 - Log warning with rejection reasons
 - Photo still marked as 'indexed' (partial success)
@@ -620,6 +656,7 @@ pnpm --filter=@sabaipics/api build
 ### Manual testing (required)
 
 **Local development:**
+
 1. Upload photo with 1 face → verify face row created, photo.face_count=1, status='indexed'
 2. Upload photo with multiple faces → verify all faces stored, retryable=null
 3. Upload photo with no faces (landscape, object) → verify face_count=0, status='indexed'
@@ -628,6 +665,7 @@ pnpm --filter=@sabaipics/api build
 6. Verify status transitions: uploading → indexing → indexed
 
 **Staging:**
+
 1. Upload 50 photos simultaneously → verify rate limiting works (no throttling errors)
 2. Upload large batch → monitor queue depth, processing time
 3. Check database for photos with retryable=true (should be transient)
@@ -680,11 +718,13 @@ pnpm --filter=@sabaipics/api build
    - No data loss (R2 images and DB records intact)
 
 **Data cleanup (if needed):**
+
 - Photos stuck in 'indexing' → manually mark as 'failed' or re-enqueue
 - Duplicate faces → delete and re-process (soft delete, not critical)
 - Orphaned collections → handled by T-20 cleanup cron (30-day retention)
 
 **Migration rollback:**
+
 - If migration needs rollback, manually:
   - Restore 'processing' status value
   - Remove 'uploading' and 'indexing' from status constraint
@@ -695,6 +735,7 @@ pnpm --filter=@sabaipics/api build
 ### Monitoring
 
 **Key metrics to track:**
+
 - Queue depth (alert if > 500)
 - Processing success rate (target > 95%)
 - Face count distribution (0, 1-5, 6-10, 11+)
@@ -703,12 +744,14 @@ pnpm --filter=@sabaipics/api build
 - **Photos with retryable=true** (should be transient, alert if stuck for > 1 hour)
 
 **Alerts to configure (post-MVP):**
+
 - Rekognition API errors > 10% of requests
 - Queue depth > 1000 messages
 - DLQ size > 100 (indicates systematic failures)
 - Photos stuck in 'indexing' state for > 1 hour
 
 **Queries for monitoring:**
+
 ```sql
 -- Photos stuck with retryable errors
 SELECT * FROM photos
@@ -733,51 +776,62 @@ GROUP BY event_id;
 ## Open questions
 
 ### [RESOLVED] Collection naming convention
+
 **Decision:** Use `event-{eventId}` as collection ID (matches getCollectionId helper)
 **Evidence:** Existing `getCollectionId` function in `rekognition/client.ts` already uses this format
 
 ### [RESOLVED] Collection idempotency handling
+
 **Decision:** Catch `ResourceAlreadyExistsException` and continue (option B from risk scout)
 **Rationale:** Simpler than checking existence first, idempotent, handles race conditions
 
 ### [RESOLVED] Zero faces handling
+
 **Decision:** Success state (status='indexed', face_count=0, retryable=null)
 **Evidence:** Acceptance criteria explicitly states "Handle no-faces case (face_count=0, still indexed)"
 
 ### [RESOLVED] Retry strategy
+
 **Decision:** Use existing exponential backoff pattern (2, 4, 8, ... 300s max)
 **Evidence:** Already implemented in `getBackoffDelay` function
 
 ### [RESOLVED] DLQ handling
+
 **Decision:** Mark photo as 'failed' with retryable=false when non-retryable error occurs
 **Rationale:** Makes failed photos visible to photographer in gallery UI, enables support workflow
 **Note:** DLQ consumer to mark retried-out photos as 'failed' is out of scope for T-17 (can be separate task)
 
 ### [RESOLVED] Rate limiter DO
+
 **Decision:** Use existing implementation
 **Evidence:** Confirmed in codebase-exemplars.md - rate limiter DO already deployed at `apps/api/src/durable-objects/rate-limiter.ts`
 
 ### [RESOLVED] R2 fetch mechanism
+
 **Decision:** Use R2 binding (env.PHOTOS_BUCKET)
 **Evidence:** Confirmed in tech-docs.md and existing queue consumer code
 
 ### [RESOLVED] Transaction usage
+
 **Decision:** Do NOT use transactions (Neon driver limitation)
 **Impact:** Sequential operations instead (insert faces, then update photo)
 **Risk:** Duplicate faces on retry if photo update fails (acceptable for MVP)
 **Evidence:** User feedback COMMENT-1
 
 ### [RESOLVED] Status flow
+
 **Decision:** Change T-16 to 'uploading', add 'indexing' status for T-17
 **Flow:** 'uploading' (T-16) → 'indexing' (T-17 start) → 'indexed' (success) or 'failed' (non-retryable)
 **Evidence:** User feedback COMMENT-2 + final confirmation
 
 ### [RESOLVED] Retryable field
+
 **Decision:** Add `retryable: boolean | null` field, default null
 **Logic:** null=success, true=retryable error, false=non-retryable error
 **Evidence:** User feedback COMMENT-2
 
 ### [NOTED - not blocking] PDPA compliance for biometric data
+
 **Question:** Does PDPA consent cover storing full Rekognition response (face landmarks, attributes)?
 **Impact:** May need legal review, but not blocking for implementation
 **Recommendation:** Store full response (as designed), flag for legal review before production launch

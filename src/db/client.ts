@@ -1,7 +1,7 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import { drizzle as drizzleServerless } from "drizzle-orm/neon-serverless";
-import * as schema from "./schema";
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { drizzle as drizzleServerless } from 'drizzle-orm/neon-serverless';
+import * as schema from './schema';
 
 /**
  * HTTP adapter - for non-transactional queries (90% of cases)
@@ -51,3 +51,6 @@ export const createDb = createDbHttp;
 // Type exports
 export type Database = ReturnType<typeof createDbHttp>;
 export type DatabaseTx = ReturnType<typeof createDbTx>;
+
+/** The `tx` parameter type inside a `.transaction()` callback. */
+export type Transaction = Parameters<Parameters<DatabaseTx['transaction']>[0]>[0];

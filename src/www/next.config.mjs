@@ -7,6 +7,9 @@ const withMDX = createMDX();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  images: {
+    formats: ['image/avif', 'image/webp'],
+  },
   turbopack: {
     root: '../../',
     resolveAlias: {

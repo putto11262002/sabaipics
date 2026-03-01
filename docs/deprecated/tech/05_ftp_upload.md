@@ -21,16 +21,19 @@ FTP upload is one of four photo upload sources for professional photographers us
 **Decision:** FTP + FTPS only (NO SFTP)
 
 **Why:**
+
 - **FTP** - Legacy camera support (older Canon, Sony models)
 - **FTPS** - Modern cameras require this (TLS 1.2+)
 - **SFTP** - Different protocol (SSH-based), cameras don't support it
 
 **Camera Compatibility:**
+
 - ✅ **Canon** (EOS R6 Mark III, R5 Mark II, R1, R5, R6) - FTPS required
 - ✅ **Sony** (A7R V, A7 IV firmware 6.00+) - FTPS required
 - ✅ **Nikon** (with WT-7 transmitter) - FTP/FTPS
 
 **All cameras require:**
+
 - Passive mode (PASV) - Cameras are behind WiFi/NAT
 - Port 21 control + passive data ports
 - Binary transfer mode (automatic for images)
@@ -42,6 +45,7 @@ FTP upload is one of four photo upload sources for professional photographers us
 **Decision:** ftpserverlib (Go library) with custom driver implementation
 
 **Why:**
+
 - **Full Control** - Direct integration with application logic (no HTTP roundtrips)
 - **Lightweight** - Library embedded in Go service (~10MB memory vs ~50MB standalone server)
 - **Direct DB Access** - Auth validation via direct DB query (faster than external HTTP calls)
@@ -50,6 +54,7 @@ FTP upload is one of four photo upload sources for professional photographers us
 - **Upload-Only** - Block unsupported commands (download, delete) by returning errors from driver methods
 
 **What ftpserverlib Provides:**
+
 - ✅ Complete FTP/FTPS protocol implementation (RFC 959, RFC 4217)
 - ✅ All FTP commands (USER, PASS, STOR, RETR, LIST, etc.)
 - ✅ Passive/Active mode support
@@ -58,6 +63,7 @@ FTP upload is one of four photo upload sources for professional photographers us
 - ✅ afero filesystem abstraction
 
 **What We Must Implement:**
+
 - **MainDriver interface** - Server settings, auth logic, connection lifecycle, TLS config
 - **ClientDriver interface** (afero.Fs) - Per-user filesystem operations
 - **FileTransfer interface** - Streaming upload to API via io.Pipe (zero disk writes)
@@ -65,6 +71,7 @@ FTP upload is one of four photo upload sources for professional photographers us
 - **Command rejection** - Return errors from driver methods to block download/delete/rename
 
 **Core Interfaces:**
+
 ```go
 // github.com/fclairamb/ftpserverlib
 type MainDriver interface {
@@ -88,10 +95,12 @@ type FileTransfer interface {
 ```
 
 **Trade-offs:**
+
 - ✅ **Benefit:** Direct integration, lower latency, full control
 - ⚠️ **Cost:** ~600 lines of custom code, 1-2 weeks development, must maintain driver code
 
 **Alternatives considered:**
+
 - **SFTPGo** (uses ftpserverlib internally) - Config-based but requires HTTP adapter for auth/upload
 - **Pure-FTPd** - Would need FUSE filesystem for streaming
 - **ProFTPD** - Would require custom C module
@@ -167,15 +176,15 @@ type FileTransfer interface {
 
 **Integration Pattern:**
 
-| Operation | ftpserverlib Hook | Implementation | External Call |
-|-----------|-------------------|----------------|---------------|
-| **Auth** | `MainDriver.AuthUser()` | Query events table by ftp_username, verify bcrypt hash | PostgreSQL |
-| **Upload** | `ClientDriver.OpenFile()` | io.Pipe → R2 upload goroutine, deduct credit from event owner | Workers API (R2.put), PostgreSQL |
-| **Download** | `ClientDriver.Open()` | Return error → 550 to camera | None (blocked) |
-| **Delete** | `ClientDriver.Remove()` | Return error → 550 to camera | None (blocked) |
-| **Rename** | `ClientDriver.Rename()` | Return error → 550 to camera | None (blocked) |
-| **Connect** | `MainDriver.ClientConnected()` | Create Sentry span, log event | Sentry |
-| **Disconnect** | `MainDriver.ClientDisconnected()` | Finish span, metrics | Sentry, Prometheus |
+| Operation      | ftpserverlib Hook                 | Implementation                                                | External Call                    |
+| -------------- | --------------------------------- | ------------------------------------------------------------- | -------------------------------- |
+| **Auth**       | `MainDriver.AuthUser()`           | Query events table by ftp_username, verify bcrypt hash        | PostgreSQL                       |
+| **Upload**     | `ClientDriver.OpenFile()`         | io.Pipe → R2 upload goroutine, deduct credit from event owner | Workers API (R2.put), PostgreSQL |
+| **Download**   | `ClientDriver.Open()`             | Return error → 550 to camera                                  | None (blocked)                   |
+| **Delete**     | `ClientDriver.Remove()`           | Return error → 550 to camera                                  | None (blocked)                   |
+| **Rename**     | `ClientDriver.Rename()`           | Return error → 550 to camera                                  | None (blocked)                   |
+| **Connect**    | `MainDriver.ClientConnected()`    | Create Sentry span, log event                                 | Sentry                           |
+| **Disconnect** | `MainDriver.ClientDisconnected()` | Finish span, metrics                                          | Sentry, Prometheus               |
 
 **Key Advantages:**
 
@@ -193,12 +202,12 @@ type FileTransfer interface {
 
 **FTP Status Codes:**
 
-| Code | Meaning | When |
-|------|---------|------|
-| `530` | Not logged in | Auth failed, connection stays open |
-| `421` | Service unavailable | After 3 failures, closes connection |
-| `331` | User name okay, need password | Username accepted |
-| `230` | User logged in, proceed | Success |
+| Code  | Meaning                       | When                                |
+| ----- | ----------------------------- | ----------------------------------- |
+| `530` | Not logged in                 | Auth failed, connection stays open  |
+| `421` | Service unavailable           | After 3 failures, closes connection |
+| `331` | User name okay, need password | Username accepted                   |
+| `230` | User logged in, proceed       | Success                             |
 
 **Multi-Layer Security:**
 
@@ -219,18 +228,20 @@ Layer 3: Application (Our API)
 
 **Required Ports:**
 
-| Port(s) | Purpose | Firewall Rule |
-|---------|---------|---------------|
-| `21` | FTP/FTPS control channel | Allow TCP 21 inbound |
+| Port(s)     | Purpose                       | Firewall Rule               |
+| ----------- | ----------------------------- | --------------------------- |
+| `21`        | FTP/FTPS control channel      | Allow TCP 21 inbound        |
 | `5000-5099` | Passive mode data (100 ports) | Allow TCP 5000:5099 inbound |
 
 **Port Calculation:** `(Max Users × 1.2) + Buffer`
+
 - For 50-100 photographers: 100 ports
 - Range 5000-5099 is standard for managed services
 
 **FTPS Ports:** Same as FTP (explicit mode - starts on 21, upgrades to TLS)
 
 **Firewall Configuration:**
+
 ```bash
 # Allow FTP control
 ufw allow 21/tcp comment 'FTP control'
@@ -249,6 +260,7 @@ ufw allow from {MONITORING_IP} to any port 9256
 **Decision:** Custom instrumentation with Sentry Go SDK and Prometheus
 
 **Why:**
+
 - Distributed tracing requires context propagation across FTP → R2 → Queue
 - ftpserverlib provides hooks at all integration points for instrumentation
 - Direct control over what to measure and when
@@ -260,11 +272,13 @@ ufw allow from {MONITORING_IP} to any port 9256
 **Solution:** Create root span in `ClientConnected()`, propagate through context, inject into R2 upload.
 
 **Credential Model:** One shared credential per event (see `00_business_rules.md` section 2.5)
+
 - Username: `event_{event_id}`
 - All photographers for an event use the same credentials
 - Cannot track which photographer uploaded (acceptable trade-off for simplicity)
 
 **Trace Flow:**
+
 ```
 Camera → MainDriver.ClientConnected() (create ROOT span)
            └─> MainDriver.AuthUser() (child span)
@@ -275,17 +289,18 @@ Camera → MainDriver.ClientConnected() (create ROOT span)
 
 ### Instrumentation Points
 
-| ftpserverlib Hook | Sentry Operation | Attributes | Purpose |
-|-------------------|------------------|------------|---------|
-| `MainDriver.ClientConnected()` | `ftp.connection` (root) | `client.ip`, `server.port` | Track entire session |
-| `MainDriver.AuthUser()` | `ftp.auth` | `ftp.username`, `event_id`, `photographer_id` | Monitor auth success/failures |
-| `ClientDriver.OpenFile()` | `ftp.upload` | `file.name`, `file.size`, `event_id` | Track upload operations |
-| `FileTransfer.Close()` | Finish upload span | `bytes_written`, `duration_ms` | Measure upload performance |
-| `MainDriver.ClientDisconnected()` | Finish connection span | `files_uploaded`, `total_bytes` | Session summary |
+| ftpserverlib Hook                 | Sentry Operation        | Attributes                                    | Purpose                       |
+| --------------------------------- | ----------------------- | --------------------------------------------- | ----------------------------- |
+| `MainDriver.ClientConnected()`    | `ftp.connection` (root) | `client.ip`, `server.port`                    | Track entire session          |
+| `MainDriver.AuthUser()`           | `ftp.auth`              | `ftp.username`, `event_id`, `photographer_id` | Monitor auth success/failures |
+| `ClientDriver.OpenFile()`         | `ftp.upload`            | `file.name`, `file.size`, `event_id`          | Track upload operations       |
+| `FileTransfer.Close()`            | Finish upload span      | `bytes_written`, `duration_ms`                | Measure upload performance    |
+| `MainDriver.ClientDisconnected()` | Finish connection span  | `files_uploaded`, `total_bytes`               | Session summary               |
 
 ### Implementation Pattern
 
 **Root Span Creation:**
+
 ```go
 // MainDriver.ClientConnected() - Create root span
 func (d *Driver) ClientConnected(cc ClientContext) (string, error) {
@@ -298,6 +313,7 @@ func (d *Driver) ClientConnected(cc ClientContext) (string, error) {
 ```
 
 **Auth Span:**
+
 ```go
 // MainDriver.AuthUser() - Child span for auth
 func (d *Driver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, error) {
@@ -319,6 +335,7 @@ func (d *Driver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, er
 ```
 
 **Upload Span with Trace Propagation:**
+
 ```go
 // FileTransfer streaming - Propagate to R2 upload
 func (t *UploadTransfer) streamToR2() {
@@ -342,6 +359,7 @@ func (t *UploadTransfer) streamToR2() {
 ### Custom Prometheus Metrics
 
 **Define metrics in driver initialization:**
+
 ```go
 var (
     ftpConnectionsTotal = prometheus.NewCounterVec(
@@ -359,6 +377,7 @@ var (
 ```
 
 **Instrument at driver hooks:**
+
 - `ClientConnected()` → increment `ftp_connections_total{status="connected"}`
 - `AuthUser()` success → increment `ftp_connections_total{status="auth_success"}`
 - `AuthUser()` failure → increment `ftp_connections_total{status="auth_failed"}`
@@ -367,6 +386,7 @@ var (
 ### Structured Logging
 
 **Log at each integration point:**
+
 ```go
 // JSON structured logs with trace context
 log.Info().
@@ -381,6 +401,7 @@ log.Info().
 See `07_observability.md` for complete Sentry architecture, error tracking patterns, and cost management.
 
 **References:**
+
 - `07_observability.md` - Critical Decision 3 (Go FTP Server Integration)
 - Sentry Go SDK: https://docs.sentry.io/platforms/go/
 - ftpserverlib: https://pkg.go.dev/github.com/fclairamb/ftpserverlib
@@ -440,6 +461,7 @@ Parsed on API side to extract photographer and event IDs.
 ```
 
 **API Action:**
+
 - Update event stats (optional)
 - Log for analytics
 - Trigger notifications if needed
@@ -452,37 +474,38 @@ Parsed on API side to extract photographer and event IDs.
 
 ## Critical Decision 7: Failure Handling
 
-| Failure Point | Detection | Handling | FTP Status | Observability |
-|---------------|-----------|----------|------------|---------------|
-| **Auth API unreachable** | HTTP timeout/5xx | Reject FTP login | 421 Service unavailable | `ftp_auth_failures_total{error_type="api_unavailable"}` |
-| **Invalid credentials** | API returns 401 | Reject FTP login | 530 Login incorrect | `ftp_auth_failures_total{error_type="invalid_credentials"}` |
-| **Event not published** | API returns 422 | Fail upload | 553 File name not allowed | `ftp_uploads_failed_total{error_type="event_not_published"}` |
-| **Upload window closed** | API returns 422 | Fail upload | 553 File name not allowed | `ftp_uploads_failed_total{error_type="upload_closed"}` |
-| **Insufficient credits** | API returns 422 | Fail upload | 552 Exceeded storage | `ftp_uploads_failed_total{error_type="insufficient_credits"}` |
-| **Rate limit exceeded** | API returns 429 | Retry 3x with backoff, then fail | 421 Service unavailable | `ftp_uploads_rate_limited_total` |
-| **File too large** | API returns 400 | Fail upload | 552 Exceeded storage | `ftp_uploads_failed_total{error_type="file_too_large"}` |
-| **R2 upload fails** | API returns 500 | Fail upload, log error | 451 Internal error | `ftp_uploads_failed_total{error_type="storage_error"}` |
-| **Network interruption** | Socket closed | Abort transfer | 426 Connection closed | `ftp_transfers_total{status="incomplete"}` |
-| **FTP server OOM** | Process crash | Reject new connections | N/A | `process_resident_memory_bytes` alert |
-| **FD exhaustion** | `too many open files` | Reject new connections | 421 Service unavailable | `process_open_fds / process_max_fds` alert |
-| **Webhook fails** | HTTP 5xx/timeout | Log error, continue | N/A | `ftp_webhook_failures_total` |
+| Failure Point            | Detection             | Handling                         | FTP Status                | Observability                                                 |
+| ------------------------ | --------------------- | -------------------------------- | ------------------------- | ------------------------------------------------------------- |
+| **Auth API unreachable** | HTTP timeout/5xx      | Reject FTP login                 | 421 Service unavailable   | `ftp_auth_failures_total{error_type="api_unavailable"}`       |
+| **Invalid credentials**  | API returns 401       | Reject FTP login                 | 530 Login incorrect       | `ftp_auth_failures_total{error_type="invalid_credentials"}`   |
+| **Event not published**  | API returns 422       | Fail upload                      | 553 File name not allowed | `ftp_uploads_failed_total{error_type="event_not_published"}`  |
+| **Upload window closed** | API returns 422       | Fail upload                      | 553 File name not allowed | `ftp_uploads_failed_total{error_type="upload_closed"}`        |
+| **Insufficient credits** | API returns 422       | Fail upload                      | 552 Exceeded storage      | `ftp_uploads_failed_total{error_type="insufficient_credits"}` |
+| **Rate limit exceeded**  | API returns 429       | Retry 3x with backoff, then fail | 421 Service unavailable   | `ftp_uploads_rate_limited_total`                              |
+| **File too large**       | API returns 400       | Fail upload                      | 552 Exceeded storage      | `ftp_uploads_failed_total{error_type="file_too_large"}`       |
+| **R2 upload fails**      | API returns 500       | Fail upload, log error           | 451 Internal error        | `ftp_uploads_failed_total{error_type="storage_error"}`        |
+| **Network interruption** | Socket closed         | Abort transfer                   | 426 Connection closed     | `ftp_transfers_total{status="incomplete"}`                    |
+| **FTP server OOM**       | Process crash         | Reject new connections           | N/A                       | `process_resident_memory_bytes` alert                         |
+| **FD exhaustion**        | `too many open files` | Reject new connections           | 421 Service unavailable   | `process_open_fds / process_max_fds` alert                    |
+| **Webhook fails**        | HTTP 5xx/timeout      | Log error, continue              | N/A                       | `ftp_webhook_failures_total`                                  |
 
 ### Retry Strategy
 
-| Operation | Retry? | Strategy |
-|-----------|--------|----------|
-| Auth validation | ❌ No | Fast fail - invalid is invalid |
-| Upload API 5xx | ✅ Yes | Retry 3x with exp backoff (1s, 2s, 4s) |
-| Upload API 429 | ✅ Yes | Retry with `Retry-After` header |
-| Upload API 4xx | ❌ No | Client error, no retry |
-| Network errors | ✅ Yes | FTP client handles retry |
-| Webhook failures | ❌ No | Log only, non-blocking |
+| Operation        | Retry? | Strategy                               |
+| ---------------- | ------ | -------------------------------------- |
+| Auth validation  | ❌ No  | Fast fail - invalid is invalid         |
+| Upload API 5xx   | ✅ Yes | Retry 3x with exp backoff (1s, 2s, 4s) |
+| Upload API 429   | ✅ Yes | Retry with `Retry-After` header        |
+| Upload API 4xx   | ❌ No  | Client error, no retry                 |
+| Network errors   | ✅ Yes | FTP client handles retry               |
+| Webhook failures | ❌ No  | Log only, non-blocking                 |
 
 ### Circuit Breaker (Future Enhancement)
 
 **Condition:** API `/ftp/upload` error rate > 50% for 1 minute
 
 **Action:**
+
 1. Open circuit - reject new uploads
 2. Return FTP 421 "Service temporarily unavailable"
 3. Prevents cascading failures
@@ -497,12 +520,14 @@ Parsed on API side to extract photographer and event IDs.
 **Provider:** DigitalOcean Droplet
 **Tier:** Basic ($4-6/month)
 **Specs:**
+
 - 1 vCPU
 - 1 GB RAM
 - 25 GB SSD
 - 1 TB transfer
 
 **Sufficient for:**
+
 - 10-20 concurrent connections
 - ~100 Mbps sustained throughput
 - Millions of files/month
@@ -517,9 +542,9 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "21:21"            # FTP control
-      - "5000-5099:5000-5099"  # FTP passive data ports
-      - "9256:9256"        # Prometheus metrics
+      - '21:21' # FTP control
+      - '5000-5099:5000-5099' # FTP passive data ports
+      - '9256:9256' # Prometheus metrics
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
@@ -527,7 +552,7 @@ services:
       - R2_ENDPOINT=${R2_ENDPOINT}
       - SENTRY_DSN=${SENTRY_DSN}
     volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro  # TLS certificates
+      - /etc/letsencrypt:/etc/letsencrypt:ro # TLS certificates
     restart: unless-stopped
 ```
 
@@ -556,6 +581,7 @@ CMD ["./ftp-server"]
 ### Configuration Pattern
 
 **Environment-based configuration:**
+
 ```go
 // config/config.go
 type Config struct {
@@ -678,6 +704,7 @@ func (d *Driver) GetSettings() (*ftpserver.Settings, error) {
 **Method:** Direct DB validation in `MainDriver.AuthUser()`
 
 **Pattern:**
+
 ```go
 // MainDriver.AuthUser() - Direct DB query
 // See 00_business_rules.md section 2.5 for complete validation rules
@@ -712,6 +739,7 @@ func (d *Driver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, er
 ```
 
 **Password Security:**
+
 - Auto-generated 32-character alphanumeric token (cryptographically secure)
 - Stored as bcrypt hash (cost factor 12) in `events.ftp_password_hash`
 - Plaintext shown ONCE to photographer when event published
@@ -719,6 +747,7 @@ func (d *Driver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, er
 - Shared by all photographers for the event (acceptable trade-off)
 
 **Credential Lifecycle:**
+
 - Generated: When event is published
 - Valid: During `upload_start_datetime` to `upload_end_datetime`
 - Revoked: When event unpublished, deleted, or upload window ends
@@ -726,6 +755,7 @@ func (d *Driver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, er
 ### Rate Limiting
 
 **Application-level (Custom):**
+
 - Implement in `MainDriver.ClientConnected()`
 - Track concurrent connections per event ID
 - Max 100 concurrent connections per event (see `00_business_rules.md` section 2.5)
@@ -733,12 +763,14 @@ func (d *Driver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, er
 - Max 50 connections per IP
 
 **Storage-level:**
+
 - R2 upload rate limits (handled by Cloudflare)
 - Credit deduction prevents unlimited uploads (1 credit per photo)
 
 ### Audit Logging
 
 **All events logged:**
+
 - Connection attempts (success/failure)
 - File uploads (success/failure)
 - Authentication failures
@@ -751,6 +783,7 @@ func (d *Driver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, er
 ## What's NOT in This Doc
 
 Implementation details for CONTEXT files:
+
 - Complete MainDriver implementation (see `07_observability.md` for Sentry patterns)
 - Complete ClientDriver (afero.Fs) implementation
 - Complete FileTransfer streaming implementation (io.Pipe pattern)
@@ -766,12 +799,14 @@ Implementation details for CONTEXT files:
 ## References
 
 **Planning Docs:**
+
 - `docs/tech/00_flows.md` - Flow #5 (FTP Upload Flow)
 - `docs/tech/05_image_pipeline.md` - Critical Decision 8 (FTP Proxy)
 - `docs/tech/07_observability.md` - Unified Sentry architecture, distributed tracing, error tracking
 - `docs/tech/03_api_design.md` - API endpoints, rate limits
 
 **Research:**
+
 - ftpserverlib GitHub: https://github.com/fclairamb/ftpserverlib
 - ftpserverlib GoDoc: https://pkg.go.dev/github.com/fclairamb/ftpserverlib
 - ftpserverlib Test Driver: https://github.com/fclairamb/ftpserverlib/blob/master/driver_test.go (reference implementation)
@@ -781,6 +816,7 @@ Implementation details for CONTEXT files:
 - Prometheus Go Client: https://prometheus.io/docs/guides/go-application/
 
 **Technology:**
+
 - ftpserverlib: Go library for building FTP/FTPS servers
 - afero: Filesystem abstraction for virtual filesystems
 - io.Pipe: Zero-copy streaming between FTP socket and R2 upload
@@ -798,6 +834,7 @@ Implementation details for CONTEXT files:
 **DECISION:** ✅ **Using ftpserverlib** for SabaiPics FTP upload component
 
 **Why ftpserverlib over SFTPGo:**
+
 - **Full Control** - Direct integration with DB and R2 (no HTTP roundtrips)
 - **Lightweight** - Embedded library (~10MB) vs standalone server (~50MB)
 - **Single Binary** - One service deployment
@@ -809,6 +846,7 @@ Implementation details for CONTEXT files:
 ### C.1 Library Overview
 
 **What is ftpserverlib?**
+
 - Go library for building FTP/FTPS servers using afero as the backend filesystem
 - 457 GitHub stars, 101 forks
 - Latest release: v0.27.0 (March 2024)
@@ -816,12 +854,14 @@ Implementation details for CONTEXT files:
 - Active maintenance, clean codebase
 
 **Production Readiness:**
+
 - Used by SFTPGo (11.4k stars) - battle-tested in production
 - Referenced implementation: ftpserver (simple gateway)
 - Small memory footprint, no global sync
 - Standard library based (minimal dependencies)
 
 **Maturity Assessment:**
+
 - Active development (last commit March 2024)
 - Only 3 open issues (low bug count indicates stability)
 - Issue #430: IdleTimeout doesn't factor in active data connections (affects large transfers)
@@ -833,6 +873,7 @@ Implementation details for CONTEXT files:
 **Key Interfaces We Must Implement:**
 
 1. **MainDriver Interface** (Server-level operations)
+
 ```go
 type MainDriver interface {
     // Server initialization
@@ -851,6 +892,7 @@ type MainDriver interface {
 ```
 
 **What MainDriver handles:**
+
 - Server settings (ports, timeouts, TLS mode)
 - Client connection/disconnection events
 - Authentication via external API call
@@ -858,6 +900,7 @@ type MainDriver interface {
 - Per-connection tracking and cleanup
 
 2. **ClientDriver Interface** (Per-user filesystem operations)
+
 ```go
 type ClientDriver interface {
     afero.Fs  // Inherits: OpenFile, Stat, Mkdir, Remove, Rename, etc.
@@ -865,6 +908,7 @@ type ClientDriver interface {
 ```
 
 **What ClientDriver handles:**
+
 - All file operations for authenticated user
 - Implements afero.Fs interface (filesystem abstraction)
 - Per-user isolation (different drivers per photographer)
@@ -872,6 +916,7 @@ type ClientDriver interface {
 3. **Optional Extension Interfaces:**
 
 **ClientDriverExtentionFileTransfer** (streaming without disk):
+
 ```go
 type ClientDriverExtentionFileTransfer interface {
     GetHandle(name string, flags int, offset int64) (FileTransfer, error)
@@ -879,6 +924,7 @@ type ClientDriverExtentionFileTransfer interface {
 ```
 
 **FileTransfer Interface** (streaming I/O):
+
 ```go
 type FileTransfer interface {
     io.Reader
@@ -891,6 +937,7 @@ type FileTransfer interface {
 ### C.3 What the Library Provides vs What We Build
 
 **Library Handles (Free):**
+
 - FTP/FTPS protocol implementation (RFC 959, RFC 4217)
 - All FTP commands (USER, PASS, STOR, RETR, LIST, MLST, etc.)
 - Passive mode (PASV/EPSV) and active mode (PORT/EPRT)
@@ -902,6 +949,7 @@ type FileTransfer interface {
 - Protocol extensions (HASH, AVLB, COMB)
 
 **We Must Implement:**
+
 - MainDriver with custom authentication logic
 - ClientDriver with streaming to HTTP endpoint
 - External API integration (POST /api/ftp/auth)
@@ -949,6 +997,7 @@ func (d *CustomDriver) AuthUser(cc ClientContext, user, pass string) (ClientDriv
 ```
 
 **Error Handling:**
+
 - Return error from AuthUser → Library sends 530 (Not logged in)
 - Can distinguish between invalid credentials vs service errors
 - Library handles retry logic per RFC 959
@@ -1054,6 +1103,7 @@ func (t *HTTPUploadTransfer) streamToHTTP() {
 ```
 
 **How Streaming Works:**
+
 1. FTP client sends STOR command
 2. Library calls GetHandle() → returns HTTPUploadTransfer
 3. Library calls Write() with file chunks → pipes to HTTP goroutine
@@ -1066,6 +1116,7 @@ func (t *HTTPUploadTransfer) streamToHTTP() {
 **Where to Add Sentry Instrumentation:**
 
 **1. Connection Lifecycle (MainDriver)**
+
 ```go
 func (d *MainDriver) ClientConnected(cc ClientContext) (string, error) {
     // Create root span for this FTP connection
@@ -1088,6 +1139,7 @@ func (d *MainDriver) ClientDisconnected(cc ClientContext) {
 ```
 
 **2. Authentication (MainDriver.AuthUser)**
+
 ```go
 func (d *MainDriver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, error) {
     // Create child span for auth
@@ -1116,6 +1168,7 @@ func (d *MainDriver) AuthUser(cc ClientContext, user, pass string) (ClientDriver
 ```
 
 **3. File Upload (HTTPUploadTransfer)**
+
 ```go
 func (t *HTTPUploadTransfer) streamToHTTP() {
     // Create span for upload
@@ -1155,6 +1208,7 @@ func (t *HTTPUploadTransfer) streamToHTTP() {
 ```
 
 **4. Custom Prometheus Metrics**
+
 ```go
 var (
     ftpConnectionsTotal = prometheus.NewCounterVec(
@@ -1184,29 +1238,31 @@ var (
 ```
 
 **5. Logging Integration**
+
 - Use fclairamb/go-log adapter for compatibility
 - Supports zerolog, zap, logrus, log15, go-kit/log
 - Structured logging with context (connection ID, user, file)
 
 ### C.7 Comparison with SFTPGo Approach
 
-| Aspect | ftpserverlib (Custom) | SFTPGo (Decision 2) |
-|--------|----------------------|---------------------|
-| **Development Effort** | High - implement all drivers, auth, streaming | Low - configure existing features |
-| **Observability** | Custom Sentry integration required | Built-in Prometheus + webhooks |
-| **Streaming to HTTP** | Custom FileTransfer implementation | HTTPFs backend (built-in) |
-| **Authentication** | Custom MainDriver.AuthUser | External auth hook (config only) |
-| **Metrics** | Custom Prometheus metrics | Automatic metrics at /metrics |
-| **Lifecycle Events** | Manual logging in driver | Webhook actions (built-in) |
-| **Testing** | Full integration test suite required | Proven in production (SFTPGo uses it) |
-| **Maintenance** | Ongoing - library updates, bug fixes | Managed by SFTPGo team |
-| **Flexibility** | Complete control over all aspects | Limited to SFTPGo features |
-| **Time to Production** | 2-3 weeks development + testing | 1-2 days configuration |
-| **Risk** | Medium - custom code can have bugs | Low - battle-tested solution |
+| Aspect                 | ftpserverlib (Custom)                         | SFTPGo (Decision 2)                   |
+| ---------------------- | --------------------------------------------- | ------------------------------------- |
+| **Development Effort** | High - implement all drivers, auth, streaming | Low - configure existing features     |
+| **Observability**      | Custom Sentry integration required            | Built-in Prometheus + webhooks        |
+| **Streaming to HTTP**  | Custom FileTransfer implementation            | HTTPFs backend (built-in)             |
+| **Authentication**     | Custom MainDriver.AuthUser                    | External auth hook (config only)      |
+| **Metrics**            | Custom Prometheus metrics                     | Automatic metrics at /metrics         |
+| **Lifecycle Events**   | Manual logging in driver                      | Webhook actions (built-in)            |
+| **Testing**            | Full integration test suite required          | Proven in production (SFTPGo uses it) |
+| **Maintenance**        | Ongoing - library updates, bug fixes          | Managed by SFTPGo team                |
+| **Flexibility**        | Complete control over all aspects             | Limited to SFTPGo features            |
+| **Time to Production** | 2-3 weeks development + testing               | 1-2 days configuration                |
+| **Risk**               | Medium - custom code can have bugs            | Low - battle-tested solution          |
 
 ### C.8 Code Examples - Key Integration Points
 
 **Example 1: Server Initialization**
+
 ```go
 package main
 
@@ -1239,6 +1295,7 @@ func main() {
 ```
 
 **Example 2: Settings Configuration**
+
 ```go
 func (d *SabaiPicsDriver) GetSettings() (*ftpserverlib.Settings, error) {
     return &ftpserverlib.Settings{
@@ -1254,6 +1311,7 @@ func (d *SabaiPicsDriver) GetSettings() (*ftpserverlib.Settings, error) {
 ```
 
 **Example 3: TLS Configuration**
+
 ```go
 func (d *SabaiPicsDriver) GetTLSConfig() (*tls.Config, error) {
     cert, err := tls.LoadX509KeyPair(
@@ -1296,12 +1354,14 @@ func (d *SabaiPicsDriver) GetTLSConfig() (*tls.Config, error) {
    - Higher risk of bugs in streaming code
 
 **Performance Characteristics:**
+
 - Small memory footprint (library design goal)
 - No global sync (good for concurrency)
 - Standard library based (minimal overhead)
 - Afero filesystem adds abstraction layer (minor overhead)
 
 **When to Use ftpserverlib:**
+
 - Need complete control over FTP behavior
 - Custom protocol extensions beyond RFC 959
 - Embedding FTP server in larger Go application
@@ -1309,6 +1369,7 @@ func (d *SabaiPicsDriver) GetTLSConfig() (*tls.Config, error) {
 - Custom storage backend (not HTTP-based)
 
 **When to Use SFTPGo:**
+
 - Need production-ready solution quickly
 - Want built-in observability (metrics, webhooks)
 - HTTPFs backend meets requirements
@@ -1317,26 +1378,27 @@ func (d *SabaiPicsDriver) GetTLSConfig() (*tls.Config, error) {
 
 ### C.10 Decision Matrix
 
-| Requirement | ftpserverlib | SFTPGo | Winner |
-|-------------|--------------|--------|--------|
-| **FTP/FTPS Protocol** | ✅ Full support | ✅ Full support | Tie |
-| **Passive Mode** | ✅ Configurable range | ✅ Configurable range | Tie |
-| **External Auth** | ✅ Custom implementation | ✅ Built-in hook | SFTPGo (easier) |
-| **Streaming to HTTP** | ⚠️ Custom FileTransfer | ✅ HTTPFs backend | SFTPGo (built-in) |
-| **Prometheus Metrics** | ❌ Custom required | ✅ Built-in /metrics | SFTPGo |
-| **Sentry Tracing** | ⚠️ Manual integration | ⚠️ Manual integration | Tie |
-| **Lifecycle Events** | ❌ Manual logging | ✅ Webhook actions | SFTPGo |
-| **Development Time** | 2-3 weeks | 1-2 days | SFTPGo |
-| **Maintenance** | High (custom code) | Low (configuration) | SFTPGo |
-| **Flexibility** | High (full control) | Medium (config-based) | ftpserverlib |
-| **Production Ready** | ⚠️ Known issues | ✅ Battle-tested | SFTPGo |
-| **Documentation** | Good (GoDoc, examples) | Excellent (full docs) | SFTPGo |
+| Requirement            | ftpserverlib             | SFTPGo                | Winner            |
+| ---------------------- | ------------------------ | --------------------- | ----------------- |
+| **FTP/FTPS Protocol**  | ✅ Full support          | ✅ Full support       | Tie               |
+| **Passive Mode**       | ✅ Configurable range    | ✅ Configurable range | Tie               |
+| **External Auth**      | ✅ Custom implementation | ✅ Built-in hook      | SFTPGo (easier)   |
+| **Streaming to HTTP**  | ⚠️ Custom FileTransfer   | ✅ HTTPFs backend     | SFTPGo (built-in) |
+| **Prometheus Metrics** | ❌ Custom required       | ✅ Built-in /metrics  | SFTPGo            |
+| **Sentry Tracing**     | ⚠️ Manual integration    | ⚠️ Manual integration | Tie               |
+| **Lifecycle Events**   | ❌ Manual logging        | ✅ Webhook actions    | SFTPGo            |
+| **Development Time**   | 2-3 weeks                | 1-2 days              | SFTPGo            |
+| **Maintenance**        | High (custom code)       | Low (configuration)   | SFTPGo            |
+| **Flexibility**        | High (full control)      | Medium (config-based) | ftpserverlib      |
+| **Production Ready**   | ⚠️ Known issues          | ✅ Battle-tested      | SFTPGo            |
+| **Documentation**      | Good (GoDoc, examples)   | Excellent (full docs) | SFTPGo            |
 
 ### C.11 Final Recommendation
 
 **Stick with SFTPGo (Critical Decision 2)**
 
 **Why:**
+
 1. **Built-in HTTPFs backend** - Zero-disk streaming without custom code
 2. **Built-in observability** - Prometheus metrics + webhooks out-of-the-box
 3. **Battle-tested** - Used in production by 11.4k+ projects
@@ -1345,12 +1407,14 @@ func (d *SabaiPicsDriver) GetTLSConfig() (*tls.Config, error) {
 6. **Known reliability** - No active issues like ftpserverlib #430, #554
 
 **When to Reconsider ftpserverlib:**
+
 - If SFTPGo doesn't meet a critical requirement (not currently the case)
 - If we need custom protocol extensions beyond RFC 959
 - If we want to embed FTP in a larger Go service (not planned)
 - If HTTPFs backend has performance issues (test first)
 
 **For SabaiPics:**
+
 - SFTPGo meets ALL requirements
 - HTTPFs backend handles streaming to HTTP
 - External auth hook handles API validation
@@ -1360,22 +1424,26 @@ func (d *SabaiPicsDriver) GetTLSConfig() (*tls.Config, error) {
 ### C.12 References
 
 **Library Documentation:**
+
 - GitHub: https://github.com/fclairamb/ftpserverlib
 - GoDoc: https://pkg.go.dev/github.com/fclairamb/ftpserverlib
 - Example Server: https://github.com/fclairamb/ftpserver
 - Production Use: https://github.com/drakkan/sftpgo (uses ftpserverlib internally)
 
 **Architecture:**
+
 - Afero Filesystem: https://github.com/spf13/afero
 - Test Driver: https://github.com/fclairamb/ftpserverlib/blob/master/driver_test.go
 - File Handling: https://github.com/fclairamb/ftpserverlib/blob/master/handle_files.go
 
 **Observability:**
+
 - Sentry Go SDK: https://docs.sentry.io/platforms/go/
 - W3C Trace Context: https://www.w3.org/TR/trace-context/
 - Prometheus Go Client: https://github.com/prometheus/client_golang
 
 **Known Issues:**
+
 - Issue #430: IdleTimeout with active transfers - https://github.com/fclairamb/ftpserverlib/issues/430
 - Issue #554: Occasional download errors - https://github.com/fclairamb/ftpserverlib/issues/554
 
@@ -1388,6 +1456,7 @@ func (d *SabaiPicsDriver) GetTLSConfig() (*tls.Config, error) {
 #### Status Code Categories
 
 FTP uses three-digit response codes where:
+
 - **First digit**: Response category (1xx-6xx)
   - 1xx: Positive Preliminary (command accepted, awaiting another reply)
   - 2xx: Positive Completion (command successfully completed)
@@ -1406,19 +1475,20 @@ FTP uses three-digit response codes where:
 
 #### Authentication-Specific Status Codes
 
-| Code | Type | Meaning | When Returned |
-|------|------|---------|---------------|
-| **220** | 2xx | Service ready for new user | Server startup, initial connection |
-| **331** | 3xx | User name okay, need password | After valid USER command |
-| **332** | 3xx | Need account for login | After USER/PASS (rare, legacy) |
-| **230** | 2xx | User logged in, proceed | Successful authentication |
-| **430** | 4xx | Invalid username or password | Temporary auth failure |
-| **530** | 5xx | Not logged in | Permanent auth failure (most common) |
-| **421** | 4xx | Service not available, closing control connection | Server shutting down, max connections |
+| Code    | Type | Meaning                                           | When Returned                         |
+| ------- | ---- | ------------------------------------------------- | ------------------------------------- |
+| **220** | 2xx  | Service ready for new user                        | Server startup, initial connection    |
+| **331** | 3xx  | User name okay, need password                     | After valid USER command              |
+| **332** | 3xx  | Need account for login                            | After USER/PASS (rare, legacy)        |
+| **230** | 2xx  | User logged in, proceed                           | Successful authentication             |
+| **430** | 4xx  | Invalid username or password                      | Temporary auth failure                |
+| **530** | 5xx  | Not logged in                                     | Permanent auth failure (most common)  |
+| **421** | 4xx  | Service not available, closing control connection | Server shutting down, max connections |
 
 #### Authentication Flow Examples
 
 **Successful Login:**
+
 ```
 CLIENT → SERVER: USER photographer_123
 SERVER → CLIENT: 331 User name okay, need password
@@ -1427,6 +1497,7 @@ SERVER → CLIENT: 230 User logged in, proceed
 ```
 
 **Failed Password (Standard):**
+
 ```
 CLIENT → SERVER: USER photographer_123
 SERVER → CLIENT: 331 User name okay, need password
@@ -1436,6 +1507,7 @@ SERVER → CLIENT: 530 Not logged in
 ```
 
 **Failed Username:**
+
 ```
 CLIENT → SERVER: USER invalidUser
 SERVER → CLIENT: 530 Not logged in
@@ -1443,6 +1515,7 @@ SERVER → CLIENT: 530 Not logged in
 ```
 
 **Server Disconnect After Max Retries:**
+
 ```
 CLIENT → SERVER: PASS wrong1
 SERVER → CLIENT: 530 Not logged in
@@ -1466,14 +1539,15 @@ According to RFC 959 and standard implementations:
 
 #### Retry Behavior - Industry Standards
 
-| Scenario | Connection State | Client Action | Server Response |
-|----------|------------------|---------------|-----------------|
-| 1st failed auth | Open | Can retry | 530 Not logged in |
-| 2nd failed auth | Open | Can retry | 530 Not logged in |
-| 3rd failed auth | Open | Can retry | 530 Not logged in |
+| Scenario         | Connection State     | Client Action  | Server Response         |
+| ---------------- | -------------------- | -------------- | ----------------------- |
+| 1st failed auth  | Open                 | Can retry      | 530 Not logged in       |
+| 2nd failed auth  | Open                 | Can retry      | 530 Not logged in       |
+| 3rd failed auth  | Open                 | Can retry      | 530 Not logged in       |
 | 4th+ failed auth | **Closed by server** | Must reconnect | 421 Service unavailable |
 
 **Best Practice**: Close connection after 3-5 failed attempts to:
+
 - Slow down brute force attacks
 - Force reconnection overhead (rate limiting)
 - Free up resources from malicious clients
@@ -1482,16 +1556,17 @@ According to RFC 959 and standard implementations:
 
 #### Recommended Limits
 
-| Limit Type | Threshold | Action | Duration | Rationale |
-|------------|-----------|--------|----------|-----------|
-| **Per-connection** | 3 attempts | Send 421, close connection | N/A | Force reconnect overhead |
-| **Per-IP (short window)** | 5 failures in 10 min | Temporary ban | 15 min | Stop single-source brute force |
-| **Per-IP (medium window)** | 3 temp bans in 24 hours | Extended ban | 24 hours | Stop persistent attackers |
-| **Per-IP (long window)** | 5 extended bans in 7 days | Permanent ban | Manual unban | Block sophisticated attacks |
+| Limit Type                 | Threshold                 | Action                     | Duration     | Rationale                      |
+| -------------------------- | ------------------------- | -------------------------- | ------------ | ------------------------------ |
+| **Per-connection**         | 3 attempts                | Send 421, close connection | N/A          | Force reconnect overhead       |
+| **Per-IP (short window)**  | 5 failures in 10 min      | Temporary ban              | 15 min       | Stop single-source brute force |
+| **Per-IP (medium window)** | 3 temp bans in 24 hours   | Extended ban               | 24 hours     | Stop persistent attackers      |
+| **Per-IP (long window)**   | 5 extended bans in 7 days | Permanent ban              | Manual unban | Block sophisticated attacks    |
 
 #### Implementation Strategy
 
 **Layer 1: Connection-Level (FTP Server)**
+
 ```
 - Track failed attempts per connection ID
 - Max 3 attempts per connection
@@ -1500,6 +1575,7 @@ According to RFC 959 and standard implementations:
 ```
 
 **Layer 2: IP-Level (Fail2Ban)**
+
 ```ini
 [vsftpd]
 enabled = true
@@ -1512,6 +1588,7 @@ action = iptables[name=ftp, port="21,5000:5099"]
 ```
 
 **Layer 3: Application-Level (API)**
+
 ```
 - Track all FTP auth attempts in database
 - Identify patterns: distributed attacks, credential stuffing
@@ -1522,6 +1599,7 @@ action = iptables[name=ftp, port="21,5000:5099"]
 #### Delay After Failed Login
 
 **Progressive Delays** (recommended):
+
 ```
 Attempt 1: Fail immediately
 Attempt 2: 2 second delay before 530
@@ -1534,15 +1612,16 @@ This slows down automated attacks without significantly impacting legitimate use
 
 #### Standard FTP Ports
 
-| Port | Mode | Usage | Protocol |
-|------|------|-------|----------|
-| **21** | Control | Commands (USER, PASS, STOR, LIST, etc.) | TCP |
-| **20** | Active Data | Data transfer when server initiates connection | TCP |
-| **Dynamic** | Passive Data | Data transfer when client initiates connection | TCP |
+| Port        | Mode         | Usage                                          | Protocol |
+| ----------- | ------------ | ---------------------------------------------- | -------- |
+| **21**      | Control      | Commands (USER, PASS, STOR, LIST, etc.)        | TCP      |
+| **20**      | Active Data  | Data transfer when server initiates connection | TCP      |
+| **Dynamic** | Passive Data | Data transfer when client initiates connection | TCP      |
 
 #### Active vs Passive Mode
 
 **Active Mode (Legacy):**
+
 ```
 1. Client connects to server port 21 (control)
 2. Client sends PORT command with its IP:port
@@ -1554,6 +1633,7 @@ Problem: Client firewall blocks incoming connections
 ```
 
 **Passive Mode (Modern Standard):**
+
 ```
 1. Client connects to server port 21 (control)
 2. Client sends PASV command
@@ -1568,6 +1648,7 @@ Advantage: Works with client firewalls and NAT
 #### FTPS Port Differences
 
 **Explicit FTPS (AUTH TLS) - Recommended:**
+
 ```
 Control Port: 21 (same as FTP)
 Process:
@@ -1582,6 +1663,7 @@ Advantage: Compatible with FTP-aware firewalls
 ```
 
 **Implicit FTPS (Legacy/Deprecated):**
+
 ```
 Control Port: 990 (dedicated)
 Process:
@@ -1600,6 +1682,7 @@ Disadvantage: Deprecated, not compatible with FTP firewalls
 #### Calculating Required Ports
 
 **Formula:**
+
 ```
 Required Ports = (Max Concurrent Users × 1.2) + Buffer
 
@@ -1610,30 +1693,33 @@ Examples:
 ```
 
 **Why 1.2 multiplier?**
+
 - Connection overlap during uploads
 - Retry connections
 - Short-lived control connections
 
 #### Recommended Port Ranges by Scale
 
-| Scenario | Users | Port Range | Ports | Firewall Rule |
-|----------|-------|------------|-------|---------------|
-| **Small** | 1-20 | 5000-5049 | 50 | Allow TCP 5000:5049 |
-| **Medium** | 20-100 | 5000-5149 | 150 | Allow TCP 5000:5149 |
-| **Large** | 100-500 | 5000-5499 | 500 | Allow TCP 5000:5499 |
-| **Max** | 500+ | 5000-5999 | 1000 | Allow TCP 5000:5999 |
+| Scenario   | Users   | Port Range | Ports | Firewall Rule       |
+| ---------- | ------- | ---------- | ----- | ------------------- |
+| **Small**  | 1-20    | 5000-5049  | 50    | Allow TCP 5000:5049 |
+| **Medium** | 20-100  | 5000-5149  | 150   | Allow TCP 5000:5149 |
+| **Large**  | 100-500 | 5000-5499  | 500   | Allow TCP 5000:5499 |
+| **Max**    | 500+    | 5000-5999  | 1000  | Allow TCP 5000:5999 |
 
 **SabaiPics Recommendation**: Start with **5000-5099** (100 ports for ~80 concurrent photographers).
 
 #### Security Considerations
 
 **Why NOT use full range (1024-65535)?**
+
 - ❌ Increases attack surface (64k open ports)
 - ❌ Difficult to monitor/audit
 - ❌ May conflict with other services
 - ❌ Firewall rule complexity
 
 **Why USE restricted range (e.g., 5000-5099)?**
+
 - ✅ Minimal attack surface
 - ✅ Easy to monitor specific port range
 - ✅ No conflicts with well-known ports
@@ -1642,6 +1728,7 @@ Examples:
 #### Server Configuration Examples
 
 **vsftpd (Linux):**
+
 ```ini
 # /etc/vsftpd.conf
 pasv_enable=YES
@@ -1651,14 +1738,17 @@ pasv_address=203.0.113.100  # Server's public IP
 ```
 
 **SFTPGo (for SabaiPics):**
+
 ```json
 {
   "ftpd": {
-    "bindings": [{
-      "port": 21,
-      "enable_tls": true,
-      "force_passive_ip": "203.0.113.100"
-    }],
+    "bindings": [
+      {
+        "port": 21,
+        "enable_tls": true,
+        "force_passive_ip": "203.0.113.100"
+      }
+    ],
     "passive_port_range": {
       "start": 5000,
       "end": 5099
@@ -1672,6 +1762,7 @@ pasv_address=203.0.113.100  # Server's public IP
 #### Server-Side Firewall Rules
 
 **Using UFW (Uncomplicated Firewall):**
+
 ```bash
 # Allow FTP control port
 ufw allow 21/tcp comment 'FTP control'
@@ -1684,6 +1775,7 @@ modprobe nf_conntrack_ftp
 ```
 
 **Using iptables:**
+
 ```bash
 # FTP control
 iptables -A INPUT -p tcp --dport 21 -m state --state NEW,ESTABLISHED -j ACCEPT
@@ -1698,6 +1790,7 @@ iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
 ```
 
 **Why Connection Tracking is Critical:**
+
 - FTP uses separate connections for control and data
 - Firewall must understand FTP protocol to allow related data connections
 - `nf_conntrack_ftp` kernel module tracks FTP sessions
@@ -1706,6 +1799,7 @@ iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
 #### Cloud Provider Firewall Examples
 
 **AWS Security Group:**
+
 ```
 Inbound Rules:
   Rule 1:
@@ -1722,6 +1816,7 @@ Inbound Rules:
 ```
 
 **DigitalOcean Firewall:**
+
 ```
 Inbound Rules:
   - Protocol: TCP
@@ -1734,6 +1829,7 @@ Inbound Rules:
 ```
 
 **Cloudflare (if using):**
+
 ```
 Note: Cloudflare DOES NOT proxy FTP traffic
 Solution: Point ftp.sabaipics.com directly to server IP (DNS only, no proxy)
@@ -1742,10 +1838,12 @@ Solution: Point ftp.sabaipics.com directly to server IP (DNS only, no proxy)
 #### Client-Side Considerations
 
 Most modern FTP clients default to **passive mode**, which requires:
+
 - Client firewall allows outbound connections to server's passive port range
 - No special configuration needed (outbound typically allowed)
 
 Photographers behind corporate firewalls should:
+
 1. Use passive mode (default in FileZilla, etc.)
 2. If blocked, request IT to allow outbound to ftp.sabaipics.com:5000-5099
 
@@ -1770,6 +1868,7 @@ sudo systemctl start fail2ban
 #### Configuration for FTP
 
 **Create jail for FTP** (`/etc/fail2ban/jail.d/vsftpd.conf`):
+
 ```ini
 [vsftpd]
 enabled = true
@@ -1784,6 +1883,7 @@ action = iptables-multiport[name=vsftpd, port="ftp,ftp-data,5000:5099"]
 ```
 
 **Parameters Explained:**
+
 - `maxretry = 5`: Ban after 5 failed login attempts
 - `findtime = 600`: Within 10 minutes (600 seconds)
 - `bantime = 900`: Ban IP for 15 minutes (900 seconds)
@@ -1792,6 +1892,7 @@ action = iptables-multiport[name=vsftpd, port="ftp,ftp-data,5000:5099"]
 #### Custom Filter for SFTPGo
 
 **Create filter** (`/etc/fail2ban/filter.d/sftpgo.conf`):
+
 ```ini
 [Definition]
 failregex = ^.*authentication failed.*user:.*client_ip:\s*<HOST>.*$
@@ -1800,6 +1901,7 @@ ignoreregex =
 ```
 
 **Update jail**:
+
 ```ini
 [sftpgo-ftp]
 enabled = true
@@ -1814,6 +1916,7 @@ bantime = 900
 #### Advanced: Progressive Ban Times
 
 **Recidivism Jail** (ban repeat offenders longer):
+
 ```ini
 [recidive]
 enabled = true
@@ -1848,6 +1951,7 @@ sudo fail2ban-client get vsftpd banned
 #### Whitelisting Trusted IPs
 
 **Add to jail config:**
+
 ```ini
 [vsftpd]
 enabled = true
@@ -1863,18 +1967,21 @@ maxretry = 5
 #### Recommended Configuration
 
 **SFTPGo Configuration:**
+
 ```json
 {
   "ftpd": {
-    "bindings": [{
-      "port": 21,
-      "enable_tls": true,
-      "force_passive_ip": "YOUR_PUBLIC_IP",
-      "certificate_file": "/etc/letsencrypt/live/ftp.sabaipics.com/fullchain.pem",
-      "certificate_key_file": "/etc/letsencrypt/live/ftp.sabaipics.com/privkey.pem",
-      "min_tls_version": 12,
-      "tls_mode": 2  // Explicit FTPS
-    }],
+    "bindings": [
+      {
+        "port": 21,
+        "enable_tls": true,
+        "force_passive_ip": "YOUR_PUBLIC_IP",
+        "certificate_file": "/etc/letsencrypt/live/ftp.sabaipics.com/fullchain.pem",
+        "certificate_key_file": "/etc/letsencrypt/live/ftp.sabaipics.com/privkey.pem",
+        "min_tls_version": 12,
+        "tls_mode": 2 // Explicit FTPS
+      }
+    ],
     "passive_port_range": {
       "start": 5000,
       "end": 5099
@@ -1882,21 +1989,22 @@ maxretry = 5
     "banner": "SabaiPics FTP Server - Use FTPS required"
   },
   "common": {
-    "max_auth_tried": 3,  // Max attempts per connection
+    "max_auth_tried": 3, // Max attempts per connection
     "defender": {
       "enabled": true,
-      "ban_time": 900,     // 15 minutes
+      "ban_time": 900, // 15 minutes
       "ban_time_increment": 300,
-      "threshold": 5,      // Failed attempts
+      "threshold": 5, // Failed attempts
       "score_invalid": 2,
       "score_valid": 1,
-      "observation_time": 600  // 10 minutes
+      "observation_time": 600 // 10 minutes
     }
   }
 }
 ```
 
 **Firewall (UFW):**
+
 ```bash
 ufw allow 21/tcp comment 'FTP control'
 ufw allow 5000:5099/tcp comment 'FTP passive data'
@@ -1907,6 +2015,7 @@ ufw enable
 ```
 
 **Fail2Ban:**
+
 ```ini
 [sftpgo-auth]
 enabled = true
@@ -1937,6 +2046,7 @@ action = iptables-multiport[name=sftpgo, port="21,5000:5099"]
 #### Monitoring & Alerts
 
 **Key Metrics:**
+
 ```prometheus
 # Failed auth attempts per minute
 rate(ftp_auth_failures_total[1m]) > 10  # Alert: Brute force attack
@@ -1952,6 +2062,7 @@ fail2ban_banned_ips{jail="sftpgo"} > 5  # Alert: Attack campaign
 ```
 
 **Alert Thresholds:**
+
 - Warning: 10+ failed logins/minute
 - Critical: 50+ failed logins/minute
 - Critical: Same IP banned 3+ times in 24 hours
@@ -2021,17 +2132,20 @@ openssl s_client -connect ftp.sabaipics.com:21 -starttls ftp
 ### A.10 References
 
 **RFCs:**
+
 - [RFC 959](https://datatracker.ietf.org/doc/html/rfc959) - File Transfer Protocol (FTP)
 - [RFC 2228](https://datatracker.ietf.org/doc/html/rfc2228) - FTP Security Extensions
 - [RFC 4217](https://datatracker.ietf.org/doc/html/rfc4217) - Securing FTP with TLS
 - [RFC 2428](https://datatracker.ietf.org/doc/html/rfc2428) - FTP Extensions for IPv6 and NATs
 
 **Security Resources:**
+
 - [OWASP - Brute Force Attack Prevention](https://owasp.org/www-community/controls/Blocking_Brute_Force_Attacks)
 - [CIS Benchmark - FTP Server Hardening](https://www.cisecurity.org/)
 - [Fail2Ban Official Documentation](https://www.fail2ban.org/wiki/index.php/Main_Page)
 
 **Implementation Guides:**
+
 - [SFTPGo Documentation](https://docs.sftpgo.com/)
 - [vsftpd Security Guide](https://security.appspot.com/vsftpd.html)
 - [DigitalOcean - FTP Security Best Practices](https://www.digitalocean.com/community/tutorials/how-to-set-up-vsftpd-for-a-user-s-directory-on-ubuntu-20-04)
@@ -2046,6 +2160,7 @@ openssl s_client -connect ftp.sabaipics.com:21 -starttls ftp
 ### B.1 Canon Camera FTP Capabilities
 
 #### Supported Models
+
 - **EOS R6 Mark III** (2025) - Latest flagship
 - **EOS R5 Mark II** (2024) - High-resolution flagship
 - **EOS R1** (2024) - Professional sports/action
@@ -2053,13 +2168,15 @@ openssl s_client -connect ftp.sabaipics.com:21 -starttls ftp
 - **1DX series, 5D Mark IV** - Professional DSLRs (with compatible firmware)
 
 #### Protocol Support
-| Protocol | Support | Notes |
-|----------|---------|-------|
-| **FTP** | ✅ All models | Standard, unencrypted |
-| **FTPS** (explicit TLS) | ✅ R6 Mark III, R5 Mark II, R1 | TLS 1.2+ |
-| **SFTP** | ⚠️ Via app only | Canon Content Transfer Professional (paid subscription) |
+
+| Protocol                | Support                        | Notes                                                   |
+| ----------------------- | ------------------------------ | ------------------------------------------------------- |
+| **FTP**                 | ✅ All models                  | Standard, unencrypted                                   |
+| **FTPS** (explicit TLS) | ✅ R6 Mark III, R5 Mark II, R1 | TLS 1.2+                                                |
+| **SFTP**                | ⚠️ Via app only                | Canon Content Transfer Professional (paid subscription) |
 
 #### Connection Requirements
+
 ```
 Port: 21 (standard FTP control port)
 Transfer Mode: Binary (automatic for images)
@@ -2069,6 +2186,7 @@ Authentication: Username/password (basic) or TLS (FTPS)
 ```
 
 #### Transfer Features
+
 - **Built-in FTP server function** - Direct camera-to-server uploads (no PC required)
 - **Automatic transfer** - Upload while shooting continues (background)
 - **Protected image auto-queue** - Photographer can star/protect images for priority upload
@@ -2077,6 +2195,7 @@ Authentication: Username/password (basic) or TLS (FTPS)
 - **Selective mode** - Upload only protected/starred images
 
 #### File Naming & Organization
+
 ```
 File Naming: Preserves original camera filenames
   - Example: IMG_0001.CR3, IMG_0001.JPG
@@ -2092,12 +2211,14 @@ Directory Structure: No special requirements
 ```
 
 #### Security Requirements
+
 - **TLS 1.2+** required for FTPS
 - **Explicit FTPS** preferred (AUTH TLS command)
 - Self-signed certificates acceptable for private networks
 - WPA2/WPA3 for Wi-Fi (no WPA/WEP)
 
 #### Canon-Specific Notes
+
 ✅ **Most compatible with event photography** - Largest market share among pro photographers
 ✅ **Mature FTP implementation** - Stable, well-tested in production environments
 ✅ **Excellent documentation** - User manuals include detailed FTP setup guides
@@ -2108,19 +2229,22 @@ Directory Structure: No special requirements
 ### B.2 Sony Camera FTP Capabilities
 
 #### Supported Models
+
 - **Alpha 7R V (A7R V)** with firmware 4.00+ (Nov 2025)
 - **Alpha 7 IV (A7 IV)** with firmware 6.00+ (Nov 2025)
 - **Alpha 7S III** - Video-focused, supports FTP
 - **Alpha 9 series** - Sports/action, supports FTP
 
 #### Protocol Support
-| Protocol | Support | Notes |
-|----------|---------|-------|
-| **FTP** | ✅ All models | Standard |
-| **FTPS** | ✅ Firmware 4.00+ | "Improved FTP security" mentioned in release notes |
-| **Network Streaming** | ✅ Latest firmware | Direct streaming to Creators' Cloud or custom FTP |
+
+| Protocol              | Support            | Notes                                              |
+| --------------------- | ------------------ | -------------------------------------------------- |
+| **FTP**               | ✅ All models      | Standard                                           |
+| **FTPS**              | ✅ Firmware 4.00+  | "Improved FTP security" mentioned in release notes |
+| **Network Streaming** | ✅ Latest firmware | Direct streaming to Creators' Cloud or custom FTP  |
 
 #### Connection Requirements
+
 ```
 Port: 21 (standard)
 Connection Mode: PASSIVE MODE - CRITICAL
@@ -2129,7 +2253,9 @@ Authentication: Built-in Wi-Fi with Creators' App support
 ```
 
 #### Transfer Features (Firmware 4.00+)
+
 **Major Enhancements in Latest Firmware:**
+
 - **Schedule FTP transfers while writing to camera storage** - Non-blocking, continues shooting
 - **Auto-schedule protected images** - Upload starred/protected images automatically
 - **Auto-protect transferred images** - Mark as uploaded (visual confirmation)
@@ -2139,6 +2265,7 @@ Authentication: Built-in Wi-Fi with Creators' App support
 - **Transfer only differences** - Incremental upload (skip already-uploaded files)
 
 #### Advanced Features
+
 ```
 Monitor & Control App:
   - Remote focus map display
@@ -2156,12 +2283,14 @@ Relay Playback:
 ```
 
 #### Security Requirements (Firmware 4.00+)
+
 - **No WPA/WEP support** - WPA2 or WPA3 only (security hardening)
 - **No IPsec support** - Removed, use Access Authentication instead
 - Modern TLS required for FTPS
 - Improved connection security with Creators' App
 
 #### Sony-Specific Notes
+
 ✅ **Most advanced FTP features** - Resume, incremental, priority transfers
 ✅ **Active development** - Major firmware updates in Nov 2025
 ✅ **Cloud integration** - Creators' Cloud direct upload
@@ -2173,18 +2302,21 @@ Relay Playback:
 ### B.3 Nikon Camera FTP Capabilities
 
 #### Supported Models
+
 - **D850** (with WT-7 wireless transmitter)
 - **Z9, Z8, Z7, Z6 series** (via SnapBridge or wireless accessories)
 - **Professional D-series DSLRs** (requires wireless transmitter)
 
 #### Protocol Support
-| Protocol | Support | Notes |
-|----------|---------|-------|
-| **FTP** | ✅ Via WT-7 transmitter | Requires external hardware |
-| **SnapBridge** | ✅ Built-in | Bluetooth + Wi-Fi to mobile apps (not true FTP) |
-| **Nikon Imaging Cloud** | ✅ Z series | Cloud workflow alternative |
+
+| Protocol                | Support                 | Notes                                           |
+| ----------------------- | ----------------------- | ----------------------------------------------- |
+| **FTP**                 | ✅ Via WT-7 transmitter | Requires external hardware                      |
+| **SnapBridge**          | ✅ Built-in             | Bluetooth + Wi-Fi to mobile apps (not true FTP) |
+| **Nikon Imaging Cloud** | ✅ Z series             | Cloud workflow alternative                      |
 
 #### Connection Requirements
+
 ```
 Hardware: WT-7 Wireless Transmitter (sold separately, ~$800)
 Port: 21 (standard)
@@ -2193,11 +2325,13 @@ Wi-Fi: Standard 802.11ac
 ```
 
 #### Transfer Features
+
 - **Automatic upload** - Images captured are uploaded immediately
 - **Selective transfer** - Marked images only (photographer selects)
 - **Background transfer** - Shooting continues while uploading
 
 #### Nikon-Specific Notes
+
 ❌ **Requires external hardware** - WT-7 transmitter ($800+) for professional FTP
 ⚠️ **Less direct FTP support** - Newer mirrorless bodies rely on SnapBridge (mobile-focused)
 ✅ **Nikon Imaging Cloud** - Alternative workflow for professional photographers
@@ -2210,6 +2344,7 @@ Wi-Fi: Standard 802.11ac
 **MUST-HAVE Features:**
 
 ✅ **1. Passive Mode (PASV) - CRITICAL**
+
 ```
 ALL modern cameras use passive mode exclusively
 Server MUST support passive port range (e.g., 5000-5099)
@@ -2218,6 +2353,7 @@ Active mode is OBSOLETE for camera uploads
 ```
 
 ✅ **2. Port Configuration**
+
 ```
 Control Port: 21 (standard) or custom
 Passive Data Ports: Dynamic range (e.g., 5000-5099)
@@ -2225,6 +2361,7 @@ FTPS: Port 21 with TLS upgrade (explicit FTPS via AUTH TLS)
 ```
 
 ✅ **3. Binary Transfer Mode**
+
 ```
 Automatic for image files (JPEG, RAW, video)
 Server MUST support TYPE I (binary) command
@@ -2232,6 +2369,7 @@ Cameras automatically select binary mode for images
 ```
 
 ✅ **4. Authentication Methods**
+
 ```
 Basic: Username/password (plaintext FTP)
 Secure: Username/password over TLS (FTPS)
@@ -2239,6 +2377,7 @@ SSH keys: For SFTP (Canon Content Transfer Pro, limited support)
 ```
 
 ✅ **5. Flexible Directory Structure**
+
 ```
 NO strict requirements - cameras are flexible
 Supported upload targets:
@@ -2249,6 +2388,7 @@ Server should allow directory creation (MKD command)
 ```
 
 ✅ **6. File Naming Support**
+
 ```
 Cameras preserve original filenames
 Server MUST support:
@@ -2260,6 +2400,7 @@ Server MUST support:
 ```
 
 ✅ **7. Security (FTPS)**
+
 ```
 TLS 1.2 or higher (TLS 1.3 recommended)
 Explicit FTPS (AUTH TLS) preferred over implicit
@@ -2272,28 +2413,33 @@ WPA2/WPA3 for Wi-Fi (no WPA/WEP)
 **NICE-TO-HAVE Features:**
 
 🟡 **Resume Support (REST command)**
+
 - Useful for large RAW files (30-50 MB) or video clips
 - Sony firmware 4.00+ supports resume
 - Canon supports in latest firmware
 - Allows retry after network interruption
 
 🟡 **Multiple Concurrent Connections**
+
 - Allows multiple cameras/photographers to upload simultaneously
 - Important for event photography (5-10 photographers typical)
 - SabaiPics should support 20+ concurrent connections
 
 🟡 **Bandwidth Throttling**
+
 - Prevent network saturation during peak uploads
 - Not required but helpful in shared network environments
 - Can prioritize certain photographers or file types
 
 🟡 **Logging & Monitoring**
+
 - Track upload success/failure
 - Monitor storage usage per event
 - Audit trail for uploaded files
 - Already implemented in SFTPGo (Critical Decision 4)
 
 🟡 **Automatic Directory Creation**
+
 - Organize uploads by date, event, or camera ID
 - Can be handled server-side (SFTPGo) or via camera settings
 - SabaiPics uses HTTPFs backend for dynamic paths
@@ -2303,6 +2449,7 @@ WPA2/WPA3 for Wi-Fi (no WPA/WEP)
 ### B.5 Typical Event Photography Upload Workflow
 
 #### Pre-Event Setup (Photographer)
+
 ```bash
 1. Configure camera with FTP server details:
    - Server: ftp.sabaipics.com
@@ -2324,6 +2471,7 @@ WPA2/WPA3 for Wi-Fi (no WPA/WEP)
 ```
 
 #### During Event
+
 ```bash
 1. Photographer shoots images
 2. Camera uploads automatically:
@@ -2338,6 +2486,7 @@ WPA2/WPA3 for Wi-Fi (no WPA/WEP)
 ```
 
 #### Post-Event
+
 ```bash
 1. Verify all images uploaded successfully:
    - Camera shows transfer history
@@ -2351,18 +2500,19 @@ WPA2/WPA3 for Wi-Fi (no WPA/WEP)
 
 #### Upload Triggers Comparison
 
-| Mode | When Upload Starts | Bandwidth | Battery | Use Case |
-|------|-------------------|-----------|---------|----------|
-| **Immediate** | After each shot | High | High drain | Small events, fast Wi-Fi |
-| **Protected** | Photographer stars image | Low | Low drain | Large events, selective sharing |
-| **Scheduled** | During idle periods | Medium | Medium | Automatic, no photographer action |
-| **Manual** | Photographer initiates | Low | Low | Full control, post-event upload |
+| Mode          | When Upload Starts       | Bandwidth | Battery    | Use Case                          |
+| ------------- | ------------------------ | --------- | ---------- | --------------------------------- |
+| **Immediate** | After each shot          | High      | High drain | Small events, fast Wi-Fi          |
+| **Protected** | Photographer stars image | Low       | Low drain  | Large events, selective sharing   |
+| **Scheduled** | During idle periods      | Medium    | Medium     | Automatic, no photographer action |
+| **Manual**    | Photographer initiates   | Low       | Low        | Full control, post-event upload   |
 
 ---
 
 ### B.6 Camera Error Handling Expectations
 
 #### Connection Lost (Wi-Fi Drops)
+
 ```
 Camera Behavior:
   - Displays error icon (Wi-Fi with X)
@@ -2377,6 +2527,7 @@ Server Requirements:
 ```
 
 #### Server Full / Quota Exceeded
+
 ```
 FTP Response: 552 Exceeded Storage Allocation
 Camera Behavior:
@@ -2392,6 +2543,7 @@ SabaiPics Behavior:
 ```
 
 #### Authentication Failure
+
 ```
 FTP Response: 530 Not logged in
 Camera Behavior:
@@ -2407,6 +2559,7 @@ Common Causes:
 ```
 
 #### Network Timeout
+
 ```
 Camera Behavior:
   - Waits 30-60 seconds (configurable timeout)
@@ -2422,20 +2575,21 @@ Server Requirements:
 
 #### Required FTP Server Response Codes (RFC 959)
 
-| Code | Message | Meaning | Camera Interpretation |
-|------|---------|---------|----------------------|
-| **250** | Requested file action okay, completed | Upload success | ✅ Display success, continue |
-| **530** | Not logged in | Auth failure | ❌ Prompt for credentials |
-| **550** | Requested action not taken (permission denied) | Permission error | ❌ Display error, stop upload |
-| **552** | Requested file action aborted (exceeded storage) | Quota exceeded | ❌ Display quota error |
-| **226** | Closing data connection (transfer complete) | Data transfer success | ✅ Mark file as uploaded |
-| **421** | Service not available, closing control connection | Server shutdown/overload | ⚠️ Retry after delay |
+| Code    | Message                                           | Meaning                  | Camera Interpretation         |
+| ------- | ------------------------------------------------- | ------------------------ | ----------------------------- |
+| **250** | Requested file action okay, completed             | Upload success           | ✅ Display success, continue  |
+| **530** | Not logged in                                     | Auth failure             | ❌ Prompt for credentials     |
+| **550** | Requested action not taken (permission denied)    | Permission error         | ❌ Display error, stop upload |
+| **552** | Requested file action aborted (exceeded storage)  | Quota exceeded           | ❌ Display quota error        |
+| **226** | Closing data connection (transfer complete)       | Data transfer success    | ✅ Mark file as uploaded      |
+| **421** | Service not available, closing control connection | Server shutdown/overload | ⚠️ Retry after delay          |
 
 ---
 
 ### B.7 Performance Expectations & Benchmarks
 
 #### Transfer Speeds (Real-World)
+
 ```
 Wi-Fi 5 GHz (802.11ac):
   - Theoretical: Up to 433 Mbps (Canon R6 Mark III)
@@ -2451,6 +2605,7 @@ Bottleneck: Usually Wi-Fi, not FTP server
 ```
 
 #### File Size Examples (Canon R6 Mark III)
+
 ```
 JPEG (Fine Quality):
   - 32.5 MP: ~10-15 MB per file
@@ -2467,6 +2622,7 @@ Video (4K 60fps):
 ```
 
 #### Concurrent Uploads (Multi-Photographer Events)
+
 ```
 Scenario: 5 photographers, each uploading simultaneously
 
@@ -2488,6 +2644,7 @@ Recommended:
 ```
 
 #### Battery Considerations
+
 ```
 Canon R6 Mark III (LP-E6P battery):
   - Normal shooting: 620 shots (LCD mode)
@@ -2506,6 +2663,7 @@ Recommendations:
 ### B.8 SabaiPics Implementation Checklist
 
 #### Server Configuration (SFTPGo)
+
 - [x] Enable passive mode (port range 5000-5099)
 - [x] Configure FTPS with TLS 1.2+ (explicit mode)
 - [x] Support binary transfer mode (automatic)
@@ -2516,6 +2674,7 @@ Recommendations:
 - [x] Prometheus metrics endpoint
 
 #### Authentication & Security
+
 - [x] Username format: `{photographer_id}_{event_id}`
 - [x] Password: Generated FTP token (`ftp_{event_id}_{random}`)
 - [x] Token invalidated when event expires
@@ -2527,6 +2686,7 @@ Recommendations:
 - [x] Fail2Ban protection (Appendix A)
 
 #### Storage & Organization
+
 - [ ] Auto-create directories per event/photographer
   - Structure: `/events/<event_id>/<photographer_id>/`
 - [x] Support both root uploads and subdirectories
@@ -2534,6 +2694,7 @@ Recommendations:
 - [x] Handle all common extensions (.CR3, .ARW, .NEF, .JPG, .HEIF, .MP4)
 
 #### Monitoring & Observability
+
 - [x] Real-time upload status dashboard
 - [x] Alert on upload failures (webhook to API)
 - [x] Storage quota monitoring per event
@@ -2542,7 +2703,9 @@ Recommendations:
 - [x] Structured logging (JSON format)
 
 #### Camera Compatibility Testing
+
 Priority 1 (MUST TEST):
+
 - [ ] Canon EOS R6 or R5 (most common for events)
   - [ ] FTP upload (port 21, passive mode)
   - [ ] FTPS upload (explicit TLS)
@@ -2550,16 +2713,19 @@ Priority 1 (MUST TEST):
   - [ ] Background upload while shooting
 
 Priority 2 (SHOULD TEST):
+
 - [ ] Sony A7R V or A7 IV (firmware 4.00+)
   - [ ] FTP upload
   - [ ] Resume interrupted transfer
   - [ ] Incremental upload (differences only)
 
 Priority 3 (NICE TO HAVE):
+
 - [ ] Nikon D850 + WT-7 (if hardware available)
   - [ ] FTP upload via wireless transmitter
 
 #### Network Setup (Event Venues)
+
 - [ ] Provide dedicated SSID for camera uploads
   - Separate from guest Wi-Fi (QoS priority)
 - [ ] Configure 5 GHz band for faster transfers
@@ -2571,6 +2737,7 @@ Priority 3 (NICE TO HAVE):
 - [ ] Wi-Fi range: Mesh network for large venues
 
 #### Documentation (For Photographers)
+
 - [ ] Camera setup guide - Canon (with screenshots)
 - [ ] Camera setup guide - Sony (with screenshots)
 - [ ] Camera setup guide - Nikon (if supported)
@@ -2588,6 +2755,7 @@ Priority 3 (NICE TO HAVE):
 ### B.9 Known Limitations & Workarounds
 
 #### Limitation 1: SFTP Support Varies
+
 ```
 Problem:
   - Not all cameras support SFTP natively
@@ -2602,6 +2770,7 @@ Workaround:
 ```
 
 #### Limitation 2: Wi-Fi Range
+
 ```
 Problem:
   - Camera Wi-Fi typically limited to 30-50 meters
@@ -2618,6 +2787,7 @@ Workaround:
 ```
 
 #### Limitation 3: Battery Drain
+
 ```
 Problem:
   - Continuous Wi-Fi upload consumes battery 30-50% faster
@@ -2634,6 +2804,7 @@ Workaround:
 ```
 
 #### Limitation 4: Transfer Speed vs Shooting Speed
+
 ```
 Problem:
   - Canon R6 Mark III: 40 fps burst mode
@@ -2651,6 +2822,7 @@ Workaround:
 ```
 
 #### Limitation 5: Network Saturation (Multi-Photographer)
+
 ```
 Problem:
   - 10 photographers uploading RAW simultaneously
@@ -2672,6 +2844,7 @@ Workaround:
 #### Pre-Implementation Tests
 
 **Test 1: Connection & Authentication**
+
 ```bash
 Goal: Verify passive mode works from camera
 Equipment: Canon EOS R6 or R5
@@ -2685,6 +2858,7 @@ Expected Result: Camera connects, authenticates, ready to upload
 ```
 
 **Test 2: Upload - Small JPEG**
+
 ```bash
 Goal: Quick upload test (baseline)
 File: Small JPEG (5-10 MB)
@@ -2698,6 +2872,7 @@ Expected Result: Upload completes in <2 seconds, file visible in dashboard
 ```
 
 **Test 3: Upload - Large RAW**
+
 ```bash
 Goal: Stress test with large file
 File: RAW file (30-50 MB)
@@ -2711,6 +2886,7 @@ Expected Result: Upload completes in 2-8 seconds (depending on Wi-Fi)
 ```
 
 **Test 4: Concurrent Uploads**
+
 ```bash
 Goal: Simulate multi-photographer event
 Setup: 3-5 cameras uploading simultaneously
@@ -2725,15 +2901,16 @@ Expected Result: All uploads succeed, server remains stable
 
 **Test 5: Error Scenarios**
 
-| Scenario | Trigger | Expected Camera Behavior | Expected Server Behavior |
-|----------|---------|-------------------------|-------------------------|
-| **Invalid credentials** | Wrong password | Display "530 Not logged in", prompt retry | Return 530, log failed attempt |
-| **Server unreachable** | Disconnect network | Display timeout error, retry 3x | N/A (server offline) |
-| **Disk full** | Set quota to 0 MB | Display "552 Exceeded storage", stop upload | Return 552, alert admin |
-| **Network interruption** | Disconnect mid-transfer | Display error, queue for retry | Log incomplete transfer |
-| **Firewall blocks passive ports** | Block 5000-5099 | Timeout on data connection | Log timeout (no data connection) |
+| Scenario                          | Trigger                 | Expected Camera Behavior                    | Expected Server Behavior         |
+| --------------------------------- | ----------------------- | ------------------------------------------- | -------------------------------- |
+| **Invalid credentials**           | Wrong password          | Display "530 Not logged in", prompt retry   | Return 530, log failed attempt   |
+| **Server unreachable**            | Disconnect network      | Display timeout error, retry 3x             | N/A (server offline)             |
+| **Disk full**                     | Set quota to 0 MB       | Display "552 Exceeded storage", stop upload | Return 552, alert admin          |
+| **Network interruption**          | Disconnect mid-transfer | Display error, queue for retry              | Log incomplete transfer          |
+| **Firewall blocks passive ports** | Block 5000-5099         | Timeout on data connection                  | Log timeout (no data connection) |
 
 **Test 6: Performance Benchmarks**
+
 ```bash
 Goal: Measure realistic upload speeds
 Metrics:
@@ -2755,6 +2932,7 @@ Expected Results:
 #### Post-Implementation Validation
 
 **Validation 1: Camera Compatibility Matrix**
+
 ```
 | Camera Model | FTP | FTPS | SFTP | Passive Mode | Resume | Notes |
 |--------------|-----|------|------|--------------|--------|-------|
@@ -2766,6 +2944,7 @@ Expected Results:
 ```
 
 **Validation 2: Production Readiness Checklist**
+
 - [ ] FTPS (explicit TLS) enabled and tested
 - [ ] Passive mode port range (5000-5099) open in firewall
 - [ ] Let's Encrypt certificate installed and auto-renewing
@@ -2782,21 +2961,25 @@ Expected Results:
 ### B.11 References & Sources
 
 **Official Canon Documentation:**
+
 - [EOS R6 Mark III Specifications](https://www.usa.canon.com/shop/p/eos-r6-mark-iii-body-with-cropping-guide-firmware) (2025)
 - Canon Camera Connect App Documentation
 - Canon Content Transfer Professional App (paid subscription)
 
 **Official Sony Documentation:**
+
 - [Alpha 7R V Firmware 4.00 Release Notes](https://www.sony.com/electronics/support/e-mount-body-ilce-7-series/ilce-7rm5/software/00292267) (November 2025)
 - Sony Alpha 7 IV Firmware 6.00 Release Notes (November 2025)
 - Sony Creators' App Documentation
 
 **Official Nikon Documentation:**
+
 - Nikon D850 Specifications
 - WT-7 Wireless Transmitter Documentation
 - SnapBridge Functionality Guide
 
 **Industry Standards:**
+
 - RFC 959 - File Transfer Protocol (FTP)
 - RFC 4217 - Securing FTP with TLS
 - RFC 1579 - Firewall-Friendly FTP (Passive Mode)
@@ -2804,6 +2987,7 @@ Expected Results:
 - W3C Trace Context Specification (for distributed tracing)
 
 **Research Sources:**
+
 - Canon EOS R6 Mark III user manual (FTP configuration chapter)
 - Sony professional camera FTP implementation guide
 - Event photography industry best practices
@@ -2817,32 +3001,35 @@ Expected Results:
 
 #### Compatibility Matrix
 
-| Requirement | SabaiPics Implementation | Canon | Sony | Nikon |
-|-------------|-------------------------|-------|------|-------|
-| **Passive Mode** | ✅ Port 5000-5099 | ✅ Required | ✅ Required | ✅ Required |
-| **Port 21** | ✅ Standard FTP control | ✅ Compatible | ✅ Compatible | ✅ Compatible |
-| **FTPS (TLS 1.2+)** | ✅ Explicit, Let's Encrypt | ✅ R6 III, R5 II, R1 | ✅ Firmware 4.00+ | ⚠️ Limited |
-| **Binary Transfer** | ✅ Automatic | ✅ Automatic | ✅ Automatic | ✅ Automatic |
-| **Flexible Paths** | ✅ HTTPFs backend | ✅ Configurable | ✅ Configurable | ✅ Configurable |
-| **Concurrent Connections** | ✅ 20+ supported | ✅ 1 per camera | ✅ 1 per camera | ✅ 1 per camera |
-| **Authentication** | ✅ External hook | ✅ User/pass | ✅ User/pass | ✅ User/pass |
-| **Resume Transfers** | ✅ REST supported | ✅ Latest firmware | ✅ Firmware 4.00+ | ❌ Not supported |
+| Requirement                | SabaiPics Implementation   | Canon                | Sony              | Nikon            |
+| -------------------------- | -------------------------- | -------------------- | ----------------- | ---------------- |
+| **Passive Mode**           | ✅ Port 5000-5099          | ✅ Required          | ✅ Required       | ✅ Required      |
+| **Port 21**                | ✅ Standard FTP control    | ✅ Compatible        | ✅ Compatible     | ✅ Compatible    |
+| **FTPS (TLS 1.2+)**        | ✅ Explicit, Let's Encrypt | ✅ R6 III, R5 II, R1 | ✅ Firmware 4.00+ | ⚠️ Limited       |
+| **Binary Transfer**        | ✅ Automatic               | ✅ Automatic         | ✅ Automatic      | ✅ Automatic     |
+| **Flexible Paths**         | ✅ HTTPFs backend          | ✅ Configurable      | ✅ Configurable   | ✅ Configurable  |
+| **Concurrent Connections** | ✅ 20+ supported           | ✅ 1 per camera      | ✅ 1 per camera   | ✅ 1 per camera  |
+| **Authentication**         | ✅ External hook           | ✅ User/pass         | ✅ User/pass      | ✅ User/pass     |
+| **Resume Transfers**       | ✅ REST supported          | ✅ Latest firmware   | ✅ Firmware 4.00+ | ❌ Not supported |
 
 #### Recommendations
 
 **Priority 1: Canon EOS R Series**
+
 - **Rationale:** Largest market share among professional event photographers
 - **Compatibility:** Excellent - all features supported
 - **Testing:** Use Canon R6 or R5 as primary test camera
 - **Documentation:** Create detailed Canon setup guide first
 
 **Priority 2: Sony Alpha 7/9 Series**
+
 - **Rationale:** Growing market share, advanced FTP features
 - **Compatibility:** Excellent with firmware 4.00+ (Nov 2025)
 - **Testing:** Validate resume & incremental upload features
 - **Documentation:** Create Sony-specific guide (highlight firmware requirements)
 
 **Priority 3: Nikon (Optional)**
+
 - **Rationale:** Smallest market share, requires external hardware (WT-7)
 - **Compatibility:** Good but limited (no resume, requires $800 transmitter)
 - **Testing:** Only if customer requests Nikon support
@@ -2857,6 +3044,7 @@ Expected Results:
 ✅ **Prometheus metrics cover all camera upload scenarios**
 
 **Action Items:**
+
 1. Test with Canon R6/R5 (priority)
 2. Test with Sony A7R V (if available)
 3. Create photographer setup guides (Canon, Sony)
