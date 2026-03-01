@@ -184,7 +184,8 @@ private struct SpoolFullImage: View {
     @State private var image: UIImage?
 
     private static let maxPixelSize: CGFloat = {
-        UIScreen.main.bounds.width * UIScreen.main.scale
+        let bounds = UIScreen.main.bounds
+        return max(bounds.width, bounds.height) * UIScreen.main.scale
     }()
 
     var body: some View {
