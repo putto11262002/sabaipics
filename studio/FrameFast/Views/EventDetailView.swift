@@ -162,13 +162,13 @@ struct EventDetailView: View {
             EventDetailStatCard(
                 icon: "clock.arrow.circlepath",
                 iconTint: Color.orange,
-                title: "Pending",
+                title: String(localized: "Pending"),
                 value: "\(uploadSummary?.pending ?? 0)"
             )
             EventDetailStatCard(
                 icon: "checkmark.circle",
                 iconTint: Color.green,
-                title: "Completed",
+                title: String(localized: "Completed"),
                 value: "\(uploadSummary?.completed ?? 0)"
             )
         }
@@ -509,8 +509,8 @@ enum EditableField: Identifiable {
 
     var title: String {
         switch self {
-        case .name: return "Name"
-        case .subtitle: return "Subtitle"
+        case .name: return String(localized: "Name")
+        case .subtitle: return String(localized: "Subtitle")
         }
     }
 }

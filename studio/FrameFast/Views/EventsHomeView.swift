@@ -334,7 +334,7 @@ private struct UploadStatsCardsRow: View {
             UploadStatCard(
                 icon: "tray.and.arrow.up",
                 iconTint: Color.green,
-                title: "Uploaded (7d)",
+                title: String(localized: "Uploaded (7d)"),
                 value: String(uploadedLast7Days)
             )
         }
@@ -352,7 +352,7 @@ private struct UploadSyncCard: View {
         return UploadStatCard(
             icon: icon,
             iconTint: tint,
-            title: "Upload queue",
+            title: String(localized: "Upload queue"),
             value: value
         )
     }

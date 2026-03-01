@@ -85,12 +85,12 @@ struct CaptureStatusBarView: View {
     private var subtitleText: String {
         switch status {
         case .connecting:
-            return "Working…"
+            return String(localized: "Working…")
         case .active:
             if let eventName, !eventName.isEmpty {
                 return eventName
             }
-            return "Tap to view"
+            return String(localized: "Tap to view")
         case .error(let message):
             return message
         }
@@ -121,11 +121,11 @@ struct CaptureStatusBarView: View {
     private var accessibilityLabel: String {
         switch status {
         case .connecting:
-            return "Capture session. Working."
+            return String(localized: "Capture session. Working.")
         case .active:
-            return "Capture session active."
+            return String(localized: "Capture session active.")
         case .error(let message):
-            return "Capture session error. \(message)"
+            return String(localized: "Capture session error. \(message)")
         }
     }
 }

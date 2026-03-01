@@ -131,7 +131,7 @@ struct CameraWiFiInternetGuideView: View {
         func text(for part: Step.Part) -> Text {
             switch part {
             case .text(let value):
-                return Text(value)
+                return Text(LocalizedStringKey(value))
             case .icon(let systemName):
                 return Text(Image(systemName: systemName))
             }
