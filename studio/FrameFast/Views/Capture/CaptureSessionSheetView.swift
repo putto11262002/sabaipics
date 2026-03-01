@@ -232,7 +232,7 @@ private struct CaptureSessionPhotosView: View {
                 .foregroundColor(.orange)
                 .font(.subheadline)
 
-            Text("\(session.skippedRawCount) RAW files skipped")
+            Text("^[\(session.skippedRawCount) RAW file skipped](inflect: true)")
                 .font(.subheadline)
                 .foregroundColor(Color.primary)
 
