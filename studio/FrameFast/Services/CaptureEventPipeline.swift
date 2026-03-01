@@ -12,11 +12,13 @@ import Foundation
 /// - Spools completed downloads to disk (URL boundary).
 /// - Fan-outs normalized events to sinks (UI, upload queue, photo library, etc.).
 actor CaptureEventPipeline {
-    private let spool: CaptureSpool
+    private let fileService: SpoolFileService
+    private let eventId: String
     private var sinks: [AnyCaptureEventSink]
 
-    init(spool: CaptureSpool, sinks: [AnyCaptureEventSink]) {
-        self.spool = spool
+    init(fileService: SpoolFileService, eventId: String, sinks: [AnyCaptureEventSink]) {
+        self.fileService = fileService
+        self.eventId = eventId
         self.sinks = sinks
     }
 
@@ -43,7 +45,7 @@ actor CaptureEventPipeline {
     func publishDownloadedBytes(objectHandle: UInt32, filename: String, captureDate: Date, fileSize: Int, data: Data) async {
         do {
             let hex = String(format: "%08X", objectHandle)
-            let item = try await spool.store(data: data, preferredFilename: filename, handleHex: hex)
+            let item = try await fileService.store(data: data, eventId: eventId, preferredFilename: filename, handleHex: hex)
             let completed = CaptureSpoolCompleted(
                 objectHandle: objectHandle,
                 filename: filename,

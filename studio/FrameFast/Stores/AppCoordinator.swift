@@ -25,9 +25,11 @@ class AppCoordinator: ObservableObject {
 
     let connectivityStore: ConnectivityStore
     let creditsStore: CreditsStore
+    let uploadQueueStore: UploadQueueStore
     let uploadManager: UploadManager
     let uploadStatusStore: UploadStatusStore
     let backgroundSession: BackgroundUploadSessionManager
+    let fileService: SpoolFileService
 
     private static let selectedEventDefaultsKey = "SelectedEventId"
     private static let selectedEventNameDefaultsKey = "SelectedEventName"
@@ -49,8 +51,12 @@ class AppCoordinator: ObservableObject {
         self.connectivityStore = ConnectivityStore(service: connectivityService)
         self.creditsStore = CreditsStore(apiClient: dashboardClient, connectivityStore: connectivityStore)
         self.backgroundSession = bgSession
-        self.uploadManager = UploadManager(baseURL: baseURL, connectivity: connectivityService, backgroundSession: bgSession)
+
+        let queueStore = UploadQueueStore(dbURL: UploadManager.defaultDBURL())
+        self.uploadQueueStore = queueStore
+        self.uploadManager = UploadManager(baseURL: baseURL, store: queueStore, connectivity: connectivityService, backgroundSession: bgSession)
         self.uploadStatusStore = UploadStatusStore(uploadManager: uploadManager)
+        self.fileService = SpoolFileService()
 
         connectivityStore.start()
         observeConnectivityForAuthRefresh()
@@ -95,6 +101,81 @@ class AppCoordinator: ObservableObject {
             print("[AppCoordinator] Scheduled background drain (\(s.inFlight) pending)")
         } catch {
             print("[AppCoordinator] Failed to schedule background drain: \(error)")
+        }
+    }
+
+    // MARK: - Spool Cleanup
+
+    /// Run cleanup if enough time has passed since the last run.
+    func runThrottledCleanup() {
+        let now = Date().timeIntervalSince1970
+        let lastRun = UserDefaults.standard.double(forKey: SpoolRetentionConfig.lastCleanupKey)
+
+        guard (now - lastRun) >= SpoolRetentionConfig.cleanupInterval else {
+            print("[AppCoordinator] Skipping cleanup, last run \(Int((now - lastRun) / 60))m ago")
+            return
+        }
+
+        UserDefaults.standard.set(now, forKey: SpoolRetentionConfig.lastCleanupKey)
+
+        Task {
+            await runCleanup()
+        }
+    }
+
+    /// Retention-based cleanup: delete expired files and prune DB records.
+    func runCleanup() async {
+        let now = Date().timeIntervalSince1970
+
+        let completedCutoff = now - SpoolRetentionConfig.completedRetention
+        let failedCutoff = now - SpoolRetentionConfig.terminalFailedRetention
+
+        await cleanupExpiredJobs(state: .completed, cutoff: completedCutoff)
+        await cleanupExpiredJobs(state: .terminalFailed, cutoff: failedCutoff)
+        await fileService.removeEmptyEventDirectories()
+
+        print("[AppCoordinator] Periodic cleanup complete")
+    }
+
+    /// Delete all completed job files immediately (manual trigger).
+    func forceCleanupCompleted() async {
+        await cleanupAllJobs(state: .completed)
+        await fileService.removeEmptyEventDirectories()
+    }
+
+    /// Delete all terminal-failed job files immediately (manual trigger).
+    func forceCleanupFailed() async {
+        await cleanupAllJobs(state: .terminalFailed)
+        await fileService.removeEmptyEventDirectories()
+    }
+
+    private func cleanupExpiredJobs(state: UploadJobState, cutoff: TimeInterval) async {
+        do {
+            let jobs = try await uploadQueueStore.fetchExpiredJobs(state: state, updatedBefore: cutoff)
+            guard !jobs.isEmpty else { return }
+
+            let urls = jobs.compactMap { URL(string: $0.localFileURL) }
+            await fileService.deleteFiles(at: urls)
+            try await uploadQueueStore.deleteJobs(ids: jobs.map(\.id))
+
+            print("[AppCoordinator] Cleaned \(jobs.count) expired \(state.rawValue) jobs")
+        } catch {
+            print("[AppCoordinator] Cleanup error (\(state.rawValue)): \(error)")
+        }
+    }
+
+    private func cleanupAllJobs(state: UploadJobState) async {
+        do {
+            let jobs = try await uploadQueueStore.fetchAllJobs(state: state)
+            guard !jobs.isEmpty else { return }
+
+            let urls = jobs.compactMap { URL(string: $0.localFileURL) }
+            await fileService.deleteFiles(at: urls)
+            try await uploadQueueStore.deleteJobs(ids: jobs.map(\.id))
+
+            print("[AppCoordinator] Force cleaned \(jobs.count) \(state.rawValue) jobs")
+        } catch {
+            print("[AppCoordinator] Force cleanup error (\(state.rawValue)): \(error)")
         }
     }
 
