@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { SectionContainer } from './section-container';
 
 import ios0 from '@/assets/ios-screenshots/ios-0.webp';
 import ios1 from '@/assets/ios-screenshots/ios-1.webp';
@@ -83,7 +84,7 @@ export function IosAppHorizontalScroll() {
       }}
     >
       {/* Content */}
-      <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 lg:grid-cols-2 lg:gap-14">
+      <SectionContainer className="grid w-full gap-10 lg:grid-cols-2 lg:gap-14">
         {/* Copy - left column */}
         <div>
           {/* Mobile: show only first panel */}
@@ -178,7 +179,7 @@ export function IosAppHorizontalScroll() {
             </a>
           </div>
         </div>
-      </div>
+      </SectionContainer>
     </div>
   );
 }

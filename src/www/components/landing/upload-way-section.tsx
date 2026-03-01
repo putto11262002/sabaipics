@@ -13,6 +13,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { UploadCameraStage } from './upload-camera-stage';
+import { SectionContainer } from './section-container';
 
 type UploadMethodKind = 'ios' | 'web' | 'desktop';
 const UPLOAD_METHOD_KINDS: UploadMethodKind[] = ['ios', 'web', 'desktop'];
@@ -602,7 +603,7 @@ export function UploadWaySection() {
 
   return (
     <section id="upload" className="scroll-mt-24 bg-muted/30 pb-16 pt-6 sm:pb-20 sm:pt-8">
-      <div className="mx-auto max-w-7xl px-4">
+      <SectionContainer>
         <div className="max-w-xl">
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('title')}</h2>
           <p className="mt-2 text-muted-foreground">{t('subtitle')}</p>
@@ -642,7 +643,7 @@ export function UploadWaySection() {
             ))}
           </div>
         </div>
-      </div>
+      </SectionContainer>
     </section>
   );
 }

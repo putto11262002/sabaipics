@@ -21,6 +21,7 @@ import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { cn } from '@/shared/utils/ui';
+import { SectionContainer } from './section-container';
 
 type Step = {
   id: string;
@@ -920,18 +921,18 @@ export function FeatureStory() {
       {/* Inject CSS keyframes */}
       <style dangerouslySetInnerHTML={{ __html: animationStyles }} />
 
-      <div className="mx-auto max-w-7xl px-4 pb-8 pt-2 sm:pt-6">
+      <SectionContainer className="pb-8 pt-2 sm:pt-6">
         <div className="max-w-4xl">
-          <h2 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
+          <h2 className="hidden text-balance text-4xl font-semibold tracking-tight sm:block sm:text-5xl">
             {t('title')}
           </h2>
           <p className="mt-3 max-w-3xl text-base text-muted-foreground sm:text-lg">
             {t('subtitle')}
           </p>
         </div>
-      </div>
+      </SectionContainer>
 
-      <div className="mx-auto max-w-7xl px-4 pb-20 md:pb-28">
+      <SectionContainer className="pb-20 md:pb-28">
         {allSteps.map((step, index) => (
           <article
             key={step.id}
@@ -1016,7 +1017,7 @@ export function FeatureStory() {
         ))}
 
         <section id="feature-story-end" className="h-[38svh] scroll-mt-24" />
-      </div>
+      </SectionContainer>
     </section>
   );
 }

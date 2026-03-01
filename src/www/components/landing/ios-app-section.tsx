@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { getLocale, getTranslations } from 'next-intl/server';
 import iosAppScreenshot from '@/assets/ios-app-screenshot.webp';
+import { SectionContainer } from './section-container';
 
 export async function IosAppSection() {
   const locale = await getLocale();
@@ -11,7 +12,7 @@ export async function IosAppSection() {
 
   return (
     <section id="ios-app" className="scroll-mt-24 bg-muted/30 py-16 sm:py-20">
-      <div className="mx-auto max-w-7xl px-4">
+      <SectionContainer>
         <div className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-card text-foreground shadow-[0_36px_90px_-58px_color-mix(in_oklab,var(--foreground)_12%,transparent)]">
           <div
             aria-hidden="true"
@@ -67,7 +68,7 @@ export async function IosAppSection() {
             </div>
           </div>
         </div>
-      </div>
+      </SectionContainer>
     </section>
   );
 }

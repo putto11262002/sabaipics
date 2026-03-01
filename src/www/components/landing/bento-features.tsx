@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Smartphone, Globe, Monitor, Aperture } from 'lucide-react';
+import { SectionContainer } from './section-container';
 
 const searchMessages = [
   'AI-powered face search...',
@@ -356,7 +357,8 @@ function OrganizerTile() {
 
 export function BentoFeatures() {
   return (
-    <section id="features" className="mx-auto max-w-7xl px-4 py-16">
+    <section id="features" className="py-16">
+      <SectionContainer>
       <div className="mb-10 max-w-3xl">
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           Everything you need to deliver event photos
@@ -391,6 +393,7 @@ export function BentoFeatures() {
           <OrganizerTile />
         </div>
       </div>
+      </SectionContainer>
     </section>
   );
 }
