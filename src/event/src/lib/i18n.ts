@@ -43,7 +43,8 @@ export const th = {
       description: (max: number) => `กรุณายกเลิกรูปที่ไม่ต้องการก่อนเลือกเพิ่ม (สูงสุด ${max} รูป)`,
     },
     searchAgain: 'ค้นหาใหม่',
-    lineButton: 'รับรูปทาง LINE',
+    lineButton: (count: number) => count > 0 ? `รับ ${count} รูปทาง LINE` : 'รับรูปทาง LINE',
+    lineSelectHint: 'เลือกรูปก่อนกดรับทาง LINE',
     lineRedirecting: 'กำลังเปิด LINE...',
   },
   lineCallback: {

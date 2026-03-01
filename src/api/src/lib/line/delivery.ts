@@ -26,6 +26,7 @@ import type { PhotographerSettings } from '@/db/schema/photographers';
 
 export type DeliveryError =
   | { type: 'not_found'; resource: string }
+  | { type: 'no_pending_delivery' }
   | { type: 'already_delivered'; existing: { photoCount: number; messageCount: number } }
   | { type: 'no_friendship' }
   | { type: 'overage_disabled' }
@@ -36,7 +37,9 @@ export type DeliveryError =
 
 export interface DeliverPhotosParams {
   searchId: string;
+  photoIds: string[];
   lineUserId: string;
+  deliveryId: string;
   db: Database;
   dbTx: DatabaseTx;
   lineClient: messagingApi.MessagingApiClient;
@@ -116,12 +119,12 @@ export function buildImageMessageBatches(
  * 8. Check monthly allowance
  * 9. Handle paid messages (credit debit)
  * 10. Push messages via LINE API
- * 11. Insert line_deliveries record
+ * 11. Update line_deliveries record with final status
  */
 export function deliverPhotosViaLine(
   params: DeliverPhotosParams,
 ): ResultAsync<DeliveryResult, DeliveryError> {
-  const { searchId, lineUserId, db, dbTx, lineClient, r2BaseUrl, cfZone, isDev } = params;
+  const { searchId, photoIds, lineUserId, deliveryId, db, dbTx, lineClient, r2BaseUrl, cfZone, isDev } = params;
 
   return ResultAsync.fromPromise(
     (async (): Promise<DeliveryResult> => {
@@ -138,6 +141,13 @@ export function deliverPhotosViaLine(
 
       if (!search) throw makeError('not_found', 'search');
       if (!search.matchedPhotoIds || search.matchedPhotoIds.length === 0) {
+        throw makeError('not_found', 'photos');
+      }
+
+      // Validate that all requested photoIds are in the search results
+      const matchedSet = new Set(search.matchedPhotoIds);
+      const invalidIds = photoIds.filter(id => !matchedSet.has(id));
+      if (invalidIds.length > 0) {
         throw makeError('not_found', 'photos');
       }
 
@@ -191,13 +201,13 @@ export function deliverPhotosViaLine(
       const photoCap = lineSettings?.photoCap ?? null;
       const overageEnabled = lineSettings?.overageEnabled ?? false;
 
-      // Step 4: Apply photo cap
-      let photoIds = [...new Set(search.matchedPhotoIds)];
-      if (photoCap !== null && photoIds.length > photoCap) {
-        photoIds = photoIds.slice(0, photoCap);
+      // Step 4: Apply photo cap to requested photoIds
+      let deliveryPhotoIds = [...new Set(photoIds)];
+      if (photoCap !== null && deliveryPhotoIds.length > photoCap) {
+        deliveryPhotoIds = deliveryPhotoIds.slice(0, photoCap);
       }
 
-      console.log('[LINE deliver] matchedPhotoIds:', search.matchedPhotoIds.length, 'deduped:', photoIds.length);
+      console.log('[LINE deliver] requested:', photoIds.length, 'deduped:', deliveryPhotoIds.length);
 
       // Step 5: Fetch photo records
       const photoRecords = await db
@@ -205,7 +215,7 @@ export function deliverPhotosViaLine(
         .from(photos)
         .where(
           and(
-            inArray(photos.id, photoIds),
+            inArray(photos.id, deliveryPhotoIds),
             eq(photos.status, 'indexed'),
             isNull(photos.deletedAt),
           ),
@@ -271,11 +281,9 @@ export function deliverPhotosViaLine(
           // If this is a 429, record partial and surface rate limit
           if (e?.statusCode === 429) {
             if (sentMessages > 0) {
-              await insertDeliveryRecord(db, {
-                photographerId: event.photographerId,
-                eventId: event.id,
-                searchId,
+              await updateDeliveryRecord(db, deliveryId, {
                 lineUserId,
+                photoIds: deliveryPhotoIds,
                 messageCount: sentMessages,
                 photoCount: sentPhotos,
                 creditCharged,
@@ -289,11 +297,9 @@ export function deliverPhotosViaLine(
           }
           // Other errors: if we sent some, record partial
           if (sentMessages > 0) {
-            await insertDeliveryRecord(db, {
-              photographerId: event.photographerId,
-              eventId: event.id,
-              searchId,
+            await updateDeliveryRecord(db, deliveryId, {
               lineUserId,
+              photoIds: deliveryPhotoIds,
               messageCount: sentMessages,
               photoCount: sentPhotos,
               creditCharged,
@@ -307,12 +313,10 @@ export function deliverPhotosViaLine(
         }
       }
 
-      // Step 10: Record delivery
-      await insertDeliveryRecord(db, {
-        photographerId: event.photographerId,
-        eventId: event.id,
-        searchId,
+      // Step 10: Update delivery record with final status
+      await updateDeliveryRecord(db, deliveryId, {
         lineUserId,
+        photoIds: deliveryPhotoIds,
         messageCount: sentMessages,
         photoCount: sentPhotos,
         creditCharged,
@@ -341,11 +345,9 @@ function makeError(type: 'not_found', resource: string): DeliveryError {
   return { type, resource };
 }
 
-interface InsertDeliveryParams {
-  photographerId: string;
-  eventId: string;
-  searchId: string;
+interface UpdateDeliveryParams {
   lineUserId: string;
+  photoIds: string[];
   messageCount: number;
   photoCount: number;
   creditCharged: boolean;
@@ -354,17 +356,22 @@ interface InsertDeliveryParams {
   errorMessage: string | null;
 }
 
-async function insertDeliveryRecord(db: Database, params: InsertDeliveryParams): Promise<void> {
-  await db.insert(lineDeliveries).values({
-    photographerId: params.photographerId,
-    eventId: params.eventId,
-    searchId: params.searchId,
-    lineUserId: params.lineUserId,
-    messageCount: params.messageCount,
-    photoCount: params.photoCount,
-    creditCharged: params.creditCharged,
-    creditLedgerEntryId: params.creditLedgerEntryId,
-    status: params.status,
-    errorMessage: params.errorMessage,
-  });
+async function updateDeliveryRecord(
+  db: Database,
+  deliveryId: string,
+  params: UpdateDeliveryParams,
+): Promise<void> {
+  await db
+    .update(lineDeliveries)
+    .set({
+      lineUserId: params.lineUserId,
+      photoIds: params.photoIds,
+      messageCount: params.messageCount,
+      photoCount: params.photoCount,
+      creditCharged: params.creditCharged,
+      creditLedgerEntryId: params.creditLedgerEntryId,
+      status: params.status,
+      errorMessage: params.errorMessage,
+    })
+    .where(eq(lineDeliveries.id, deliveryId));
 }

@@ -13,7 +13,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { safeTry, ok, err } from 'neverthrow';
+import { safeTry, ok, err, ResultAsync } from 'neverthrow';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
 import {
@@ -26,7 +26,7 @@ import { deliverPhotosViaLine, type DeliveryError } from '../../lib/line/deliver
 import { createLineClient } from '../../lib/line/client';
 import { getMonthlyUsage } from '../../lib/line/allowance';
 import { getBalance } from '../../lib/credits';
-import { events, photographers } from '@/db';
+import { events, photographers, lineDeliveries } from '@/db';
 import { eq } from 'drizzle-orm';
 import type { PhotographerSettings } from '@/db/schema/photographers';
 import { capturePostHogEvent } from '../../lib/posthog';
@@ -46,6 +46,12 @@ const callbackQuerySchema = z.object({
   friendship_status_changed: z.string().optional(),
 });
 
+const pendingBodySchema = z.object({
+  eventId: z.string().uuid('Invalid event ID format'),
+  searchId: z.string().uuid('Invalid search ID format'),
+  photoIds: z.array(z.string().uuid()).min(1, 'At least one photo ID required'),
+});
+
 const deliverBodySchema = z.object({
   eventId: z.string().uuid('Invalid event ID format'),
   searchId: z.string().uuid('Invalid search ID format'),
@@ -60,6 +66,8 @@ function mapDeliveryError(e: DeliveryError): HandlerError {
   switch (e.type) {
     case 'not_found':
       return { code: 'NOT_FOUND', message: `${e.resource} not found` };
+    case 'no_pending_delivery':
+      return { code: 'NOT_FOUND', message: 'No pending delivery found for this search. Please start the LINE delivery flow again.' };
     case 'already_delivered':
       return { code: 'CONFLICT', message: `Photos already delivered (${e.existing.photoCount} photos)` };
     case 'no_friendship':
@@ -246,19 +254,99 @@ export const lineParticipantRouter = new Hono<Env>()
   })
 
   // =========================================================================
+  // POST /participant/line/pending — Create pending delivery record
+  // =========================================================================
+  .post('/pending', zValidator('json', pendingBodySchema), async (c) => {
+    const { eventId, searchId, photoIds } = c.req.valid('json');
+
+    return safeTry(async function* () {
+      const db = c.var.db();
+
+      // Look up event → photographerId
+      const eventRows = yield* ResultAsync.fromPromise(
+        db.select({ photographerId: events.photographerId })
+          .from(events)
+          .where(eq(events.id, eventId))
+          .limit(1),
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+      ).andThen((rows) =>
+        rows[0]
+          ? ok(rows[0])
+          : err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' }),
+      );
+
+      // Check for existing pending delivery for this search
+      const [existing] = await db
+        .select({ id: lineDeliveries.id })
+        .from(lineDeliveries)
+        .where(eq(lineDeliveries.searchId, searchId))
+        .limit(1);
+
+      if (existing) {
+        // Update existing record with new photoIds
+        await db
+          .update(lineDeliveries)
+          .set({ photoIds, status: 'pending' })
+          .where(eq(lineDeliveries.id, existing.id));
+      } else {
+        // Create new pending record
+        await db.insert(lineDeliveries).values({
+          photographerId: eventRows.photographerId,
+          eventId,
+          searchId,
+          photoIds,
+          lineUserId: '', // Will be filled during delivery
+          status: 'pending',
+          messageCount: 0,
+          photoCount: 0,
+          creditCharged: false,
+        });
+      }
+
+      return ok({ success: true });
+    })
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
+  })
+
+  // =========================================================================
   // POST /participant/line/deliver — Push photos via LINE
   // =========================================================================
   .post('/deliver', zValidator('json', deliverBodySchema), async (c) => {
     const { eventId, searchId, lineUserId } = c.req.valid('json');
 
     return safeTry(async function* () {
+      const db = c.var.db();
       const lineClient = createLineClient({
         LINE_CHANNEL_ACCESS_TOKEN: c.env.LINE_CHANNEL_ACCESS_TOKEN,
       });
 
+      // Look up pending delivery record
+      const pendingDelivery = yield* ResultAsync.fromPromise(
+        db.select({ photoIds: lineDeliveries.photoIds, id: lineDeliveries.id })
+          .from(lineDeliveries)
+          .where(eq(lineDeliveries.searchId, searchId))
+          .limit(1),
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+      ).andThen((rows) => {
+        const row = rows[0];
+        return row?.photoIds && row.photoIds.length > 0
+          ? ok({ photoIds: row.photoIds, deliveryId: row.id })
+          : err<never, HandlerError>({
+              code: 'NOT_FOUND',
+              message: 'No pending delivery found for this search. Please start the LINE delivery flow again.',
+            });
+      });
+
+      const { photoIds, deliveryId } = pendingDelivery;
+
       const result = yield* deliverPhotosViaLine({
         searchId,
+        photoIds,
         lineUserId,
+        deliveryId,
         db: c.var.db(),
         dbTx: c.var.dbTx(),
         lineClient,
