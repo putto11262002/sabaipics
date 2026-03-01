@@ -27,6 +27,11 @@ output "queue_names" {
   description = "Map of queue logical names to their actual names"
 }
 
+output "kv_namespace_ids" {
+  value       = module.cloudflare_infra.kv_namespace_ids
+  description = "Map of KV namespace logical names to their IDs"
+}
+
 # ------------------------------------------------------------------------------
 # Worker Secrets
 # ------------------------------------------------------------------------------

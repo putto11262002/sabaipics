@@ -52,6 +52,9 @@ module "cloudflare_infra" {
 
   # Event Notifications (none for dev - local testing)
   bucket_notifications = var.bucket_notifications
+
+  # KV Namespaces
+  kv_namespaces = var.kv_namespaces
 }
 
 # ------------------------------------------------------------------------------

@@ -1,11 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router';
-import { CheckCircle2, XCircle, Loader2, UserPlus } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, UserPlus, ExternalLink } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
-import { deliverViaLine, type LineDeliveryResult } from '../../lib/api';
+import { type LineDeliveryResult, checkFriendshipStatus } from '../../lib/api';
 import { th } from '../../lib/i18n';
+import { useDeliverViaLine } from '@/shared/hooks/rq/line/use-deliver-via-line';
 
-type CallbackState = 'delivering' | 'success' | 'error' | 'not_friend';
+type CallbackState = 'delivering' | 'success' | 'error' | 'waiting_for_friend' | 'checking_friend';
+
+const POLL_INTERVAL_MS = 3000; // 3 seconds
+const POLL_MAX_ATTEMPTS = 60; // 3 minutes max
+
+const LINE_OA_URL = 'https://line.me/R/ti/p/@your-oa-id'; // TODO: Replace with actual OA URL
 
 export function LineCallbackPage() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -13,17 +19,76 @@ export function LineCallbackPage() {
   const [state, setState] = useState<CallbackState>('delivering');
   const [result, setResult] = useState<LineDeliveryResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pollAttempts, setPollAttempts] = useState(0);
 
   const lineUserId = searchParams.get('lineUserId');
   const searchId = searchParams.get('searchId');
   const status = searchParams.get('status');
   const deliveryCalled = useRef(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const { mutateAsync: deliverPhotos } = useDeliverViaLine();
+
+  // Stop polling
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
+  // Attempt delivery
+  const attemptDelivery = useCallback(async () => {
+    if (!eventId || !searchId || !lineUserId) {
+      setState('error');
+      setErrorMessage('ข้อมูลไม่ครบ');
+      return;
+    }
+
+    setState('delivering');
+    try {
+      const deliveryResult = await deliverPhotos({ eventId, searchId, lineUserId });
+      setResult(deliveryResult);
+      setState('success');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'ส่งรูปไม่สำเร็จ';
+      if (message.includes('NOT_FOUND') || message.includes('expired')) {
+        setState('error');
+        setErrorMessage(th.lineCallback.sessionExpired);
+      } else if (message.includes('not friend') || message.includes('FRIEND')) {
+        // Still not friend, go back to waiting
+        setState('waiting_for_friend');
+      } else {
+        setState('error');
+        setErrorMessage(message);
+      }
+    }
+  }, [eventId, searchId, lineUserId, deliverPhotos]);
+
+  // Poll for friendship status
+  const pollFriendship = useCallback(async () => {
+    if (!lineUserId) return;
+
+    try {
+      const friendship = await checkFriendshipStatus(lineUserId);
+      if (friendship.isFriend) {
+        stopPolling();
+        setState('checking_friend');
+        // Small delay before attempting delivery
+        setTimeout(() => attemptDelivery(), 500);
+      }
+    } catch {
+      // On error, continue polling
+    }
+  }, [lineUserId, stopPolling, attemptDelivery]);
+
+  // Handle initial state
   useEffect(() => {
     if (deliveryCalled.current) return;
     deliveryCalled.current = true;
+
     if (status === 'not_friend') {
-      setState('not_friend');
+      setState('waiting_for_friend');
       return;
     }
 
@@ -39,30 +104,39 @@ export function LineCallbackPage() {
       return;
     }
 
-    // Deliver photos
-    deliverViaLine(eventId, searchId, lineUserId)
-      .then((deliveryResult) => {
-        setResult(deliveryResult);
-        setState('success');
-      })
-      .catch((err: Error) => {
-        setState('error');
-        setErrorMessage(err.message || 'ส่งรูปไม่สำเร็จ');
+    // Status is 'ok' - proceed with delivery
+    attemptDelivery();
+  }, [eventId, searchId, lineUserId, status, searchParams, attemptDelivery]);
+
+  // Polling effect for 'waiting_for_friend' state
+  useEffect(() => {
+    if (state !== 'waiting_for_friend') {
+      stopPolling();
+      return;
+    }
+
+    // Start polling
+    pollIntervalRef.current = setInterval(() => {
+      setPollAttempts((prev) => {
+        const next = prev + 1;
+        if (next >= POLL_MAX_ATTEMPTS) {
+          stopPolling();
+          setState('error');
+          setErrorMessage(th.lineCallback.sessionExpired);
+        }
+        return next;
       });
-  }, [eventId, searchId, lineUserId, status, searchParams]);
+      pollFriendship();
+    }, POLL_INTERVAL_MS);
+
+    // Initial check
+    pollFriendship();
+
+    return () => stopPolling();
+  }, [state, pollFriendship, stopPolling]);
 
   const handleRetry = () => {
-    if (!eventId || !searchId || !lineUserId) return;
-    setState('delivering');
-    deliverViaLine(eventId, searchId, lineUserId)
-      .then((deliveryResult) => {
-        setResult(deliveryResult);
-        setState('success');
-      })
-      .catch((err: Error) => {
-        setState('error');
-        setErrorMessage(err.message || 'ส่งรูปไม่สำเร็จ');
-      });
+    attemptDelivery();
   };
 
   const handleBackToSearch = () => {
@@ -70,6 +144,12 @@ export function LineCallbackPage() {
       window.location.href = `/${eventId}/search`;
     }
   };
+
+  const handleAddFriend = () => {
+    window.open(LINE_OA_URL, '_blank');
+  };
+
+  const remainingTime = Math.max(0, POLL_MAX_ATTEMPTS - pollAttempts) * 3;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -98,15 +178,33 @@ export function LineCallbackPage() {
           </>
         )}
 
-        {state === 'not_friend' && (
+        {state === 'waiting_for_friend' && (
           <>
             <UserPlus className="mx-auto size-12 text-yellow-500" />
-            <div className="space-y-1">
+            <div className="space-y-2">
               <p className="text-lg font-medium">{th.lineCallback.notFriend}</p>
+              <p className="text-sm text-muted-foreground">{th.lineCallback.notFriendHint}</p>
             </div>
-            <Button size="sm" onClick={handleBackToSearch}>
-              {th.lineCallback.backToResults}
-            </Button>
+            <div className="space-y-3">
+              <Button size="sm" onClick={handleAddFriend} className="w-full">
+                <ExternalLink className="mr-2 size-4" />
+                {th.lineCallback.addFriendButton}
+              </Button>
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                <span>{th.lineCallback.checkingFriend}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {remainingTime > 0 && `(${Math.floor(remainingTime / 60)}:${String(remainingTime % 60).padStart(2, '0')})`}
+              </p>
+            </div>
+          </>
+        )}
+
+        {state === 'checking_friend' && (
+          <>
+            <Loader2 className="mx-auto size-12 animate-spin text-primary" />
+            <p className="text-lg font-medium">{th.lineCallback.delivering}</p>
           </>
         )}
 

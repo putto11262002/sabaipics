@@ -60,3 +60,11 @@ enable_lut_uploads_notification = true
 
 # Webhook URL for notification proxy worker (update with your ngrok URL)
 webhook_url = "https://unscientifically-pseudogenteel-kinley.ngrok-free.dev/webhooks/dev/r2-notification"
+
+# ------------------------------------------------------------------------------
+# KV Namespace Configuration
+# ------------------------------------------------------------------------------
+
+kv_namespaces = {
+  line_pending = "line-pending-dev"
+}

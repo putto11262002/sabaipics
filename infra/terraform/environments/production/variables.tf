@@ -124,3 +124,13 @@ variable "cache_rules" {
   description = "Cloudflare cache rules for edge caching"
   default     = []
 }
+
+# ------------------------------------------------------------------------------
+# KV Namespace Configuration
+# ------------------------------------------------------------------------------
+
+variable "kv_namespaces" {
+  type        = map(string)
+  description = "Map of KV namespace logical names to titles"
+  default     = {}
+}

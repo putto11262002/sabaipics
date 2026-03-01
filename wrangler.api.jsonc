@@ -44,6 +44,14 @@
     },
   ],
 
+  // KV namespace for short-lived LINE delivery state
+  "kv_namespaces": [
+    {
+      "binding": "LINE_PENDING_KV",
+      "id": "be2cda35cb584e11942d8c5cf627d2cc",
+    },
+  ],
+
   // Images API binding for transformation
   "images": {
     "binding": "IMAGES",
@@ -198,6 +206,12 @@
           "bucket_name": "framefast-photos-staging",
         },
       ],
+      "kv_namespaces": [
+        {
+          "binding": "LINE_PENDING_KV",
+          "id": "06902819b8834bf0be8482f1afcd0486",
+        },
+      ],
       "queues": {
         "producers": [
           {
@@ -344,6 +358,12 @@
         {
           "binding": "PHOTOS_BUCKET",
           "bucket_name": "framefast-photos",
+        },
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "LINE_PENDING_KV",
+          "id": "6ff9993fe8dd48ff9e2521e139b0455e",
         },
       ],
       "queues": {

@@ -126,3 +126,13 @@ variable "webhook_url" {
   type        = string
   description = "Webhook URL for R2 notification proxy (ngrok URL for local dev)"
 }
+
+# ------------------------------------------------------------------------------
+# KV Namespace Configuration
+# ------------------------------------------------------------------------------
+
+variable "kv_namespaces" {
+  type        = map(string)
+  description = "Map of KV namespace logical names to titles"
+  default     = {}
+}

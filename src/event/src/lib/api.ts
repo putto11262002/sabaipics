@@ -122,6 +122,23 @@ export async function getLineAuthUrl(eventId: string, searchId: string): Promise
   return result.data.authUrl;
 }
 
+export async function createPendingLineDelivery(
+  eventId: string,
+  searchId: string,
+  photoIds: string[],
+): Promise<void> {
+  const response = await fetch(`${API_URL}/participant/line/pending`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventId, searchId, photoIds }),
+  });
+
+  if (!response.ok) {
+    const error = (await response.json()) as ApiError;
+    throw new Error(error.error?.code || 'UNKNOWN_ERROR');
+  }
+}
+
 export async function deliverViaLine(
   eventId: string,
   searchId: string,
@@ -139,6 +156,24 @@ export async function deliverViaLine(
   }
 
   const result = (await response.json()) as { data: LineDeliveryResult };
+  return result.data;
+}
+
+export interface FriendshipStatus {
+  isFriend: boolean;
+  displayName?: string;
+}
+
+export async function checkFriendshipStatus(lineUserId: string): Promise<FriendshipStatus> {
+  const params = new URLSearchParams({ lineUserId });
+  const response = await fetch(`${API_URL}/participant/line/friendship?${params.toString()}`);
+
+  if (!response.ok) {
+    // On error, assume not friend
+    return { isFriend: false };
+  }
+
+  const result = (await response.json()) as { data: FriendshipStatus };
   return result.data;
 }
 

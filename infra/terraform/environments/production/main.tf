@@ -69,6 +69,9 @@ module "cloudflare_infra" {
 
   # Cache Rules
   cache_rules = var.cache_rules
+
+  # KV Namespaces
+  kv_namespaces = var.kv_namespaces
 }
 
 # ------------------------------------------------------------------------------

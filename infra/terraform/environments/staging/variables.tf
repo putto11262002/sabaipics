@@ -104,3 +104,13 @@ variable "infisical_project_id" {
   description = "Infisical project (workspace) ID"
   default     = "315a1831-a394-47fb-856b-e791dd7e9f9e"
 }
+
+# ------------------------------------------------------------------------------
+# KV Namespace Configuration
+# ------------------------------------------------------------------------------
+
+variable "kv_namespaces" {
+  type        = map(string)
+  description = "Map of KV namespace logical names to titles"
+  default     = {}
+}

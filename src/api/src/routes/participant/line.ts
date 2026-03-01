@@ -5,15 +5,18 @@
  * No authentication required — these are for event participants.
  *
  * Routes:
+ * - GET  /participant/line/status?eventId=...                — Check if LINE delivery is available
+ * - POST /participant/line/pending                           — Store photo selection in KV before OAuth
  * - GET  /participant/line/auth?eventId=...&searchId=...     — Build LINE Login auth URL
  * - GET  /participant/line/callback?code=...&state=...       — Handle OAuth callback
+ * - GET  /participant/line/friendship?lineUserId=...         — Check friendship status (for polling)
  * - POST /participant/line/deliver                           — Deliver photos via LINE
  */
 
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { safeTry, ok, err } from 'neverthrow';
+import { safeTry, ok, err, ResultAsync } from 'neverthrow';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
 import {
@@ -26,10 +29,55 @@ import { deliverPhotosViaLine, type DeliveryError } from '../../lib/line/deliver
 import { createLineClient } from '../../lib/line/client';
 import { getMonthlyUsage } from '../../lib/line/allowance';
 import { getBalance } from '../../lib/credits';
-import { events, photographers } from '@/db';
+import { events, photographers, lineDeliveries } from '@/db';
 import { eq } from 'drizzle-orm';
 import type { PhotographerSettings } from '@/db/schema/photographers';
 import { capturePostHogEvent } from '../../lib/posthog';
+
+// =============================================================================
+// KV Storage Helpers
+// =============================================================================
+
+const KV_TTL_SECONDS = 600; // 10 minutes
+
+interface PendingLineDelivery {
+  photoIds: string[];
+  eventId: string;
+  photographerId: string;
+  lineAccessToken?: string; // Stored during callback for friendship polling
+  createdAt: string;
+}
+
+function kvKey(searchId: string): string {
+  return `line_pending:${searchId}`;
+}
+
+async function storePendingDelivery(
+  kv: KVNamespace,
+  searchId: string,
+  data: PendingLineDelivery,
+): Promise<void> {
+  await kv.put(kvKey(searchId), JSON.stringify(data), {
+    expirationTtl: KV_TTL_SECONDS,
+  });
+}
+
+async function getPendingDelivery(
+  kv: KVNamespace,
+  searchId: string,
+): Promise<PendingLineDelivery | null> {
+  const value = await kv.get(kvKey(searchId));
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as PendingLineDelivery;
+  } catch {
+    return null;
+  }
+}
+
+async function deletePendingDelivery(kv: KVNamespace, searchId: string): Promise<void> {
+  await kv.delete(kvKey(searchId));
+}
 
 // =============================================================================
 // Schemas
@@ -46,6 +94,16 @@ const callbackQuerySchema = z.object({
   friendship_status_changed: z.string().optional(),
 });
 
+const pendingBodySchema = z.object({
+  eventId: z.string().uuid('Invalid event ID format'),
+  searchId: z.string().uuid('Invalid search ID format'),
+  photoIds: z.array(z.string().uuid()).min(1, 'At least one photo ID required'),
+});
+
+const friendshipQuerySchema = z.object({
+  lineUserId: z.string().min(1, 'LINE user ID required'),
+});
+
 const deliverBodySchema = z.object({
   eventId: z.string().uuid('Invalid event ID format'),
   searchId: z.string().uuid('Invalid search ID format'),
@@ -60,6 +118,8 @@ function mapDeliveryError(e: DeliveryError): HandlerError {
   switch (e.type) {
     case 'not_found':
       return { code: 'NOT_FOUND', message: `${e.resource} not found` };
+    case 'no_pending_delivery':
+      return { code: 'NOT_FOUND', message: 'Your session has expired. Please start the LINE delivery flow again.' };
     case 'already_delivered':
       return { code: 'CONFLICT', message: `Photos already delivered (${e.existing.photoCount} photos)` };
     case 'no_friendship':
@@ -146,6 +206,45 @@ export const lineParticipantRouter = new Hono<Env>()
   })
 
   // =========================================================================
+  // POST /participant/line/pending — Store photo selection in KV before OAuth
+  // =========================================================================
+  .post('/pending', zValidator('json', pendingBodySchema), async (c) => {
+    const { eventId, searchId, photoIds } = c.req.valid('json');
+
+    return safeTry(async function* () {
+      const db = c.var.db();
+      const kv = c.env.LINE_PENDING_KV;
+
+      // Look up event → photographerId
+      const eventRows = yield* ResultAsync.fromPromise(
+        db.select({ photographerId: events.photographerId })
+          .from(events)
+          .where(eq(events.id, eventId))
+          .limit(1),
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+      ).andThen((rows) =>
+        rows[0]
+          ? ok(rows[0])
+          : err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' }),
+      );
+
+      // Store in KV (not database - we don't have lineUserId yet)
+      await storePendingDelivery(kv, searchId, {
+        photoIds,
+        eventId,
+        photographerId: eventRows.photographerId,
+        createdAt: new Date().toISOString(),
+      });
+
+      return ok({ success: true });
+    })
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
+  })
+
+  // =========================================================================
   // GET /participant/line/auth — Build LINE Login authorization URL
   // =========================================================================
   .get('/auth', zValidator('query', authQuerySchema), async (c) => {
@@ -214,6 +313,14 @@ export const lineParticipantRouter = new Hono<Env>()
         }),
       );
 
+      // Store access token in KV for friendship polling (in case user isn't friend yet)
+      const kv = c.env.LINE_PENDING_KV;
+      const pending = await getPendingDelivery(kv, searchId);
+      if (pending) {
+        pending.lineAccessToken = tokens.access_token;
+        await storePendingDelivery(kv, searchId, pending);
+      }
+
       // Redirect back to event app
       const eventAppUrl = c.env.EVENT_FRONTEND_URL;
       const params = new URLSearchParams({
@@ -229,7 +336,6 @@ export const lineParticipantRouter = new Hono<Env>()
         (redirectUrl) => c.redirect(redirectUrl, 302),
         (e) => {
           // On error, redirect to event app with error status
-          // Try to extract eventId from state for redirect
           try {
             const { state } = c.req.valid('query');
             const { eventId } = JSON.parse(atob(state));
@@ -246,19 +352,114 @@ export const lineParticipantRouter = new Hono<Env>()
   })
 
   // =========================================================================
+  // GET /participant/line/friendship — Check friendship status (for polling)
+  // =========================================================================
+  .get('/friendship', zValidator('query', friendshipQuerySchema), async (c) => {
+    const { lineUserId } = c.req.valid('query');
+
+    return safeTry(async function* () {
+      // Use Messaging API to check if user is following
+      // This is more reliable than user access token for polling
+      const lineClient = createLineClient({
+        LINE_CHANNEL_ACCESS_TOKEN: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      });
+
+      // Get follower list and check if lineUserId is in it
+      // Note: This requires the LINE Official Account to have "Obtain follower list" permission
+      // Alternative: Try to send a dummy message and catch the "not friend" error
+      // For simplicity, we'll use the friendship check approach
+
+      // We need the user's access token from KV - but we don't have searchId here
+      // Alternative approach: Try to get profile using Messaging API
+      try {
+        // Try to get the user's profile via Messaging API
+        // This will fail if not friends
+        const profile = await lineClient.getProfile(lineUserId);
+        return ok({ isFriend: true, displayName: profile.displayName });
+      } catch {
+        // If we can't get profile, they're not a friend
+        return ok({ isFriend: false });
+      }
+    })
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
+  })
+
+  // =========================================================================
   // POST /participant/line/deliver — Push photos via LINE
   // =========================================================================
   .post('/deliver', zValidator('json', deliverBodySchema), async (c) => {
     const { eventId, searchId, lineUserId } = c.req.valid('json');
 
     return safeTry(async function* () {
+      const db = c.var.db();
+      const kv = c.env.LINE_PENDING_KV;
       const lineClient = createLineClient({
         LINE_CHANNEL_ACCESS_TOKEN: c.env.LINE_CHANNEL_ACCESS_TOKEN,
       });
 
+      // Get photoIds from KV
+      const pending = yield* ResultAsync.fromPromise(
+        getPendingDelivery(kv, searchId),
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'KV error', cause: e }),
+      ).andThen((data) =>
+        data?.photoIds && data.photoIds.length > 0
+          ? ok(data)
+          : err<never, HandlerError>({
+              code: 'NOT_FOUND',
+              message: 'Your session has expired. Please start the LINE delivery flow again.',
+            }),
+      );
+
+      const { photoIds, photographerId } = pending;
+
+      // Check for existing successful delivery (idempotency)
+      const [existingDelivery] = await db
+        .select({
+          status: lineDeliveries.status,
+          photoCount: lineDeliveries.photoCount,
+          messageCount: lineDeliveries.messageCount,
+        })
+        .from(lineDeliveries)
+        .where(
+          eq(lineDeliveries.searchId, searchId),
+        )
+        .limit(1);
+
+      if (existingDelivery?.status === 'sent') {
+        return ok({
+          status: 'sent' as const,
+          photoCount: existingDelivery.photoCount,
+          messageCount: existingDelivery.messageCount,
+          creditCharged: false,
+        });
+      }
+
+      // Create delivery record with pending status
+      const [deliveryRecord] = await db
+        .insert(lineDeliveries)
+        .values({
+          photographerId,
+          eventId,
+          searchId,
+          photoIds,
+          lineUserId,
+          status: 'pending',
+          messageCount: 0,
+          photoCount: 0,
+          creditCharged: false,
+        })
+        .returning({ id: lineDeliveries.id });
+
+      const deliveryId = deliveryRecord.id;
+
       const result = yield* deliverPhotosViaLine({
         searchId,
+        photoIds,
         lineUserId,
+        deliveryId,
         db: c.var.db(),
         dbTx: c.var.dbTx(),
         lineClient,
@@ -266,6 +467,9 @@ export const lineParticipantRouter = new Hono<Env>()
         cfZone: c.env.CF_ZONE,
         isDev: c.env.NODE_ENV === 'development',
       }).mapErr(mapDeliveryError);
+
+      // Clean up KV entry after successful delivery
+      c.executionCtx.waitUntil(deletePendingDelivery(kv, searchId));
 
       c.executionCtx.waitUntil(
         capturePostHogEvent(c.env.POSTHOG_API_KEY, {

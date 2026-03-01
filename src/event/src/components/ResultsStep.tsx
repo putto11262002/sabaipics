@@ -1,13 +1,15 @@
-import { useState, useCallback, useEffect } from 'react';
-import { Download, Check, RefreshCw, Image, Info } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Download, Check, RefreshCw, Image } from 'lucide-react';
 import { RowsPhotoAlbum, type Photo } from 'react-photo-album';
 import { toast } from 'sonner';
 import { Button } from '@/shared/components/ui/button';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Spinner } from '@/shared/components/ui/spinner';
-import { downloadBulk, getLineStatus, type SearchResult } from '../lib/api';
+import { type SearchResult } from '../lib/api';
 import { th } from '../lib/i18n';
 import { LineDeliveryButton } from './LineDeliveryButton';
+import { useLineStatus } from '@/shared/hooks/rq/line/use-line-status';
+import { useDownloadBulk } from '@/shared/hooks/rq/downloads/use-download-bulk';
 
 const MAX_SELECTION = 15;
 
@@ -28,14 +30,8 @@ interface ResultsStepProps {
 
 export function ResultsStep({ eventId, searchId, photos, searchResult, onSearchAgain }: ResultsStepProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [lineAvailable, setLineAvailable] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    getLineStatus(eventId)
-      .then((s) => setLineAvailable(s.available))
-      .catch(() => setLineAvailable(true));
-  }, [eventId]);
+  const { data: lineStatus } = useLineStatus({ eventId });
+  const { mutateAsync: downloadAsync, isPending: isDownloadPending } = useDownloadBulk();
 
   const albumPhotos: Photo[] = photos.map((photo) => ({
     src: photo.thumbnailUrl,
@@ -75,9 +71,8 @@ export function ResultsStep({ eventId, searchId, photos, searchResult, onSearchA
   const handleDownloadSelected = useCallback(async () => {
     if (selectedIds.size === 0) return;
 
-    setIsDownloading(true);
     try {
-      const blob = await downloadBulk(eventId, Array.from(selectedIds));
+      const blob = await downloadAsync({ eventId, photoIds: Array.from(selectedIds) });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -91,10 +86,10 @@ export function ResultsStep({ eventId, searchId, photos, searchResult, onSearchA
       toast.error(th.results.downloadError.title, {
         description: th.results.downloadError.description,
       });
-    } finally {
-      setIsDownloading(false);
     }
-  }, [eventId, selectedIds]);
+  }, [eventId, selectedIds, downloadAsync]);
+
+  const lineAvailable = lineStatus?.available ?? true; // Default to true - fail open on network errors
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -112,8 +107,7 @@ export function ResultsStep({ eventId, searchId, photos, searchResult, onSearchA
 
       {/* Hint Alert */}
       <div className="px-4 pb-4">
-        <Alert variant="info">
-          <Info />
+        <Alert>
           <AlertDescription>{th.results.hint}</AlertDescription>
         </Alert>
       </div>
@@ -133,9 +127,13 @@ export function ResultsStep({ eventId, searchId, photos, searchResult, onSearchA
               const isSelected = photoData && selectedIds.has(photoData.photoId);
               return (
                 <>
+                  {/* Dark overlay when selected */}
+                  {isSelected && (
+                    <div className="absolute inset-0 z-5 rounded bg-black/30" />
+                  )}
                   {/* Selection indicator - top right */}
                   {isSelected && (
-                    <div className="absolute right-2 top-2 z-10 rounded-full bg-primary/60 p-1.5">
+                    <div className="absolute right-2 top-2 z-10 rounded-full bg-primary p-1.5">
                       <Check className="size-4 text-primary-foreground" strokeWidth={3} />
                     </div>
                   )}
@@ -148,37 +146,32 @@ export function ResultsStep({ eventId, searchId, photos, searchResult, onSearchA
         />
       </div>
 
-      {/* Sticky Footer — always visible */}
-      <div className="sticky bottom-0 z-30 space-y-2 border-t bg-background p-4">
-        {lineAvailable && (
-          <LineDeliveryButton
-            eventId={eventId}
-            searchId={searchId}
-            searchResult={searchResult}
-          />
-        )}
-        <Button
-          variant="outline"
-          size="lg"
-          className="w-full"
-          onClick={handleDownloadSelected}
-          disabled={isDownloading || selectedIds.size === 0}
-        >
-          {isDownloading ? (
-            <>
-              <Spinner className="mr-1 size-4" />
-              {th.results.downloading}
-            </>
-          ) : (
-            <>
-              <Download className="mr-1 size-4" />
-              {selectedIds.size > 0
-                ? th.results.download(selectedIds.size)
-                : th.results.download(0)}
-            </>
+      {/* Floating Action Buttons - only show when photos selected */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 right-4 z-30 flex flex-col gap-3 opacity-100 md:right-6 md:flex-row">
+          {lineAvailable && (
+            <LineDeliveryButton
+              eventId={eventId}
+              searchId={searchId}
+              searchResult={searchResult}
+              selectedIds={selectedIds}
+            />
           )}
-        </Button>
-      </div>
+          <Button
+            variant="default"
+            size="icon"
+            className="size-12 rounded-full shadow-lg"
+            onClick={handleDownloadSelected}
+            disabled={isDownloadPending}
+          >
+            {isDownloadPending ? (
+              <Spinner className="size-5" />
+            ) : (
+              <Download className="size-5" />
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
