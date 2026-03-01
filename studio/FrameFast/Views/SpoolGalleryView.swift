@@ -11,6 +11,7 @@ import ImageIO
 struct SpoolGalleryView: View {
     @StateObject private var store: SpoolGalleryStore
     @State private var selectedPhotoIndex: Int?
+    @Environment(\.scenePhase) private var scenePhase
 
     private static let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
 
@@ -34,6 +35,11 @@ struct SpoolGalleryView: View {
         .onAppear {
             store.loadPhotos()
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                store.loadPhotos()
+            }
+        }
         .fullScreenCover(isPresented: Binding(
             get: { selectedPhotoIndex != nil },
             set: { if !$0 { selectedPhotoIndex = nil } }
@@ -51,6 +57,7 @@ struct SpoolGalleryView: View {
             LazyVGrid(columns: Self.columns, spacing: 2) {
                 ForEach(Array(store.photos.enumerated()), id: \.element.id) { index, item in
                     SpoolPhotoCell(item: item)
+                        .contentShape(Rectangle())
                         .onTapGesture {
                             selectedPhotoIndex = index
                         }
@@ -223,6 +230,10 @@ private struct SpoolPhotoCell: View {
 
     @State private var thumbnail: UIImage?
 
+    private static let thumbnailPixelSize: CGFloat = {
+        ceil(UIScreen.main.bounds.width / 3) * UIScreen.main.scale
+    }()
+
     var body: some View {
         ZStack {
             Rectangle()
@@ -247,7 +258,7 @@ private struct SpoolPhotoCell: View {
             guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
 
             let options: [CFString: Any] = [
-                kCGImageSourceThumbnailMaxPixelSize: 200,
+                kCGImageSourceThumbnailMaxPixelSize: SpoolPhotoCell.thumbnailPixelSize,
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
                 kCGImageSourceCreateThumbnailWithTransform: true,
             ]

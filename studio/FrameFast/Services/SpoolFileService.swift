@@ -15,12 +15,20 @@ import Foundation
 /// Created once at app startup in `AppCoordinator` and shared
 /// with the capture pipeline, storage UI, and cleanup orchestration.
 actor SpoolFileService {
-    struct Item: Sendable {
-        let id: UUID
+    struct Item: Sendable, Identifiable {
+        let id: String
         let url: URL
         let filename: String
         let createdAt: Date
         let bytes: Int
+
+        init(url: URL, filename: String, createdAt: Date, bytes: Int) {
+            self.id = url.absoluteString
+            self.url = url
+            self.filename = filename
+            self.createdAt = createdAt
+            self.bytes = bytes
+        }
     }
 
     /// Fallback directory name when no event is selected.
@@ -67,7 +75,6 @@ actor SpoolFileService {
         try data.write(to: url, options: [.atomic])
 
         return Item(
-            id: UUID(),
             url: url,
             filename: sanitized,
             createdAt: createdAt,
@@ -117,11 +124,15 @@ actor SpoolFileService {
                 guard fileManager.fileExists(atPath: dir.path, isDirectory: &isDir),
                       isDir.boolValue else { continue }
 
-                let children = try fileManager.contentsOfDirectory(atPath: dir.path)
-                if children.isEmpty {
-                    try fileManager.removeItem(at: dir)
-                    ensuredDirectories.remove(dir.lastPathComponent)
-                    print("[SpoolFileService] Removed empty directory: \(dir.lastPathComponent)")
+                do {
+                    let children = try fileManager.contentsOfDirectory(atPath: dir.path)
+                    if children.isEmpty {
+                        try fileManager.removeItem(at: dir)
+                        ensuredDirectories.remove(dir.lastPathComponent)
+                        print("[SpoolFileService] Removed empty directory: \(dir.lastPathComponent)")
+                    }
+                } catch {
+                    print("[SpoolFileService] Failed to process directory \(dir.lastPathComponent): \(error)")
                 }
             }
         } catch {
@@ -147,7 +158,6 @@ actor SpoolFileService {
                       values.isRegularFile == true else { return nil }
 
                 return Item(
-                    id: UUID(),
                     url: url,
                     filename: url.lastPathComponent,
                     createdAt: values.creationDate ?? Date.distantPast,
@@ -224,11 +234,15 @@ actor SpoolFileService {
         return name
     }
 
-    private static func timestampString(_ date: Date) -> String {
+    private static let timestampFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(secondsFromGMT: 0)
         f.dateFormat = "yyyyMMdd-HHmmss"
-        return f.string(from: date)
+        return f
+    }()
+
+    private static func timestampString(_ date: Date) -> String {
+        timestampFormatter.string(from: date)
     }
 }

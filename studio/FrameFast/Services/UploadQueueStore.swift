@@ -589,26 +589,30 @@ actor UploadQueueStore {
         return result
     }
 
-    /// Batch delete jobs by IDs.
+    /// Batch delete jobs by IDs (chunked to respect SQLite's 999 parameter limit).
     func deleteJobs(ids: [String]) throws {
         guard !ids.isEmpty else { return }
         try openAndMigrateIfNeeded()
 
-        let placeholders = ids.map { _ in "?" }.joined(separator: ",")
-        let sql = "DELETE FROM upload_jobs WHERE id IN (\(placeholders));"
+        let batchSize = 500
+        for batch in stride(from: 0, to: ids.count, by: batchSize) {
+            let chunk = Array(ids[batch..<min(batch + batchSize, ids.count)])
+            let placeholders = chunk.map { _ in "?" }.joined(separator: ",")
+            let sql = "DELETE FROM upload_jobs WHERE id IN (\(placeholders));"
 
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
-        }
-        defer { sqlite3_finalize(stmt) }
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+                throw UploadQueueStoreError.prepareFailed(message: lastErrorMessage())
+            }
+            defer { sqlite3_finalize(stmt) }
 
-        for (i, id) in ids.enumerated() {
-            sqlite3_bind_text(stmt, Int32(i + 1), id, -1, SQLITE_TRANSIENT)
-        }
+            for (i, id) in chunk.enumerated() {
+                sqlite3_bind_text(stmt, Int32(i + 1), id, -1, SQLITE_TRANSIENT)
+            }
 
-        guard sqlite3_step(stmt) == SQLITE_DONE else {
-            throw UploadQueueStoreError.stepFailed(message: lastErrorMessage())
+            guard sqlite3_step(stmt) == SQLITE_DONE else {
+                throw UploadQueueStoreError.stepFailed(message: lastErrorMessage())
+            }
         }
     }
 
@@ -691,7 +695,7 @@ actor UploadQueueStore {
             next_attempt_at = ?,
             attempts = attempts + ?,
             state = ?,
-            last_error = COALESCE(?, last_error),
+            last_error = ?,
             upload_id = COALESCE(?, upload_id),
             put_url = COALESCE(?, put_url),
             object_key = COALESCE(?, object_key),
