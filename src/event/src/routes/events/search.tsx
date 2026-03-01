@@ -190,6 +190,7 @@ export function SearchPage() {
           onRetry={errorType === 'NO_FACE' ? handleRetake : handleRetry}
         />
       )}
+
     </div>
   );
 }
