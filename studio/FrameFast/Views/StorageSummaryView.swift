@@ -23,6 +23,23 @@ struct StorageSummaryView: View {
                 actionsSection(summary: summary)
             } else if store.isLoading {
                 skeletonSection
+            } else {
+                Section {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 8) {
+                            Text("Unable to load storage info")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.secondary)
+                            Button("Retry") {
+                                store.refresh()
+                            }
+                            .font(.subheadline)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 12)
+                }
             }
         }
         .listStyle(.insetGrouped)
