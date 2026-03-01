@@ -13,9 +13,10 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { safeTry, ok, err, ResultAsync } from 'neverthrow';
+import { safeTry, ok, err, okAsync, ResultAsync } from 'neverthrow';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
+import { signState, verifyState } from '../../lib/oauth-state';
 import {
   buildLineLoginUrl,
   exchangeCodeForToken,
@@ -30,6 +31,92 @@ import { events, photographers, lineDeliveries } from '@/db';
 import { eq } from 'drizzle-orm';
 import type { PhotographerSettings } from '@/db/schema/photographers';
 import { capturePostHogEvent } from '../../lib/posthog';
+
+// =============================================================================
+// KV Storage Helpers
+// =============================================================================
+
+const KV_TTL_SECONDS = 600; // 10 minutes
+
+interface PendingLineDelivery {
+  photoIds: string[];
+  eventId: string;
+  photographerId: string;
+  createdAt: string;
+}
+
+function kvKey(searchId: string): string {
+  return `line_pending:${searchId}`;
+}
+
+async function storePendingDelivery(
+  kv: KVNamespace,
+  searchId: string,
+  data: PendingLineDelivery,
+): Promise<void> {
+  await kv.put(kvKey(searchId), JSON.stringify(data), {
+    expirationTtl: KV_TTL_SECONDS,
+  });
+}
+
+async function getPendingDelivery(
+  kv: KVNamespace,
+  searchId: string,
+): Promise<PendingLineDelivery | null> {
+  const value = await kv.get(kvKey(searchId));
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as PendingLineDelivery;
+  } catch {
+    return null;
+  }
+}
+
+async function deletePendingDelivery(kv: KVNamespace, searchId: string): Promise<void> {
+  await kv.delete(kvKey(searchId));
+}
+
+// =============================================================================
+// Friendship Check Helper
+// =============================================================================
+
+interface FriendshipCheckError {
+  message: string;
+  cause?: unknown;
+}
+
+function checkFriendshipViaMessagingApi(
+  lineClient: ReturnType<typeof createLineClient>,
+  lineUserId: string,
+): ResultAsync<boolean, FriendshipCheckError> {
+  return ResultAsync.fromPromise(
+    lineClient.getProfile(lineUserId),
+    (e): FriendshipCheckError => ({
+      message: 'Failed to check friendship status',
+      cause: e,
+    }),
+  ).andThen((profile) => {
+    // If we can get the profile, they're a friend
+    return okAsync(!!profile);
+  }).orElse(() => {
+    // If we can't get the profile, they're not a friend
+    return okAsync(false);
+  });
+}
+
+// =============================================================================
+// Database Error Helpers
+// =============================================================================
+
+interface DatabaseError {
+  code?: string;
+  constraint?: string;
+}
+
+function isUniqueConstraintViolation(err: unknown): boolean {
+  const dbErr = err as DatabaseError;
+  return dbErr?.code === '23505'; // PostgreSQL unique violation
+}
 
 // =============================================================================
 // Schemas
@@ -52,6 +139,10 @@ const pendingBodySchema = z.object({
   photoIds: z.array(z.string().uuid()).min(1, 'At least one photo ID required'),
 });
 
+const friendshipQuerySchema = z.object({
+  lineUserId: z.string().min(1, 'LINE user ID required'),
+});
+
 const deliverBodySchema = z.object({
   eventId: z.string().uuid('Invalid event ID format'),
   searchId: z.string().uuid('Invalid search ID format'),
@@ -67,7 +158,7 @@ function mapDeliveryError(e: DeliveryError): HandlerError {
     case 'not_found':
       return { code: 'NOT_FOUND', message: `${e.resource} not found` };
     case 'no_pending_delivery':
-      return { code: 'NOT_FOUND', message: 'No pending delivery found for this search. Please start the LINE delivery flow again.' };
+      return { code: 'NOT_FOUND', message: 'Your session has expired. Please start the LINE delivery flow again.' };
     case 'already_delivered':
       return { code: 'CONFLICT', message: `Photos already delivered (${e.existing.photoCount} photos)` };
     case 'no_friendship':
@@ -159,7 +250,10 @@ export const lineParticipantRouter = new Hono<Env>()
   .get('/auth', zValidator('query', authQuerySchema), async (c) => {
     const { eventId, searchId } = c.req.valid('query');
 
-    const state = btoa(JSON.stringify({ eventId, searchId }));
+    // Sign state with HMAC to prevent tampering
+    const payload = JSON.stringify({ eventId, searchId });
+    const stateData = await signState(payload, c.env.LINE_LOGIN_CHANNEL_SECRET);
+    const state = btoa(JSON.stringify(stateData));
     const redirectUri = `${c.env.API_BASE_URL}/participant/line/callback`;
 
     const authUrl = buildLineLoginUrl({
@@ -178,10 +272,15 @@ export const lineParticipantRouter = new Hono<Env>()
     return safeTry(async function* () {
       const { code, state } = c.req.valid('query');
 
-      // Decode state
+      // Decode and verify signed state
       let parsedState: { eventId: string; searchId: string };
       try {
-        parsedState = JSON.parse(atob(state));
+        const stateData = JSON.parse(atob(state)) as Awaited<ReturnType<typeof signState>>;
+        const payload = await verifyState(stateData, c.env.LINE_LOGIN_CHANNEL_SECRET);
+        if (!payload) {
+          return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'Invalid or expired state parameter' });
+        }
+        parsedState = JSON.parse(payload);
       } catch {
         return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'Invalid state parameter' });
       }
@@ -254,13 +353,14 @@ export const lineParticipantRouter = new Hono<Env>()
   })
 
   // =========================================================================
-  // POST /participant/line/pending — Create pending delivery record
+  // POST /participant/line/pending — Store photo selection in KV before OAuth
   // =========================================================================
   .post('/pending', zValidator('json', pendingBodySchema), async (c) => {
     const { eventId, searchId, photoIds } = c.req.valid('json');
 
     return safeTry(async function* () {
       const db = c.var.db();
+      const kv = c.env.LINE_PENDING_KV;
 
       // Look up event → photographerId
       const eventRows = yield* ResultAsync.fromPromise(
@@ -275,35 +375,43 @@ export const lineParticipantRouter = new Hono<Env>()
           : err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' }),
       );
 
-      // Check for existing pending delivery for this search
-      const [existing] = await db
-        .select({ id: lineDeliveries.id })
-        .from(lineDeliveries)
-        .where(eq(lineDeliveries.searchId, searchId))
-        .limit(1);
-
-      if (existing) {
-        // Update existing record with new photoIds
-        await db
-          .update(lineDeliveries)
-          .set({ photoIds, status: 'pending' })
-          .where(eq(lineDeliveries.id, existing.id));
-      } else {
-        // Create new pending record
-        await db.insert(lineDeliveries).values({
-          photographerId: eventRows.photographerId,
-          eventId,
-          searchId,
-          photoIds,
-          lineUserId: '', // Will be filled during delivery
-          status: 'pending',
-          messageCount: 0,
-          photoCount: 0,
-          creditCharged: false,
-        });
-      }
+      // Store in KV (not database - we don't have lineUserId yet)
+      await storePendingDelivery(kv, searchId, {
+        photoIds,
+        eventId,
+        photographerId: eventRows.photographerId,
+        createdAt: new Date().toISOString(),
+      });
 
       return ok({ success: true });
+    })
+      .match(
+        (data) => c.json({ data }),
+        (e) => apiError(c, e),
+      );
+  })
+
+  // =========================================================================
+  // GET /participant/line/friendship — Check friendship status (for polling)
+  // =========================================================================
+  .get('/friendship', zValidator('query', friendshipQuerySchema), async (c) => {
+    const { lineUserId } = c.req.valid('query');
+
+    return safeTry(async function* () {
+      // Use Messaging API to check if user is following
+      const lineClient = createLineClient({
+        LINE_CHANNEL_ACCESS_TOKEN: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      });
+
+      try {
+        // Try to get the user's profile via Messaging API
+        // This will fail if not friends
+        const profile = await lineClient.getProfile(lineUserId);
+        return ok({ isFriend: true, displayName: profile.displayName });
+      } catch {
+        // If we can't get profile, they're not a friend
+        return ok({ isFriend: false });
+      }
     })
       .match(
         (data) => c.json({ data }),
@@ -319,28 +427,118 @@ export const lineParticipantRouter = new Hono<Env>()
 
     return safeTry(async function* () {
       const db = c.var.db();
+      const kv = c.env.LINE_PENDING_KV;
       const lineClient = createLineClient({
         LINE_CHANNEL_ACCESS_TOKEN: c.env.LINE_CHANNEL_ACCESS_TOKEN,
       });
 
-      // Look up pending delivery record
-      const pendingDelivery = yield* ResultAsync.fromPromise(
-        db.select({ photoIds: lineDeliveries.photoIds, id: lineDeliveries.id })
-          .from(lineDeliveries)
-          .where(eq(lineDeliveries.searchId, searchId))
-          .limit(1),
-        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
-      ).andThen((rows) => {
-        const row = rows[0];
-        return row?.photoIds && row.photoIds.length > 0
-          ? ok({ photoIds: row.photoIds, deliveryId: row.id })
+      // Get photoIds from KV
+      const pending = yield* ResultAsync.fromPromise(
+        getPendingDelivery(kv, searchId),
+        (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'KV error', cause: e }),
+      ).andThen((data) =>
+        data?.photoIds && data.photoIds.length > 0
+          ? ok(data)
           : err<never, HandlerError>({
               code: 'NOT_FOUND',
-              message: 'No pending delivery found for this search. Please start the LINE delivery flow again.',
-            });
-      });
+              message: 'Your session has expired. Please start the LINE delivery flow again.',
+            }),
+      );
 
-      const { photoIds, deliveryId } = pendingDelivery;
+      const { photoIds, photographerId } = pending;
+
+      // Verify friendship before attempting delivery
+      const isFriend = yield* checkFriendshipViaMessagingApi(lineClient, lineUserId).mapErr(
+        (e): HandlerError => ({
+          code: 'BAD_GATEWAY',
+          message: e.message,
+          cause: e.cause,
+        }),
+      );
+
+      if (!isFriend) {
+        return ok({
+          status: 'partial' as const,
+          photoCount: 0,
+          messageCount: 0,
+          creditCharged: false,
+        });
+      }
+
+      // Check for existing successful delivery (idempotency)
+      const [existingDelivery] = await db
+        .select({
+          status: lineDeliveries.status,
+          photoCount: lineDeliveries.photoCount,
+          messageCount: lineDeliveries.messageCount,
+        })
+        .from(lineDeliveries)
+        .where(
+          eq(lineDeliveries.searchId, searchId),
+        )
+        .limit(1);
+
+      if (existingDelivery?.status === 'sent') {
+        return ok({
+          status: 'sent' as const,
+          photoCount: existingDelivery.photoCount,
+          messageCount: existingDelivery.messageCount,
+          creditCharged: false,
+        });
+      }
+
+      // Create delivery record with pending status
+      // Handle race condition: if another request created a delivery for this searchId,
+      // re-query and return the existing result
+      let deliveryId: string;
+      try {
+        const [deliveryRecord] = await db
+          .insert(lineDeliveries)
+          .values({
+            photographerId,
+            eventId,
+            searchId,
+            photoIds,
+            lineUserId,
+            status: 'pending',
+            messageCount: 0,
+            photoCount: 0,
+            creditCharged: false,
+          })
+          .returning({ id: lineDeliveries.id });
+        deliveryId = deliveryRecord.id;
+      } catch (dbError: unknown) {
+        // Check for unique constraint violation (race condition)
+        if (isUniqueConstraintViolation(dbError)) {
+          // Re-query to get the existing delivery
+          const [raceDelivery] = await db
+            .select({
+              id: lineDeliveries.id,
+              status: lineDeliveries.status,
+              photoCount: lineDeliveries.photoCount,
+              messageCount: lineDeliveries.messageCount,
+            })
+            .from(lineDeliveries)
+            .where(eq(lineDeliveries.searchId, searchId))
+            .limit(1);
+
+          if (raceDelivery?.status === 'sent') {
+            return ok({
+              status: 'sent' as const,
+              photoCount: raceDelivery.photoCount,
+              messageCount: raceDelivery.messageCount,
+              creditCharged: false,
+            });
+          }
+
+          // If still pending, another request is processing - return error
+          return err<never, HandlerError>({
+            code: 'CONFLICT',
+            message: 'Another delivery request is in progress. Please wait.',
+          });
+        }
+        throw dbError;
+      }
 
       const result = yield* deliverPhotosViaLine({
         searchId,
@@ -354,6 +552,9 @@ export const lineParticipantRouter = new Hono<Env>()
         cfZone: c.env.CF_ZONE,
         isDev: c.env.NODE_ENV === 'development',
       }).mapErr(mapDeliveryError);
+
+      // Clean up KV entry after successful delivery
+      c.executionCtx.waitUntil(deletePendingDelivery(kv, searchId));
 
       c.executionCtx.waitUntil(
         capturePostHogEvent(c.env.POSTHOG_API_KEY, {

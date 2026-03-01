@@ -122,3 +122,5 @@ __pycache__/
 
 # Test images (large dataset, keep external)
 testimages/
+.wrangler/state/
+docs/plans/
