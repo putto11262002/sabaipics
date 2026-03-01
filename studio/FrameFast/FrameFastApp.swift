@@ -16,6 +16,10 @@ struct FrameFastApp: App {
     @State private var clerk = Clerk.shared
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        UIView.appearance().tintColor = UIColor(named: "AccentColor")
+    }
+
     var body: some Scene {
         WindowGroup {
             RootFlowView()

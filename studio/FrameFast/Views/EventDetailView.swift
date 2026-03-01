@@ -3,7 +3,7 @@
 //  FrameFast
 //
 //  Created: 2026-01-29
-//  Redesigned: Clean iOS-native detail view
+//  Redesigned: Full detail view with FTP, pipeline, links, upload stats
 //
 
 import SwiftUI
@@ -12,11 +12,29 @@ import UIKit
 struct EventDetailView: View {
     let eventId: String
 
+    @EnvironmentObject private var coordinator: AppCoordinator
+
     @State private var event: Event?
     @State private var isFirstLoad = true
-    @State private var isRefreshing = false
     @State private var error: Error?
-    @State private var showCopyConfirmation = false
+    @State private var copiedItem: CopyableItem?
+
+    // FTP (bare response — no data wrapper)
+    @State private var ftpCredentials: FtpCredentials?
+    @State private var ftpNotConfigured = false
+    @State private var ftpPassword: String?
+    @State private var isRevealingPassword = false
+
+    // Image Pipeline (summary only — editing happens in ImagePipelineView)
+    @State private var pipelineSettings: ImagePipelineSettings?
+
+    // Edit sheet
+    @State private var editField: EditableField?
+    @State private var editValue: String = ""
+    @State private var isSavingEdit = false
+
+    // Upload stats
+    @State private var uploadSummary: UploadManager.EventSummary?
 
     private let repository: EventsRepository
 
@@ -33,13 +51,20 @@ struct EventDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .tint(Color.accentColor)
             .task {
-                await loadEvent()
+                await loadAllData()
             }
-            .overlay(alignment: .top) {
-                if showCopyConfirmation {
-                    CopyConfirmationView()
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
+            .task {
+                await uploadLoop()
+            }
+            .sheet(item: $editField) { field in
+                EditFieldSheet(
+                    field: field,
+                    value: $editValue,
+                    isSaving: $isSavingEdit,
+                    onSave: { newValue in
+                        await saveField(field, value: newValue)
+                    }
+                )
             }
     }
 
@@ -47,7 +72,7 @@ struct EventDetailView: View {
     private var contentView: some View {
         if isFirstLoad && event == nil {
             skeletonView
-        } else if let error = error {
+        } else if let error = error, event == nil {
             errorView(error: error)
         } else if let event = event {
             eventContentView(event: event)
@@ -71,51 +96,234 @@ struct EventDetailView: View {
     @ViewBuilder
     private func eventContentView(event: Event) -> some View {
         List {
+            Section("Upload Activity") {
+                uploadActivitySection
+            }
+
             Section("Details") {
-                LabeledContent("Name", value: event.name)
+                detailsSection(event: event)
+            }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Subtitle")
-                        .font(.caption)
-                        .foregroundStyle(Color.secondary)
-                    Text(event.subtitle ?? "No subtitle")
-                        .font(.body)
-                        .foregroundStyle(event.subtitle != nil ? Color.primary : Color.secondary)
-                }
-                .padding(.vertical, 4)
+            Section("Links") {
+                linksSection(event: event)
+            }
 
-                if let startDate = event.startDate {
-                    LabeledContent("Start Date", value: startDate.formattedDateTime())
-                }
+            Section("FTP") {
+                ftpSection
+            }
 
-                if let endDate = event.endDate {
-                    LabeledContent("End Date", value: endDate.formattedDateTime())
-                }
+            Section {
+                imagePipelineSection
+            }
 
-                LabeledContent("Created", value: event.createdAt.formattedDateTime())
-                LabeledContent("Expires", value: event.expiresAt.formattedDateTime())
+            Section("Info") {
+                infoSection(event: event)
             }
         }
         .listStyle(.insetGrouped)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button {
-                        copyToClipboard(searchURL(for: event))
-                    } label: {
-                        Label("Copy Search Link", systemImage: "magnifyingglass")
+                    Button("Copy Search Link") {
+                        copyToClipboard(searchURL(for: event), item: .searchLink)
                     }
-
-                    Button {
-                        copyToClipboard(slideshowURL(for: event))
-                    } label: {
-                        Label("Copy Slideshow Link", systemImage: "play.rectangle")
+                    Button("Copy Slideshow Link") {
+                        copyToClipboard(slideshowURL(for: event), item: .slideshowLink)
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(Color.accentColor)
                 }
             }
+        }
+    }
+
+    // MARK: - Upload Activity Section
+
+    private var uploadActivitySection: some View {
+        HStack(spacing: 12) {
+            EventDetailStatCard(
+                icon: "clock.arrow.circlepath",
+                iconTint: Color.orange,
+                title: "Pending",
+                value: "\(uploadSummary?.pending ?? 0)"
+            )
+            EventDetailStatCard(
+                icon: "checkmark.circle",
+                iconTint: Color.green,
+                title: "Completed",
+                value: "\(uploadSummary?.completed ?? 0)"
+            )
+        }
+        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+        .listRowBackground(Color.clear)
+    }
+
+    // MARK: - Details Section
+
+    @ViewBuilder
+    private func detailsSection(event: Event) -> some View {
+        Button {
+            editField = .name
+            editValue = event.name
+        } label: {
+            LabeledContent("Name") {
+                Text(event.name)
+                    .foregroundStyle(Color.primary)
+            }
+        }
+        .foregroundStyle(Color.primary)
+
+        Button {
+            editField = .subtitle
+            editValue = event.subtitle ?? ""
+        } label: {
+            LabeledContent("Subtitle") {
+                Text(event.subtitle ?? "No subtitle")
+                    .foregroundStyle(event.subtitle != nil ? Color.primary : Color.secondary)
+            }
+        }
+        .foregroundStyle(Color.primary)
+    }
+
+    // MARK: - Links Section
+
+    @ViewBuilder
+    private func linksSection(event: Event) -> some View {
+        HStack {
+            Label("Search Link", systemImage: "magnifyingglass")
+                .font(.body)
+            Spacer()
+            Button {
+                copyToClipboard(searchURL(for: event), item: .searchLink)
+            } label: {
+                Image(systemName: copiedItem == .searchLink ? "checkmark" : "doc.on.doc")
+                    .font(.subheadline)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(copiedItem == .searchLink ? Color.green : Color.accentColor)
+        }
+
+        HStack {
+            Label("Slideshow Link", systemImage: "play.rectangle")
+                .font(.body)
+            Spacer()
+            Button {
+                copyToClipboard(slideshowURL(for: event), item: .slideshowLink)
+            } label: {
+                Image(systemName: copiedItem == .slideshowLink ? "checkmark" : "doc.on.doc")
+                    .font(.subheadline)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(copiedItem == .slideshowLink ? Color.green : Color.accentColor)
+        }
+    }
+
+    // MARK: - FTP Section
+
+    @ViewBuilder
+    private var ftpSection: some View {
+        if ftpNotConfigured {
+            Text("Not configured")
+                .foregroundStyle(Color.secondary)
+        } else if let ftp = ftpCredentials {
+            LabeledContent("Username") {
+                Text(ftp.username)
+                    .textSelection(.enabled)
+            }
+
+            HStack {
+                Text("Password")
+                Spacer()
+                if let password = ftpPassword {
+                    Text(password)
+                        .font(.body.monospaced())
+                        .foregroundStyle(Color.primary)
+                    Button {
+                        ftpPassword = nil
+                    } label: {
+                        Image(systemName: "eye.slash")
+                            .font(.subheadline)
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(Color.accentColor)
+                    Button {
+                        copyToClipboard(password, item: .ftpPassword)
+                    } label: {
+                        Image(systemName: copiedItem == .ftpPassword ? "checkmark" : "doc.on.doc")
+                            .font(.subheadline)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(copiedItem == .ftpPassword ? Color.green : Color.accentColor)
+                } else {
+                    Button {
+                        Task { await revealPassword() }
+                    } label: {
+                        if isRevealingPassword {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "eye")
+                                .font(.subheadline)
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(isRevealingPassword)
+                }
+            }
+        } else {
+            HStack {
+                Text("Loading credentials...")
+                    .foregroundStyle(Color.secondary)
+                Spacer()
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+    }
+
+    // MARK: - Image Pipeline Section
+
+    @ViewBuilder
+    private var imagePipelineSection: some View {
+        if let settings = pipelineSettings {
+            NavigationLink {
+                ImagePipelineView(
+                    eventId: eventId,
+                    initialSettings: settings,
+                    onSave: { newSettings in
+                        pipelineSettings = newSettings
+                    }
+                )
+            } label: {
+                Text("Color Grading & Auto-Edit")
+            }
+        } else {
+            HStack {
+                Text("Color Grading & Auto-Edit")
+                    .foregroundStyle(Color.secondary)
+                Spacer()
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+    }
+
+    // MARK: - Info Section
+
+    @ViewBuilder
+    private func infoSection(event: Event) -> some View {
+        LabeledContent("Created", value: event.createdAt.formattedDateTime())
+        LabeledContent("Expires", value: event.expiresAt.formattedDateTime())
+
+        if let startDate = event.startDate {
+            LabeledContent("Start Date", value: startDate.formattedDateTime())
+        }
+
+        if let endDate = event.endDate {
+            LabeledContent("End Date", value: endDate.formattedDateTime())
         }
     }
 
@@ -139,9 +347,7 @@ struct EventDetailView: View {
                 .padding(.horizontal)
 
             Button {
-                Task {
-                    await loadEvent()
-                }
+                Task { await loadAllData() }
             } label: {
                 Text("Retry")
             }
@@ -152,27 +358,37 @@ struct EventDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Helper Methods
+    // MARK: - Data Loading
 
-    private func loadEvent(isRefresh: Bool = false) async {
-        if !isRefresh {
-            isFirstLoad = event == nil
-        }
-
-        if isRefresh {
-            isRefreshing = true
-        }
-
+    private func loadAllData() async {
+        isFirstLoad = event == nil
         error = nil
 
-        // Concurrent operations: fetch + minimum display time
-        async let eventData = repository.fetchEvent(id: eventId)
-        async let minimumDelay: () = Task.sleep(nanoseconds: 300_000_000)  // 300ms
+        async let eventFetch = repository.fetchEvent(id: eventId)
+        async let ftpFetch: FtpCredentials? = {
+            try? await repository.fetchFtpCredentials(eventId: eventId)
+        }()
+        async let pipelineFetch: ImagePipelineResponse? = {
+            try? await repository.fetchImagePipeline(eventId: eventId)
+        }()
+        async let minimumDelay: () = Task.sleep(nanoseconds: 300_000_000)
 
         do {
-            let result = try await eventData
-            try await minimumDelay  // Prevent skeleton flicker on fast loads
-            event = result.value.data
+            let eventResult = try await eventFetch
+            let ftpResult = await ftpFetch
+            let pipelineResult = await pipelineFetch
+            try? await minimumDelay
+
+            event = eventResult.value.data
+
+            if let ftp = ftpResult {
+                ftpCredentials = ftp
+                ftpNotConfigured = false
+            } else {
+                ftpNotConfigured = true
+            }
+
+            pipelineSettings = pipelineResult?.data
         } catch {
             try? await minimumDelay
             print("[EventDetail Error] Failed to load event \(eventId): \(error.localizedDescription)")
@@ -180,8 +396,52 @@ struct EventDetailView: View {
         }
 
         isFirstLoad = false
-        isRefreshing = false
     }
+
+    private func uploadLoop() async {
+        while !Task.isCancelled {
+            let summary = await coordinator.uploadManager.eventSummaries(eventIds: [eventId])
+            await MainActor.run {
+                self.uploadSummary = summary[eventId]
+            }
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+        }
+    }
+
+    // MARK: - Actions
+
+    private func revealPassword() async {
+        isRevealingPassword = true
+        do {
+            let result = try await repository.revealFtpPassword(eventId: eventId)
+            ftpPassword = result.password
+        } catch {
+            print("[EventDetail Error] Failed to reveal password: \(error.localizedDescription)")
+        }
+        isRevealingPassword = false
+    }
+
+    private func saveField(_ field: EditableField, value: String) async {
+        isSavingEdit = true
+        let input: UpdateEventInput
+        switch field {
+        case .name:
+            input = UpdateEventInput(name: value, subtitle: nil)
+        case .subtitle:
+            input = UpdateEventInput(name: nil, subtitle: value)
+        }
+
+        do {
+            let result = try await repository.updateEvent(id: eventId, input: input)
+            event = result.data
+            editField = nil
+        } catch {
+            print("[EventDetail Error] Failed to update event: \(error.localizedDescription)")
+        }
+        isSavingEdit = false
+    }
+
+    // MARK: - Helpers
 
     private func searchURL(for event: Event) -> String {
         let frontendURL = Bundle.main.object(forInfoDictionaryKey: "EventFrontendURL") as? String ?? "https://sabaipics.com"
@@ -193,39 +453,132 @@ struct EventDetailView: View {
         return "\(frontendURL)/participant/events/\(event.id)/slideshow"
     }
 
-    private func copyToClipboard(_ text: String) {
+    private func copyToClipboard(_ text: String, item: CopyableItem) {
         UIPasteboard.general.string = text
 
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            showCopyConfirmation = true
+        withAnimation {
+            copiedItem = item
         }
 
         Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                showCopyConfirmation = false
+            withAnimation {
+                if copiedItem == item {
+                    copiedItem = nil
+                }
             }
         }
     }
 }
 
-// MARK: - Supporting Views
+// MARK: - Editable Field
 
-struct CopyConfirmationView: View {
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Color.accentColor)
-            Text("Copied to clipboard")
-                .font(.subheadline)
-                .foregroundStyle(Color.primary)
+enum EditableField: Identifiable {
+    case name
+    case subtitle
+
+    var id: String {
+        switch self {
+        case .name: return "name"
+        case .subtitle: return "subtitle"
         }
-        .padding()
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(10)
-        .shadow(color: Color.primary.opacity(0.1), radius: 8, x: 0, y: 2)
-        .padding(.top, 8)
     }
+
+    var title: String {
+        switch self {
+        case .name: return "Name"
+        case .subtitle: return "Subtitle"
+        }
+    }
+}
+
+// MARK: - Edit Field Sheet
+
+private struct EditFieldSheet: View {
+    let field: EditableField
+    @Binding var value: String
+    @Binding var isSaving: Bool
+    let onSave: (String) async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField(field.title, text: $value)
+                    .autocorrectionDisabled()
+            }
+            .navigationTitle("Edit \(field.title)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .disabled(isSaving)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        Task { await onSave(value) }
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text("Save")
+                        }
+                    }
+                    .disabled(value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+}
+
+// MARK: - Stat Card
+
+private struct EventDetailStatCard: View {
+    let icon: String
+    let iconTint: Color
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(Color.secondary)
+
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(iconTint)
+                Spacer(minLength: 8)
+                Text(value)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Color.primary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.6), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Copyable Item
+
+private enum CopyableItem: Equatable {
+    case searchLink
+    case slideshowLink
+    case ftpPassword
 }
 
 // MARK: - Previews
@@ -236,58 +589,19 @@ struct CopyConfirmationView: View {
     }
 }
 
-#Preview("2. Loaded Event") {
+#Preview("2. Full Event") {
     NavigationStack {
-        EventDetailPreview(
-            event: Event(
-                id: "evt_preview",
-                name: "Wedding - Bangkok Grand Hotel",
-                subtitle: "John & Jane's Special Day",
-                logoUrl: nil,
-                startDate: "2026-02-14T18:00:00.000+07:00",
-                endDate: "2026-02-14T23:00:00.000+07:00",
-                createdAt: "2026-01-27T10:30:00.000+07:00",
-                expiresAt: "2026-03-14T23:59:59.000+07:00"
-            )
-        )
+        EventDetailFullPreview()
     }
 }
 
-#Preview("3. Long Subtitle (Wrapping)") {
+#Preview("3. Minimal Event") {
     NavigationStack {
-        EventDetailPreview(
-            event: Event(
-                id: "evt_preview_2",
-                name: "Corporate Annual Meeting 2026",
-                subtitle: "This is a very long subtitle that will wrap to multiple lines to test layout and ensure proper text wrapping behavior in the detail view",
-                logoUrl: nil,
-                startDate: "2026-03-01T09:00:00.000+07:00",
-                endDate: "2026-03-01T17:00:00.000+07:00",
-                createdAt: "2026-01-20T14:15:00.000+07:00",
-                expiresAt: "2026-04-01T23:59:59.000+07:00"
-            )
-        )
+        EventDetailMinimalPreview()
     }
 }
 
-#Preview("4. Minimal Event (No Optional Fields)") {
-    NavigationStack {
-        EventDetailPreview(
-            event: Event(
-                id: "evt_minimal",
-                name: "Minimal Event",
-                subtitle: nil,
-                logoUrl: nil,
-                startDate: nil,
-                endDate: nil,
-                createdAt: "2026-01-20T14:15:00.000+07:00",
-                expiresAt: "2026-04-01T23:59:59.000+07:00"
-            )
-        )
-    }
-}
-
-#Preview("5. Error State") {
+#Preview("4. Error State") {
     NavigationStack {
         EventDetailErrorPreview()
     }
@@ -298,23 +612,45 @@ struct CopyConfirmationView: View {
 private struct EventDetailSkeletonPreview: View {
     var body: some View {
         List {
+            Section("Upload Activity") {
+                HStack(spacing: 12) {
+                    EventDetailStatCard(icon: "clock.arrow.circlepath", iconTint: .orange, title: "Pending", value: "0")
+                    EventDetailStatCard(icon: "checkmark.circle", iconTint: .green, title: "Completed", value: "0")
+                }
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
+            }
+
             Section("Details") {
                 LabeledContent("Name", value: "Loading Event Name")
+                LabeledContent("Subtitle", value: "Loading subtitle")
+            }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Subtitle")
-                        .font(.caption)
-                        .foregroundStyle(Color.secondary)
-                    Text("Loading subtitle text here")
-                        .font(.body)
-                        .foregroundStyle(Color.primary)
+            Section("Links") {
+                HStack {
+                    Label("Search Link", systemImage: "magnifyingglass")
+                    Spacer()
+                    Image(systemName: "doc.on.doc").font(.subheadline)
                 }
-                .padding(.vertical, 4)
+                HStack {
+                    Label("Slideshow Link", systemImage: "play.rectangle")
+                    Spacer()
+                    Image(systemName: "doc.on.doc").font(.subheadline)
+                }
+            }
 
-                LabeledContent("Start Date", value: "Jan 1, 2026 at 12:00 AM")
-                LabeledContent("End Date", value: "Jan 1, 2026 at 12:00 AM")
-                LabeledContent("Created", value: "Jan 1, 2026 at 12:00 AM")
-                LabeledContent("Expires", value: "Jan 1, 2026 at 12:00 AM")
+            Section("FTP") {
+                LabeledContent("Username", value: "ftp_loading")
+                LabeledContent("Password", value: "Reveal")
+            }
+
+            Section {
+                Text("Color Grading & Auto-Edit")
+            }
+
+            Section("Info") {
+                LabeledContent("Created", value: "Jan 1, 2026")
+                LabeledContent("Expires", value: "Mar 1, 2026")
             }
         }
         .listStyle(.insetGrouped)
@@ -325,34 +661,60 @@ private struct EventDetailSkeletonPreview: View {
     }
 }
 
-private struct EventDetailPreview: View {
-    let event: Event
-
+private struct EventDetailFullPreview: View {
     var body: some View {
         List {
+            Section("Upload Activity") {
+                HStack(spacing: 12) {
+                    EventDetailStatCard(icon: "clock.arrow.circlepath", iconTint: .orange, title: "Pending", value: "3")
+                    EventDetailStatCard(icon: "checkmark.circle", iconTint: .green, title: "Completed", value: "42")
+                }
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
+            }
+
             Section("Details") {
-                LabeledContent("Name", value: event.name)
+                LabeledContent("Name", value: "Wedding - Bangkok Grand Hotel")
+                LabeledContent("Subtitle", value: "John & Jane's Special Day")
+            }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Subtitle")
-                        .font(.caption)
-                        .foregroundStyle(Color.secondary)
-                    Text(event.subtitle ?? "No subtitle")
-                        .font(.body)
-                        .foregroundStyle(event.subtitle != nil ? Color.primary : Color.secondary)
+            Section("Links") {
+                HStack {
+                    Label("Search Link", systemImage: "magnifyingglass")
+                    Spacer()
+                    Image(systemName: "doc.on.doc")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.accentColor)
                 }
-                .padding(.vertical, 4)
-
-                if let startDate = event.startDate {
-                    LabeledContent("Start Date", value: startDate.formattedDateTime())
+                HStack {
+                    Label("Slideshow Link", systemImage: "play.rectangle")
+                    Spacer()
+                    Image(systemName: "doc.on.doc")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.accentColor)
                 }
+            }
 
-                if let endDate = event.endDate {
-                    LabeledContent("End Date", value: endDate.formattedDateTime())
+            Section("FTP") {
+                LabeledContent("Username", value: "ABCDE")
+                HStack {
+                    Text("Password")
+                    Spacer()
+                    Button("Reveal") {}
+                        .font(.subheadline)
+                        .buttonStyle(.borderless)
                 }
+            }
 
-                LabeledContent("Created", value: event.createdAt.formattedDateTime())
-                LabeledContent("Expires", value: event.expiresAt.formattedDateTime())
+            Section {
+                Text("Color Grading & Auto-Edit")
+            }
+
+            Section("Info") {
+                LabeledContent("Created", value: "Jan 27, 2026 at 10:30 AM")
+                LabeledContent("Expires", value: "Mar 14, 2026 at 11:59 PM")
+                LabeledContent("Start Date", value: "Feb 14, 2026 at 6:00 PM")
+                LabeledContent("End Date", value: "Feb 14, 2026 at 11:00 PM")
             }
         }
         .listStyle(.insetGrouped)
@@ -361,18 +723,75 @@ private struct EventDetailPreview: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button {} label: {
-                        Label("Copy Search Link", systemImage: "magnifyingglass")
-                    }
-                    Button {} label: {
-                        Label("Copy Slideshow Link", systemImage: "play.rectangle")
-                    }
+                    Button("Copy Search Link") {}
+                    Button("Copy Slideshow Link") {}
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(Color.accentColor)
                 }
             }
         }
+    }
+}
+
+private struct EventDetailMinimalPreview: View {
+    var body: some View {
+        List {
+            Section("Upload Activity") {
+                HStack(spacing: 12) {
+                    EventDetailStatCard(icon: "clock.arrow.circlepath", iconTint: .orange, title: "Pending", value: "0")
+                    EventDetailStatCard(icon: "checkmark.circle", iconTint: .green, title: "Completed", value: "0")
+                }
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
+            }
+
+            Section("Details") {
+                LabeledContent("Name", value: "Minimal Event")
+                LabeledContent("Subtitle") {
+                    Text("No subtitle")
+                        .foregroundStyle(Color.secondary)
+                }
+            }
+
+            Section("Links") {
+                HStack {
+                    Label("Search Link", systemImage: "magnifyingglass")
+                    Spacer()
+                    Image(systemName: "doc.on.doc")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.accentColor)
+                }
+                HStack {
+                    Label("Slideshow Link", systemImage: "play.rectangle")
+                    Spacer()
+                    Image(systemName: "doc.on.doc")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+
+            Section("FTP") {
+                Text("Not configured")
+                    .foregroundStyle(Color.secondary)
+            }
+
+            Section {
+                HStack {
+                    Text("Color Grading & Auto-Edit")
+                        .foregroundStyle(Color.secondary)
+                    Spacer()
+                    ProgressView().controlSize(.small)
+                }
+            }
+
+            Section("Info") {
+                LabeledContent("Created", value: "Jan 20, 2026 at 2:15 PM")
+                LabeledContent("Expires", value: "Apr 1, 2026 at 11:59 PM")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Event Details")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

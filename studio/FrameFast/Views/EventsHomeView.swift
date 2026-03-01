@@ -198,16 +198,21 @@ struct EventsHomeView: View {
 
             Section {
                 ForEach(viewModel.events) { event in
-                    UploadEventStatusRow(
-                        title: event.name,
-                        isOnline: connectivityStore.isOnline,
-                        summary: uploadByEventId[event.id]
-                    )
+                    NavigationLink(value: event) {
+                        UploadEventStatusRow(
+                            title: event.name,
+                            isOnline: connectivityStore.isOnline,
+                            summary: uploadByEventId[event.id]
+                        )
+                    }
                 }
             } header: {
                 Text("Events")
                     .foregroundStyle(Color.secondary)
             }
+        }
+        .navigationDestination(for: Event.self) { event in
+            EventDetailView(eventId: event.id)
         }
     }
 

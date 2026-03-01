@@ -80,6 +80,42 @@ actor EventsRepository {
         )
     }
 
+    // MARK: - Event Mutations
+
+    func updateEvent(id: String, input: UpdateEventInput) async throws -> EventResponse {
+        try await apiClient.updateEvent(id: id, input: input)
+    }
+
+    // MARK: - FTP Credentials
+
+    func fetchFtpCredentials(eventId: String) async throws -> FtpCredentials {
+        try await apiClient.fetchFtpCredentials(eventId: eventId)
+    }
+
+    func revealFtpPassword(eventId: String) async throws -> FtpRevealData {
+        try await apiClient.revealFtpPassword(eventId: eventId)
+    }
+
+    // MARK: - Image Pipeline
+
+    func fetchImagePipeline(eventId: String) async throws -> ImagePipelineResponse {
+        try await apiClient.fetchImagePipeline(eventId: eventId)
+    }
+
+    func updateImagePipeline(eventId: String, input: UpdateImagePipelineInput) async throws -> ImagePipelineResponse {
+        try await apiClient.updateImagePipeline(eventId: eventId, input: input)
+    }
+
+    // MARK: - Studio
+
+    func fetchAutoEditPresets() async throws -> AutoEditPresetsResponse {
+        try await apiClient.fetchAutoEditPresets()
+    }
+
+    func fetchStudioLuts() async throws -> StudioLutsResponse {
+        try await apiClient.fetchStudioLuts()
+    }
+
     // MARK: - Private
 
     private func cacheNamespaceForCurrentUser() async -> String? {

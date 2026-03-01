@@ -72,6 +72,77 @@ actor EventsAPIClient {
         return try await performRequest(request: request)
     }
 
+    func updateEvent(id: String, input: UpdateEventInput) async throws -> EventResponse {
+        guard let url = URL(string: "\(baseURL)/events/\(id)") else {
+            throw APIError.invalidURL
+        }
+
+        var request = try await buildAuthenticatedRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(input)
+        return try await performRequest(request: request)
+    }
+
+    func fetchFtpCredentials(eventId: String) async throws -> FtpCredentials {
+        guard let url = URL(string: "\(baseURL)/api/ftp/events/\(eventId)/ftp-credentials") else {
+            throw APIError.invalidURL
+        }
+
+        let request = try await buildAuthenticatedRequest(url: url)
+        return try await performRequest(request: request)
+    }
+
+    func revealFtpPassword(eventId: String) async throws -> FtpRevealData {
+        guard let url = URL(string: "\(baseURL)/api/ftp/events/\(eventId)/ftp-credentials/reveal") else {
+            throw APIError.invalidURL
+        }
+
+        let request = try await buildAuthenticatedRequest(url: url)
+        return try await performRequest(request: request)
+    }
+
+    func fetchImagePipeline(eventId: String) async throws -> ImagePipelineResponse {
+        guard let url = URL(string: "\(baseURL)/events/\(eventId)/image-pipeline") else {
+            throw APIError.invalidURL
+        }
+
+        let request = try await buildAuthenticatedRequest(url: url)
+        return try await performRequest(request: request)
+    }
+
+    func updateImagePipeline(eventId: String, input: UpdateImagePipelineInput) async throws -> ImagePipelineResponse {
+        guard let url = URL(string: "\(baseURL)/events/\(eventId)/image-pipeline") else {
+            throw APIError.invalidURL
+        }
+
+        var request = try await buildAuthenticatedRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(input)
+        return try await performRequest(request: request)
+    }
+
+    // MARK: - Studio
+
+    func fetchAutoEditPresets(limit: Int = 200) async throws -> AutoEditPresetsResponse {
+        guard let url = URL(string: "\(baseURL)/studio/auto-edit?limit=\(limit)") else {
+            throw APIError.invalidURL
+        }
+
+        let request = try await buildAuthenticatedRequest(url: url)
+        return try await performRequest(request: request)
+    }
+
+    func fetchStudioLuts(limit: Int = 200) async throws -> StudioLutsResponse {
+        guard let url = URL(string: "\(baseURL)/studio/luts?limit=\(limit)") else {
+            throw APIError.invalidURL
+        }
+
+        let request = try await buildAuthenticatedRequest(url: url)
+        return try await performRequest(request: request)
+    }
+
     // MARK: - Private Methods
 
     private func buildAuthenticatedRequest(url: URL) async throws -> URLRequest {
