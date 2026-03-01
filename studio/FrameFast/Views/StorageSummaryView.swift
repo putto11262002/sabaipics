@@ -58,7 +58,7 @@ struct StorageSummaryView: View {
     private func overviewSection(summary: StorageSummary) -> some View {
         Section("Overview") {
             storageRow(
-                title: "Total Storage Used",
+                title: String(localized: "Total Storage Used"),
                 systemImage: "internaldrive",
                 bytes: store.diskUsage,
                 files: summary.totalFiles
@@ -69,21 +69,21 @@ struct StorageSummaryView: View {
     private func byStatusSection(summary: StorageSummary) -> some View {
         Section("By Status") {
             storageRow(
-                title: "Uploaded",
+                title: String(localized: "Uploaded"),
                 systemImage: "checkmark.circle",
                 bytes: summary.completedBytes,
                 files: summary.completedFiles,
                 tint: .green
             )
             storageRow(
-                title: "Pending",
+                title: String(localized: "Pending"),
                 systemImage: "clock",
                 bytes: summary.pendingBytes,
                 files: summary.pendingFiles,
                 tint: .accentColor
             )
             storageRow(
-                title: "Failed",
+                title: String(localized: "Failed"),
                 systemImage: "exclamationmark.triangle",
                 bytes: summary.failedBytes,
                 files: summary.failedFiles,
@@ -212,7 +212,7 @@ struct StorageSummaryView: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(Self.formatBytes(bytes))
                     .font(.subheadline.weight(.semibold))
-                Text("\(files) \(files == 1 ? "photo" : "photos")")
+                Text(String(localized: "\(files) photos"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
