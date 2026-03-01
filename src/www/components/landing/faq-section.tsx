@@ -1,4 +1,5 @@
 import { getTranslations } from 'next-intl/server';
+import { SectionContainer } from './section-container';
 
 const FAQ_ITEMS = ['accuracy', 'privacy', 'formats', 'credits', 'upload', 'sales'] as const;
 const SALES_EMAIL = 'sales@framefast.io';
@@ -8,7 +9,7 @@ export async function FaqSection() {
 
   return (
     <section id="faq" className="scroll-mt-24 bg-muted/30 py-16">
-      <div className="mx-auto max-w-7xl px-4">
+      <SectionContainer>
         <div className="grid gap-8 lg:grid-cols-12 lg:gap-12">
           <div className="lg:col-span-4">
             <h2 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -51,7 +52,7 @@ export async function FaqSection() {
             </div>
           </div>
         </div>
-      </div>
+      </SectionContainer>
     </section>
   );
 }

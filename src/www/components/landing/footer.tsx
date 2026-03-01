@@ -2,6 +2,7 @@ import { Link } from '@/i18n/navigation';
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { Mail } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
+import { SectionContainer } from './section-container';
 
 const CONTACT_EMAIL = 'contact@framefast.io';
 
@@ -25,7 +26,7 @@ export async function Footer() {
 
   return (
     <footer className="bg-muted/30">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+      <SectionContainer className="py-12 sm:py-16">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
@@ -125,7 +126,7 @@ export async function Footer() {
         <div className="mt-12 flex flex-col items-center justify-center gap-4 pt-8 sm:flex-row">
           <p className="text-xs text-muted-foreground">{t('copyright', { year })}</p>
         </div>
-      </div>
+      </SectionContainer>
     </footer>
   );
 }
