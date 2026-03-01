@@ -59,7 +59,7 @@ struct FeedbackView: View {
                     errorMessage = nil
                 }
             } message: {
-                Text(errorMessage ?? "An unexpected error occurred. Please try again.")
+                Text(errorMessage ?? String(localized: "An unexpected error occurred. Please try again."))
             }
         }
     }
