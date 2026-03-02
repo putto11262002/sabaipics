@@ -67,8 +67,12 @@ export async function verifyState(
     return null;
   }
 
-  const valid = await crypto.subtle.timingSafeEqual(sigBytes, expectedBytes);
-  if (!valid) {
+  // Manual timing-safe comparison (crypto.subtle.timingSafeEqual not available)
+  let result = 0;
+  for (let i = 0; i < sigBytes.length; i++) {
+    result |= sigBytes[i] ^ expectedBytes[i];
+  }
+  if (result !== 0) {
     return null;
   }
 
