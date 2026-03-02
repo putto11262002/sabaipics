@@ -1,36 +1,50 @@
-# TODO
+# TODO — iOS App
 
-## v2 Face Recognition — Remaining Work
+## Internationalization (i18n)
 
-**Modal endpoint:** `https://putto11262002--framefast-recognition-serve.modal.run`
+Target languages: English (default), Thai
 
-### Done
-- [x] Modal deployment with T4 GPU + CUDA (`modal_app.py`)
-- [x] Eval: Modal matches AWS Rekognition accuracy (~73% Precision@10, 98% Rank-5)
-- [x] `RECOGNITION_ENDPOINT` as wrangler var (dev=localhost:8082, staging/prod=Modal)
-- [x] `pnpm dev:recognition` / `pnpm deploy:recognition` scripts
-- [x] Face-eval modal provider
+### Phase 1 — Authentication & Onboarding
+- [ ] `WelcomeView.swift` — tagline, auth buttons, legal links
+- [ ] `EmailEntryView.swift` — form labels, placeholders, validation
+- [ ] `OTPVerificationView.swift` — instructions, resend, error messages
+- [ ] `LoadingView.swift` — loading tagline
 
-### 1. DB Migration
-- [ ] `pnpm db:generate` — create migration for `face_embeddings` table
-- [ ] Hand-edit migration SQL:
-  - `CREATE EXTENSION IF NOT EXISTS vector;` at top
-  - HNSW index: `CREATE INDEX face_embeddings_embedding_hnsw_idx ON face_embeddings USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);`
-- [ ] Run migration against staging DB
+### Phase 2 — Main Navigation & Events
+- [ ] `MainTabView.swift` — tab labels (Events, Capture, Profile)
+- [ ] `EventsHomeView.swift` — empty states, error states, upload queue cards, sync status
+- [ ] `EventDetailView.swift` — section headers, field labels, stat cards, buttons, edit sheet
+- [ ] `ImagePipelineView.swift` — settings labels, validation errors, preset names
 
-### 2. Worker-Side: `extractFacesFromUrl`
-- [ ] Add `extractFacesFromUrl(imageUrl)` to `extractor.ts`
-- [ ] Update `photo-consumer.ts` to send R2 public URL instead of base64
+### Phase 3 — Camera Setup & Discovery
+- [ ] `CameraConnectFlow.swift` — manufacturer selection, navigation
+- [ ] `CameraDiscoveryView.swift` — discovery states, error messages, camera lists
+- [ ] `CanonAPSetupView.swift` — Canon-specific setup instructions
+- [ ] `NikonHotspotSetupView.swift` — Nikon-specific setup instructions
+- [ ] `SonySetupFlowView.swift` / `SonyAPEntryView.swift` — Sony QR flow, instructions
 
-### 3. Clean Slate
-- [ ] Hard-delete all events + photos in staging DB (no users yet, no backfill)
-- [ ] Drop old `faces` table (migration)
-- [ ] Drop `rekognitionCollectionId` column from `events` table (migration)
+### Phase 4 — Connectivity Guide
+- [ ] `ConnectivityGuideFlow.swift` — guide steps, navigation
+- [ ] `ConnectivityGuideWiFiTapStep.swift` — WiFi tap instructions
+- [ ] `ConnectivityGuideIPv4Step.swift` — IPv4 instructions
+- [ ] `ConnectivityGuideConfigureIPStep.swift` — IP config instructions
+- [ ] `ConnectivityGuideOnlineCheckStep.swift` — online check, success/failure
+- [ ] `CameraWiFiInternetGuideView.swift` — internet guide steps
 
-### 4. Verification
-- [ ] E2E: upload photo → face_embeddings row → selfie search → results
-- [ ] Verify HNSW index works (cosine similarity query)
+### Phase 5 — Capture Flow
+- [ ] `CaptureHomeView.swift` — camera list, empty states, disconnect
+- [ ] `CaptureSessionSheetView.swift` — session info labels, RAW warning
+- [ ] `EventPickerSheetView.swift` — event picker labels
+- [ ] `CaptureStatusBarView.swift` — status messages, connection states
 
-### 5. Cleanup (after verification)
-- [ ] Remove `AWS_REGION` from wrangler vars
-- [ ] Remove old `infra/recognition/fly.toml` and Fly.io Dockerfile
+### Phase 6 — Profile & Storage
+- [ ] `ProfileView.swift` — section headers, menu items, sign out/delete alerts
+- [ ] `StorageSummaryView.swift` — storage rows, actions, retention, error fallback
+- [ ] `FeedbackView.swift` — form labels, placeholder, submit, success/error alerts
+- [ ] `CreditsToolbarView.swift` — offline/unavailable labels
+
+### Phase 7 — Gallery
+- [ ] `SpoolGalleryView.swift` — empty state, navigation title, photo counter
+
+### Pluralization
+- [ ] Set up plural rules in `Localizable.xcstrings` for: "photo/photos", "file/files", "camera/cameras", "RAW file(s) skipped"

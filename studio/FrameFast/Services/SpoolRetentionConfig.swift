@@ -21,8 +21,8 @@ enum SpoolRetentionConfig {
 
         var displayName: String {
             switch self {
-            case .sevenDays: return "7 days"
-            case .thirtyDays: return "30 days"
+            case .sevenDays: return String(localized: "7 days")
+            case .thirtyDays: return String(localized: "30 days")
             }
         }
     }

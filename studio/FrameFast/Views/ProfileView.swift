@@ -64,7 +64,7 @@ struct ProfileView: View {
                         )
                     } label: {
                         profileRowLabel(
-                            title: "Local Storage",
+                            title: String(localized: "Local Storage"),
                             systemImage: "internaldrive",
                             foreground: Color.primary,
                             showsChevron: false
@@ -77,7 +77,7 @@ struct ProfileView: View {
                         showAccountPortal = true
                     } label: {
                         profileRowLabel(
-                            title: "Manage Account",
+                            title: String(localized: "Manage Account"),
                             systemImage: connectivityStore.isOnline ? "person.crop.circle" : "wifi.slash",
                             foreground: Color.primary,
                             showsChevron: true
@@ -91,7 +91,7 @@ struct ProfileView: View {
                         showFeedback = true
                     } label: {
                         profileRowLabel(
-                            title: "Send Feedback",
+                            title: String(localized: "Send Feedback"),
                             systemImage: connectivityStore.isOnline ? "bubble.left.and.exclamationmark.bubble.right" : "wifi.slash",
                             foreground: Color.primary,
                             showsChevron: true
@@ -112,7 +112,7 @@ struct ProfileView: View {
                         }
                     } label: {
                         profileRowLabel(
-                            title: "Sign Out",
+                            title: String(localized: "Sign Out"),
                             systemImage: "rectangle.portrait.and.arrow.right",
                             foreground: Color.red,
                             showsChevron: false
@@ -126,7 +126,7 @@ struct ProfileView: View {
                         showDeleteConfirmation = true
                     } label: {
                         profileRowLabel(
-                            title: "Delete Account",
+                            title: String(localized: "Delete Account"),
                             systemImage: "person.crop.circle.badge.minus",
                             foreground: Color.red,
                             showsChevron: false
@@ -142,7 +142,7 @@ struct ProfileView: View {
                         legalURL = URL(string: "https://framefast.io/terms")
                     } label: {
                         profileRowLabel(
-                            title: "Terms of Service",
+                            title: String(localized: "Terms of Service"),
                             systemImage: "doc.text",
                             foreground: Color.primary,
                             showsChevron: true
@@ -156,7 +156,7 @@ struct ProfileView: View {
                         legalURL = URL(string: "https://framefast.io/privacy")
                     } label: {
                         profileRowLabel(
-                            title: "Privacy Policy",
+                            title: String(localized: "Privacy Policy"),
                             systemImage: "hand.raised",
                             foreground: Color.primary,
                             showsChevron: true
@@ -193,7 +193,7 @@ struct ProfileView: View {
             .alert("Sign Out Failed", isPresented: $showSignOutError) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text(signOutError?.localizedDescription ?? "An unexpected error occurred. Please try again.")
+                Text(signOutError?.localizedDescription ?? String(localized: "An unexpected error occurred. Please try again."))
             }
             .confirmationDialog(
                 "Delete Account",
@@ -217,7 +217,7 @@ struct ProfileView: View {
             .alert("Delete Account Failed", isPresented: $showDeleteError) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text(deleteError?.localizedDescription ?? "An unexpected error occurred. Please try again.")
+                Text(deleteError?.localizedDescription ?? String(localized: "An unexpected error occurred. Please try again."))
             }
         }
     }

@@ -15,9 +15,9 @@ enum FeedbackCategory: String, CaseIterable, Codable {
 
     var displayName: String {
         switch self {
-        case .general: return "General"
-        case .suggestion: return "Suggestion"
-        case .featureRequest: return "Feature Request"
+        case .general: return String(localized: "General")
+        case .suggestion: return String(localized: "Suggestion")
+        case .featureRequest: return String(localized: "Feature Request")
         }
     }
 }
