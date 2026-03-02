@@ -71,15 +71,15 @@ struct CaptureSessionSheetView: View {
         VStack(spacing: 0) {
             sessionInfoRow(
                 icon: "calendar",
-                label: "Event",
-                value: eventName ?? "No event selected"
+                label: String(localized: "Event"),
+                value: eventName ?? String(localized: "No event selected")
             )
 
             Divider().padding(.leading, 44)
 
             sessionInfoRow(
                 icon: "camera",
-                label: "Camera",
+                label: String(localized: "Camera"),
                 value: cameraName
             )
 
@@ -87,7 +87,7 @@ struct CaptureSessionSheetView: View {
 
             sessionInfoRow(
                 icon: "arrow.down.circle",
-                label: "Downloaded",
+                label: String(localized: "Downloaded"),
                 value: "\(downloadsCount)"
             )
 
@@ -95,7 +95,7 @@ struct CaptureSessionSheetView: View {
 
             sessionInfoRow(
                 icon: "checkmark.icloud",
-                label: "Synced",
+                label: String(localized: "Synced"),
                 value: "\(syncedCount)"
             )
         }
@@ -232,7 +232,7 @@ private struct CaptureSessionPhotosView: View {
                 .foregroundColor(.orange)
                 .font(.subheadline)
 
-            Text("\(session.skippedRawCount) RAW file\(session.skippedRawCount == 1 ? "" : "s") skipped")
+            Text("\(session.skippedRawCount) RAW files skipped")
                 .font(.subheadline)
                 .foregroundColor(Color.primary)
 
