@@ -45,3 +45,8 @@ output "notification_proxy_worker_name" {
   value       = module.dev_notification_proxy.worker_name
   description = "Name of the deployed notification proxy worker"
 }
+
+output "kv_namespace_ids" {
+  value       = module.cloudflare_infra.kv_namespace_ids
+  description = "Map of KV namespace logical names to their IDs"
+}

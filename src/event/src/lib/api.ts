@@ -159,6 +159,24 @@ export async function deliverViaLine(
   return result.data;
 }
 
+export interface FriendshipStatus {
+  isFriend: boolean;
+  displayName?: string;
+}
+
+export async function checkFriendshipStatus(lineUserId: string): Promise<FriendshipStatus> {
+  const params = new URLSearchParams({ lineUserId });
+  const response = await fetch(`${API_URL}/participant/line/friendship?${params.toString()}`);
+
+  if (!response.ok) {
+    // On error, assume not friend
+    return { isFriend: false };
+  }
+
+  const result = (await response.json()) as { data: FriendshipStatus };
+  return result.data;
+}
+
 // =============================================================================
 // Slideshow
 // =============================================================================

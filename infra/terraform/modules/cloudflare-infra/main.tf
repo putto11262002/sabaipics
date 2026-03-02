@@ -140,3 +140,14 @@ resource "cloudflare_ruleset" "cache_rules" {
     }
   }]
 }
+
+# ------------------------------------------------------------------------------
+# Workers KV Namespaces
+# ------------------------------------------------------------------------------
+
+resource "cloudflare_workers_kv_namespace" "namespaces" {
+  for_each = var.kv_namespaces
+
+  account_id = var.account_id
+  title      = each.value
+}

@@ -70,3 +70,11 @@ bucket_notifications = [
     description = "Trigger LUT processing on new LUT uploads"
   }
 ]
+
+# ------------------------------------------------------------------------------
+# Workers KV Namespaces
+# ------------------------------------------------------------------------------
+
+kv_namespaces = {
+  line_pending = "line-pending-staging"
+}

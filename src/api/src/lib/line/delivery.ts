@@ -207,8 +207,6 @@ export function deliverPhotosViaLine(
         deliveryPhotoIds = deliveryPhotoIds.slice(0, photoCap);
       }
 
-      console.log('[LINE deliver] requested:', photoIds.length, 'deduped:', deliveryPhotoIds.length);
-
       // Step 5: Fetch photo records
       const photoRecords = await db
         .select({ id: photos.id, r2Key: photos.r2Key })
@@ -220,8 +218,6 @@ export function deliverPhotosViaLine(
             isNull(photos.deletedAt),
           ),
         );
-
-      console.log('[LINE deliver] photoRecords from DB:', photoRecords.length);
 
       if (photoRecords.length === 0) throw makeError('not_found', 'photos');
 

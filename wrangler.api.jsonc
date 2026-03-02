@@ -44,6 +44,14 @@
     },
   ],
 
+  // KV namespace for short-lived LINE delivery state
+  "kv_namespaces": [
+    {
+      "binding": "LINE_PENDING_KV",
+      "id": "be2cda35cb584e11942d8c5cf627d2cc",
+    },
+  ],
+
   // Images API binding for transformation
   "images": {
     "binding": "IMAGES",
@@ -154,6 +162,13 @@
         "namespace_id": "1002",
         "simple": { "limit": 200, "period": 10 },
       },
+      {
+        // LINE friendship check rate limiting (polling every 3s = 20 requests/min max)
+        "name": "LINE_FRIENDSHIP_RATE_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1004",
+        "simple": { "limit": 30, "period": 60 },
+      },
     ],
   },
 
@@ -196,6 +211,12 @@
         {
           "binding": "PHOTOS_BUCKET",
           "bucket_name": "framefast-photos-staging",
+        },
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "LINE_PENDING_KV",
+          "id": "06902819b8834bf0be8482f1afcd0486",
         },
       ],
       "queues": {
@@ -287,6 +308,13 @@
             "namespace_id": "1002",
             "simple": { "limit": 200, "period": 10 },
           },
+          {
+            // LINE friendship check rate limiting (polling every 3s = 20 requests/min max)
+            "name": "LINE_FRIENDSHIP_RATE_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "1004",
+            "simple": { "limit": 30, "period": 60 },
+          },
         ],
       },
       "triggers": {
@@ -344,6 +372,12 @@
         {
           "binding": "PHOTOS_BUCKET",
           "bucket_name": "framefast-photos",
+        },
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "LINE_PENDING_KV",
+          "id": "6ff9993fe8dd48ff9e2521e139b0455e",
         },
       ],
       "queues": {
@@ -434,6 +468,13 @@
             "type": "ratelimit",
             "namespace_id": "1002",
             "simple": { "limit": 200, "period": 10 },
+          },
+          {
+            // LINE friendship check rate limiting (polling every 3s = 20 requests/min max)
+            "name": "LINE_FRIENDSHIP_RATE_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "1004",
+            "simple": { "limit": 30, "period": 60 },
           },
         ],
       },

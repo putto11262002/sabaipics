@@ -122,3 +122,17 @@ variable "cache_rules" {
   default     = []
   description = "List of Cloudflare cache rules to create"
 }
+
+# ------------------------------------------------------------------------------
+# Workers KV Namespace Configuration
+# ------------------------------------------------------------------------------
+
+variable "kv_namespaces" {
+  type        = map(string)
+  default     = {}
+  description = "Map of KV namespace logical names to titles"
+  # Example:
+  # {
+  #   line_pending = "framefast-line-pending-staging"
+  # }
+}

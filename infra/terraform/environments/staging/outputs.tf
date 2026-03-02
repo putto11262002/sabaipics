@@ -40,3 +40,8 @@ output "secrets_pushed" {
   value       = module.worker_secrets.secrets_pushed
   description = "List of secret names pushed to the Worker"
 }
+
+output "kv_namespace_ids" {
+  value       = module.cloudflare_infra.kv_namespace_ids
+  description = "Map of KV namespace logical names to their IDs"
+}

@@ -30,3 +30,10 @@ output "queue_names" {
   }
   description = "Map of queue logical names to their actual names"
 }
+
+output "kv_namespace_ids" {
+  value = {
+    for key, ns in cloudflare_workers_kv_namespace.namespaces : key => ns.id
+  }
+  description = "Map of KV namespace logical names to their IDs"
+}
