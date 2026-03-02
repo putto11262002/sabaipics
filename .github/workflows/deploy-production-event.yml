@@ -41,4 +41,4 @@ jobs:
         run: pnpm build:event --mode production
 
       - name: Deploy Event
-        run: pnpm exec wrangler pages deploy src/event/dist --project-name=event --branch=main
+        run: pnpm exec wrangler deploy --env production -c wrangler.event.jsonc

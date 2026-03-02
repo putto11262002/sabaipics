@@ -10,6 +10,7 @@ on:
       - 'src/db/**'
       - 'vite.event.config.ts'
       - 'vite.base.ts'
+      - 'wrangler.event.jsonc'
       - 'tsconfig.browser.json'
       - 'tsconfig.json'
       - 'package.json'
@@ -57,4 +58,4 @@ jobs:
         run: pnpm build:event --mode staging
 
       - name: Deploy Event
-        run: pnpm exec wrangler pages deploy src/event/dist --project-name=event --branch=staging
+        run: pnpm exec wrangler deploy --env staging -c wrangler.event.jsonc
