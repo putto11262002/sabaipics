@@ -46,5 +46,7 @@ Target languages: English (default), Thai
 ### Phase 7 — Gallery ✓
 - [x] `SpoolGalleryView.swift` — empty state, navigation title, photo counter
 
-### Pluralization
-- [ ] Set up plural rules in `Localizable.xcstrings` for: "photo/photos", "file/files", "camera/cameras", "RAW file(s) skipped"
+### Pluralization ✓
+- [x] Set up plural rules in `Localizable.xcstrings` for: "photo/photos", "RAW file(s) skipped"
+  - StorageSummaryView.swift — `^[\(files) photo](inflect: true)`
+  - CaptureSessionSheetView.swift — `^[\(session.skippedRawCount) RAW file skipped](inflect: true)`

@@ -212,7 +212,7 @@ struct StorageSummaryView: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(Self.formatBytes(bytes))
                     .font(.subheadline.weight(.semibold))
-                Text(String(localized: "\(files) photos"))
+                Text("^[\(files) photo](inflect: true)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
