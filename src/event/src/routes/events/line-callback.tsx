@@ -7,7 +7,7 @@ import { th } from '../../lib/i18n';
 import { useDeliverViaLine } from '@/shared/hooks/rq/line/use-deliver-via-line';
 import { LINE_DELIVERY_CONFIG } from '../../lib/config';
 
-type CallbackState = 'delivering' | 'success' | 'error' | 'not_friend' | 'checking_friend';
+type CallbackState = 'delivering' | 'success' | 'error' | 'not_friend';
 
 export function LineCallbackPage() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -16,6 +16,8 @@ export function LineCallbackPage() {
   const [result, setResult] = useState<LineDeliveryResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pollAttempts, setPollAttempts] = useState(0);
+  // Separate state for checking UI - NOT in polling effect dependencies
+  const [isChecking, setIsChecking] = useState(false);
 
   const lineUserId = searchParams.get('lineUserId');
   const searchId = searchParams.get('searchId');
@@ -47,7 +49,7 @@ export function LineCallbackPage() {
     };
   }, []);
 
-  // Friendship polling effect
+  // Friendship polling effect - isChecking is intentionally NOT in dependencies
   useEffect(() => {
     if (state !== 'not_friend' || !lineUserId) return;
     if (pollAttempts >= LINE_DELIVERY_CONFIG.POLL_MAX_ATTEMPTS) {
@@ -63,12 +65,14 @@ export function LineCallbackPage() {
     pollingRef.current = setTimeout(async () => {
       if (signal.aborted || !mountedRef.current) return;
 
-      setState('checking_friend');
+      setIsChecking(true);
       try {
         const friendshipStatus = await checkFriendshipStatus(lineUserId);
 
         // Check if still mounted and not aborted
         if (signal.aborted || !mountedRef.current) return;
+
+        setIsChecking(false);
 
         if (friendshipStatus.isFriend) {
           // Friend detected - proceed to delivery
@@ -91,15 +95,14 @@ export function LineCallbackPage() {
         } else {
           // Still not a friend - continue polling
           setPollAttempts((prev) => prev + 1);
-          setState('not_friend');
         }
       } catch {
         // Check if still mounted before updating state
         if (signal.aborted || !mountedRef.current) return;
 
         // On error, continue polling
+        setIsChecking(false);
         setPollAttempts((prev) => prev + 1);
-        setState('not_friend');
       }
     }, LINE_DELIVERY_CONFIG.POLL_INTERVAL_MS);
 
@@ -192,12 +195,12 @@ export function LineCallbackPage() {
           </>
         )}
 
-        {(state === 'not_friend' || state === 'checking_friend') && (
+        {state === 'not_friend' && (
           <>
             <UserPlus className="mx-auto size-12 text-yellow-500" />
             <div className="space-y-1">
               <p className="text-lg font-medium">{th.lineCallback.notFriend}</p>
-              {state === 'checking_friend' ? (
+              {isChecking ? (
                 <p className="text-sm text-muted-foreground">{th.lineCallback.checkingFriend}</p>
               ) : (
                 <p className="text-sm text-muted-foreground">{th.lineCallback.notFriendHint}</p>
