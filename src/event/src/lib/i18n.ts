@@ -76,7 +76,7 @@ export const th = {
     pageNotFound: 'ไม่พบหน้านี้',
     fileSize: {
       title: 'ไฟล์ใหญ่เกินไป',
-      description: 'กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 5MB',
+      description: 'กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 10MB',
     },
     fileType: {
       title: 'ไฟล์ไม่รองรับ',

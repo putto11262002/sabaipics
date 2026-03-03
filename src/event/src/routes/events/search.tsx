@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { searchPhotos, getEventPublic, type SearchResult } from '../../lib/api';
 import { th } from '../../lib/i18n';
+import { resizeImage } from '../../lib/resize-image';
 import { ConsentStep } from '../../components/ConsentStep';
 import { UploadStep } from '../../components/UploadStep';
 import { PreviewStep } from '../../components/PreviewStep';
@@ -84,9 +85,9 @@ export function SearchPage() {
     setState('upload');
   }, []);
 
-  const handleFileSelect = useCallback((file: File) => {
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
+  const handleFileSelect = useCallback(async (file: File) => {
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
       toast.error(th.errors.fileSize.title, {
         description: th.errors.fileSize.description,
       });
@@ -101,8 +102,11 @@ export function SearchPage() {
       return;
     }
 
-    setSelfieFile(file);
-    setSelfiePreview(URL.createObjectURL(file));
+    // Resize large images client-side before upload
+    const resized = await resizeImage(file);
+
+    setSelfieFile(resized);
+    setSelfiePreview(URL.createObjectURL(resized));
     setState('preview');
   }, []);
 
