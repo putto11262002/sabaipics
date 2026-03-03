@@ -83,25 +83,31 @@ def create_web_app():
     web_app = FastAPI(title="FrameFast Recognition", version="3.0.0")
 
     # -------------------------------------------------------------------------
-    # Model (lazy-loaded once per container)
+    # Model (eager-loaded once per container with CUDA warmup)
     # -------------------------------------------------------------------------
 
-    _face_app = None
+    def _init_face_app():
+        from insightface.app import FaceAnalysis
+
+        model_pack = os.getenv("MODEL_PACK", "buffalo_l")
+        det_size = int(os.getenv("DET_SIZE", "640"))
+        fa = FaceAnalysis(
+            name=model_pack,
+            providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+            allowed_modules=["detection", "recognition"],
+        )
+        fa.prepare(ctx_id=0, det_size=(det_size, det_size))
+
+        # Warmup: run a dummy inference to prime the CUDA pipeline
+        dummy = np.zeros((det_size, det_size, 3), dtype=np.uint8)
+        fa.get(dummy)
+
+        print(f"[InsightFace] Model loaded + warmed up: {model_pack} (det_size={det_size}, GPU)")
+        return fa
+
+    _face_app = _init_face_app()
 
     def get_face_app():
-        nonlocal _face_app
-        if _face_app is None:
-            from insightface.app import FaceAnalysis
-
-            model_pack = os.getenv("MODEL_PACK", "buffalo_l")
-            det_size = int(os.getenv("DET_SIZE", "640"))
-            _face_app = FaceAnalysis(
-                name=model_pack,
-                providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
-                allowed_modules=["detection", "recognition"],
-            )
-            _face_app.prepare(ctx_id=0, det_size=(det_size, det_size))
-            print(f"[InsightFace] Model loaded: {model_pack} (det_size={det_size}, GPU)")
         return _face_app
 
     # -------------------------------------------------------------------------
