@@ -96,7 +96,6 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 		FTPPassivePortEnd:   0,
 		FTPIdleTimeout:      30,
 		FTPDebug:            testing.Verbose(),
-		SentryEnvironment:   "test",
 	}
 
 	mgr := clientmgr.NewManager()
@@ -143,7 +142,6 @@ func SetupMultiModeTestEnv(t *testing.T) *TestEnv {
 		FTPPassivePortEnd:   0,
 		FTPIdleTimeout:      30,
 		FTPDebug:            testing.Verbose(),
-		SentryEnvironment:   "test",
 		ImplicitFTPSEnabled: true,
 		ImplicitFTPSPort:    implicitAddr,
 	}

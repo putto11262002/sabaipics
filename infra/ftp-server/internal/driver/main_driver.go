@@ -4,10 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"log"
 	"time"
 
 	ftpserver "github.com/fclairamb/ftpserverlib"
-	"github.com/getsentry/sentry-go"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/client"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/clientmgr"
@@ -67,12 +67,6 @@ func NewMainDriverImplicit(cfg *config.Config, clientMgr *clientmgr.Manager) *Ma
 	}
 }
 
-// log returns a Sentry logger for application-level events
-// Upload-level tracing is now handled in UploadTransfer, not at connection level
-func (d *MainDriver) log() sentry.Logger {
-	return sentry.NewLogger(context.Background())
-}
-
 // GetSettings returns FTP server settings
 func (d *MainDriver) GetSettings() (*ftpserver.Settings, error) {
 	listenAddr := d.config.FTPListenAddress
@@ -107,7 +101,7 @@ func (d *MainDriver) ClientConnected(cc ftpserver.ClientContext) (string, error)
 	d.clientMgr.RegisterClient(cc)
 
 	// Log at application boundary (no transaction - uploads create their own)
-	d.log().Info().Emitf("Client connected: %s (ID: %d)", clientIP, clientID)
+	log.Printf("client_connected ip=%s id=%d", clientIP, clientID)
 
 	return fmt.Sprintf("Welcome to SabaiPics FTP Server (Client: %s)", clientIP), nil
 }
@@ -121,7 +115,7 @@ func (d *MainDriver) ClientDisconnected(cc ftpserver.ClientContext) {
 	d.clientMgr.UnregisterClient(clientID)
 
 	// Log at application boundary (no transaction cleanup needed)
-	d.log().Info().Emitf("Client disconnected: %s (ID: %d)", clientIP, clientID)
+	log.Printf("client_disconnected ip=%s id=%d", clientIP, clientID)
 }
 
 // AuthUser validates FTP credentials via API and returns ClientDriver with JWT token
@@ -129,7 +123,7 @@ func (d *MainDriver) AuthUser(cc ftpserver.ClientContext, user, pass string) (ft
 	clientIP := cc.RemoteAddr().String()
 
 	// Log auth attempt at application boundary
-	d.log().Info().Emitf("Auth attempt: user=%s, client=%s", user, clientIP)
+	log.Printf("auth_attempt user=%s client=%s", user, clientIP)
 
 	// Create context with timeout for auth request
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -141,11 +135,11 @@ func (d *MainDriver) AuthUser(cc ftpserver.ClientContext, user, pass string) (ft
 		Password: pass,
 	})
 	if err != nil {
-		d.log().Error().Emitf("FTP auth failed for user=%s: %v", user, err)
+		log.Printf("auth_failed user=%s client=%s error=%v", user, clientIP, err)
 		return nil, fmt.Errorf("authentication failed") // FTP 530 response
 	}
 
-	d.log().Info().Emitf("FTP auth successful: user=%s, event=%s, credits=%d",
+	log.Printf("auth_ok user=%s event=%s credits=%d",
 		user, authResp.EventID, authResp.CreditsRemaining)
 
 	// Create ClientDriver with JWT token, client manager (for event reporting), and API client

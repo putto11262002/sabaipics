@@ -2,10 +2,10 @@ package clientmgr
 
 import (
 	"context"
+	"log"
 	"sync"
 
 	ftpserver "github.com/fclairamb/ftpserverlib"
-	"github.com/getsentry/sentry-go"
 )
 
 // EventType represents the type of client event
@@ -85,8 +85,7 @@ func (m *Manager) RegisterClient(cc ftpserver.ClientContext) {
 	}
 	m.clients[cc.ID()] = client
 
-	sentry.NewLogger(context.Background()).Info().Emitf(
-		"ClientManager: Registered client %d (%s)", cc.ID(), client.ClientIP)
+	log.Printf("client_registered id=%d ip=%s", cc.ID(), client.ClientIP)
 }
 
 // UnregisterClient removes a client from the manager
@@ -96,8 +95,7 @@ func (m *Manager) UnregisterClient(clientID uint32) {
 
 	if client, exists := m.clients[clientID]; exists {
 		client.UploadCancel()
-		sentry.NewLogger(context.Background()).Info().Emitf(
-			"ClientManager: Unregistered client %d (%s)", clientID, client.ClientIP)
+		log.Printf("client_unregistered id=%d ip=%s", clientID, client.ClientIP)
 		delete(m.clients, clientID)
 	}
 }
@@ -123,8 +121,7 @@ func (m *Manager) SendEvent(event ClientEvent) {
 		// Event sent successfully
 	default:
 		// Channel full, log warning but don't block
-		sentry.NewLogger(context.Background()).Warn().Emitf(
-			"ClientManager: Event channel full, dropping event for client %d", event.ClientID)
+		log.Printf("client_event_dropped reason=channel_full client_id=%d", event.ClientID)
 	}
 }
 
@@ -138,13 +135,12 @@ func (m *Manager) EventChan() chan<- ClientEvent {
 func (m *Manager) run() {
 	defer m.wg.Done()
 
-	log := sentry.NewLogger(context.Background())
-	log.Info().Emitf("ClientManager: Started event processing loop")
+	log.Printf("client_event_loop_started")
 
 	for {
 		select {
 		case <-m.ctx.Done():
-			log.Info().Emitf("ClientManager: Shutting down event processing loop")
+			log.Printf("client_event_loop_stopped")
 			return
 
 		case event := <-m.eventChan:
@@ -156,21 +152,19 @@ func (m *Manager) run() {
 // handleEvent processes a single event and decides what action to take
 // All client management decisions are centralized here
 func (m *Manager) handleEvent(event ClientEvent) {
-	log := sentry.NewLogger(context.Background())
-
 	switch event.Type {
 	case EventAuthExpired:
 		// Decision: Disconnect client when auth expires
-		log.Info().Emitf("ClientManager: Auth expired for client %d, disconnecting", event.ClientID)
+		log.Printf("client_auth_expired client_id=%d action=disconnect", event.ClientID)
 		m.disconnectClient(event.ClientID, "authentication expired")
 
 	case EventUploadFailed:
 		// Decision: Log the failure but keep connection open
 		// Client can retry or upload other files
-		log.Warn().Emitf("ClientManager: Upload failed for client %d: %s", event.ClientID, event.Reason)
+		log.Printf("client_upload_failed client_id=%d reason=%s", event.ClientID, event.Reason)
 
 	default:
-		log.Warn().Emitf("ClientManager: Unknown event type %d for client %d", event.Type, event.ClientID)
+		log.Printf("client_event_unknown type=%d client_id=%d", event.Type, event.ClientID)
 	}
 }
 
@@ -181,16 +175,13 @@ func (m *Manager) disconnectClient(clientID uint32, reason string) {
 	m.clientsMu.RUnlock()
 
 	if !exists {
-		sentry.NewLogger(context.Background()).Warn().Emitf(
-			"ClientManager: Cannot disconnect client %d - not found", clientID)
+		log.Printf("client_disconnect_skipped reason=not_found client_id=%d", clientID)
 		return
 	}
 
-	sentry.NewLogger(context.Background()).Info().Emitf(
-		"ClientManager: Disconnecting client %d (%s): %s", clientID, client.ClientIP, reason)
+	log.Printf("client_disconnecting id=%d ip=%s reason=%s", clientID, client.ClientIP, reason)
 
 	if err := client.Context.Close(); err != nil {
-		sentry.NewLogger(context.Background()).Error().Emitf(
-			"ClientManager: Failed to disconnect client %d: %v", clientID, err)
+		log.Printf("client_disconnect_error id=%d error=%v", clientID, err)
 	}
 }

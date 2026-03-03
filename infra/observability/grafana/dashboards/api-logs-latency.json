@@ -1,0 +1,111 @@
+{
+  "id": null,
+  "uid": "framefast-api-observability",
+  "title": "FrameFast API - Metrics",
+  "tags": ["framefast", "api", "observability"],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 3,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "API Request Rate (req/s)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(framefast_api_requests_total[5m]))" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "API Error Rate (req/s)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "(sum(sum_over_time(framefast_api_errors_total[15m])) or vector(0)) / 900" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "API p95 Latency (ms)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_api_request_duration_ms_milliseconds_bucket[5m])))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Requests by Status Class",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status_class) (increase(framefast_api_requests_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "API Error Ratio (%)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum(rate(framefast_api_errors_total[5m])) / clamp_min(sum(rate(framefast_api_requests_total[5m])), 0.001)"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "API Errors by Class (5m)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (error_class) (increase(framefast_api_errors_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Client Errors by Source + Type (5m)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (source_service, error_type) (increase(framefast_client_errors_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Client Error Rate (events/s)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(framefast_client_errors_total[5m]))"
+        }
+      ]
+    }
+  ]
+}
