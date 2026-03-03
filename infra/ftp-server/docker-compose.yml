@@ -17,10 +17,20 @@ services:
 
       # API URL (required) - FTP server proxies all uploads to this API
       API_URL: ${API_URL:-https://api.sabaipics.com}
+      NODE_ENV: ${NODE_ENV:-development}
 
-      # Sentry (optional - comment out if not using)
-      # SENTRY_DSN: your-sentry-dsn-here
-      SENTRY_ENVIRONMENT: development
+      # Optional OTLP export to Grafana Cloud
+      GRAFANA_OTLP_TRACES_URL: ${GRAFANA_OTLP_TRACES_URL:-}
+      OTLP_TRACES_USER: ${OTLP_TRACES_USER:-}
+      OTLP_TRACES_TOKEN: ${OTLP_TRACES_TOKEN:-}
+      OTEL_TRACE_SAMPLE_RATIO: ${OTEL_TRACE_SAMPLE_RATIO:-1.0}
+      GRAFANA_OTLP_METRICS_URL: ${GRAFANA_OTLP_METRICS_URL:-https://otlp-gateway-prod-ap-southeast-1.grafana.net/otlp}
+      OTLP_METRICS_USER: ${OTLP_METRICS_USER:-}
+      OTLP_METRICS_TOKEN: ${OTLP_METRICS_TOKEN:-}
+      GRAFANA_LOKI_URL: ${GRAFANA_LOKI_URL:-}
+      LOKI_USER: ${LOKI_USER:-}
+      LOKI_TOKEN: ${LOKI_TOKEN:-}
+
     ports:
       - "2121:21"           # FTP command port
       - "5000-5099:5000-5099"  # FTP passive ports

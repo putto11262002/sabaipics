@@ -71,3 +71,23 @@ LINE_CHANNEL_ACCESS_TOKEN=xxxxx
 R2_ACCESS_KEY_ID=xxxxxxxxxxxxxxxxxxxx
 R2_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 CF_ACCOUNT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Observability (optional for local development)
+# Grafana OTLP/Loki endpoints + credentials
+GRAFANA_LOKI_URL=https://logs-prod-020.grafana.net
+LOKI_USER=xxxxx
+LOKI_TOKEN=xxxxx
+GRAFANA_OTLP_TRACES_URL=https://otlp-gateway-prod-ap-southeast-1.grafana.net/otlp
+OTLP_TRACES_USER=xxxxx
+OTLP_TRACES_TOKEN=xxxxx
+# Optional separate metrics endpoint/credentials; falls back to traces values when empty
+GRAFANA_OTLP_METRICS_URL=https://otlp-gateway-prod-ap-southeast-1.grafana.net/otlp
+OTLP_METRICS_USER=
+OTLP_METRICS_TOKEN=
+
+# Trace sampling ratio (0.0 - 1.0)
+# Defaults by environment if unset:
+# - development: 1.0
+# - staging: 0.60
+# - production: 0.50
+OTEL_TRACE_SAMPLE_RATIO=1.0

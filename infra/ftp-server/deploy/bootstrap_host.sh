@@ -37,6 +37,7 @@ certbot certonly --standalone -d "$DOMAIN" -m "$EMAIL" --agree-tos --non-interac
 
 cat > /opt/sabaipics-ftp/.env <<ENV
 API_URL=${API_URL}
+NODE_ENV=production
 FTP_LISTEN_ADDRESS=0.0.0.0:21
 FTP_PASSIVE_PORT_START=60000
 FTP_PASSIVE_PORT_END=60100
@@ -46,8 +47,16 @@ TLS_CERT_PATH=/etc/letsencrypt/live/${DOMAIN}/fullchain.pem
 TLS_KEY_PATH=/etc/letsencrypt/live/${DOMAIN}/privkey.pem
 IMPLICIT_FTPS_ENABLED=true
 IMPLICIT_FTPS_PORT=0.0.0.0:990
-SENTRY_DSN=
-SENTRY_ENVIRONMENT=production
+GRAFANA_OTLP_TRACES_URL=https://otlp-gateway-prod-ap-southeast-1.grafana.net/otlp
+OTLP_TRACES_USER=
+OTLP_TRACES_TOKEN=
+OTEL_TRACE_SAMPLE_RATIO=0.50
+GRAFANA_OTLP_METRICS_URL=https://otlp-gateway-prod-ap-southeast-1.grafana.net/otlp
+OTLP_METRICS_USER=
+OTLP_METRICS_TOKEN=
+GRAFANA_LOKI_URL=
+LOKI_USER=
+LOKI_TOKEN=
 ENV
 
 cat > /opt/sabaipics-ftp/docker-compose.yml <<'YML'

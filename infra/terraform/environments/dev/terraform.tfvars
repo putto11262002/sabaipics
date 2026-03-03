@@ -23,7 +23,13 @@ photo_domain           = "photos-dev.framefast.io"
 
 cors_allowed_origins = ["*"]
 cors_allowed_methods = ["GET", "PUT", "HEAD"]
-cors_allowed_headers = ["Content-Type", "Content-Length", "If-None-Match"]
+cors_allowed_headers = [
+  "Content-Type",
+  "Content-Length",
+  "If-None-Match",
+  "x-amz-meta-traceparent",
+  "x-amz-meta-baggage",
+]
 cors_expose_headers  = ["ETag"]
 cors_max_age_seconds = 3600
 
