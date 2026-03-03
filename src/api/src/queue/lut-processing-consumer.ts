@@ -17,7 +17,6 @@ import { createDb, photoLuts } from '@/db';
 import { eq } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, type Result as NtResult } from 'neverthrow';
 import { parseCubeLut } from '../lib/images/color-grade';
-import * as Sentry from '@sentry/cloudflare';
 
 // =============================================================================
 // Types
@@ -219,7 +218,6 @@ async function handleLutProcessingError(env: Bindings, error: LutProcessingError
           .where(eq(photoLuts.id, error.lutId));
       } catch (e) {
         console.error('[lut-processing-consumer] Failed to mark expired:', e);
-        Sentry.captureException(e);
         throw e;
       }
       await bestEffortDeleteTemp(env, error.key);
@@ -237,7 +235,6 @@ async function handleLutProcessingError(env: Bindings, error: LutProcessingError
           .where(eq(photoLuts.id, error.lutId));
       } catch (e) {
         console.error('[lut-processing-consumer] Failed to mark not_found:', e);
-        Sentry.captureException(e);
         throw e;
       }
       return;
@@ -254,7 +251,6 @@ async function handleLutProcessingError(env: Bindings, error: LutProcessingError
           .where(eq(photoLuts.id, error.lutId));
       } catch (e) {
         console.error('[lut-processing-consumer] Failed to mark invalid_lut:', e);
-        Sentry.captureException(e);
         throw e;
       }
       await bestEffortDeleteTemp(env, error.key);
@@ -272,7 +268,6 @@ async function handleLutProcessingError(env: Bindings, error: LutProcessingError
           .where(eq(photoLuts.id, error.lutId));
       } catch (e) {
         console.error('[lut-processing-consumer] Failed to mark unsupported_source:', e);
-        Sentry.captureException(e);
         throw e;
       }
       await bestEffortDeleteTemp(env, error.key);
@@ -285,7 +280,6 @@ async function handleLutProcessingError(env: Bindings, error: LutProcessingError
         `[lut-processing-consumer] Retryable ${error.type} error (${error.operation}):`,
         error,
       );
-      Sentry.captureException(error);
       throw new Error(`${error.type} error: ${error.operation}`);
   }
 }
@@ -307,7 +301,6 @@ async function markRetryExhaustedFailure(params: {
         '[lut-processing-consumer] Failed to fetch LUT for retry-exhausted failure:',
         e,
       );
-      Sentry.captureException(e);
       return null;
     },
   );
@@ -325,7 +318,6 @@ async function markRetryExhaustedFailure(params: {
       .where(eq(photoLuts.id, lut.id));
   } catch (e) {
     console.error('[lut-processing-consumer] Failed to mark retry-exhausted failure:', e);
-    Sentry.captureException(e);
     return;
   }
 
@@ -372,7 +364,6 @@ export default {
           message.ack();
         } catch (e) {
           console.error('[lut-processing-consumer] Error handler threw (retrying):', e);
-          Sentry.captureException(e);
           message.retry();
         }
       } else {

@@ -16,6 +16,7 @@ import type {
   DetectedFace,
   RecognitionError,
 } from './types';
+import { getCurrentTraceHeaders } from '../observability/trace-context';
 
 // =============================================================================
 // Error Helpers
@@ -124,6 +125,7 @@ export function createExtractor(config: ExtractorConfig): FaceExtractor {
    */
   const callExtract = (body: Record<string, unknown>): ResultAsync<ExtractionResult, RecognitionError> =>
     safeTry(async function* () {
+      const traceHeaders = getCurrentTraceHeaders();
       const response = yield* ResultAsync.fromPromise(
         fetch(`${endpoint}/extract`, {
           method: 'POST',
@@ -131,6 +133,8 @@ export function createExtractor(config: ExtractorConfig): FaceExtractor {
             'Content-Type': 'application/json',
             'Modal-Key': modalKey,
             'Modal-Secret': modalSecret,
+            ...(traceHeaders?.traceparent ? { traceparent: traceHeaders.traceparent } : {}),
+            ...(traceHeaders?.baggage ? { baggage: traceHeaders.baggage } : {}),
           },
           body: JSON.stringify(body),
         }),

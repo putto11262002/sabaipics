@@ -13,12 +13,24 @@ export type Bindings = Cloudflare.Env & {
   CF_ACCESS_AUD: string;
   LINE_LOGIN_CHANNEL_ID: string;
   LINE_LOGIN_CHANNEL_SECRET: string;
+  GRAFANA_LOKI_URL?: string;
+  LOKI_USER?: string;
+  LOKI_TOKEN?: string;
+  GRAFANA_OTLP_TRACES_URL?: string;
+  OTLP_TRACES_USER?: string;
+  OTLP_TRACES_TOKEN?: string;
+  OTEL_TRACE_SAMPLE_RATIO?: string;
+  GRAFANA_OTLP_METRICS_URL?: string;
+  OTLP_METRICS_USER?: string;
+  OTLP_METRICS_TOKEN?: string;
 };
 
 export type Variables = AuthVariables & {
   db: () => Database; // HTTP adapter - fast, no transactions
   dbTx: () => DatabaseTx; // WebSocket adapter - with transaction support
   adminEmail?: string; // Admin email from CF Access JWT
+  requestId: string; // Request correlation ID
+  traceparent: string | null; // Active distributed trace context for this request
 };
 
 export type Env = { Bindings: Bindings; Variables: Variables };

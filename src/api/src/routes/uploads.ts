@@ -24,6 +24,7 @@ import {
   reprocessInsufficientCreditsForEvent,
   reprocessInsufficientCreditsForIntent,
 } from '../lib/services/uploads/reprocess';
+import { getCurrentTraceHeaders } from '../lib/observability/trace-context';
 
 // =============================================================================
 // Constants
@@ -152,6 +153,10 @@ export const uploadsRouter = new Hono<Env>()
       const uploadId = crypto.randomUUID();
       const timestamp = Date.now();
       const r2Key = `uploads/${eventId}/${uploadId}-${timestamp}`;
+      const traceHeaders = getCurrentTraceHeaders();
+      const uploadTraceMetadata: Record<string, string> = {};
+      if (traceHeaders?.traceparent) uploadTraceMetadata.traceparent = traceHeaders.traceparent;
+      if (traceHeaders?.baggage) uploadTraceMetadata.baggage = traceHeaders.baggage;
 
       // 4. Generate presigned URL
       const presignResult = yield* ResultAsync.fromPromise(
@@ -164,6 +169,7 @@ export const uploadsRouter = new Hono<Env>()
             key: r2Key,
             contentType,
             contentLength,
+            customMetadata: uploadTraceMetadata,
             expiresIn: PRESIGN_TTL_SECONDS,
           },
         ),
@@ -207,6 +213,14 @@ export const uploadsRouter = new Hono<Env>()
         }),
       );
 
+      const traceMetadataHeaders: Record<string, string> = {};
+      if (uploadTraceMetadata.traceparent) {
+        traceMetadataHeaders['x-amz-meta-traceparent'] = uploadTraceMetadata.traceparent;
+      }
+      if (uploadTraceMetadata.baggage) {
+        traceMetadataHeaders['x-amz-meta-baggage'] = uploadTraceMetadata.baggage;
+      }
+
       // 7. Return presigned URL details
       return ok({
         uploadId: intent.id,
@@ -217,6 +231,7 @@ export const uploadsRouter = new Hono<Env>()
           'Content-Type': contentType,
           'Content-Length': contentLength.toString(),
           'If-None-Match': '*',
+          ...traceMetadataHeaders,
         },
       });
     })

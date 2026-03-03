@@ -1,7 +1,7 @@
 /**
  * Upload Consumer Tests
  *
- * Tests the upload processing queue consumer with mocked DB/Sentry/normalize/exif
+ * Tests the upload processing queue consumer with mocked DB/normalize/exif
  * and real R2 via miniflare. Runs in workerd via @cloudflare/vitest-pool-workers.
  */
 
@@ -94,12 +94,6 @@ vi.mock('@/db', () => {
   };
 });
 
-vi.mock('@sentry/cloudflare', () => ({
-  startSpan: vi.fn((_opts: any, cb: any) => cb({ setAttribute: vi.fn() })),
-  withScope: vi.fn((cb: any) => cb({ setTag: vi.fn(), setExtra: vi.fn(), setLevel: vi.fn() })),
-  captureMessage: vi.fn(),
-}));
-
 vi.mock('@/api/src/lib/images/normalize', () => ({
   normalizeWithCfImages: mockNormalizeCfImages,
   applyPostProcessPhoton: mockApplyPostProcess,
@@ -111,7 +105,6 @@ vi.mock('@/api/src/lib/images/exif', () => ({
 
 // Import the queue handler AFTER mocks are declared
 import { queue } from '../src/queue/upload-consumer';
-import * as Sentry from '@sentry/cloudflare';
 
 // =============================================================================
 // Test Data
@@ -474,7 +467,6 @@ describe('upload-consumer', () => {
       await queue(batch, env as any, {} as ExecutionContext);
 
       expect(msg.ack).toHaveBeenCalled();
-      expect(Sentry.captureMessage).toHaveBeenCalled();
     });
 
     it('5.2 — file too large → invalid_file size_exceeded', async () => {
@@ -680,10 +672,7 @@ describe('upload-consumer', () => {
       expect(msg.ack).toHaveBeenCalled();
       // Upload still succeeds — transaction should have been called
       expect(mockTxTransaction).toHaveBeenCalled();
-      // Warning captured for LUT failure
-      expect(Sentry.captureMessage).toHaveBeenCalledWith(
-        expect.stringMatching(/color_grade_apply_failed|modal_process_failed/),
-      );
+      // Upload still succeeds even when LUT apply fails
     });
   });
 
@@ -803,7 +792,6 @@ describe('upload-consumer', () => {
 
       expect(msg.ack).toHaveBeenCalled();
       // database error → best-effort find + mark failed
-      expect(Sentry.captureMessage).toHaveBeenCalled();
     });
   });
 
@@ -854,9 +842,6 @@ describe('upload-consumer', () => {
       // Still acked — transaction already committed
       expect(msg.ack).toHaveBeenCalled();
       expect(msg.retry).not.toHaveBeenCalled();
-
-      // Sentry captures the enqueue failure
-      expect(Sentry.captureMessage).toHaveBeenCalledWith(expect.stringContaining('enqueue_failed'));
 
       queueSpy.mockRestore();
     });

@@ -22,4 +22,10 @@ export interface PhotoJob {
 
   /** R2 object key: "{event_id}/{photo_id}.{ext}" */
   r2_key: string;
+
+  /** W3C trace context propagated from upload queue worker */
+  traceparent?: string;
+
+  /** Optional W3C baggage propagated across async boundaries */
+  baggage?: string;
 }

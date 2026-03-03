@@ -25,6 +25,7 @@ import { signFtpToken } from '../lib/ftp/jwt';
 import { ALLOWED_MIME_TYPES } from '../lib/event/constants';
 import { decryptSecret } from '../lib/crypto/secret';
 import { createFtpCredentialsWithRetry } from '../lib/ftp/credentials';
+import { getCurrentTraceHeaders } from '../lib/observability/trace-context';
 
 // =============================================================================
 // Constants
@@ -230,12 +231,17 @@ export const ftpRouter = new Hono<Env>()
         const uploadId = crypto.randomUUID();
         const timestamp = Date.now();
         const r2Key = `uploads/${ftpAuth.eventId}/${uploadId}-${timestamp}`;
+        const traceHeaders = getCurrentTraceHeaders();
+        const uploadTraceMetadata: Record<string, string> = {};
+        if (traceHeaders?.traceparent) uploadTraceMetadata.traceparent = traceHeaders.traceparent;
+        if (traceHeaders?.baggage) uploadTraceMetadata.baggage = traceHeaders.baggage;
 
         // 4. Generate presigned URL (contentLength is optional)
         const presignOptions: any = {
           bucket: c.env.PHOTO_BUCKET_NAME,
           key: r2Key,
           contentType,
+          customMetadata: uploadTraceMetadata,
           expiresIn: PRESIGN_TTL_SECONDS,
         };
 
@@ -284,6 +290,12 @@ export const ftpRouter = new Hono<Env>()
           'Content-Type': contentType,
           'If-None-Match': '*',
         };
+        if (uploadTraceMetadata.traceparent) {
+          requiredHeaders['x-amz-meta-traceparent'] = uploadTraceMetadata.traceparent;
+        }
+        if (uploadTraceMetadata.baggage) {
+          requiredHeaders['x-amz-meta-baggage'] = uploadTraceMetadata.baggage;
+        }
 
         if (contentLength !== undefined) {
           requiredHeaders['Content-Length'] = contentLength.toString();
