@@ -40,7 +40,7 @@ export function searchByFace(
   const similarity = sql<number>`1 - (${distance})`;
 
   return ResultAsync.fromPromise(
-    db.execute(sql`SET LOCAL hnsw.ef_search = ${FACE_SEARCH_EF_SEARCH}`).then(() =>
+    db.execute(sql.raw(`SET LOCAL hnsw.ef_search = ${FACE_SEARCH_EF_SEARCH}`)).then(() =>
       db
         .select({
           photoId: faceEmbeddings.photoId,
