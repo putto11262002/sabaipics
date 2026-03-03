@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { Button } from '@/shared/components/ui/button';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Spinner } from '@/shared/components/ui/spinner';
-import { type SearchResult } from '../lib/api';
 import { th } from '../lib/i18n';
 import { LineDeliveryButton } from './LineDeliveryButton';
 import { useLineStatus } from '@/shared/hooks/rq/line/use-line-status';
@@ -24,11 +23,10 @@ interface ResultsStepProps {
   eventId: string;
   searchId: string;
   photos: ResultPhoto[];
-  searchResult: SearchResult;
   onSearchAgain: () => void;
 }
 
-export function ResultsStep({ eventId, searchId, photos, searchResult, onSearchAgain }: ResultsStepProps) {
+export function ResultsStep({ eventId, searchId, photos, onSearchAgain }: ResultsStepProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { data: lineStatus } = useLineStatus({ eventId });
   const { mutateAsync: downloadAsync, isPending: isDownloadPending } = useDownloadBulk();
@@ -153,7 +151,6 @@ export function ResultsStep({ eventId, searchId, photos, searchResult, onSearchA
             <LineDeliveryButton
               eventId={eventId}
               searchId={searchId}
-              searchResult={searchResult}
               selectedIds={selectedIds}
             />
           )}

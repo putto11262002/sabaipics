@@ -16,6 +16,7 @@ export interface BuildLoginUrlParams {
   channelId: string;
   redirectUri: string;
   state: string;
+  disableAutoLogin?: boolean;
 }
 
 export interface ExchangeTokenParams {
@@ -52,7 +53,7 @@ export type LineLoginError = { type: 'line_login'; message: string; cause?: unkn
  * Requests `profile openid` scopes and uses `bot_prompt=aggressive`
  * to prompt the user to add the Official Account as a friend.
  */
-export function buildLineLoginUrl({ channelId, redirectUri, state }: BuildLoginUrlParams): string {
+export function buildLineLoginUrl({ channelId, redirectUri, state, disableAutoLogin }: BuildLoginUrlParams): string {
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: channelId,
@@ -62,6 +63,10 @@ export function buildLineLoginUrl({ channelId, redirectUri, state }: BuildLoginU
     bot_prompt: 'aggressive',
     ui_locales: 'th',
   });
+
+  if (disableAutoLogin) {
+    params.set('disable_auto_login', 'true');
+  }
 
   return `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
 }

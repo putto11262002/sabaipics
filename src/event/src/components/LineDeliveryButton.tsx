@@ -1,20 +1,16 @@
-import { useState, useCallback, useRef } from 'react';
-import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/shared/components/ui/button';
 import { Spinner } from '@/shared/components/ui/spinner';
-import { type SearchResult } from '../lib/api';
-import { th } from '../lib/i18n';
-import { useLineAuthUrl } from '@/shared/hooks/rq/line/use-line-auth-url';
-import { usePendingLineDelivery } from '@/shared/hooks/rq/line/use-pending-line-delivery';
+import { getLineAuthUrl } from '../lib/api';
+
+const API_URL = import.meta.env.VITE_API_URL;
+const LINE_GREEN = '#06C755';
 
 interface LineDeliveryButtonProps {
   eventId: string;
   searchId: string;
-  searchResult: SearchResult;
   selectedIds: Set<string>;
 }
-
-const LINE_GREEN = '#06C755';
 
 function LineIcon({ className }: { className?: string }) {
   return (
@@ -24,58 +20,52 @@ function LineIcon({ className }: { className?: string }) {
   );
 }
 
-export function LineDeliveryButton({ eventId, searchId, searchResult, selectedIds }: LineDeliveryButtonProps) {
-  const [isRedirecting, setIsRedirecting] = useState(false);
-  const hasSelection = selectedIds.size > 0;
-  const { mutateAsync: getAuthUrl } = useLineAuthUrl();
-  const { mutateAsync: createPending } = usePendingLineDelivery();
-  const linkRef = useRef<HTMLAnchorElement>(null);
+/**
+ * LINE delivery button rendered as a direct <a> tag.
+ *
+ * The auth URL is pre-fetched on mount so the user's tap navigates
+ * directly to LINE's authorization page — preserving the iOS gesture
+ * context required for Universal Links to open the native LINE app.
+ *
+ * Photo selection is stored in KV via a fire-and-forget fetch with
+ * `keepalive: true` so it survives page unload.
+ */
+export function LineDeliveryButton({ eventId, searchId, selectedIds }: LineDeliveryButtonProps) {
+  // Pre-fetch LINE auth URL when component mounts
+  const { data: authUrl, isLoading } = useQuery({
+    queryKey: ['line', 'auth', eventId, searchId],
+    queryFn: () => getLineAuthUrl(eventId, searchId),
+    staleTime: 5 * 60 * 1000, // 5 min (server state has 10 min TTL)
+  });
 
-  const handleClick = useCallback(async () => {
-    if (!hasSelection) {
-      toast.warning(th.results.lineSelectHint);
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!authUrl || isLoading) {
+      e.preventDefault();
       return;
     }
 
-    setIsRedirecting(true);
-    try {
-      const photoIds = Array.from(selectedIds);
+    // Fire-and-forget: store photo selection in KV before navigating away.
+    // keepalive ensures the request survives page unload.
+    fetch(`${API_URL}/participant/line/pending`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId, searchId, photoIds: Array.from(selectedIds) }),
+      keepalive: true,
+    }).catch(() => {});
 
-      // 1. Create pending delivery record on server
-      await createPending({ eventId, searchId, photoIds });
-
-      // 2. Get auth URL and navigate via anchor click
-      //    Using a real <a> click instead of window.location.href
-      //    so iOS Universal Links can trigger the native LINE app.
-      const authUrl = await getAuthUrl({ eventId, searchId });
-      const link = linkRef.current!;
-      link.href = authUrl;
-      link.click();
-    } catch {
-      toast.error('ไม่สามารถเชื่อมต่อ LINE ได้', {
-        description: 'กรุณาลองอีกครั้ง',
-      });
-      setIsRedirecting(false);
-    }
-  }, [eventId, searchId, selectedIds, hasSelection, createPending, getAuthUrl]);
+    // Don't prevent default — let the <a> navigate directly to LINE
+  };
 
   return (
-    <>
-      {/* Hidden anchor for Universal Links compatibility */}
-      <a ref={linkRef} className="hidden" aria-hidden="true" />
-      <Button
-        size="icon"
-        className="size-12 rounded-full shadow-lg text-white opacity-100"
-        style={{ backgroundColor: LINE_GREEN }}
-        onClick={handleClick}
-        disabled={isRedirecting || !hasSelection}
-      >
-        {isRedirecting ? (
-          <Spinner className="size-5" />
-        ) : (
-          <LineIcon className="size-5" />
-        )}
-      </Button>
-    </>
+    <Button
+      asChild
+      size="icon"
+      className="size-12 rounded-full shadow-lg text-white opacity-100"
+      style={{ backgroundColor: LINE_GREEN }}
+    >
+      <a href={authUrl ?? '#'} onClick={handleClick}>
+        {isLoading ? <Spinner className="size-5" /> : <LineIcon className="size-5" />}
+      </a>
+    </Button>
   );
 }

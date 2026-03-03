@@ -181,7 +181,6 @@ export function SearchPage() {
           eventId={eventId}
           searchId={searchResult.searchId}
           photos={searchResult.photos}
-          searchResult={searchResult}
           onSearchAgain={handleRetry}
         />
       )}
