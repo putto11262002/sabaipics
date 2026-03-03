@@ -5,11 +5,13 @@ import { LineCallbackPage } from './routes/events/line-callback';
 import { PrivacyPage } from './routes/privacy';
 import { TermsPage } from './routes/terms';
 import { th } from './lib/i18n';
+import RouteErrorFallback from './components/errors/RouteErrorFallback';
 
 export const router = createBrowserRouter([
   {
     path: '/:eventId/search',
     element: <SearchPage />,
+    errorElement: <RouteErrorFallback />,
   },
   {
     path: '/:eventId/slideshow',
@@ -18,14 +20,17 @@ export const router = createBrowserRouter([
   {
     path: '/:eventId/line-callback',
     element: <LineCallbackPage />,
+    errorElement: <RouteErrorFallback />,
   },
   {
     path: '/privacy',
     element: <PrivacyPage />,
+    errorElement: <RouteErrorFallback />,
   },
   {
     path: '/terms',
     element: <TermsPage />,
+    errorElement: <RouteErrorFallback />,
   },
   {
     path: '*',

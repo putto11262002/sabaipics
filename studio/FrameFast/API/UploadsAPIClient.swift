@@ -112,6 +112,14 @@ actor UploadsAPIClient {
 
     func presign(eventId: String, contentType: String, contentLength: Int, filename: String?) async throws -> UploadPresignResponse.DataPayload {
         guard let url = URL(string: "\(baseURL)/uploads/presign") else {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: nil,
+                errorType: "ios_api_invalid_url",
+                message: "Invalid URL for uploads presign",
+                error: UploadsAPIError.invalidURL,
+                metadata: ["client": "uploads_api"]
+            )
             throw UploadsAPIError.invalidURL
         }
 
@@ -136,6 +144,14 @@ actor UploadsAPIClient {
 
     func repressign(uploadId: String) async throws -> UploadPresignResponse.DataPayload {
         guard let url = URL(string: "\(baseURL)/uploads/\(uploadId)/presign") else {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: nil,
+                errorType: "ios_api_invalid_url",
+                message: "Invalid URL for uploads repressign",
+                error: UploadsAPIError.invalidURL,
+                metadata: ["client": "uploads_api"]
+            )
             throw UploadsAPIError.invalidURL
         }
 
@@ -150,6 +166,14 @@ actor UploadsAPIClient {
     func fetchStatus(uploadIds: [String]) async throws -> [UploadStatusResponse.Item] {
         let ids = uploadIds.joined(separator: ",")
         guard let url = URL(string: "\(baseURL)/uploads/status?ids=\(ids)") else {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: nil,
+                errorType: "ios_api_invalid_url",
+                message: "Invalid URL for uploads status",
+                error: UploadsAPIError.invalidURL,
+                metadata: ["client": "uploads_api"]
+            )
             throw UploadsAPIError.invalidURL
         }
 
@@ -164,10 +188,26 @@ actor UploadsAPIClient {
         let session = await MainActor.run { Clerk.shared.session }
 
         guard let session else {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: nil,
+                errorType: "ios_api_not_authenticated",
+                message: "Clerk session missing",
+                error: UploadsAPIError.notAuthenticated,
+                metadata: ["client": "uploads_api", "route": url.path]
+            )
             throw UploadsAPIError.notAuthenticated
         }
 
         guard let token = try await session.getToken() else {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: nil,
+                errorType: "ios_api_no_token",
+                message: "Token was nil after Clerk fetch",
+                error: UploadsAPIError.noToken,
+                metadata: ["client": "uploads_api", "route": url.path]
+            )
             throw UploadsAPIError.noToken
         }
 
@@ -176,6 +216,7 @@ actor UploadsAPIClient {
         var request = URLRequest(url: url)
         request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        TraceContext.applyClientTraceHeaders(to: &request, client: "ios", route: url.path)
         return request
     }
 
@@ -185,10 +226,26 @@ actor UploadsAPIClient {
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: request,
+                errorType: "ios_api_transport_error",
+                message: "Network transport error in UploadsAPI",
+                error: error,
+                metadata: ["client": "uploads_api"]
+            )
             throw UploadsAPIError.transport(underlying: error)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: request,
+                errorType: "ios_api_bad_response",
+                message: "Non-HTTP response in UploadsAPI",
+                error: UploadsAPIError.transport(underlying: URLError(.badServerResponse)),
+                metadata: ["client": "uploads_api"]
+            )
             throw UploadsAPIError.transport(underlying: URLError(.badServerResponse))
         }
 
@@ -200,6 +257,19 @@ actor UploadsAPIClient {
                 print("[UploadsAPI Error] HTTP \(httpResponse.statusCode): \(responseBody)")
             }
 
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: request,
+                errorType: "ios_api_http_error",
+                message: "HTTP \(httpResponse.statusCode) in UploadsAPI",
+                error: UploadsAPIError.api(
+                    statusCode: httpResponse.statusCode,
+                    code: envelope?.error.code ?? .unknown("UNKNOWN"),
+                    message: envelope?.error.message ?? responseBody,
+                    retryAfterSeconds: retryAfter
+                ),
+                metadata: ["client": "uploads_api", "status_code": String(httpResponse.statusCode)]
+            )
             throw UploadsAPIError.api(
                 statusCode: httpResponse.statusCode,
                 code: envelope?.error.code ?? .unknown("UNKNOWN"),
@@ -213,6 +283,14 @@ actor UploadsAPIClient {
             return try decoder.decode(T.self, from: data)
         } catch {
             let responseBody = String(data: data, encoding: .utf8)
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: request,
+                errorType: "ios_api_decode_error",
+                message: "Decode error in UploadsAPI",
+                error: error,
+                metadata: ["client": "uploads_api"]
+            )
             throw UploadsAPIError.decoding(underlying: error, bodySnippet: responseBody)
         }
     }

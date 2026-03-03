@@ -12,6 +12,8 @@ import 'sonner/dist/styles.css';
 import { shouldRetry } from '@/shared/lib/api-error';
 import { getPostHogApiKey, POSTHOG_CONFIG } from '@/shared/lib/posthog';
 import { router } from './router.tsx';
+import { installGlobalErrorHandlers } from './lib/client-error-reporter';
+import { AppErrorBoundary } from './components/errors/AppErrorBoundary';
 
 const phKey = getPostHogApiKey();
 if (phKey) {
@@ -39,12 +41,16 @@ if (!clerkPubKey) {
   throw new Error('VITE_CLERK_PUBLISHABLE_KEY is not set');
 }
 
+installGlobalErrorHandlers();
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider publishableKey={clerkPubKey}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <RouterProvider router={router} />
+          <AppErrorBoundary>
+            <RouterProvider router={router} />
+          </AppErrorBoundary>
           <ReactQueryDevtools initialIsOpen={false} />
           <Toaster position="bottom-right" />
         </TooltipProvider>
