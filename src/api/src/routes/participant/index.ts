@@ -21,7 +21,7 @@ import { z } from 'zod';
 import { activeEvents, photos, participantSearches, events, feedback, feedbackCategories, type EventSettings } from '@/db';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
-import { createExtractor, searchByFace, type RecognitionError } from '../../lib/recognition';
+import { createExtractor, searchByFace, type RecognitionError, FACE_SEARCH_MAX_RESULTS, FACE_SEARCH_MIN_SIMILARITY } from '../../lib/recognition';
 import { ResultAsync, safeTry, ok, err } from 'neverthrow';
 import { createZip } from 'littlezipper';
 import { slideshowPhotosQuerySchema } from '../events/slideshow-schema';
@@ -286,8 +286,8 @@ export const participantRouter = new Hono<Env>()
         const searchMatches = yield* searchByFace(c.var.db(), {
           eventId,
           embedding: queryEmbedding,
-          maxResults: 50,
-          minSimilarity: 0.8,
+          maxResults: FACE_SEARCH_MAX_RESULTS,
+          minSimilarity: FACE_SEARCH_MIN_SIMILARITY,
         }).mapErr(mapRecognitionError);
 
         // Step 8: Handle empty response - return 200 with empty array (NOT an error)
