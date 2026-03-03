@@ -50,13 +50,13 @@ const bulkDownloadSchema = z.object({
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
-const MAX_SELFIE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_SELFIE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 const searchRequestSchema = z.object({
   selfie: z
     .instanceof(File)
     .refine((f) => f.size > 0, 'File cannot be empty')
-    .refine((f) => f.size <= MAX_SELFIE_SIZE, `File size must be less than 5 MB`)
+    .refine((f) => f.size <= MAX_SELFIE_SIZE, `File size must be less than 10 MB`)
     .refine(
       (f) => ALLOWED_MIME_TYPES.includes(f.type as (typeof ALLOWED_MIME_TYPES)[number]),
       `File type must be one of: ${ALLOWED_MIME_TYPES.join(', ')}`,
