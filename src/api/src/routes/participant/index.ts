@@ -279,6 +279,11 @@ export const participantRouter = new Hono<Env>()
           .extractFaces(transformedBytes)
           .mapErr(mapRecognitionError);
 
+        // Guard: extraction succeeded but no face found (e.g. genuinely no face in image)
+        if (extractResult.faces.length === 0) {
+          return err(mapRecognitionError({ type: 'no_face_detected', retryable: false, throttle: false }));
+        }
+
         // Use first face's embedding for search
         const queryEmbedding = extractResult.faces[0].embedding;
 
