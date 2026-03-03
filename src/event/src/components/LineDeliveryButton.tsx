@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/shared/components/ui/button';
 import { Spinner } from '@/shared/components/ui/spinner';
@@ -29,6 +29,7 @@ export function LineDeliveryButton({ eventId, searchId, searchResult, selectedId
   const hasSelection = selectedIds.size > 0;
   const { mutateAsync: getAuthUrl } = useLineAuthUrl();
   const { mutateAsync: createPending } = usePendingLineDelivery();
+  const linkRef = useRef<HTMLAnchorElement>(null);
 
   const handleClick = useCallback(async () => {
     if (!hasSelection) {
@@ -43,9 +44,13 @@ export function LineDeliveryButton({ eventId, searchId, searchResult, selectedId
       // 1. Create pending delivery record on server
       await createPending({ eventId, searchId, photoIds });
 
-      // 2. Get auth URL and redirect
+      // 2. Get auth URL and navigate via anchor click
+      //    Using a real <a> click instead of window.location.href
+      //    so iOS Universal Links can trigger the native LINE app.
       const authUrl = await getAuthUrl({ eventId, searchId });
-      window.location.href = authUrl;
+      const link = linkRef.current!;
+      link.href = authUrl;
+      link.click();
     } catch {
       toast.error('ไม่สามารถเชื่อมต่อ LINE ได้', {
         description: 'กรุณาลองอีกครั้ง',
@@ -55,18 +60,22 @@ export function LineDeliveryButton({ eventId, searchId, searchResult, selectedId
   }, [eventId, searchId, selectedIds, hasSelection, createPending, getAuthUrl]);
 
   return (
-    <Button
-      size="icon"
-      className="size-12 rounded-full shadow-lg text-white opacity-100"
-      style={{ backgroundColor: LINE_GREEN }}
-      onClick={handleClick}
-      disabled={isRedirecting || !hasSelection}
-    >
-      {isRedirecting ? (
-        <Spinner className="size-5" />
-      ) : (
-        <LineIcon className="size-5" />
-      )}
-    </Button>
+    <>
+      {/* Hidden anchor for Universal Links compatibility */}
+      <a ref={linkRef} className="hidden" aria-hidden="true" />
+      <Button
+        size="icon"
+        className="size-12 rounded-full shadow-lg text-white opacity-100"
+        style={{ backgroundColor: LINE_GREEN }}
+        onClick={handleClick}
+        disabled={isRedirecting || !hasSelection}
+      >
+        {isRedirecting ? (
+          <Spinner className="size-5" />
+        ) : (
+          <LineIcon className="size-5" />
+        )}
+      </Button>
+    </>
   );
 }
