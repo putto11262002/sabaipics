@@ -60,6 +60,7 @@ export function buildLineLoginUrl({ channelId, redirectUri, state }: BuildLoginU
     state,
     scope: 'profile openid',
     bot_prompt: 'aggressive',
+    ui_locales: 'th',
   });
 
   return `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
