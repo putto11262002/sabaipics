@@ -25,19 +25,23 @@ import LineDeliveryPage from './routes/line-delivery';
 import StudioAutoEditPage from './routes/studio/auto-edit';
 import StudioAutoEditNewPage from './routes/studio/auto-edit/new';
 import { SidebarLayout } from './components/shell/sidebar-layout';
+import RouteErrorFallback from './components/errors/RouteErrorFallback';
 export const router = createBrowserRouter([
   // Public routes
   {
     path: '/sign-in/*',
     element: <SignInPage />,
+    errorElement: <RouteErrorFallback />,
   },
   {
     path: '/sign-up/*',
     element: <SignUpPage />,
+    errorElement: <RouteErrorFallback />,
   },
   {
     path: '/auth/desktop',
     element: <DesktopAuthPage />,
+    errorElement: <RouteErrorFallback />,
   },
 
   // Slideshow editor (auth required, no sidebar)
@@ -48,6 +52,7 @@ export const router = createBrowserRouter([
         <EventSlideshowTab />
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorFallback />,
   },
 
   // Credits routes (auth required, no sidebar)
@@ -58,6 +63,7 @@ export const router = createBrowserRouter([
         <Outlet />
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorFallback />,
     children: [
       {
         path: 'success',
@@ -73,6 +79,7 @@ export const router = createBrowserRouter([
         <SidebarLayout />
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorFallback />,
     children: [
       {
         path: '/dashboard',
@@ -165,5 +172,6 @@ export const router = createBrowserRouter([
         </SignedOut>
       </>
     ),
+    errorElement: <RouteErrorFallback />,
   },
 ]);

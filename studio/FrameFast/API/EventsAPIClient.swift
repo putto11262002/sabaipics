@@ -56,6 +56,14 @@ actor EventsAPIClient {
 
     func fetchEvents(page: Int = 0, limit: Int = 10) async throws -> EventsResponse {
         guard let url = URL(string: "\(baseURL)/events?page=\(page)&limit=\(limit)") else {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: nil,
+                errorType: "ios_api_invalid_url",
+                message: "Invalid URL for fetchEvents",
+                error: APIError.invalidURL,
+                metadata: ["client": "events_api"]
+            )
             throw APIError.invalidURL
         }
 
@@ -65,6 +73,14 @@ actor EventsAPIClient {
 
     func fetchEvent(id: String) async throws -> EventResponse {
         guard let url = URL(string: "\(baseURL)/events/\(id)") else {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: nil,
+                errorType: "ios_api_invalid_url",
+                message: "Invalid URL for fetchEvent",
+                error: APIError.invalidURL,
+                metadata: ["client": "events_api"]
+            )
             throw APIError.invalidURL
         }
 
@@ -149,6 +165,14 @@ actor EventsAPIClient {
         let session = await MainActor.run { Clerk.shared.session }
 
         guard let session = session else {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: nil,
+                errorType: "ios_api_not_authenticated",
+                message: "Clerk session missing",
+                error: APIError.notAuthenticated,
+                metadata: ["client": "events_api", "route": url.path]
+            )
             throw APIError.notAuthenticated
         }
 
@@ -156,10 +180,26 @@ actor EventsAPIClient {
         do {
             token = try await session.getToken()
         } catch {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: nil,
+                errorType: "ios_api_token_fetch_failed",
+                message: "Failed to fetch Clerk token",
+                error: error,
+                metadata: ["client": "events_api", "route": url.path]
+            )
             throw APIError.notAuthenticated
         }
 
         guard let token else {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: nil,
+                errorType: "ios_api_no_token",
+                message: "Token was nil after Clerk fetch",
+                error: APIError.noToken,
+                metadata: ["client": "events_api", "route": url.path]
+            )
             throw APIError.noToken
         }
 
@@ -168,14 +208,37 @@ actor EventsAPIClient {
         var request = URLRequest(url: url)
         request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        TraceContext.applyClientTraceHeaders(to: &request, client: "ios", route: url.path)
 
         return request
     }
 
     private func performRequest<T: Decodable>(request: URLRequest) async throws -> T {
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: request,
+                errorType: "ios_api_transport_error",
+                message: "Network transport error in EventsAPI",
+                error: error,
+                metadata: ["client": "events_api"]
+            )
+            throw APIError.networkError(error)
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: request,
+                errorType: "ios_api_bad_response",
+                message: "Non-HTTP response in EventsAPI",
+                error: APIError.networkError(URLError(.badServerResponse)),
+                metadata: ["client": "events_api"]
+            )
             throw APIError.networkError(URLError(.badServerResponse))
         }
 
@@ -189,9 +252,28 @@ actor EventsAPIClient {
             }
 
             if httpResponse.statusCode == 401 {
+                ClientErrorReporter.reportNonFatal(
+                    baseURL: baseURL,
+                    request: request,
+                    errorType: "ios_api_http_401",
+                    message: "HTTP 401 in EventsAPI",
+                    error: APIError.notAuthenticated,
+                    metadata: ["client": "events_api", "status_code": "401"]
+                )
                 throw APIError.notAuthenticated
             }
 
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: request,
+                errorType: "ios_api_http_error",
+                message: "HTTP \(httpResponse.statusCode) in EventsAPI",
+                error: APIError.httpError(
+                    statusCode: httpResponse.statusCode,
+                    message: errorMessage?["message"]
+                ),
+                metadata: ["client": "events_api", "status_code": String(httpResponse.statusCode)]
+            )
             throw APIError.httpError(
                 statusCode: httpResponse.statusCode,
                 message: errorMessage?["message"]
@@ -202,6 +284,14 @@ actor EventsAPIClient {
             let decoder = JSONDecoder()
             return try decoder.decode(T.self, from: data)
         } catch {
+            ClientErrorReporter.reportNonFatal(
+                baseURL: baseURL,
+                request: request,
+                errorType: "ios_api_decode_error",
+                message: "Decode error in EventsAPI",
+                error: error,
+                metadata: ["client": "events_api"]
+            )
             throw APIError.decodingError(error)
         }
     }

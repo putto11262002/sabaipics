@@ -1,3 +1,4 @@
+import { tracingFetch } from './tracing-fetch';
 const API_URL = import.meta.env.VITE_API_URL;
 
 export interface SearchResult {
@@ -26,7 +27,7 @@ export interface EventPublic {
 }
 
 export async function getEventPublic(eventId: string): Promise<EventPublic> {
-  const response = await fetch(`${API_URL}/participant/events/${eventId}`);
+  const response = await tracingFetch(`${API_URL}/participant/events/${eventId}`);
 
   if (!response.ok) {
     const error = (await response.json()) as ApiError;
@@ -46,7 +47,7 @@ export async function searchPhotos(
   formData.append('selfie', selfie);
   formData.append('consentAccepted', String(consentAccepted));
 
-  const response = await fetch(`${API_URL}/participant/events/${eventId}/search`, {
+  const response = await tracingFetch(`${API_URL}/participant/events/${eventId}/search`, {
     method: 'POST',
     body: formData,
   });
@@ -61,7 +62,7 @@ export async function searchPhotos(
 }
 
 export async function downloadBulk(eventId: string, photoIds: string[]): Promise<Blob> {
-  const response = await fetch(`${API_URL}/participant/events/${eventId}/photos/download`, {
+  const response = await tracingFetch(`${API_URL}/participant/events/${eventId}/photos/download`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -98,7 +99,7 @@ export interface LineStatus {
 
 export async function getLineStatus(eventId: string): Promise<LineStatus> {
   const params = new URLSearchParams({ eventId });
-  const response = await fetch(`${API_URL}/participant/line/status?${params.toString()}`);
+  const response = await tracingFetch(`${API_URL}/participant/line/status?${params.toString()}`);
 
   if (!response.ok) {
     // Default to available if check fails — don't block the button on network errors
@@ -111,7 +112,7 @@ export async function getLineStatus(eventId: string): Promise<LineStatus> {
 
 export async function getLineAuthUrl(eventId: string, searchId: string): Promise<string> {
   const params = new URLSearchParams({ eventId, searchId });
-  const response = await fetch(`${API_URL}/participant/line/auth?${params.toString()}`);
+  const response = await tracingFetch(`${API_URL}/participant/line/auth?${params.toString()}`);
 
   if (!response.ok) {
     const error = (await response.json()) as ApiError;
@@ -144,7 +145,7 @@ export async function deliverViaLine(
   searchId: string,
   lineUserId: string,
 ): Promise<LineDeliveryResult> {
-  const response = await fetch(`${API_URL}/participant/line/deliver`, {
+  const response = await tracingFetch(`${API_URL}/participant/line/deliver`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ eventId, searchId, lineUserId }),
