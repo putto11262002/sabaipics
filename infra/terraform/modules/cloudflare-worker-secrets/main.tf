@@ -65,6 +65,12 @@ locals {
     LINE_CHANNEL_ACCESS_TOKEN    = local.infisical["LINE_CHANNEL_ACCESS_TOKEN"].value
     LINE_LOGIN_CHANNEL_ID        = local.infisical["LINE_LOGIN_CHANNEL_ID"].value
     LINE_LOGIN_CHANNEL_SECRET    = local.infisical["LINE_LOGIN_CHANNEL_SECRET"].value
+    LOKI_USER                    = local.infisical["LOKI_USER"].value
+    LOKI_TOKEN                   = local.infisical["LOKI_TOKEN"].value
+    OTLP_TRACES_USER             = local.infisical["OTLP_TRACES_USER"].value
+    OTLP_TRACES_TOKEN            = local.infisical["OTLP_TRACES_TOKEN"].value
+    OTLP_METRICS_USER            = local.infisical["OTLP_METRICS_USER"].value
+    OTLP_METRICS_TOKEN           = local.infisical["OTLP_METRICS_TOKEN"].value
   }
 
   # Terraform-generated secrets (only R2 credentials — safe to regenerate)

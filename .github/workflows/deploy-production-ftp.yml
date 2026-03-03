@@ -46,6 +46,32 @@ jobs:
             ghcr.io/${{ env.GHCR_USER }}/sabaipics-ftp-server:${{ github.sha }}
             ghcr.io/${{ env.GHCR_USER }}/sabaipics-ftp-server:latest
 
+      - name: Validate FTP deploy env
+        run: |
+          set -euo pipefail
+          required_vars=(
+            GHCR_USER
+            GHCR_DEPLOY_TOKEN
+            OTLP_TRACES_USER
+            OTLP_TRACES_TOKEN
+            OTLP_METRICS_USER
+            OTLP_METRICS_TOKEN
+            LOKI_USER
+            LOKI_TOKEN
+          )
+
+          missing=0
+          for key in "${required_vars[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              echo "Missing required env: $key"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
       - name: Deploy to Droplet
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -53,8 +79,32 @@ jobs:
           username: ${{ env.FTP_SERVER_USER }}
           key: ${{ env.FTP_SERVER_SSH_KEY }}
           port: ${{ env.FTP_SERVER_SSH_PORT || 22 }}
+          envs: GHCR_USER,GHCR_DEPLOY_TOKEN,API_URL,NODE_ENV,GRAFANA_OTLP_TRACES_URL,OTLP_TRACES_USER,OTLP_TRACES_TOKEN,OTEL_TRACE_SAMPLE_RATIO,GRAFANA_OTLP_METRICS_URL,OTLP_METRICS_USER,OTLP_METRICS_TOKEN,GRAFANA_LOKI_URL,LOKI_USER,LOKI_TOKEN
           script: |
             set -euo pipefail
-            export GHCR_TOKEN="${{ env.GHCR_DEPLOY_TOKEN }}"
-            export GHCR_USER="${{ env.GHCR_USER }}"
+            cat > /opt/sabaipics-ftp/.env <<EOF
+            API_URL=${API_URL:-https://api.sabaipics.com}
+            NODE_ENV=${NODE_ENV:-production}
+            FTP_LISTEN_ADDRESS=0.0.0.0:21
+            FTP_PASSIVE_PORT_START=60000
+            FTP_PASSIVE_PORT_END=60100
+            FTP_IDLE_TIMEOUT=600
+            FTP_DEBUG=false
+            TLS_CERT_PATH=/etc/letsencrypt/live/ftp.sabaipics.com/fullchain.pem
+            TLS_KEY_PATH=/etc/letsencrypt/live/ftp.sabaipics.com/privkey.pem
+            IMPLICIT_FTPS_ENABLED=true
+            IMPLICIT_FTPS_PORT=0.0.0.0:990
+            GRAFANA_OTLP_TRACES_URL=${GRAFANA_OTLP_TRACES_URL:-https://otlp-gateway-prod-ap-southeast-1.grafana.net/otlp}
+            OTLP_TRACES_USER=${OTLP_TRACES_USER}
+            OTLP_TRACES_TOKEN=${OTLP_TRACES_TOKEN}
+            OTEL_TRACE_SAMPLE_RATIO=${OTEL_TRACE_SAMPLE_RATIO:-0.50}
+            GRAFANA_OTLP_METRICS_URL=${GRAFANA_OTLP_METRICS_URL:-https://otlp-gateway-prod-ap-southeast-1.grafana.net/otlp}
+            OTLP_METRICS_USER=${OTLP_METRICS_USER}
+            OTLP_METRICS_TOKEN=${OTLP_METRICS_TOKEN}
+            GRAFANA_LOKI_URL=${GRAFANA_LOKI_URL:-https://logs-prod-020.grafana.net}
+            LOKI_USER=${LOKI_USER}
+            LOKI_TOKEN=${LOKI_TOKEN}
+            EOF
+
+            export GHCR_TOKEN="${GHCR_DEPLOY_TOKEN}"
             /opt/sabaipics-ftp/deploy_container.sh
