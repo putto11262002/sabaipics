@@ -6,6 +6,7 @@
  */
 
 import { err, ok, Result, ResultAsync } from 'neverthrow';
+import { getCurrentTraceHeaders } from './observability/trace-context';
 
 export interface ModalProcessOptions {
   autoEdit: boolean;
@@ -58,10 +59,13 @@ export function processWithModal(
   options: ModalProcessOptions,
   env: { MODAL_KEY: string; MODAL_SECRET: string },
 ): ResultAsync<ModalProcessResult, ModalError> {
+  const traceHeaders = getCurrentTraceHeaders();
   const body: Record<string, unknown> = {
     input_url: inputUrl,
     output_url: output.url,
     output_headers: output.headers,
+    traceparent: traceHeaders?.traceparent ?? null,
+    baggage: traceHeaders?.baggage ?? null,
     options: {
       normalize_max_px: options.normalizeMaxPx ?? 2500,
       auto_edit: options.autoEdit,
@@ -85,6 +89,8 @@ export function processWithModal(
         'Content-Type': 'application/json',
         'Modal-Key': env.MODAL_KEY,
         'Modal-Secret': env.MODAL_SECRET,
+        ...(traceHeaders?.traceparent ? { traceparent: traceHeaders.traceparent } : {}),
+        ...(traceHeaders?.baggage ? { baggage: traceHeaders.baggage } : {}),
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(MODAL_TIMEOUT_MS),

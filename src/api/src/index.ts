@@ -1,8 +1,12 @@
-import * as Sentry from '@sentry/cloudflare';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { HTTPException } from 'hono/http-exception';
 import { createAnyAuth } from './middleware/any-auth';
 import { createDbHttp, createDbTx } from '@/db';
+import { requestLogger } from './middleware/request-logger';
+import { emitStructuredLog } from './lib/observability/log';
+import { emitCounterMetric } from './lib/observability/metrics';
+import { getCurrentTraceSpan } from './lib/observability/trace-context';
 import { authRouter } from './routes/auth';
 import { webhookRouter } from './routes/webhooks';
 import { adminRouter } from './routes/admin';
@@ -20,6 +24,7 @@ import { desktopAuthRouter } from './routes/desktop-auth';
 import { studioRouter } from './routes/studio';
 import { feedbackRouter } from './routes/feedback';
 import { lineDeliveryRouter } from './routes/line-delivery';
+import { observabilityRouter } from './routes/observability';
 import type { Env, Bindings } from './types';
 
 // Queue consumers
@@ -50,6 +55,7 @@ registerStripeHandlers();
 
 // Method chaining - NEVER break the chain for type inference
 const app = new Hono<Env>()
+  .use(requestLogger())
   // DB injection - dual adapter pattern:
   // - db (HTTP): Fast, stateless, no transactions - for 90% of queries
   // - dbTx (WebSocket): With transaction support - for critical multi-step operations
@@ -72,13 +78,21 @@ const app = new Hono<Env>()
     })(c, next);
   })
   // Health check - public, no auth (used by iOS connectivity probe)
-  .get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }))
+  .get('/health', (c) => {
+    const shouldFail = c.req.query('fail') === '1';
+    if (shouldFail) {
+      throw new HTTPException(500, { message: 'Simulated health failure' });
+    }
+    return c.json({ status: 'ok', timestamp: Date.now() });
+  })
   // Participant routes (public, no auth - for event participants)
   .route('/participant', participantRouter)
   // LINE participant routes (public, no auth - LINE Login OAuth + delivery)
   .route('/participant/line', lineParticipantRouter)
   // Public announcements (no auth - for www/dashboard)
   .route('/announcements', publicAnnouncementsRouter)
+  // Public observability ingest (dashboard/iOS client error events)
+  .route('/observability', observabilityRouter)
   // Admin routes - API key auth, no Clerk (must be before Clerk middleware)
   .route('/admin', adminRouter)
   // FTP routes - FTP JWT auth, no Clerk (must be before Clerk middleware)
@@ -95,6 +109,52 @@ const app = new Hono<Env>()
   .route('/feedback', feedbackRouter)
   .route('/', photosRouter);
 
+app.onError((error, c) => {
+  const path = new URL(c.req.url).pathname;
+  const status = error instanceof HTTPException ? error.status : 500;
+  const statusClass = `${Math.floor(status / 100)}xx`;
+  const activeSpan = getCurrentTraceSpan();
+  activeSpan?.markError({
+    statusMessage: error.name,
+    attributes: {
+      'http.error.status': status,
+      'error.name': error.name,
+      'error.message': error.message,
+    },
+  });
+  let requestId: string | null = null;
+  let traceparent: string | null = null;
+  try {
+    requestId = c.get('requestId');
+    traceparent = c.get('traceparent');
+  } catch {
+    // request logger middleware might not have run in tests
+  }
+
+  emitStructuredLog(c, 'error', 'unhandled_error', {
+    request_id: requestId,
+    traceparent,
+    method: c.req.method,
+    path,
+    status,
+    error_name: error.name,
+    error_message: error.message,
+  });
+  emitCounterMetric(c.env, c.executionCtx as unknown as ExecutionContext, 'framefast_api_errors_total', 1, {
+    status_class: statusClass,
+    error_class: error instanceof HTTPException ? 'http_exception' : 'unhandled',
+  });
+
+  if (error instanceof HTTPException) {
+    return error.getResponse();
+  }
+
+  return c.json(
+    { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+    500,
+  );
+});
+
 // =============================================================================
 // Worker Export
 // =============================================================================
@@ -103,35 +163,26 @@ const app = new Hono<Env>()
 export type AppType = typeof app;
 
 // Export worker with fetch, queue, and scheduled handlers
-// Sentry.withSentry wraps all handlers (fetch, queue, scheduled) for error capture
-export default Sentry.withSentry(
-  (env: Bindings) => ({
-    dsn: env.SENTRY_DSN,
-    environment: env.NODE_ENV,
-    tracesSampleRate: env.NODE_ENV === 'production' ? 0.1 : 1.0,
-    debug: env.NODE_ENV === 'staging',
-  }),
-  {
-    fetch: app.fetch,
-    queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
-      // Route by queue name prefix (handles -dev, -staging, etc.)
-      if (batch.queue.startsWith('photo-processing')) {
-        return photoQueue(batch as MessageBatch<any>, env, ctx);
-      }
-      if (batch.queue.startsWith('rekognition-cleanup')) {
-        return cleanupQueue(batch as MessageBatch<any>, env);
-      }
-      if (batch.queue.startsWith('upload-processing')) {
-        return uploadQueue(batch as MessageBatch<any>, env, ctx);
-      }
-      if (batch.queue.startsWith('logo-processing')) {
-        return logoUploadConsumer.queue(batch as MessageBatch<any>, env);
-      }
-      if (batch.queue.startsWith('lut-processing')) {
-        return lutProcessingConsumer.queue(batch as MessageBatch<any>, env);
-      }
-      console.error('[Queue] Unknown queue:', batch.queue);
-    },
-    scheduled,
+export default {
+  fetch: app.fetch,
+  queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
+    // Route by queue name prefix (handles -dev, -staging, etc.)
+    if (batch.queue.startsWith('photo-processing')) {
+      return photoQueue(batch as MessageBatch<any>, env, ctx);
+    }
+    if (batch.queue.startsWith('rekognition-cleanup')) {
+      return cleanupQueue(batch as MessageBatch<any>, env);
+    }
+    if (batch.queue.startsWith('upload-processing')) {
+      return uploadQueue(batch as MessageBatch<any>, env, ctx);
+    }
+    if (batch.queue.startsWith('logo-processing')) {
+      return logoUploadConsumer.queue(batch as MessageBatch<any>, env);
+    }
+    if (batch.queue.startsWith('lut-processing')) {
+      return lutProcessingConsumer.queue(batch as MessageBatch<any>, env);
+    }
+    console.error('[Queue] Unknown queue:', batch.queue);
   },
-);
+  scheduled,
+};

@@ -15,6 +15,7 @@ export interface PresignOptions {
   key: string;
   contentType: string;
   contentLength?: number;
+  customMetadata?: Record<string, string>;
   expiresIn: number; // seconds
 }
 
@@ -68,6 +69,11 @@ export async function generatePresignedPutUrl(
 
   if (options.contentLength !== undefined) {
     headers['Content-Length'] = options.contentLength.toString();
+  }
+  if (options.customMetadata) {
+    for (const [key, value] of Object.entries(options.customMetadata)) {
+      headers[`x-amz-meta-${key}`] = value;
+    }
   }
 
   const signedRequest = await client.sign(

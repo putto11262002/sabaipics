@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/cloudflare';
 import { safeTry, type Err, type Result } from 'neverthrow';
 import type { Context, TypedResponse } from 'hono';
 import type { ContentlessStatusCode, SuccessStatusCode } from 'hono/utils/http-status';
@@ -11,12 +10,15 @@ import {
   type ApiErrorCode,
   type ApiErrorStatus,
 } from './error';
+import { emitStructuredLog } from './observability/log';
+import { getSafeCauseMeta } from './observability/cause';
+import { getCurrentTraceSpan } from './observability/trace-context';
 
 type ErrorResponseBody = { error: { code: ApiErrorCode; message: string } };
 
 /**
  * Wraps a neverthrow generator into a typed Hono response with
- * built-in observability (Sentry capture + structured logging).
+ * built-in observability (structured logging + trace error marking).
  *
  * The generator captures the Hono context `c` via closure, so
  * safeHandler only needs to be generic over `T` (response data)
@@ -43,8 +45,39 @@ export async function safeHandler<T, S extends ContentfulSuccessStatusCode = 200
 ): Promise<TypedResponse<{ data: T }, S> | TypedResponse<ErrorResponseBody, ApiErrorStatus>> {
   return safeTry(fn)
     .orTee((e) => {
+      const status = API_ERROR_STATUS[e.code];
+      const level = status >= 500 ? 'error' : 'warn';
+      const activeSpan = getCurrentTraceSpan();
+      activeSpan?.markError({
+        statusMessage: e.code,
+        attributes: {
+          'api.error.code': e.code,
+          'api.error.http_status': status,
+        },
+      });
+      const path = new URL(c.req.url).pathname;
+      const causeMeta = getSafeCauseMeta(e.cause);
+      let requestId: string | null = null;
+      let traceparent: string | null = null;
+      try {
+        requestId = c.get('requestId');
+        traceparent = c.get('traceparent');
+      } catch {
+        // request logger middleware might not have run in tests
+      }
+
+      emitStructuredLog(c, level, 'result_error', {
+        request_id: requestId,
+        traceparent,
+        api_error_code: e.code,
+        http_status: status,
+        method: c.req.method,
+        path,
+        message: e.message,
+        ...causeMeta,
+      });
+
       if (e.cause) console.error('[safeHandler]', e.code, e.cause);
-      captureApiError(c, e);
     })
     .match(
       (data) => c.json({ data } as { data: T }, (options?.status ?? 200) as S) as any,
@@ -59,58 +92,4 @@ export async function safeHandler<T, S extends ContentfulSuccessStatusCode = 200
         ) as any;
       },
     );
-}
-
-/**
- * Capture API errors to Sentry with appropriate severity.
- *
- * - 5xx: captureException (error level) — server failures we must fix
- * - 4xx with cause: captureMessage (warning level) — unexpected failures
- * - 4xx without cause: skip — normal business logic (not found, validation)
- */
-function captureApiError(c: Context<any, any, any>, e: HandlerError): void {
-  const status = API_ERROR_STATUS[e.code];
-
-  if (status >= 500) {
-    Sentry.withScope((scope) => {
-      scope.setTag('api_error_code', e.code);
-      scope.setTag('http_status', String(status));
-      scope.setExtra('path', new URL(c.req.url).pathname);
-      scope.setExtra('method', c.req.method);
-      scope.setExtra('message', e.message);
-
-      try {
-        const auth = c.get('auth');
-        if (auth?.userId) scope.setUser({ id: auth.userId });
-      } catch {
-        // auth variable not registered — fine
-      }
-
-      if (e.cause instanceof Error) {
-        Sentry.captureException(e.cause);
-      } else if (e.cause) {
-        Sentry.captureException(new Error(e.message, { cause: e.cause }));
-      } else {
-        Sentry.captureException(new Error(`[${e.code}] ${e.message}`));
-      }
-    });
-  } else if (e.cause) {
-    Sentry.withScope((scope) => {
-      scope.setTag('api_error_code', e.code);
-      scope.setTag('http_status', String(status));
-      scope.setExtra('path', new URL(c.req.url).pathname);
-      scope.setExtra('method', c.req.method);
-      scope.setExtra('message', e.message);
-      scope.setLevel('warning');
-
-      try {
-        const auth = c.get('auth');
-        if (auth?.userId) scope.setUser({ id: auth.userId });
-      } catch {
-        // ignore
-      }
-
-      Sentry.captureMessage(`[${e.code}] ${e.message}`);
-    });
-  }
 }

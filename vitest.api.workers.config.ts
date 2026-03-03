@@ -30,7 +30,6 @@ export default defineWorkersConfig({
             R2_SECRET_ACCESS_KEY: 'test-r2-secret-key',
             RECOGNITION_ENDPOINT: 'https://example.com/recognition',
             POSTHOG_API_KEY: '',
-            SENTRY_DSN: '',
             MODAL_KEY: 'test-modal-key',
             MODAL_SECRET: 'test-modal-secret',
           },

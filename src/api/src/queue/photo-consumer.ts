@@ -10,7 +10,6 @@
  * The extraction service is self-hosted on Modal with no TPS limits.
  */
 
-import * as Sentry from '@sentry/cloudflare';
 import type { PhotoJob } from '../types/photo-job';
 import type { Bindings } from '../types';
 import {
@@ -25,9 +24,13 @@ import {
   type ExtractionResult,
 } from '../lib/recognition';
 import { createDb, createDbTx } from '@/db';
-import { photos } from '@/db';
+import { photos, uploadIntents } from '@/db';
 import { eq } from 'drizzle-orm';
 import { ResultAsync, type Result } from 'neverthrow';
+import { emitWorkerLog } from '../lib/observability/worker-log';
+import { emitCounterMetric, emitHistogramMetricMs } from '../lib/observability/metrics';
+import { TraceSpan } from '../lib/observability/trace';
+import { runWithTraceSpan } from '../lib/observability/trace-context';
 
 // Must match wrangler.api.jsonc consumer max_retries setting.
 // CF Workers: attempts starts at 1, so last attempt = MAX_RETRIES + 1.
@@ -50,13 +53,20 @@ export type PhotoProcessingError =
 interface ProcessedPhoto {
   message: Message<PhotoJob>;
   result: Result<ExtractionResult, PhotoProcessingError>;
+  rootSpan: TraceSpan;
+  startedAt: number;
+  extractDurationMs: number;
 }
 
-// =============================================================================
-// Sentry Helpers
-// =============================================================================
+const AREA = 'upload';
+const COMPONENT = 'photo-consumer';
+const E2E_HISTOGRAM_BOUNDS_MS = [
+  100, 250, 500, 1000, 2500, 5000, 10000, 15000, 30000, 60000, 120000,
+];
 
 function capturePhotoError(
+  env: Bindings,
+  ctx: ExecutionContext,
   errorType: string,
   context: {
     photoId: string;
@@ -65,23 +75,28 @@ function capturePhotoError(
     extra?: Record<string, unknown>;
   },
 ): void {
-  Sentry.withScope((scope) => {
-    scope.setTag('error_type', errorType);
-    scope.setTag('queue', 'photo-processing');
-    scope.setTag('photo_id', context.photoId);
-    scope.setTag('event_id', context.eventId);
-    scope.setExtra('r2_key', context.r2Key);
-    if (context.extra) {
-      for (const [k, v] of Object.entries(context.extra)) {
-        scope.setExtra(k, v);
-      }
-    }
-    scope.setLevel('error');
-    Sentry.captureMessage(`Photo processing failed: ${errorType}`);
-  });
+  emitWorkerLog(
+    env,
+    'error',
+    'photo_processing_failed',
+    {
+      area: AREA,
+      component: COMPONENT,
+      operation: 'process_photo',
+      queue: 'photo-processing',
+      error_type: errorType,
+      photo_id: context.photoId,
+      event_id: context.eventId,
+      r2_key: context.r2Key,
+      ...(context.extra ?? {}),
+    },
+    ctx,
+  );
 }
 
 function capturePhotoWarning(
+  env: Bindings,
+  ctx: ExecutionContext,
   errorType: string,
   context: {
     photoId: string;
@@ -90,20 +105,23 @@ function capturePhotoWarning(
     extra?: Record<string, unknown>;
   },
 ): void {
-  Sentry.withScope((scope) => {
-    scope.setTag('error_type', errorType);
-    scope.setTag('queue', 'photo-processing');
-    scope.setTag('photo_id', context.photoId);
-    scope.setTag('event_id', context.eventId);
-    scope.setExtra('r2_key', context.r2Key);
-    if (context.extra) {
-      for (const [k, v] of Object.entries(context.extra)) {
-        scope.setExtra(k, v);
-      }
-    }
-    scope.setLevel('warning');
-    Sentry.captureMessage(`Photo processing warning: ${errorType}`);
-  });
+  emitWorkerLog(
+    env,
+    'warn',
+    'photo_processing_warning',
+    {
+      area: AREA,
+      component: COMPONENT,
+      operation: 'process_photo',
+      queue: 'photo-processing',
+      error_type: errorType,
+      photo_id: context.photoId,
+      event_id: context.eventId,
+      r2_key: context.r2Key,
+      ...(context.extra ?? {}),
+    },
+    ctx,
+  );
 }
 
 // =============================================================================
@@ -239,36 +257,98 @@ export async function queue(
     return;
   }
 
-  console.log(`[Queue] Batch start`, { batchSize: batch.messages.length });
+  emitWorkerLog(
+    env,
+    'info',
+    'photo_batch_start',
+    {
+      area: AREA,
+      component: COMPONENT,
+      operation: 'process_batch',
+      queue: 'photo-processing',
+      batch_size: batch.messages.length,
+    },
+    ctx,
+  );
 
   const db = createDb(env.DATABASE_URL);
 
   // Process all photos in parallel (no rate limiter needed)
   const processed: ProcessedPhoto[] = await Promise.all(
     batch.messages.map(async (message) => {
-      const result = await Sentry.startSpan(
-        { name: 'photo.process', op: 'queue.process' },
-        async (span) => {
-          const job = message.body;
-          span.setAttribute('photo.id', job.photo_id);
-          span.setAttribute('photo.event_id', job.event_id);
-          span.setAttribute('photo.r2_key', job.r2_key);
-
-          const r = await processPhoto(env, message);
-          r.match(
-            (data) => {
-              span.setAttribute('photo.status', 'ok');
-              span.setAttribute('photo.face_count', data.faces.length);
+      const startedAt = Date.now();
+      const job = message.body;
+      const rootSpan = new TraceSpan(env, 'photo.queue.process', {
+        parentTraceparent: job.traceparent ?? null,
+        baggage: job.baggage,
+        ctx,
+        attributes: {
+          'queue.name': 'photo-processing',
+          'job.photo_id': job.photo_id,
+          'job.event_id': job.event_id,
+          'worker.message_attempt': message.attempts,
+        },
+      });
+      const extractSpan = rootSpan.child('recognition.extract', {
+        attributes: {
+          'http.route': '/extract',
+        },
+      });
+      const extractStartedAt = Date.now();
+      const result = await runWithTraceSpan(extractSpan, async () => await processPhoto(env, message));
+      const extractDurationMs = Date.now() - extractStartedAt;
+      result.match(
+        (data) => {
+          extractSpan.end('ok', {
+            attributes: {
+              'recognition.face_count': data.faces.length,
             },
-            (error) => {
-              span.setAttribute('photo.status', 'error');
-              span.setAttribute('photo.error_type', error.type);
+          });
+          emitWorkerLog(
+            env,
+            'info',
+            'photo_processed',
+            {
+              area: AREA,
+              component: COMPONENT,
+              operation: 'process_photo',
+              photo_id: job.photo_id,
+              event_id: job.event_id,
+              r2_key: job.r2_key,
+              face_count: data.faces.length,
+              trace_id: rootSpan.traceId,
+              span_id: extractSpan.spanId,
             },
+            ctx,
           );
-          return r;
+        },
+        (error) => {
+          extractSpan.end('error', {
+            attributes: {
+              'error.type': error.type,
+            },
+            statusMessage: error.type,
+          });
+          emitWorkerLog(
+            env,
+            'warn',
+            'photo_process_error',
+            {
+              area: AREA,
+              component: COMPONENT,
+              operation: 'process_photo',
+              photo_id: job.photo_id,
+              event_id: job.event_id,
+              r2_key: job.r2_key,
+              error_type: error.type,
+              trace_id: rootSpan.traceId,
+              span_id: extractSpan.spanId,
+            },
+            ctx,
+          );
         },
       );
-      return { message, result };
+      return { message, result, rootSpan, startedAt, extractDurationMs };
     }),
   );
 
@@ -276,9 +356,81 @@ export async function queue(
   let successCount = 0;
   let failCount = 0;
 
-  for (const { message, result } of processed) {
+  for (const { message, result, rootSpan, startedAt, extractDurationMs } of processed) {
+    const emitJobMetrics = (status: 'ok' | 'error') => {
+      emitCounterMetric(env, ctx, 'framefast_queue_jobs_total', 1, {
+        queue: 'photo-processing',
+        operation: 'process_photo',
+        status,
+      });
+      emitHistogramMetricMs(
+        env,
+        ctx,
+        'framefast_queue_job_duration_ms',
+        Date.now() - startedAt,
+        {
+          queue: 'photo-processing',
+          operation: 'process_photo',
+        },
+      );
+    };
     const job = message.body;
-    const sentryCtx = { photoId: job.photo_id, eventId: job.event_id, r2Key: job.r2_key };
+    const logCtx = { photoId: job.photo_id, eventId: job.event_id, r2Key: job.r2_key };
+    const uploadContext = await db.query.uploadIntents.findFirst({
+      where: eq(uploadIntents.photoId, job.photo_id),
+      columns: {
+        createdAt: true,
+        source: true,
+      },
+    });
+    const uploadSource = uploadContext?.source ?? 'unknown';
+    const emitUploadE2EMetrics = (status: 'ok' | 'error', errorType?: string) => {
+      const nowMs = Date.now();
+      const e2eDurationMs = uploadContext
+        ? Math.max(0, nowMs - new Date(uploadContext.createdAt).getTime())
+        : null;
+      emitCounterMetric(env, ctx, 'framefast_upload_e2e_total', 1, {
+        source: uploadSource,
+        status,
+        ...(errorType ? { error_type: errorType } : {}),
+      });
+      if (e2eDurationMs !== null) {
+        emitHistogramMetricMs(env, ctx, 'framefast_upload_e2e_duration_ms', e2eDurationMs, {
+          source: uploadSource,
+          status,
+        }, E2E_HISTOGRAM_BOUNDS_MS);
+      }
+    };
+    emitHistogramMetricMs(env, ctx, 'framefast_upload_stage_duration_ms', extractDurationMs, {
+      source: uploadSource,
+      stage: 'face_extraction',
+      status: result.isOk() ? 'ok' : 'error',
+    });
+    const emitWorkflowTerminalSpan = (
+      status: 'ok' | 'error',
+      options?: {
+        attributes?: Record<string, string | number | boolean | null | undefined>;
+        statusMessage?: string;
+      },
+    ) => {
+      const workflowSpan = new TraceSpan(env, 'upload.workflow', {
+        parentTraceparent: job.traceparent ?? null,
+        baggage: job.baggage,
+        ctx,
+        attributes: {
+          'workflow.name': 'upload_to_index',
+          'workflow.status': status === 'ok' ? 'ok' : 'failed',
+          'job.photo_id': job.photo_id,
+          'job.event_id': job.event_id,
+          'queue.name': 'photo-processing',
+          'worker.message_attempt': message.attempts,
+        },
+      });
+      workflowSpan.end(status, {
+        attributes: options?.attributes,
+        statusMessage: options?.statusMessage,
+      });
+    };
 
     await result
       .orTee((error) => {
@@ -297,20 +449,29 @@ export async function queue(
         extra.isLastAttempt = isLastAttempt;
 
         const captureFn = !retryable || isLastAttempt ? capturePhotoError : capturePhotoWarning;
-        captureFn(error.type, { ...sentryCtx, extra });
+        captureFn(env, ctx, error.type, { ...logCtx, extra });
       })
       .match(
         // Success path — persist embeddings and update photo
         async (extractResult) => {
           await persistAndUpdatePhoto(env.DATABASE_URL, job, extractResult)
             .orTee((persistErr) => {
-              console.error(`[Queue] Persist error`, {
-                photoId: job.photo_id,
-                type: persistErr.type,
-                ...(persistErr.type === 'database' ? { operation: persistErr.operation } : {}),
-              });
-              capturePhotoWarning('persist_failed', {
-                ...sentryCtx,
+              emitWorkerLog(
+                env,
+                'warn',
+                'photo_persist_error',
+                {
+                  area: AREA,
+                  component: COMPONENT,
+                  operation: 'persist_photo',
+                  photo_id: job.photo_id,
+                  error_type: persistErr.type,
+                  ...(persistErr.type === 'database' ? { db_operation: persistErr.operation } : {}),
+                },
+                ctx,
+              );
+              capturePhotoWarning(env, ctx, 'persist_failed', {
+                ...logCtx,
                 extra: { persistErrorType: persistErr.type },
               });
             })
@@ -318,6 +479,10 @@ export async function queue(
               () => {
                 successCount++;
                 message.ack();
+                rootSpan.end('ok');
+                emitWorkflowTerminalSpan('ok');
+                emitUploadE2EMetrics('ok');
+                emitJobMetrics('ok');
               },
               async (persistErr) => {
                 failCount++;
@@ -337,12 +502,55 @@ export async function queue(
                 );
 
                 if (writeResult.isErr()) {
-                  console.error(`[Queue] Failed to mark photo error:`, writeResult.error);
+                  emitWorkerLog(
+                    env,
+                    'error',
+                    'photo_mark_failed_error',
+                    {
+                      area: AREA,
+                      component: COMPONENT,
+                      operation: 'mark_photo_failed',
+                      photo_id: job.photo_id,
+                      cause: String(writeResult.error),
+                    },
+                    ctx,
+                  );
                   message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+                  rootSpan.end('error', {
+                    attributes: {
+                      'error.type': persistErr.type,
+                      'worker.retry': true,
+                    },
+                    statusMessage: persistErr.type,
+                  });
+                  emitJobMetrics('error');
                 } else if (isLastAttempt) {
                   message.ack();
+                  rootSpan.end('error', {
+                    attributes: {
+                      'error.type': persistErr.type,
+                      'worker.retry': false,
+                    },
+                    statusMessage: persistErr.type,
+                  });
+                  emitWorkflowTerminalSpan('error', {
+                    attributes: {
+                      'error.type': persistErr.type,
+                    },
+                    statusMessage: persistErr.type,
+                  });
+                  emitUploadE2EMetrics('error', persistErr.type);
+                  emitJobMetrics('error');
                 } else {
                   message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+                  rootSpan.end('error', {
+                    attributes: {
+                      'error.type': persistErr.type,
+                      'worker.retry': true,
+                    },
+                    statusMessage: persistErr.type,
+                  });
+                  emitJobMetrics('error');
                 }
               },
             );
@@ -372,20 +580,73 @@ export async function queue(
           );
 
           if (writeResult.isErr()) {
-            console.error(`[Queue] Failed to mark photo error:`, writeResult.error);
+            emitWorkerLog(
+              env,
+              'error',
+              'photo_mark_failed_error',
+              {
+                area: AREA,
+                component: COMPONENT,
+                operation: 'mark_photo_failed',
+                photo_id: job.photo_id,
+                cause: String(writeResult.error),
+              },
+              ctx,
+            );
             message.retry({ delaySeconds: delayFn(message.attempts) });
+            rootSpan.end('error', {
+              attributes: {
+                'error.type': error.type,
+                'worker.retry': true,
+              },
+              statusMessage: errorName,
+            });
+            emitJobMetrics('error');
           } else if (!retryable || isLastAttempt) {
             message.ack();
+            rootSpan.end('error', {
+              attributes: {
+                'error.type': error.type,
+                'worker.retry': false,
+              },
+              statusMessage: errorName,
+            });
+            emitWorkflowTerminalSpan('error', {
+              attributes: {
+                'error.type': error.type,
+              },
+              statusMessage: errorName,
+            });
+            emitUploadE2EMetrics('error', error.type);
+            emitJobMetrics('error');
           } else {
             message.retry({ delaySeconds: delayFn(message.attempts) });
+            rootSpan.end('error', {
+              attributes: {
+                'error.type': error.type,
+                'worker.retry': true,
+              },
+              statusMessage: errorName,
+            });
+            emitJobMetrics('error');
           }
         },
       );
   }
 
-  console.log(`[Queue] Batch complete`, {
-    batchSize: batch.messages.length,
-    successCount,
-    failCount,
-  });
+  emitWorkerLog(
+    env,
+    'info',
+    'photo_batch_complete',
+    {
+      area: AREA,
+      component: COMPONENT,
+      operation: 'process_batch',
+      queue: 'photo-processing',
+      batch_size: batch.messages.length,
+      success_count: successCount,
+      fail_count: failCount,
+    },
+    ctx,
+  );
 }

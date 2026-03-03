@@ -280,7 +280,7 @@ export const stripeWebhookRouter = new Hono<{
         );
 
         // If fulfillment failed, return error so Stripe retries
-        // safeHandler captures to Sentry automatically for 5xx errors
+        // safeHandler emits structured error logs automatically for 5xx errors
         if (!result.success) {
           return err<never, HandlerError>({
             code: 'INTERNAL_ERROR',

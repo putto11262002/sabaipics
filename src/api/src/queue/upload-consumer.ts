@@ -10,7 +10,6 @@
  * 6. Enqueue for face detection
  */
 
-import * as Sentry from '@sentry/cloudflare';
 import type { R2EventMessage } from '../types/r2-event';
 import type { Bindings } from '../types';
 import type { PhotoJob } from '../types/photo-job';
@@ -41,6 +40,10 @@ import { extractExif } from '../lib/images/exif';
 import { PHOTO_MAX_FILE_SIZE } from '../lib/upload/constants';
 import { processWithModal, isModalConfigured, type ModalProcessOptions } from '../lib/modal-client';
 import { generatePresignedGetUrl, generatePresignedPutUrl } from '../lib/r2/presign';
+import { emitWorkerLog } from '../lib/observability/worker-log';
+import { emitCounterMetric, emitHistogramMetricMs } from '../lib/observability/metrics';
+import { TraceSpan } from '../lib/observability/trace';
+import { runWithTraceSpan } from '../lib/observability/trace-context';
 
 // wrangler.api.jsonc sets max_retries: 1 as a crash safety net.
 // The consumer itself never calls message.retry() — the idempotency guard
@@ -54,6 +57,8 @@ const MAX_PIXELS = 25_000_000;
 const MODAL_R2_PRESIGN_TTL_SECONDS = 300;
 const BASE_UPLOAD_OPERATION_TYPE = 'image_upload';
 const AUTO_EDIT_SURCHARGE_OPERATION_TYPE = 'image_upload_auto_edit_surcharge';
+const AREA = 'upload';
+const COMPONENT = 'upload-consumer';
 
 /**
  * Generate R2 keys for original and processed photos.
@@ -164,11 +169,12 @@ function shouldChargeAutoEditSurcharge(operationsApplied: string[]): boolean {
 }
 
 // =============================================================================
-// Sentry Helpers
+// Logging Helpers
 // =============================================================================
 
-/** Capture a non-retryable upload error to Sentry */
 function captureUploadError(
+  env: Bindings,
+  ctx: ExecutionContext | undefined,
   errorType: string,
   context: {
     intentId?: string;
@@ -180,27 +186,31 @@ function captureUploadError(
     extra?: Record<string, unknown>;
   },
 ): void {
-  Sentry.withScope((scope) => {
-    scope.setTag('error_type', errorType);
-    scope.setTag('queue', 'upload-processing');
-    if (context.intentId) scope.setTag('intent_id', context.intentId);
-    if (context.photographerId) scope.setTag('photographer_id', context.photographerId);
-    if (context.eventId) scope.setTag('event_id', context.eventId);
-    if (context.r2Key) scope.setExtra('r2_key', context.r2Key);
-    if (context.fileSize != null) scope.setExtra('file_size', context.fileSize);
-    if (context.contentType) scope.setExtra('content_type', context.contentType);
-    if (context.extra) {
-      for (const [k, v] of Object.entries(context.extra)) {
-        scope.setExtra(k, v);
-      }
-    }
-    scope.setLevel('error');
-    Sentry.captureMessage(`Upload failed: ${errorType}`);
-  });
+  emitWorkerLog(
+    env,
+    'error',
+    'upload_processing_failed',
+    {
+      area: AREA,
+      component: COMPONENT,
+      operation: 'process_upload',
+      queue: 'upload-processing',
+      error_type: errorType,
+      intent_id: context.intentId,
+      photographer_id: context.photographerId,
+      event_id: context.eventId,
+      r2_key: context.r2Key,
+      file_size: context.fileSize,
+      content_type: context.contentType,
+      ...(context.extra ?? {}),
+    },
+    ctx,
+  );
 }
 
-/** Capture a retryable upload error to Sentry (warning level) */
 function captureUploadWarning(
+  env: Bindings,
+  ctx: ExecutionContext | undefined,
   errorType: string,
   context: {
     intentId?: string;
@@ -210,21 +220,24 @@ function captureUploadWarning(
     extra?: Record<string, unknown>;
   },
 ): void {
-  Sentry.withScope((scope) => {
-    scope.setTag('error_type', errorType);
-    scope.setTag('queue', 'upload-processing');
-    if (context.intentId) scope.setTag('intent_id', context.intentId);
-    if (context.photographerId) scope.setTag('photographer_id', context.photographerId);
-    if (context.eventId) scope.setTag('event_id', context.eventId);
-    if (context.r2Key) scope.setExtra('r2_key', context.r2Key);
-    if (context.extra) {
-      for (const [k, v] of Object.entries(context.extra)) {
-        scope.setExtra(k, v);
-      }
-    }
-    scope.setLevel('warning');
-    Sentry.captureMessage(`Upload warning: ${errorType}`);
-  });
+  emitWorkerLog(
+    env,
+    'warn',
+    'upload_processing_warning',
+    {
+      area: AREA,
+      component: COMPONENT,
+      operation: 'process_upload',
+      queue: 'upload-processing',
+      error_type: errorType,
+      intent_id: context.intentId,
+      photographer_id: context.photographerId,
+      event_id: context.eventId,
+      r2_key: context.r2Key,
+      ...(context.extra ?? {}),
+    },
+    ctx,
+  );
 }
 
 // =============================================================================
@@ -233,8 +246,10 @@ function captureUploadWarning(
 
 async function processUpload(
   env: Bindings,
+  ctx: ExecutionContext,
   event: R2EventMessage,
   caches: UploadBatchCaches,
+  traceSpan: TraceSpan,
 ): Promise<Result<void, UploadProcessingError>> {
   return safeTry(async function* () {
     const { key, size } = event.object;
@@ -244,14 +259,12 @@ async function processUpload(
 
     // Step 1: Find matching upload intent
     const intent = yield* ResultAsync.fromPromise(
-      Sentry.startSpan({ name: 'upload.find_intent', op: 'db.query' }, () =>
-        db.query.uploadIntents.findFirst({ where: eq(uploadIntents.r2Key, key) }),
-      ),
+      db.query.uploadIntents.findFirst({ where: eq(uploadIntents.r2Key, key) }),
       (cause): UploadProcessingError => ({ type: 'database', operation: 'find_intent', cause }),
     );
 
     if (!intent) {
-      captureUploadWarning('orphan', { r2Key: key });
+      captureUploadWarning(env, ctx, 'orphan', { r2Key: key });
       return err<never, UploadProcessingError>({ type: 'orphan', key });
     }
 
@@ -266,7 +279,7 @@ async function processUpload(
       return ok(undefined);
     }
 
-    // Intent context available from here — used in all Sentry captures below
+    // Intent context available from here — used in all observability logs below
     const intentCtx = {
       intentId: intent.id,
       photographerId: intent.photographerId,
@@ -297,20 +310,18 @@ async function processUpload(
 
     // Step 2: Check if intent expired
     if (new Date(intent.expiresAt) < new Date(event.eventTime)) {
-      captureUploadWarning('expired', intentCtx);
+      captureUploadWarning(env, ctx, 'expired', intentCtx);
       return err<never, UploadProcessingError>({ type: 'expired', key, intentId: intent.id });
     }
 
     // Step 3: HEAD request first to check size without downloading
     const headResult = yield* ResultAsync.fromPromise(
-      Sentry.startSpan({ name: 'upload.r2_fetch', op: 'r2.get' }, () =>
-        env.PHOTOS_BUCKET.head(key),
-      ),
+      env.PHOTOS_BUCKET.head(key),
       (cause): UploadProcessingError => ({ type: 'r2', operation: 'head', cause }),
     );
 
     if (!headResult) {
-      captureUploadError('r2_object_not_found', intentCtx);
+      captureUploadError(env, ctx, 'r2_object_not_found', intentCtx);
       return err<never, UploadProcessingError>({
         type: 'r2',
         operation: 'head',
@@ -320,7 +331,7 @@ async function processUpload(
 
     // Step 4: Validate file size from HEAD before downloading
     if (headResult.size > PHOTO_MAX_FILE_SIZE) {
-      captureUploadError('invalid_file', {
+      captureUploadError(env, ctx, 'invalid_file', {
         ...intentCtx,
         fileSize: headResult.size,
         extra: { reason: 'size_exceeded', max_size: PHOTO_MAX_FILE_SIZE },
@@ -359,7 +370,7 @@ async function processUpload(
     // Step 6: Validate magic bytes
     const magicValidation = validateImageMagicBytes(new Uint8Array(imageBytes.slice(0, 16)));
     if (!magicValidation.valid) {
-      captureUploadError('invalid_file', {
+      captureUploadError(env, ctx, 'invalid_file', {
         ...intentCtx,
         extra: { reason: 'invalid_magic_bytes' },
       });
@@ -387,7 +398,7 @@ async function processUpload(
     })();
 
     if (dims && dims.width * dims.height > MAX_PIXELS) {
-      captureUploadError('invalid_file', {
+      captureUploadError(env, ctx, 'invalid_file', {
         ...intentCtx,
         extra: {
           reason: 'dimensions_too_large',
@@ -407,7 +418,7 @@ async function processUpload(
     }
 
     if (!dims) {
-      captureUploadError('invalid_file', {
+      captureUploadError(env, ctx, 'invalid_file', {
         ...intentCtx,
         extra: {
           reason: 'dimension_parse_failed',
@@ -427,8 +438,8 @@ async function processUpload(
     const exifResult = await extractExif(imageBytes);
     let exifData = exifResult.match(
       (data) => data,
-      (error) => {
-        captureUploadWarning('exif_extraction', {
+          (error) => {
+        captureUploadWarning(env, ctx, 'exif_extraction', {
           ...intentCtx,
           extra: {
             cause: error.cause instanceof Error ? error.cause.message : String(error.cause),
@@ -441,27 +452,10 @@ async function processUpload(
     // Step 7: Normalize image to JPEG via CF Images (external — zero Worker memory for decode)
     console.log(`[upload-consumer] Normalizing with CF Images: ${key}`);
 
-    const cfNormalizeResult = await Sentry.startSpan(
-      { name: 'upload.normalize', op: 'image.process' },
-      async (span) => {
-        span.setAttribute('upload.original_size', imageBytes.byteLength);
-        span.setAttribute('upload.normalization_method', 'cf_images');
-
-        const result = await normalizeWithCfImages(imageBytes, env.IMAGES);
-        result.match(
-          (val) => {
-            span.setAttribute('upload.width', val.width);
-            span.setAttribute('upload.height', val.height);
-            span.setAttribute('upload.file_size', val.bytes.byteLength);
-          },
-          (error) => span.setAttribute('upload.error_stage', error.stage),
-        );
-        return result;
-      },
-    );
+    const cfNormalizeResult = await normalizeWithCfImages(imageBytes, env.IMAGES);
 
     if (cfNormalizeResult.isErr()) {
-      captureUploadError('normalization', {
+      captureUploadError(env, ctx, 'normalization', {
         ...intentCtx,
         extra: {
           normalization_method: 'cf_images',
@@ -502,11 +496,9 @@ async function processUpload(
 
     // Step 9: Upload original (normalized) image to final location
     yield* ResultAsync.fromPromise(
-      Sentry.startSpan({ name: 'upload.r2_put_original', op: 'r2.put' }, () =>
-        env.PHOTOS_BUCKET.put(r2Keys.original, normalizedBytes, {
-          httpMetadata: { contentType: 'image/jpeg' },
-        }),
-      ),
+      env.PHOTOS_BUCKET.put(r2Keys.original, normalizedBytes, {
+        httpMetadata: { contentType: 'image/jpeg' },
+      }),
       (cause): UploadProcessingError => ({ type: 'r2', operation: 'put_original', cause }),
     );
 
@@ -518,7 +510,7 @@ async function processUpload(
     const eventSettings = hasEventSettings
       ? (caches.eventSettingsByEventId.get(intent.eventId) ?? null)
       : await ResultAsync.fromPromise(
-          Sentry.startSpan({ name: 'upload.load_event_settings', op: 'db.query' }, async () => {
+          (async () => {
             const [row] = await db
               .select({ settings: activeEvents.settings })
               .from(activeEvents)
@@ -533,7 +525,7 @@ async function processUpload(
               .where(eq(events.id, intent.eventId))
               .limit(1);
             return fallback?.settings ?? null;
-          }),
+          })(),
           (cause) => cause,
         ).match(
           (settings) => {
@@ -542,14 +534,14 @@ async function processUpload(
           },
           (cause) => {
             colorGradeSkip = { reason: 'event_settings_unavailable' };
-            // Do not cache failures: transient DB errors shouldn't disable grading
-            // for the rest of the batch.
-            if (!caches.eventSettingsLoadFailedByEventId.has(intent.eventId)) {
-              caches.eventSettingsLoadFailedByEventId.add(intent.eventId);
-              captureUploadWarning('color_grade_skipped', {
-                ...intentCtx,
-                extra: { reason: 'event_settings_unavailable', cause: unknownToString(cause) },
-              });
+              // Do not cache failures: transient DB errors shouldn't disable grading
+              // for the rest of the batch.
+              if (!caches.eventSettingsLoadFailedByEventId.has(intent.eventId)) {
+                caches.eventSettingsLoadFailedByEventId.add(intent.eventId);
+                captureUploadWarning(env, ctx, 'color_grade_skipped', {
+                  ...intentCtx,
+                  extra: { reason: 'event_settings_unavailable', cause: unknownToString(cause) },
+                });
             }
             return null;
           },
@@ -562,7 +554,7 @@ async function processUpload(
 
       const warnSkip = (reason: string, extra?: Record<string, unknown>) => {
         colorGradeSkip = { reason, extra };
-        captureUploadWarning('color_grade_skipped', {
+        captureUploadWarning(env, ctx, 'color_grade_skipped', {
           ...intentCtx,
           extra: { reason, lutId, ...(extra ?? {}) },
         });
@@ -578,15 +570,10 @@ async function processUpload(
       } else {
         let lutLookupFailed = false;
         const lutRow = await ResultAsync.fromPromise(
-          Sentry.startSpan({ name: 'upload.color_grade.find_lut', op: 'db.query' }, () =>
-            db.query.photoLuts.findFirst({
-              where: and(
-                eq(photoLuts.id, lutId),
-                eq(photoLuts.photographerId, intent.photographerId),
-              ),
-              columns: { status: true, lutR2Key: true },
-            }),
-          ),
+          db.query.photoLuts.findFirst({
+            where: and(eq(photoLuts.id, lutId), eq(photoLuts.photographerId, intent.photographerId)),
+            columns: { status: true, lutR2Key: true },
+          }),
           (cause) => cause,
         ).match(
           (row) => row,
@@ -631,13 +618,11 @@ async function processUpload(
           lutR2Key = lutRow.lutR2Key;
           let lutText = caches.lutTextByR2Key.get(lutR2Key);
 
-          if (lutText === undefined) {
-            const r2Object = await ResultAsync.fromPromise(
-              Sentry.startSpan({ name: 'upload.color_grade.r2_get_lut', op: 'r2.get' }, () =>
+            if (lutText === undefined) {
+              const r2Object = await ResultAsync.fromPromise(
                 env.PHOTOS_BUCKET.get(lutR2Key!),
-              ),
-              (cause) => cause,
-            ).match(
+                (cause) => cause,
+              ).match(
               (obj) => obj,
               (cause) => {
                 caches.lutTextByR2Key.set(lutR2Key!, null);
@@ -749,32 +734,30 @@ async function processUpload(
 
         if (preset === undefined) {
           const row = await ResultAsync.fromPromise(
-            Sentry.startSpan({ name: 'upload.auto_edit.find_preset', op: 'db.query' }, () =>
-              db
-                .select({
-                  contrast: autoEditPresets.contrast,
-                  brightness: autoEditPresets.brightness,
-                  saturation: autoEditPresets.saturation,
-                  sharpness: autoEditPresets.sharpness,
-                  autoContrast: autoEditPresets.autoContrast,
-                })
-                .from(autoEditPresets)
-                .where(
-                  and(
-                    eq(autoEditPresets.id, colorGrade.autoEditPresetId!),
-                    or(
-                      eq(autoEditPresets.photographerId, intent.photographerId),
-                      eq(autoEditPresets.isBuiltin, true),
-                    ),
+            db
+              .select({
+                contrast: autoEditPresets.contrast,
+                brightness: autoEditPresets.brightness,
+                saturation: autoEditPresets.saturation,
+                sharpness: autoEditPresets.sharpness,
+                autoContrast: autoEditPresets.autoContrast,
+              })
+              .from(autoEditPresets)
+              .where(
+                and(
+                  eq(autoEditPresets.id, colorGrade.autoEditPresetId!),
+                  or(
+                    eq(autoEditPresets.photographerId, intent.photographerId),
+                    eq(autoEditPresets.isBuiltin, true),
                   ),
-                )
-                .limit(1),
-            ),
+                ),
+              )
+              .limit(1),
             (cause) => cause,
           ).match(
             (rows) => rows[0] ?? null,
             (cause) => {
-              captureUploadWarning('auto_edit_preset_lookup_failed', {
+              captureUploadWarning(env, ctx, 'auto_edit_preset_lookup_failed', {
                 ...intentCtx,
                 extra: {
                   presetId: colorGrade.autoEditPresetId,
@@ -805,7 +788,7 @@ async function processUpload(
           modalOptions.sharpness = preset.sharpness;
           modalOptions.autoContrast = preset.autoContrast;
         } else {
-          captureUploadWarning('auto_edit_preset_not_found', {
+          captureUploadWarning(env, ctx, 'auto_edit_preset_not_found', {
             ...intentCtx,
             extra: {
               presetId: colorGrade.autoEditPresetId,
@@ -857,7 +840,7 @@ async function processUpload(
           'If-None-Match': '*',
         };
       } catch (cause) {
-        captureUploadWarning('modal_presign_failed', {
+        captureUploadWarning(env, ctx, 'modal_presign_failed', {
           ...intentCtx,
           extra: { cause: unknownToString(cause) },
         });
@@ -865,17 +848,15 @@ async function processUpload(
 
       const modalResult =
         inputUrl && outputUrl && outputHeaders
-          ? await Sentry.startSpan(
-              { name: 'upload.modal_process', op: 'image.process' },
-              async (span) => {
-                span.setAttribute('upload.modal.auto_edit', colorGrade.autoEdit);
-                span.setAttribute('upload.modal.preset_id', colorGrade.autoEditPresetId ?? 'null');
-                span.setAttribute('upload.modal.auto_edit_intensity', colorGrade.autoEditIntensity);
-                span.setAttribute('upload.modal.lut_enabled', !!colorGrade.lutId);
-                span.setAttribute('upload.modal.lut_intensity', colorGrade.lutIntensity);
-                span.setAttribute('upload.modal.input_size', fileSizeOriginal);
-
-                const result = await processWithModal(
+          ? await (async () => {
+              const modalStartedAt = Date.now();
+              const modalSpan = traceSpan.child('modal.process', {
+                attributes: {
+                  'http.route': '/framefast-image-pipeline-process',
+                },
+              });
+              const result = await runWithTraceSpan(modalSpan, async () =>
+                await processWithModal(
                   inputUrl,
                   { url: outputUrl, headers: outputHeaders },
                   modalOptions,
@@ -883,19 +864,46 @@ async function processUpload(
                     MODAL_KEY: env.MODAL_KEY!,
                     MODAL_SECRET: env.MODAL_SECRET!,
                   },
-                );
-                result.match(
-                  (val) => {
-                    span.setAttribute('upload.modal.output_size', val.outputSize);
-                    span.setAttribute('upload.modal.width', val.width);
-                    span.setAttribute('upload.modal.height', val.height);
-                    span.setAttribute('upload.modal.operations', val.operationsApplied.join(','));
+                ),
+              );
+              if (result.isErr()) {
+                modalSpan.end('error', {
+                  attributes: {
+                    'error.type': result.error.type,
                   },
-                  (error) => span.setAttribute('upload.modal.error', error.message),
+                  statusMessage: result.error.type,
+                });
+                emitHistogramMetricMs(
+                  env,
+                  ctx,
+                  'framefast_upload_stage_duration_ms',
+                  Date.now() - modalStartedAt,
+                  {
+                    source: intent.source ?? 'unknown',
+                    stage: 'image_processing',
+                    status: 'error',
+                  },
                 );
-                return result;
-              },
-            )
+              } else {
+                modalSpan.end('ok', {
+                  attributes: {
+                    'modal.output_size': result.value.outputSize,
+                  },
+                });
+                emitHistogramMetricMs(
+                  env,
+                  ctx,
+                  'framefast_upload_stage_duration_ms',
+                  Date.now() - modalStartedAt,
+                  {
+                    source: intent.source ?? 'unknown',
+                    stage: 'image_processing',
+                    status: 'ok',
+                  },
+                );
+              }
+              return result;
+            })()
           : err({
               type: 'modal_response' as const,
               message: 'Modal presign failed',
@@ -909,7 +917,7 @@ async function processUpload(
           errorMessage: modalResult.error.message,
         });
         // Modal failure is non-fatal — use un-graded CF Images output + warn.
-        captureUploadWarning('modal_process_failed', {
+        captureUploadWarning(env, ctx, 'modal_process_failed', {
           ...intentCtx,
           extra: {
             error: modalResult.error.message,
@@ -960,8 +968,7 @@ async function processUpload(
     const dbTx = createDbTx(env.DATABASE_URL);
 
     const photo = yield* ResultAsync.fromPromise(
-      Sentry.startSpan({ name: 'upload.transaction', op: 'db.transaction' }, () =>
-        dbTx.transaction(async (tx) => {
+      dbTx.transaction(async (tx) => {
           // Steps 10a-10e: Debit base upload credit via FIFO allocation
           const baseDebitResult = await debitCreditsIfNotExists(tx, {
             photographerId: intent.photographerId,
@@ -1028,17 +1035,16 @@ async function processUpload(
 
           return newPhoto;
         }),
-      ),
       (cause): UploadProcessingError => {
         // CreditError discriminated union from debitCredits
         if (cause && typeof cause === 'object' && 'type' in cause) {
           const creditErr = cause as { type: string; cause?: unknown };
           if (creditErr.type === 'insufficient_credits') {
-            captureUploadError('insufficient_credits', intentCtx);
+            captureUploadError(env, ctx, 'insufficient_credits', intentCtx);
             return { type: 'insufficient_credits', key, intentId: intent.id };
           }
         }
-        captureUploadError('database', {
+        captureUploadError(env, ctx, 'database', {
           ...intentCtx,
           extra: { operation: 'transaction', cause: String(cause) },
         });
@@ -1050,21 +1056,20 @@ async function processUpload(
 
     // Step 12: Enqueue for face detection (best-effort)
     // The transaction already committed — credit deducted, photo created, intent completed.
-    // If enqueue fails, we capture to Sentry but still return ok() to avoid:
+    // If enqueue fails, we capture to logs but still return ok() to avoid:
     //   - re-running the entire pipeline (double credit deduction, duplicate photo)
     //   - overwriting the completed intent back to failed
     // The photo will be stuck in 'uploading' but a reconciliation cron can re-enqueue it.
     await ResultAsync.fromPromise(
-      Sentry.startSpan({ name: 'upload.enqueue', op: 'queue.send' }, () =>
-        env.PHOTO_QUEUE.send({
-          photo_id: photo.id,
-          event_id: intent.eventId,
-          r2_key: photo.r2Key,
-        } as PhotoJob),
-      ),
+      env.PHOTO_QUEUE.send({
+        photo_id: photo.id,
+        event_id: intent.eventId,
+        r2_key: photo.r2Key,
+        ...traceSpan.propagationHeaders(),
+      } as PhotoJob),
       (cause) => cause,
     ).mapErr((enqueueCause) => {
-      captureUploadError('enqueue_failed', {
+      captureUploadError(env, ctx, 'enqueue_failed', {
         ...intentCtx,
         extra: {
           photoId: photo.id,
@@ -1098,10 +1103,9 @@ export async function queue(
     lutLookupFailedByCacheKey: new Set(),
     lutTextByR2Key: new Map(),
   };
-
+  const db = createDb(env.DATABASE_URL);
   for (const message of batch.messages) {
     const event = message.body;
-
     // Only process PutObject events
     if (event.action !== 'PutObject' && event.action !== 'CompleteMultipartUpload') {
       message.ack();
@@ -1114,27 +1118,94 @@ export async function queue(
       continue;
     }
 
-    const result = await Sentry.startSpan(
-      { name: 'upload.process', op: 'queue.process' },
-      async (rootSpan) => {
-        const r = await processUpload(env, event, caches);
-        rootSpan.setAttribute('upload.r2_key', event.object.key);
-        r.match(
-          () => rootSpan.setAttribute('upload.status', 'ok'),
-          (error) => {
-            rootSpan.setAttribute('upload.status', 'error');
-            rootSpan.setAttribute('upload.error_type', error.type);
+    let parentTraceparent: string | null = null;
+    let parentBaggage: string | undefined;
+    const headForTrace = await env.PHOTOS_BUCKET.head(event.object.key).catch(() => null);
+    if (headForTrace?.customMetadata) {
+      parentTraceparent = headForTrace.customMetadata.traceparent ?? null;
+      parentBaggage = headForTrace.customMetadata.baggage;
+    }
+
+    const traceSpan = new TraceSpan(env, 'upload.queue.process', {
+      parentTraceparent,
+      baggage: parentBaggage,
+      ctx,
+      attributes: {
+        'queue.name': 'upload-processing',
+        'r2.object.key': event.object.key,
+        'worker.message_attempt': message.attempts,
+      },
+    });
+    const startedAt = Date.now();
+    const emitJobMetrics = (status: 'ok' | 'error') => {
+      emitCounterMetric(env, ctx, 'framefast_queue_jobs_total', 1, {
+        queue: 'upload-processing',
+        operation: 'process_upload',
+        status,
+      });
+      emitHistogramMetricMs(
+        env,
+        ctx,
+        'framefast_queue_job_duration_ms',
+        Date.now() - startedAt,
+        {
+          queue: 'upload-processing',
+          operation: 'process_upload',
+        },
+      );
+    };
+
+    const result = await runWithTraceSpan(
+      traceSpan,
+      async () => await processUpload(env, ctx, event, caches, traceSpan),
+    );
+    result.match(
+      () => {
+        emitWorkerLog(
+          env,
+          'info',
+          'upload_processed',
+          {
+            area: AREA,
+            component: COMPONENT,
+            operation: 'process_upload',
+            queue: 'upload-processing',
+            r2_key: event.object.key,
+            status: 'ok',
+            trace_id: traceSpan.traceId,
+            span_id: traceSpan.spanId,
           },
+          ctx,
         );
-        return r;
+      },
+      (error) => {
+        emitWorkerLog(
+          env,
+          'warn',
+          'upload_process_error',
+          {
+            area: AREA,
+            component: COMPONENT,
+            operation: 'process_upload',
+            queue: 'upload-processing',
+            r2_key: event.object.key,
+            status: 'error',
+            error_type: error.type,
+            trace_id: traceSpan.traceId,
+            span_id: traceSpan.spanId,
+          },
+          ctx,
+        );
       },
     );
-    const db = createDb(env.DATABASE_URL);
-
     // Process once, always ack. No message.retry() — wrangler max_retries: 1
     // provides a crash safety net; the idempotency guard makes redelivery safe.
     await result.match(
-      () => message.ack(),
+      () => {
+        message.ack();
+        traceSpan.end('ok');
+        emitJobMetrics('ok');
+      },
       async (error) => {
         switch (error.type) {
           case 'orphan':
@@ -1177,7 +1248,7 @@ export async function queue(
             break;
 
           case 'intent_update':
-            captureUploadError('intent_update', {
+            captureUploadError(env, ctx, 'intent_update', {
               intentId: error.intentId,
               extra: { cause: unknownToString(error.cause) },
             });
@@ -1194,7 +1265,7 @@ export async function queue(
             break;
 
           case 'normalization':
-            captureUploadError('normalization', {
+            captureUploadError(env, ctx, 'normalization', {
               intentId: error.intentId,
               r2Key: error.key,
               extra: { cause: unknownToString(error.cause) },
@@ -1214,7 +1285,7 @@ export async function queue(
           case 'database':
           case 'r2': {
             const errorCode = error.type === 'database' ? 'database_error' : 'r2_error';
-            captureUploadError(errorCode, {
+            captureUploadError(env, ctx, errorCode, {
               r2Key: event.object.key,
               extra: {
                 operation: 'operation' in error ? error.operation : undefined,
@@ -1248,6 +1319,13 @@ export async function queue(
         }
 
         message.ack();
+        traceSpan.end('error', {
+          attributes: {
+            'error.type': error.type,
+          },
+          statusMessage: error.type,
+        });
+        emitJobMetrics('error');
       },
     );
   }

@@ -27,6 +27,7 @@ import { createZip } from 'littlezipper';
 import { slideshowPhotosQuerySchema } from '../events/slideshow-schema';
 import { slideshowSettingsSchema } from '../events/slideshow-settings-schema';
 import { capturePostHogEvent } from '../../lib/posthog';
+import { emitCounterMetric, emitHistogramMetricMs } from '../../lib/observability/metrics';
 
 // =============================================================================
 // Schemas
@@ -51,6 +52,9 @@ const bulkDownloadSchema = z.object({
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 const MAX_SELFIE_SIZE = 10 * 1024 * 1024; // 10 MB
+const E2E_HISTOGRAM_BOUNDS_MS = [
+  100, 250, 500, 1000, 2500, 5000, 10000, 15000, 30000, 60000, 120000,
+];
 
 const searchRequestSchema = z.object({
   selfie: z
@@ -184,6 +188,61 @@ export const participantRouter = new Hono<Env>()
     zValidator('param', eventParamsSchema),
     zValidator('form', searchRequestSchema),
     async (c) => {
+      const searchStartedAt = Date.now();
+      const searchSource = 'participant';
+      let extractDurationMs: number | null = null;
+      let vectorSearchDurationMs: number | null = null;
+      let extractStatus: 'ok' | 'error' | null = null;
+      let vectorSearchStatus: 'ok' | 'error' | null = null;
+      const emitSearchMetrics = (status: 'ok' | 'error') => {
+        emitCounterMetric(
+          c.env,
+          c.executionCtx as unknown as ExecutionContext,
+          'framefast_search_e2e_total',
+          1,
+          {
+            source: searchSource,
+            status,
+          },
+        );
+        emitHistogramMetricMs(
+          c.env,
+          c.executionCtx as unknown as ExecutionContext,
+          'framefast_search_e2e_duration_ms',
+          Date.now() - searchStartedAt,
+          {
+            source: searchSource,
+            status,
+          },
+          E2E_HISTOGRAM_BOUNDS_MS,
+        );
+        if (extractDurationMs !== null && extractStatus) {
+          emitHistogramMetricMs(
+            c.env,
+            c.executionCtx as unknown as ExecutionContext,
+            'framefast_search_stage_duration_ms',
+            extractDurationMs,
+            {
+              source: searchSource,
+              stage: 'face_extraction',
+              status: extractStatus,
+            },
+          );
+        }
+        if (vectorSearchDurationMs !== null && vectorSearchStatus) {
+          emitHistogramMetricMs(
+            c.env,
+            c.executionCtx as unknown as ExecutionContext,
+            'framefast_search_stage_duration_ms',
+            vectorSearchDurationMs,
+            {
+              source: searchSource,
+              stage: 'vector_search',
+              status: vectorSearchStatus,
+            },
+          );
+        }
+      };
       return safeTry(async function* () {
         const { eventId } = c.req.valid('param');
 
@@ -275,9 +334,15 @@ export const participantRouter = new Hono<Env>()
           modalKey: c.env.MODAL_KEY!,
           modalSecret: c.env.MODAL_SECRET!,
         });
-        const extractResult = yield* extractor
-          .extractFaces(transformedBytes)
-          .mapErr(mapRecognitionError);
+        const extractStartedAt = Date.now();
+        const extractAttempt = await extractor.extractFaces(transformedBytes).mapErr(mapRecognitionError);
+        extractDurationMs = Date.now() - extractStartedAt;
+        if (extractAttempt.isErr()) {
+          extractStatus = 'error';
+          return err<never, HandlerError>(extractAttempt.error);
+        }
+        extractStatus = 'ok';
+        const extractResult = extractAttempt.value;
 
         // Guard: extraction succeeded but no face found (e.g. genuinely no face in image)
         if (extractResult.faces.length === 0) {
@@ -288,12 +353,20 @@ export const participantRouter = new Hono<Env>()
         const queryEmbedding = extractResult.faces[0].embedding;
 
         // Step 7: Search pgvector for similar faces in the event
-        const searchMatches = yield* searchByFace(c.var.db(), {
+        const vectorSearchStartedAt = Date.now();
+        const searchMatchesResult = await searchByFace(c.var.db(), {
           eventId,
           embedding: queryEmbedding,
           maxResults: FACE_SEARCH_MAX_RESULTS,
           minSimilarity: FACE_SEARCH_MIN_SIMILARITY,
         }).mapErr(mapRecognitionError);
+        vectorSearchDurationMs = Date.now() - vectorSearchStartedAt;
+        if (searchMatchesResult.isErr()) {
+          vectorSearchStatus = 'error';
+          return err<never, HandlerError>(searchMatchesResult.error);
+        }
+        vectorSearchStatus = 'ok';
+        const searchMatches = searchMatchesResult.value;
 
         // Step 8: Handle empty response - return 200 with empty array (NOT an error)
         if (searchMatches.length === 0) {
@@ -399,8 +472,14 @@ export const participantRouter = new Hono<Env>()
       })
         .orTee((e) => e.cause && console.error(`[${c.req.url}] ${e.code}:`, e.cause))
         .match(
-          (data) => c.json({ data }, 200),
-          (e) => apiError(c, e),
+          (data) => {
+            emitSearchMetrics('ok');
+            return c.json({ data }, 200);
+          },
+          (e) => {
+            emitSearchMetrics('error');
+            return apiError(c, e);
+          },
         );
     },
   )
