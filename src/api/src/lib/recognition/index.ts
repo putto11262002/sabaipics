@@ -11,6 +11,9 @@ export { createExtractor, type ExtractorConfig } from './extractor';
 // pgvector search
 export { searchByFace } from './search';
 
+// Tunable parameters
+export { FACE_SEARCH_MIN_SIMILARITY, FACE_SEARCH_MAX_RESULTS, FACE_SEARCH_EF_SEARCH } from './config';
+
 // Embedding persistence
 export { insertFaceEmbeddings } from './storage';
 

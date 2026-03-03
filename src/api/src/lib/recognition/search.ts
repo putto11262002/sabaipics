@@ -10,6 +10,11 @@ import { cosineDistance, sql, desc, eq, and, isNull } from 'drizzle-orm';
 import { faceEmbeddings, photos } from '@/db';
 import type { Database } from '@/db';
 import type { SearchOptions, PhotoMatch, RecognitionError } from './types';
+import {
+  FACE_SEARCH_MIN_SIMILARITY,
+  FACE_SEARCH_MAX_RESULTS,
+  FACE_SEARCH_EF_SEARCH,
+} from './config';
 
 /**
  * Search for photos containing faces similar to the query embedding.
@@ -27,33 +32,35 @@ export function searchByFace(
   const {
     eventId,
     embedding,
-    maxResults = 50,
-    minSimilarity = 0.8,
+    maxResults = FACE_SEARCH_MAX_RESULTS,
+    minSimilarity = FACE_SEARCH_MIN_SIMILARITY,
   } = options;
 
   const distance = cosineDistance(faceEmbeddings.embedding, embedding);
   const similarity = sql<number>`1 - (${distance})`;
 
   return ResultAsync.fromPromise(
-    db
-      .select({
-        photoId: faceEmbeddings.photoId,
-        similarity: sql<number>`MAX(${similarity})`,
-        faceCount: sql<number>`COUNT(*)::int`,
-      })
-      .from(faceEmbeddings)
-      .innerJoin(photos, eq(photos.id, faceEmbeddings.photoId))
-      .where(
-        and(
-          eq(photos.eventId, eventId),
-          eq(photos.status, 'indexed'),
-          isNull(photos.deletedAt),
-        ),
-      )
-      .groupBy(faceEmbeddings.photoId)
-      .having(sql`MAX(${similarity}) >= ${minSimilarity}`)
-      .orderBy(desc(sql`MAX(${similarity})`))
-      .limit(maxResults),
+    db.execute(sql`SET LOCAL hnsw.ef_search = ${FACE_SEARCH_EF_SEARCH}`).then(() =>
+      db
+        .select({
+          photoId: faceEmbeddings.photoId,
+          similarity: sql<number>`MAX(${similarity})`,
+          faceCount: sql<number>`COUNT(*)::int`,
+        })
+        .from(faceEmbeddings)
+        .innerJoin(photos, eq(photos.id, faceEmbeddings.photoId))
+        .where(
+          and(
+            eq(photos.eventId, eventId),
+            eq(photos.status, 'indexed'),
+            isNull(photos.deletedAt),
+          ),
+        )
+        .groupBy(faceEmbeddings.photoId)
+        .having(sql`MAX(${similarity}) >= ${minSimilarity}`)
+        .orderBy(desc(sql`MAX(${similarity})`))
+        .limit(maxResults),
+    ),
     (cause): RecognitionError => ({
       type: 'database',
       operation: 'search_by_face',
