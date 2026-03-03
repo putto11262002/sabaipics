@@ -128,9 +128,6 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@sentry/cloudflare':
-        specifier: ^10.38.0
-        version: 10.38.0
       '@tanstack/react-query':
         specifier: ^5.90.12
         version: 5.90.21(react@19.2.4)
@@ -3521,19 +3518,6 @@ packages:
 
   '@sec-ant/readable-stream@0.4.1':
     resolution: {integrity: sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg==}
-
-  '@sentry/cloudflare@10.38.0':
-    resolution: {integrity: sha512-g008TNjxPbS5csEem3u6jBO40qNY4Vky5q1hJXlUjoNnCDt+5vMLPMzVqJVVbAzWWU+dwjdiMzGeNjwn0RYwcQ==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@cloudflare/workers-types': ^4.x
-    peerDependenciesMeta:
-      '@cloudflare/workers-types':
-        optional: true
-
-  '@sentry/core@10.38.0':
-    resolution: {integrity: sha512-1pubWDZE5y5HZEPMAZERP4fVl2NH3Ihp1A+vMoVkb3Qc66Diqj1WierAnStlZP7tCx0TBa0dK85GTW/ZFYyB9g==}
-    engines: {node: '>=18'}
 
   '@shikijs/core@3.22.0':
     resolution: {integrity: sha512-iAlTtSDDbJiRpvgL5ugKEATDtHdUVkqgHDm/gbD2ZS9c88mx7G1zSYjjOxp5Qa0eaW0MAQosFRmJSk354PRoQA==}
@@ -11952,13 +11936,6 @@ snapshots:
   '@schummar/icu-type-parser@1.21.5': {}
 
   '@sec-ant/readable-stream@0.4.1': {}
-
-  '@sentry/cloudflare@10.38.0':
-    dependencies:
-      '@opentelemetry/api': 1.9.0
-      '@sentry/core': 10.38.0
-
-  '@sentry/core@10.38.0': {}
 
   '@shikijs/core@3.22.0':
     dependencies:
