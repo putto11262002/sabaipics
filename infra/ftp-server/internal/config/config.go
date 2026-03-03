@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"strconv"
 
 	"github.com/joho/godotenv"
@@ -17,10 +18,6 @@ type Config struct {
 	FTPIdleTimeout      int  // seconds
 	FTPDebug            bool // Enable FTP protocol command/response logging
 
-	// Sentry settings
-	SentryDSN         string
-	SentryEnvironment string
-
 	// TLS settings (optional)
 	TLSCertPath string
 	TLSKeyPath  string
@@ -31,6 +28,25 @@ type Config struct {
 
 	// API settings - FTP server proxies uploads to this API
 	APIURL string // Base URL for SabaiPics API (e.g., https://api.sabaipics.com)
+
+	// Environment label for observability
+	Environment string
+
+	// Grafana OTLP tracing
+	GrafanaOTLPTracesURL string
+	OTLPTracesUser       string
+	OTLPTracesToken      string
+	OTELTraceSampleRatio float64
+
+	// Grafana OTLP metrics
+	GrafanaOTLPMetricsURL string
+	OTLPMetricsUser       string
+	OTLPMetricsToken      string
+
+	// Grafana Loki logs
+	GrafanaLokiURL string
+	LokiUser       string
+	LokiToken      string
 }
 
 // Load reads configuration from environment variables
@@ -46,10 +62,6 @@ func Load() (*Config, error) {
 		FTPIdleTimeout:      getEnvInt("FTP_IDLE_TIMEOUT", 300),
 		FTPDebug:            getEnvBool("FTP_DEBUG", false),
 
-		// Sentry
-		SentryDSN:         getEnv("SENTRY_DSN", ""),
-		SentryEnvironment: getEnv("SENTRY_ENVIRONMENT", "development"),
-
 		// TLS (optional)
 		TLSCertPath: getEnv("TLS_CERT_PATH", ""),
 		TLSKeyPath:  getEnv("TLS_KEY_PATH", ""),
@@ -60,6 +72,25 @@ func Load() (*Config, error) {
 
 		// API settings
 		APIURL: getEnv("API_URL", ""),
+
+		// Observability
+		Environment: getEnv("NODE_ENV", "development"),
+
+		GrafanaOTLPTracesURL: getEnv("GRAFANA_OTLP_TRACES_URL", ""),
+		OTLPTracesUser:       getEnv("OTLP_TRACES_USER", ""),
+		OTLPTracesToken:      getEnv("OTLP_TRACES_TOKEN", ""),
+		OTELTraceSampleRatio: getEnvFloat(
+			"OTEL_TRACE_SAMPLE_RATIO",
+			defaultTraceSampleRatio(getEnv("NODE_ENV", "development")),
+		),
+
+		GrafanaOTLPMetricsURL: getEnv("GRAFANA_OTLP_METRICS_URL", ""),
+		OTLPMetricsUser:       getEnv("OTLP_METRICS_USER", ""),
+		OTLPMetricsToken:      getEnv("OTLP_METRICS_TOKEN", ""),
+
+		GrafanaLokiURL: getEnv("GRAFANA_LOKI_URL", ""),
+		LokiUser:       getEnv("LOKI_USER", ""),
+		LokiToken:      getEnv("LOKI_TOKEN", ""),
 	}
 
 	// Validate required fields
@@ -96,4 +127,30 @@ func getEnvBool(key string, defaultValue bool) bool {
 		}
 	}
 	return defaultValue
+}
+
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+			if floatVal < 0 {
+				return 0
+			}
+			if floatVal > 1 {
+				return 1
+			}
+			return floatVal
+		}
+	}
+	return defaultValue
+}
+
+func defaultTraceSampleRatio(env string) float64 {
+	switch strings.ToLower(strings.TrimSpace(env)) {
+	case "development", "dev", "local":
+		return 1
+	case "staging":
+		return 0.6
+	default:
+		return 0.5
+	}
 }

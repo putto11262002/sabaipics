@@ -1,0 +1,23 @@
+{
+  "id": null,
+  "uid": "framefast-tracing-overview",
+  "title": "FrameFast Tracing Overview",
+  "tags": ["framefast", "tracing", "tempo", "observability"],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "TraceQL Shortcuts",
+      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "# Explore Trace Queries\\n\\nUse Explore with datasource `grafanacloud-traces` and these TraceQL queries:\\n\\n- Upload flow spans\\n\\n```traceql\\n{ span.name = \"upload.queue.process\" } || { span.name = \"photo.queue.process\" } || { span.name = \"modal.process\" }\\n```\\n\\n- Recognition spans\\n\\n```traceql\\n{ resource.service.name = \"framefast-recognition\" } || { span.name = \"recognition.inference\" }\\n```\\n\\n- API entry spans\\n\\n```traceql\\n{ resource.service.name = \"framefast-api\" && span.name = \"http.request\" }\\n```"
+      }
+    }
+  ]
+}

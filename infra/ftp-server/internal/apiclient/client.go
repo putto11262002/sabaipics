@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/tracectx"
 )
 
 // APIClient defines the interface for API operations (for testing)
@@ -104,6 +106,7 @@ func (c *Client) Authenticate(ctx context.Context, req AuthRequest) (*AuthRespon
 		return nil, fmt.Errorf("failed to create auth request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	applyTraceHeaders(httpReq, ctx, "/api/ftp/auth")
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -152,6 +155,7 @@ func (c *Client) Presign(ctx context.Context, token, filename, contentType strin
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
+	applyTraceHeaders(req, ctx, "/api/ftp/presign")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -280,7 +284,7 @@ func mapPresignStatus(resp *http.Response, apiErr *APIError, parsed bool) error 
 		case "RATE_LIMITED":
 			return parseRateLimitError(resp)
 		case "BAD_REQUEST", "UNPROCESSABLE":
-			return fmt.Errorf(apiErr.Error.Message)
+			return errors.New(apiErr.Error.Message)
 		}
 	}
 
@@ -310,6 +314,18 @@ func parseRateLimitError(resp *http.Response) error {
 
 	return rateLimitError{
 		retryAfter: parseRetryAfterHeader(resp),
+	}
+}
+
+func applyTraceHeaders(req *http.Request, ctx context.Context, route string) {
+	traceparent, baggage, ok := tracectx.FromContext(ctx)
+	if !ok {
+		traceparent = tracectx.NewTraceparent()
+		baggage = tracectx.NewBaggage("ftp", route)
+	}
+	req.Header.Set("traceparent", traceparent)
+	if baggage != "" {
+		req.Header.Set("baggage", baggage)
 	}
 }
 

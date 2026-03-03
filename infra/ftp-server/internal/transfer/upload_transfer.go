@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,9 +12,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/apiclient"
 	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/clientmgr"
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/observability"
+	"github.com/sabaipics/sabaipics/apps/ftp-server/internal/tracectx"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ErrAuthExpired indicates that the JWT token has expired (401 from API)
@@ -26,20 +29,22 @@ var ErrAuthExpired = errors.New("authentication expired")
 // Buffers to disk to determine Content-Length before uploading to R2.
 // LIFETIME CONTRACT: 1:1 with uploadTransaction. Must not be reused after Close().
 type UploadTransfer struct {
-	ctx               context.Context
-	eventID           string
-	jwtToken          string
-	clientIP          string
-	filename          string
-	contentType       string
-	clientID          uint32 // Client ID for event reporting
-	clientMgr         *clientmgr.Manager
-	apiClient         apiclient.APIClient
-	tempFile          *os.File
-	tempPath          string
-	bytesWritten      atomic.Int64
-	startTime         time.Time
-	uploadTransaction *sentry.Span // Sentry ROOT transaction for this upload (1:1 lifetime)
+	ctx          context.Context
+	eventID      string
+	jwtToken     string
+	clientIP     string
+	filename     string
+	contentType  string
+	clientID     uint32 // Client ID for event reporting
+	clientMgr    *clientmgr.Manager
+	apiClient    apiclient.APIClient
+	tempFile     *os.File
+	tempPath     string
+	bytesWritten atomic.Int64
+	startTime    time.Time
+	traceparent  string
+	baggage      string
+	span         trace.Span
 }
 
 // NewUploadTransfer creates a new upload transfer that buffers to disk
@@ -52,42 +57,44 @@ func NewUploadTransfer(ctx context.Context, eventID, jwtToken, clientIP, filenam
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	uploadTransaction := sentry.StartTransaction(ctx,
-		"ftp.upload",
-		sentry.WithTransactionSource(sentry.SourceCustom),
-	)
-
-	uploadTransaction.SetTag("file.name", filename)
-	uploadTransaction.SetTag("event.id", eventID)
-	uploadTransaction.SetTag("client.ip", clientIP)
-
-	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
-	if ext != "" {
-		uploadTransaction.SetTag("file.extension", ext)
-		fileType := categorizeFileType(ext)
-		if fileType != "" {
-			uploadTransaction.SetTag("file.type", fileType)
-		}
+	ctx, uploadSpan := observability.StartUploadSpan(ctx, filename, eventID, clientIP)
+	traceparent, baggage, ok := observability.InjectHeaders(ctx)
+	if !ok {
+		traceparent = tracectx.NewTraceparent()
+		baggage = tracectx.NewBaggage("ftp", "/ftp/upload")
 	}
+	ctx = tracectx.WithTrace(ctx, traceparent, baggage)
 
 	transfer := &UploadTransfer{
-		ctx:               ctx,
-		eventID:           eventID,
-		jwtToken:          jwtToken,
-		clientIP:          clientIP,
-		filename:          filename,
-		contentType:       contentType,
-		clientID:          clientID,
-		clientMgr:         clientMgr,
-		apiClient:         apiClient,
-		tempFile:          tempFile,
-		tempPath:          tempFile.Name(),
-		startTime:         time.Now(),
-		uploadTransaction: uploadTransaction,
+		ctx:         ctx,
+		eventID:     eventID,
+		jwtToken:    jwtToken,
+		clientIP:    clientIP,
+		filename:    filename,
+		contentType: contentType,
+		clientID:    clientID,
+		clientMgr:   clientMgr,
+		apiClient:   apiClient,
+		tempFile:    tempFile,
+		tempPath:    tempFile.Name(),
+		startTime:   time.Now(),
+		traceparent: traceparent,
+		baggage:     baggage,
+		span:        uploadSpan,
 	}
 
-	sentry.NewLogger(uploadTransaction.Context()).Info().Emitf("Upload started: file=%s, event=%s, client=%s",
-		filename, eventID, clientIP)
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
+	fileType := ""
+	if ext != "" {
+		fileType = categorizeFileType(ext)
+	}
+	observability.EmitLog(ctx, "info", "upload_started", map[string]any{
+		"file":      filename,
+		"event_id":  eventID,
+		"client_ip": clientIP,
+		"extension": ext,
+		"file_type": fileType,
+	})
 
 	return transfer, nil
 }
@@ -102,13 +109,14 @@ func (t *UploadTransfer) Write(p []byte) (int, error) {
 // Close uploads the buffered file to R2
 func (t *UploadTransfer) Close() error {
 	if err := t.tempFile.Close(); err != nil {
-		if t.uploadTransaction != nil {
-			t.uploadTransaction.Status = sentry.SpanStatusInternalError
-			t.uploadTransaction.SetTag("error", "true")
-			t.uploadTransaction.SetData("error.message", err.Error())
-			t.uploadTransaction.Finish()
-		}
-		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("Temp file close error: file=%s, error=%v", t.filename, err)
+		t.span.SetStatus(codes.Error, "temp_file_close_failed")
+		t.span.RecordError(err)
+		t.span.End()
+		observability.RecordUpload("error", t.bytesWritten.Load(), time.Since(t.startTime))
+		observability.EmitLog(t.ctx, "error", "upload_temp_close_error", map[string]any{
+			"file":  t.filename,
+			"error": err.Error(),
+		})
 		return err
 	}
 
@@ -125,39 +133,54 @@ func (t *UploadTransfer) Close() error {
 	bytesTotal := t.bytesWritten.Load()
 	throughputMBps := float64(bytesTotal) / duration.Seconds() / 1024 / 1024
 
-	if t.uploadTransaction != nil {
-		t.uploadTransaction.SetData("upload.bytes", bytesTotal)
-		t.uploadTransaction.SetData("upload.duration_ms", duration.Milliseconds())
-		t.uploadTransaction.SetData("upload.throughput_mbps", throughputMBps)
-
-		if uploadErr != nil {
-			t.uploadTransaction.Status = sentry.SpanStatusInternalError
-			t.uploadTransaction.SetTag("error", "true")
-			t.uploadTransaction.SetData("error.message", uploadErr.Error())
-		} else {
-			t.uploadTransaction.Status = sentry.SpanStatusOK
-		}
-
-		t.uploadTransaction.Finish()
-	}
-
 	if uploadErr != nil {
-		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("Upload failed: file=%s, bytes=%d, error=%v", t.filename, bytesTotal, uploadErr)
+		t.span.SetStatus(codes.Error, "upload_failed")
+		t.span.RecordError(uploadErr)
+		t.span.SetAttributes(
+			attribute.Int64("upload.bytes", bytesTotal),
+			attribute.Int64("upload.duration_ms", duration.Milliseconds()),
+			attribute.Float64("upload.throughput_mbps", throughputMBps),
+		)
+		t.span.End()
+		observability.RecordUpload("error", bytesTotal, duration)
+		observability.EmitLog(t.ctx, "error", "upload_completed", map[string]any{
+			"status":          "error",
+			"file":            t.filename,
+			"bytes":           bytesTotal,
+			"duration_ms":     duration.Milliseconds(),
+			"throughput_mbps": throughputMBps,
+			"error":           uploadErr.Error(),
+		})
 	} else {
-		sentry.NewLogger(t.uploadTransaction.Context()).Info().Emitf("Upload completed: file=%s, bytes=%d, duration=%s, throughput=%.2f MB/s",
-			t.filename, bytesTotal, duration, throughputMBps)
+		t.span.SetAttributes(
+			attribute.Int64("upload.bytes", bytesTotal),
+			attribute.Int64("upload.duration_ms", duration.Milliseconds()),
+			attribute.Float64("upload.throughput_mbps", throughputMBps),
+		)
+		t.span.SetStatus(codes.Ok, "")
+		t.span.End()
+		observability.RecordUpload("ok", bytesTotal, duration)
+		observability.EmitLog(t.ctx, "info", "upload_completed", map[string]any{
+			"status":          "ok",
+			"file":            t.filename,
+			"bytes":           bytesTotal,
+			"duration_ms":     duration.Milliseconds(),
+			"throughput_mbps": throughputMBps,
+		})
 	}
 
 	return uploadErr
 }
 
 func (t *UploadTransfer) uploadBufferedFile(fileSize int64) error {
-	ctx := context.Background()
+	ctx := t.ctx
 
 	if err := t.presignAndUpload(ctx, fileSize); err != nil {
 		safeErr := sanitizeUploadError(err)
-		log.Printf("R2 upload failed for file=%s: %s", t.filename, safeErr)
-		sentry.NewLogger(t.uploadTransaction.Context()).Error().Emitf("R2 upload failed for file=%s: %s", t.filename, safeErr)
+		observability.EmitLog(t.ctx, "error", "upload_r2_failed", map[string]any{
+			"file":  t.filename,
+			"error": safeErr,
+		})
 
 		if errors.Is(err, apiclient.ErrUnauthorized) {
 			t.clientMgr.SendEvent(clientmgr.ClientEvent{
@@ -176,7 +199,9 @@ func (t *UploadTransfer) uploadBufferedFile(fileSize int64) error {
 		return fmt.Errorf("upload failed: %s", safeErr)
 	}
 
-	sentry.NewLogger(t.uploadTransaction.Context()).Info().Emitf("Upload successful: file=%s", t.filename)
+	observability.EmitLog(t.ctx, "info", "upload_r2_ok", map[string]any{
+		"file": t.filename,
+	})
 	return nil
 }
 
@@ -186,7 +211,8 @@ func (t *UploadTransfer) presignAndUpload(ctx context.Context, fileSize int64) e
 		contentLength = 0
 	}
 
-	presignCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	presignSpanCtx, presignSpan := observability.StartSpan(ctx, "ftp.presign")
+	presignCtx, cancel := context.WithTimeout(presignSpanCtx, 15*time.Second)
 	presignResp, err := t.apiClient.PresignWithRetry(
 		presignCtx,
 		t.jwtToken,
@@ -197,8 +223,13 @@ func (t *UploadTransfer) presignAndUpload(ctx context.Context, fileSize int64) e
 	)
 	cancel()
 	if err != nil {
+		presignSpan.SetStatus(codes.Error, "presign_failed")
+		presignSpan.RecordError(err)
+		presignSpan.End()
 		return err
 	}
+	presignSpan.SetStatus(codes.Ok, "")
+	presignSpan.End()
 
 	if presignResp == nil || presignResp.PutURL == "" {
 		return fmt.Errorf("presign response missing put_url")
@@ -223,7 +254,8 @@ func (t *UploadTransfer) presignAndUpload(ctx context.Context, fileSize int64) e
 		requiredHeaders["If-None-Match"] = "*"
 	}
 
-	uploadCtx, uploadCancel := context.WithTimeout(ctx, 30*time.Minute)
+	uploadSpanCtx, putSpan := observability.StartSpan(ctx, "ftp.upload_put")
+	uploadCtx, uploadCancel := context.WithTimeout(uploadSpanCtx, 30*time.Minute)
 	resp, err := t.apiClient.UploadToPresignedURL(
 		uploadCtx,
 		presignResp.PutURL,
@@ -232,13 +264,24 @@ func (t *UploadTransfer) presignAndUpload(ctx context.Context, fileSize int64) e
 	)
 	uploadCancel()
 	if err != nil {
+		putSpan.SetStatus(codes.Error, "put_failed")
+		putSpan.RecordError(err)
+		putSpan.End()
 		return err
 	}
-	defer resp.Body.Close()
+	if resp.Body != nil {
+		defer resp.Body.Close()
+	}
 
 	if resp.StatusCode != http.StatusOK {
+		putSpan.SetStatus(codes.Error, "put_status_failed")
+		putSpan.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
+		putSpan.End()
 		return fmt.Errorf("R2 upload failed: %d", resp.StatusCode)
 	}
+	putSpan.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
+	putSpan.SetStatus(codes.Ok, "")
+	putSpan.End()
 
 	return nil
 }

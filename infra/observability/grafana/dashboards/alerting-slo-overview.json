@@ -1,0 +1,103 @@
+{
+  "id": null,
+  "uid": "framefast-alerting-slo",
+  "title": "FrameFast Alerting + SLO",
+  "tags": ["framefast", "alerts", "slo", "observability"],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "API Error Ratio (%)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "100 * sum(rate(framefast_api_errors_total[5m])) / clamp_min(sum(rate(framefast_api_requests_total[5m])), 0.001)" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Client Error Rate (events/s)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(framefast_client_errors_total[5m]))" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Queue Failure Ratio (%)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "100 * sum(rate(framefast_queue_jobs_total{status=\"error\"}[10m])) / clamp_min(sum(rate(framefast_queue_jobs_total[10m])), 0.001)" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Upload-to-Index Success Rate (%)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        { "refId": "A", "expr": "100 * sum(rate(framefast_upload_e2e_total{status=\"ok\"}[15m])) / clamp_min(sum(rate(framefast_upload_e2e_total[15m])), 0.001)" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Upload-to-Index p95 (ms)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_upload_e2e_duration_ms_milliseconds_bucket[15m])))" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Search Success Rate (%)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "targets": [
+        { "refId": "A", "expr": "100 * sum(rate(framefast_search_e2e_total{status=\"ok\"}[15m])) / clamp_min(sum(rate(framefast_search_e2e_total[15m])), 0.001)" }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Search p95 (ms)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_search_e2e_duration_ms_milliseconds_bucket[15m])))" }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Recognition Error Ratio (%)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "targets": [
+        { "refId": "A", "expr": "100 * sum(rate(framefast_recognition_errors_total[10m])) / clamp_min(sum(rate(framefast_recognition_requests_total[10m])), 0.001)" }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Recognition p95 (ms)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_recognition_inference_latency_ms_milliseconds_bucket[10m])))" }
+      ]
+    }
+  ]
+}
