@@ -128,8 +128,10 @@ const authQuerySchema = z.object({
 });
 
 const callbackQuerySchema = z.object({
-  code: z.string().min(1, 'Authorization code required'),
-  state: z.string().min(1, 'State parameter required'),
+  code: z.string().optional(),
+  state: z.string().optional(),
+  error: z.string().optional(),
+  error_description: z.string().optional(),
   friendship_status_changed: z.string().optional(),
 });
 
@@ -269,11 +271,60 @@ export const lineParticipantRouter = new Hono<Env>()
   // GET /participant/line/callback — Handle LINE Login OAuth callback
   // =========================================================================
   .get('/callback', zValidator('query', callbackQuerySchema), async (c) => {
-    return safeTry(async function* () {
-      const { code, state } = c.req.valid('query');
+    const { code, state, error: lineError, error_description: lineErrorDesc } = c.req.valid('query');
+    const eventAppUrl = c.env.EVENT_FRONTEND_URL;
+    const redirectUri = `${c.env.API_BASE_URL}/participant/line/callback`;
 
+    // Helper: try to extract eventId from state (without full verification)
+    const tryDecodeState = (): { eventId: string; searchId: string; retry?: boolean } | null => {
+      try {
+        if (!state) return null;
+        const stateData = JSON.parse(atob(state)) as { payload: string };
+        return JSON.parse(stateData.payload);
+      } catch {
+        return null;
+      }
+    };
+
+    // Helper: build retry auth URL with disable_auto_login
+    const buildRetryUrl = async (eventId: string, searchId: string): Promise<string> => {
+      const retryPayload = JSON.stringify({ eventId, searchId, retry: true });
+      const retryState = await signState(retryPayload, c.env.LINE_LOGIN_CHANNEL_SECRET);
+      return buildLineLoginUrl({
+        channelId: c.env.LINE_LOGIN_CHANNEL_ID,
+        redirectUri,
+        state: btoa(JSON.stringify(retryState)),
+        disableAutoLogin: true,
+      });
+    };
+
+    // Handle LINE error response (user denied, auto login failure, etc.)
+    if (lineError) {
+      const decoded = tryDecodeState();
+      if (decoded && !decoded.retry) {
+        // First attempt failed — retry with disable_auto_login
+        const retryUrl = await buildRetryUrl(decoded.eventId, decoded.searchId);
+        return c.redirect(retryUrl, 302);
+      }
+      // Already retried or can't decode state — show error
+      const msg = lineErrorDesc || lineError;
+      if (decoded) {
+        return c.redirect(
+          `${eventAppUrl}/${decoded.eventId}/line-callback?status=error&message=${encodeURIComponent(msg)}`,
+          302,
+        );
+      }
+      return c.redirect(`${eventAppUrl}?status=error&message=${encodeURIComponent(msg)}`, 302);
+    }
+
+    // code and state are required for the normal flow
+    if (!code || !state) {
+      return c.redirect(`${eventAppUrl}?status=error&message=${encodeURIComponent('Missing parameters')}`, 302);
+    }
+
+    return safeTry(async function* () {
       // Decode and verify signed state
-      let parsedState: { eventId: string; searchId: string };
+      let parsedState: { eventId: string; searchId: string; retry?: boolean };
       try {
         const stateData = JSON.parse(atob(state)) as Awaited<ReturnType<typeof signState>>;
         const payload = await verifyState(stateData, c.env.LINE_LOGIN_CHANNEL_SECRET);
@@ -282,19 +333,33 @@ export const lineParticipantRouter = new Hono<Env>()
         }
         parsedState = JSON.parse(payload);
       } catch {
+        // State decode/verify failed — could be auto login failure
+        const decoded = tryDecodeState();
+        if (decoded && !decoded.retry) {
+          const retryUrl = await buildRetryUrl(decoded.eventId, decoded.searchId);
+          return ok(retryUrl);
+        }
         return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'Invalid state parameter' });
       }
 
       const { eventId, searchId } = parsedState;
-      const redirectUri = `${c.env.API_BASE_URL}/participant/line/callback`;
 
       // Exchange code for tokens
-      const tokens = yield* exchangeCodeForToken({
+      const tokenResult = await exchangeCodeForToken({
         code,
         redirectUri,
         channelId: c.env.LINE_LOGIN_CHANNEL_ID,
         channelSecret: c.env.LINE_LOGIN_CHANNEL_SECRET,
-      }).mapErr((e): HandlerError => ({
+      });
+
+      // If token exchange fails and this is the first attempt, retry with disable_auto_login
+      if (tokenResult.isErr() && !parsedState.retry) {
+        console.warn('[LINE callback] Token exchange failed, retrying with disable_auto_login', tokenResult.error);
+        const retryUrl = await buildRetryUrl(eventId, searchId);
+        return ok(retryUrl);
+      }
+
+      const tokens = yield* tokenResult.mapErr((e): HandlerError => ({
         code: 'BAD_GATEWAY',
         message: e.message,
         cause: e.cause,
@@ -322,7 +387,6 @@ export const lineParticipantRouter = new Hono<Env>()
       );
 
       // Redirect back to event app
-      const eventAppUrl = c.env.EVENT_FRONTEND_URL;
       const params = new URLSearchParams({
         lineUserId,
         searchId,
@@ -336,34 +400,12 @@ export const lineParticipantRouter = new Hono<Env>()
         (redirectUrl) => c.redirect(redirectUrl, 302),
         async (e) => {
           // On error, redirect to event app with error status
-          // Verify and parse the signed state before extracting eventId
-          try {
-            const { state } = c.req.valid('query');
-            const stateData = JSON.parse(atob(state)) as { payload: string; signature: string; timestamp: number };
-
-            // Verify signature before trusting the state
-            const payload = await verifyState(stateData, c.env.LINE_LOGIN_CHANNEL_SECRET);
-            if (!payload) {
-              // Invalid or expired state - redirect to generic error
-              return c.redirect(
-                `${c.env.EVENT_FRONTEND_URL}?status=error&message=${encodeURIComponent('Session expired')}`,
-                302,
-              );
-            }
-
-            const { eventId } = JSON.parse(payload);
-            const eventAppUrl = c.env.EVENT_FRONTEND_URL;
-            return c.redirect(
-              `${eventAppUrl}/${eventId}/line-callback?status=error&message=${encodeURIComponent(e.message)}`,
-              302,
-            );
-          } catch {
-            // State parsing failed - redirect to generic error page
-            return c.redirect(
-              `${c.env.EVENT_FRONTEND_URL}?status=error&message=${encodeURIComponent(e.message)}`,
-              302,
-            );
+          const decoded = tryDecodeState();
+          const msg = encodeURIComponent(e.message);
+          if (decoded) {
+            return c.redirect(`${eventAppUrl}/${decoded.eventId}/line-callback?status=error&message=${msg}`, 302);
           }
+          return c.redirect(`${eventAppUrl}?status=error&message=${msg}`, 302);
         },
       );
   })
