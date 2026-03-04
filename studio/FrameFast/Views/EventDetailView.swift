@@ -99,11 +99,23 @@ struct EventDetailView: View {
     @ViewBuilder
     private func eventContentView(event: Event) -> some View {
         List {
-            Section("Upload Activity") {
-                uploadActivitySection
-            }
+            Section("Activity") {
+                LabeledContent {
+                    Text("\(uploadSummary?.pending ?? 0)")
+                        .foregroundStyle(Color.primary)
+                } label: {
+                    Label("Pending", systemImage: "clock.arrow.circlepath")
+                        .foregroundStyle(Color.orange)
+                }
 
-            Section("Local Photos") {
+                LabeledContent {
+                    Text("\(uploadSummary?.completed ?? 0)")
+                        .foregroundStyle(Color.primary)
+                } label: {
+                    Label("Completed", systemImage: "checkmark.circle")
+                        .foregroundStyle(Color.green)
+                }
+
                 NavigationLink {
                     SpoolGalleryView(eventId: eventId, fileService: coordinator.fileService)
                 } label: {
@@ -118,24 +130,18 @@ struct EventDetailView: View {
                 }
             }
 
-            Section("Details") {
+            Section("Event") {
                 detailsSection(event: event)
+                infoSection(event: event)
             }
 
-            Section("Links") {
+            Section("Sharing") {
                 linksSection(event: event)
-            }
-
-            Section("FTP") {
                 ftpSection
             }
 
-            Section {
+            Section("Settings") {
                 imagePipelineSection
-            }
-
-            Section("Info") {
-                infoSection(event: event)
             }
         }
         .listStyle(.insetGrouped)
@@ -153,27 +159,6 @@ struct EventDetailView: View {
                 }
             }
         }
-    }
-
-    // MARK: - Upload Activity Section
-
-    private var uploadActivitySection: some View {
-        HStack(spacing: 12) {
-            EventDetailStatCard(
-                icon: "clock.arrow.circlepath",
-                iconTint: Color.orange,
-                title: String(localized: "Pending"),
-                value: "\(uploadSummary?.pending ?? 0)"
-            )
-            EventDetailStatCard(
-                icon: "checkmark.circle",
-                iconTint: Color.green,
-                title: String(localized: "Completed"),
-                value: "\(uploadSummary?.completed ?? 0)"
-            )
-        }
-        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-        .listRowBackground(Color.clear)
     }
 
     // MARK: - Details Section
@@ -559,43 +544,6 @@ private struct EditFieldSheet: View {
     }
 }
 
-// MARK: - Stat Card
-
-private struct EventDetailStatCard: View {
-    let icon: String
-    let iconTint: Color
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(Color.secondary)
-
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(iconTint)
-                Spacer(minLength: 8)
-                Text(value)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(Color.primary)
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color(UIColor.separator).opacity(0.6), lineWidth: 1)
-        )
-    }
-}
-
 // MARK: - Copyable Item
 
 private enum CopyableItem: Equatable {
@@ -635,16 +583,19 @@ private enum CopyableItem: Equatable {
 private struct EventDetailSkeletonPreview: View {
     var body: some View {
         List {
-            Section("Upload Activity") {
-                HStack(spacing: 12) {
-                    EventDetailStatCard(icon: "clock.arrow.circlepath", iconTint: .orange, title: "Pending", value: "0")
-                    EventDetailStatCard(icon: "checkmark.circle", iconTint: .green, title: "Completed", value: "0")
+            Section("Activity") {
+                LabeledContent {
+                    Text("0")
+                } label: {
+                    Label("Pending", systemImage: "clock.arrow.circlepath")
+                        .foregroundStyle(Color.orange)
                 }
-                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                .listRowBackground(Color.clear)
-            }
-
-            Section("Local Photos") {
+                LabeledContent {
+                    Text("0")
+                } label: {
+                    Label("Completed", systemImage: "checkmark.circle")
+                        .foregroundStyle(Color.green)
+                }
                 HStack {
                     Label("Photo Gallery", systemImage: "photo.on.rectangle.angled")
                     Spacer()
@@ -654,12 +605,14 @@ private struct EventDetailSkeletonPreview: View {
                 }
             }
 
-            Section("Details") {
+            Section("Event") {
                 LabeledContent("Name", value: "Loading Event Name")
                 LabeledContent("Subtitle", value: "Loading subtitle")
+                LabeledContent("Created", value: "Jan 1, 2026")
+                LabeledContent("Expires", value: "Mar 1, 2026")
             }
 
-            Section("Links") {
+            Section("Sharing") {
                 HStack {
                     Label("Search Link", systemImage: "magnifyingglass")
                     Spacer()
@@ -670,20 +623,12 @@ private struct EventDetailSkeletonPreview: View {
                     Spacer()
                     Image(systemName: "doc.on.doc").font(.subheadline)
                 }
-            }
-
-            Section("FTP") {
                 LabeledContent("Username", value: "ftp_loading")
                 LabeledContent("Password", value: "Reveal")
             }
 
-            Section {
+            Section("Settings") {
                 Text("Color Grading & Auto-Edit")
-            }
-
-            Section("Info") {
-                LabeledContent("Created", value: "Jan 1, 2026")
-                LabeledContent("Expires", value: "Mar 1, 2026")
             }
         }
         .listStyle(.insetGrouped)
@@ -697,16 +642,19 @@ private struct EventDetailSkeletonPreview: View {
 private struct EventDetailFullPreview: View {
     var body: some View {
         List {
-            Section("Upload Activity") {
-                HStack(spacing: 12) {
-                    EventDetailStatCard(icon: "clock.arrow.circlepath", iconTint: .orange, title: "Pending", value: "3")
-                    EventDetailStatCard(icon: "checkmark.circle", iconTint: .green, title: "Completed", value: "42")
+            Section("Activity") {
+                LabeledContent {
+                    Text("3")
+                } label: {
+                    Label("Pending", systemImage: "clock.arrow.circlepath")
+                        .foregroundStyle(Color.orange)
                 }
-                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                .listRowBackground(Color.clear)
-            }
-
-            Section("Local Photos") {
+                LabeledContent {
+                    Text("42")
+                } label: {
+                    Label("Completed", systemImage: "checkmark.circle")
+                        .foregroundStyle(Color.green)
+                }
                 HStack {
                     Label("Photo Gallery", systemImage: "photo.on.rectangle.angled")
                     Spacer()
@@ -716,12 +664,16 @@ private struct EventDetailFullPreview: View {
                 }
             }
 
-            Section("Details") {
+            Section("Event") {
                 LabeledContent("Name", value: "Wedding - Bangkok Grand Hotel")
                 LabeledContent("Subtitle", value: "John & Jane's Special Day")
+                LabeledContent("Created", value: "Jan 27, 2026 at 10:30 AM")
+                LabeledContent("Expires", value: "Mar 14, 2026 at 11:59 PM")
+                LabeledContent("Start Date", value: "Feb 14, 2026 at 6:00 PM")
+                LabeledContent("End Date", value: "Feb 14, 2026 at 11:00 PM")
             }
 
-            Section("Links") {
+            Section("Sharing") {
                 HStack {
                     Label("Search Link", systemImage: "magnifyingglass")
                     Spacer()
@@ -736,9 +688,6 @@ private struct EventDetailFullPreview: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.accentColor)
                 }
-            }
-
-            Section("FTP") {
                 LabeledContent("Username", value: "ABCDE")
                 HStack {
                     Text("Password")
@@ -749,15 +698,8 @@ private struct EventDetailFullPreview: View {
                 }
             }
 
-            Section {
+            Section("Settings") {
                 Text("Color Grading & Auto-Edit")
-            }
-
-            Section("Info") {
-                LabeledContent("Created", value: "Jan 27, 2026 at 10:30 AM")
-                LabeledContent("Expires", value: "Mar 14, 2026 at 11:59 PM")
-                LabeledContent("Start Date", value: "Feb 14, 2026 at 6:00 PM")
-                LabeledContent("End Date", value: "Feb 14, 2026 at 11:00 PM")
             }
         }
         .listStyle(.insetGrouped)
@@ -779,16 +721,19 @@ private struct EventDetailFullPreview: View {
 private struct EventDetailMinimalPreview: View {
     var body: some View {
         List {
-            Section("Upload Activity") {
-                HStack(spacing: 12) {
-                    EventDetailStatCard(icon: "clock.arrow.circlepath", iconTint: .orange, title: "Pending", value: "0")
-                    EventDetailStatCard(icon: "checkmark.circle", iconTint: .green, title: "Completed", value: "0")
+            Section("Activity") {
+                LabeledContent {
+                    Text("0")
+                } label: {
+                    Label("Pending", systemImage: "clock.arrow.circlepath")
+                        .foregroundStyle(Color.orange)
                 }
-                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                .listRowBackground(Color.clear)
-            }
-
-            Section("Local Photos") {
+                LabeledContent {
+                    Text("0")
+                } label: {
+                    Label("Completed", systemImage: "checkmark.circle")
+                        .foregroundStyle(Color.green)
+                }
                 HStack {
                     Label("Photo Gallery", systemImage: "photo.on.rectangle.angled")
                     Spacer()
@@ -798,15 +743,17 @@ private struct EventDetailMinimalPreview: View {
                 }
             }
 
-            Section("Details") {
+            Section("Event") {
                 LabeledContent("Name", value: "Minimal Event")
                 LabeledContent("Subtitle") {
                     Text("No subtitle")
                         .foregroundStyle(Color.secondary)
                 }
+                LabeledContent("Created", value: "Jan 20, 2026 at 2:15 PM")
+                LabeledContent("Expires", value: "Apr 1, 2026 at 11:59 PM")
             }
 
-            Section("Links") {
+            Section("Sharing") {
                 HStack {
                     Label("Search Link", systemImage: "magnifyingglass")
                     Spacer()
@@ -821,25 +768,17 @@ private struct EventDetailMinimalPreview: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.accentColor)
                 }
-            }
-
-            Section("FTP") {
                 Text("Not configured")
                     .foregroundStyle(Color.secondary)
             }
 
-            Section {
+            Section("Settings") {
                 HStack {
                     Text("Color Grading & Auto-Edit")
                         .foregroundStyle(Color.secondary)
                     Spacer()
                     ProgressView().controlSize(.small)
                 }
-            }
-
-            Section("Info") {
-                LabeledContent("Created", value: "Jan 20, 2026 at 2:15 PM")
-                LabeledContent("Expires", value: "Apr 1, 2026 at 11:59 PM")
             }
         }
         .listStyle(.insetGrouped)
