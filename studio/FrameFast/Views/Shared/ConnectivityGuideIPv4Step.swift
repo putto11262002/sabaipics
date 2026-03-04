@@ -119,16 +119,26 @@ struct ConnectivityGuideIPv4Step: View {
     // MARK: - Instruction
 
     private var instruction: some View {
-        Group {
-            switch phase {
-            case .highlightValues:
-                Text("Note your **IP Address** and **Subnet Mask**")
-            case .tapConfigureIP:
-                Text("Then tap **Configure IP**")
+        VStack(alignment: .leading, spacing: 8) {
+            Group {
+                switch phase {
+                case .highlightValues:
+                    Text("Note your **IP Address** and **Subnet Mask**")
+                case .tapConfigureIP:
+                    Text("Then tap **Configure IP**")
+                }
+            }
+            .font(.title3)
+            .foregroundStyle(.primary)
+            .animation(.easeInOut(duration: 0.3), value: phase)
+
+            if phase == .highlightValues {
+                Text("Tip: Press and hold to copy the IP Address")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity)
             }
         }
-        .font(.title3)
-        .foregroundStyle(.primary)
         .animation(.easeInOut(duration: 0.3), value: phase)
     }
 

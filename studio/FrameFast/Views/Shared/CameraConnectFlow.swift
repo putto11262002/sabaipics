@@ -218,7 +218,7 @@ struct CameraConnectFlow<Setup: View>: View {
                         step = .discovery(preferredRecordID: nil)
                     }
                 )
-                .navigationTitle(config.navigationTitle)
+                .navigationTitle("Settings Guide")
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationBarBackButtonHidden(true)
                 .toolbar {

@@ -50,6 +50,7 @@ struct ConnectivityGuideWiFiTapStep: View {
             List {
                 Section {
                     Toggle("Wi‑Fi", isOn: .constant(true))
+                        .tint(.green)
                 }
 
                 Section {
