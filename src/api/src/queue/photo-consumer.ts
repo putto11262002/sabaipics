@@ -63,6 +63,13 @@ const COMPONENT = 'photo-consumer';
 const E2E_HISTOGRAM_BOUNDS_MS = [
   100, 250, 500, 1000, 2500, 5000, 10000, 15000, 30000, 60000, 120000,
 ];
+const RETRY_DELAY_BOUNDS_MS = [1000, 2000, 5000, 10000, 15000, 30000, 60000, 120000];
+
+function attemptBucket(attempt: number): '1' | '2' | '3_plus' {
+  if (attempt <= 1) return '1';
+  if (attempt === 2) return '2';
+  return '3_plus';
+}
 
 function capturePhotoError(
   env: Bindings,
@@ -362,6 +369,7 @@ export async function queue(
         queue: 'photo-processing',
         operation: 'process_photo',
         status,
+        attempt_bucket: attemptBucket(message.attempts),
       });
       emitHistogramMetricMs(
         env,
@@ -372,6 +380,69 @@ export async function queue(
           queue: 'photo-processing',
           operation: 'process_photo',
         },
+      );
+    };
+    const emitRetryDecision = (options: {
+      decision: 'retry' | 'ack';
+      errorType: string;
+      errorName: string;
+      retryable: boolean;
+      throttle: boolean;
+      isLastAttempt: boolean;
+      delaySeconds?: number;
+      reason: string;
+    }) => {
+      emitCounterMetric(env, ctx, 'framefast_queue_retry_decisions_total', 1, {
+        queue: 'photo-processing',
+        operation: 'process_photo',
+        decision: options.decision,
+        error_type: options.errorType,
+        error_name: options.errorName,
+        retryable: options.retryable,
+        throttle: options.throttle,
+        is_last_attempt: options.isLastAttempt,
+        attempt_bucket: attemptBucket(message.attempts),
+      });
+      if (typeof options.delaySeconds === 'number') {
+        emitHistogramMetricMs(
+          env,
+          ctx,
+          'framefast_queue_retry_delay_ms',
+          options.delaySeconds * 1000,
+          {
+            queue: 'photo-processing',
+            operation: 'process_photo',
+            error_type: options.errorType,
+            throttle: options.throttle,
+          },
+          RETRY_DELAY_BOUNDS_MS,
+        );
+      }
+      emitWorkerLog(
+        env,
+        options.decision === 'retry' ? 'warn' : 'info',
+        'photo_retry_decision',
+        {
+          area: AREA,
+          component: COMPONENT,
+          operation: 'process_photo',
+          queue: 'photo-processing',
+          photo_id: message.body.photo_id,
+          event_id: message.body.event_id,
+          r2_key: message.body.r2_key,
+          decision: options.decision,
+          reason: options.reason,
+          error_type: options.errorType,
+          error_name: options.errorName,
+          retryable: options.retryable,
+          throttle: options.throttle,
+          is_last_attempt: options.isLastAttempt,
+          attempt: message.attempts,
+          delay_seconds: options.delaySeconds,
+          trace_id: rootSpan.traceId,
+          span_id: rootSpan.spanId,
+        },
+        ctx,
       );
     };
     const job = message.body;
@@ -502,6 +573,17 @@ export async function queue(
                 );
 
                 if (writeResult.isErr()) {
+                  const delaySeconds = getBackoffDelay(message.attempts);
+                  emitRetryDecision({
+                    decision: 'retry',
+                    errorType: persistErr.type,
+                    errorName: persistErr.type,
+                    retryable: true,
+                    throttle: false,
+                    isLastAttempt: false,
+                    delaySeconds,
+                    reason: 'persist_write_failed',
+                  });
                   emitWorkerLog(
                     env,
                     'error',
@@ -515,16 +597,26 @@ export async function queue(
                     },
                     ctx,
                   );
-                  message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+                  message.retry({ delaySeconds });
                   rootSpan.end('error', {
                     attributes: {
                       'error.type': persistErr.type,
                       'worker.retry': true,
+                      'worker.retry_delay_seconds': delaySeconds,
                     },
                     statusMessage: persistErr.type,
                   });
                   emitJobMetrics('error');
                 } else if (isLastAttempt) {
+                  emitRetryDecision({
+                    decision: 'ack',
+                    errorType: persistErr.type,
+                    errorName: persistErr.type,
+                    retryable: false,
+                    throttle: false,
+                    isLastAttempt: true,
+                    reason: 'persist_error_last_attempt',
+                  });
                   message.ack();
                   rootSpan.end('error', {
                     attributes: {
@@ -542,11 +634,23 @@ export async function queue(
                   emitUploadE2EMetrics('error', persistErr.type);
                   emitJobMetrics('error');
                 } else {
-                  message.retry({ delaySeconds: getBackoffDelay(message.attempts) });
+                  const delaySeconds = getBackoffDelay(message.attempts);
+                  emitRetryDecision({
+                    decision: 'retry',
+                    errorType: persistErr.type,
+                    errorName: persistErr.type,
+                    retryable: true,
+                    throttle: false,
+                    isLastAttempt: false,
+                    delaySeconds,
+                    reason: 'persist_error_retryable',
+                  });
+                  message.retry({ delaySeconds });
                   rootSpan.end('error', {
                     attributes: {
                       'error.type': persistErr.type,
                       'worker.retry': true,
+                      'worker.retry_delay_seconds': delaySeconds,
                     },
                     statusMessage: persistErr.type,
                   });
@@ -565,6 +669,7 @@ export async function queue(
 
           // Determine retry delay
           const delayFn = throttle ? getThrottleBackoffDelay : getBackoffDelay;
+          const delaySeconds = delayFn(message.attempts);
 
           // Write error to photo record
           const writeResult = await ResultAsync.fromPromise(
@@ -580,6 +685,16 @@ export async function queue(
           );
 
           if (writeResult.isErr()) {
+            emitRetryDecision({
+              decision: 'retry',
+              errorType: error.type,
+              errorName,
+              retryable: true,
+              throttle,
+              isLastAttempt: false,
+              delaySeconds,
+              reason: 'mark_failed_write_error',
+            });
             emitWorkerLog(
               env,
               'error',
@@ -593,16 +708,26 @@ export async function queue(
               },
               ctx,
             );
-            message.retry({ delaySeconds: delayFn(message.attempts) });
+            message.retry({ delaySeconds });
             rootSpan.end('error', {
               attributes: {
                 'error.type': error.type,
                 'worker.retry': true,
+                'worker.retry_delay_seconds': delaySeconds,
               },
               statusMessage: errorName,
             });
             emitJobMetrics('error');
           } else if (!retryable || isLastAttempt) {
+            emitRetryDecision({
+              decision: 'ack',
+              errorType: error.type,
+              errorName,
+              retryable,
+              throttle,
+              isLastAttempt,
+              reason: retryable ? 'last_attempt_exhausted' : 'non_retryable_error',
+            });
             message.ack();
             rootSpan.end('error', {
               attributes: {
@@ -620,11 +745,22 @@ export async function queue(
             emitUploadE2EMetrics('error', error.type);
             emitJobMetrics('error');
           } else {
-            message.retry({ delaySeconds: delayFn(message.attempts) });
+            emitRetryDecision({
+              decision: 'retry',
+              errorType: error.type,
+              errorName,
+              retryable,
+              throttle,
+              isLastAttempt,
+              delaySeconds,
+              reason: throttle ? 'throttle_backoff' : 'retryable_error',
+            });
+            message.retry({ delaySeconds });
             rootSpan.end('error', {
               attributes: {
                 'error.type': error.type,
                 'worker.retry': true,
+                'worker.retry_delay_seconds': delaySeconds,
               },
               statusMessage: errorName,
             });

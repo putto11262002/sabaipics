@@ -60,6 +60,12 @@ const AUTO_EDIT_SURCHARGE_OPERATION_TYPE = 'image_upload_auto_edit_surcharge';
 const AREA = 'upload';
 const COMPONENT = 'upload-consumer';
 
+function attemptBucket(attempt: number): '1' | '2' | '3_plus' {
+  if (attempt <= 1) return '1';
+  if (attempt === 2) return '2';
+  return '3_plus';
+}
+
 /**
  * Generate R2 keys for original and processed photos.
  * New structure: events/{eventId}/{photoId}/original.jpeg and processed.jpeg
@@ -1137,11 +1143,31 @@ export async function queue(
       },
     });
     const startedAt = Date.now();
+    if (message.attempts > 1) {
+      emitWorkerLog(
+        env,
+        'warn',
+        'upload_message_redelivery',
+        {
+          area: AREA,
+          component: COMPONENT,
+          operation: 'process_upload',
+          queue: 'upload-processing',
+          r2_key: event.object.key,
+          attempt: message.attempts,
+          attempt_bucket: attemptBucket(message.attempts),
+          trace_id: traceSpan.traceId,
+          span_id: traceSpan.spanId,
+        },
+        ctx,
+      );
+    }
     const emitJobMetrics = (status: 'ok' | 'error') => {
       emitCounterMetric(env, ctx, 'framefast_queue_jobs_total', 1, {
         queue: 'upload-processing',
         operation: 'process_upload',
         status,
+        attempt_bucket: attemptBucket(message.attempts),
       });
       emitHistogramMetricMs(
         env,
