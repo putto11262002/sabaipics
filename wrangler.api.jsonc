@@ -103,12 +103,12 @@
       },
       {
         "queue": "upload-processing-dev",
-        // CF Images handles the heavy decode externally; Photon is only used for
-        // LUT grading on the already-resized output (~14 MB RGBA). Safe to batch.
-        "max_batch_size": 10,
+        // Upload consumer currently reads full objects into memory via arrayBuffer().
+        // Keep per-instance batch tiny and fan out via queue concurrency.
+        "max_batch_size": 1,
         "max_batch_timeout": 5,
         "max_retries": 1,
-        "max_concurrency": 8,
+        "max_concurrency": 12,
         "dead_letter_queue": "upload-processing-dlq-dev",
       },
       {
@@ -267,11 +267,12 @@
           },
           {
             "queue": "upload-processing-staging",
-            // CF Images handles heavy decode — see dev comment above
-            "max_batch_size": 10,
+            // Upload consumer currently reads full objects into memory via arrayBuffer().
+            // Keep per-instance batch tiny and fan out via queue concurrency.
+            "max_batch_size": 1,
             "max_batch_timeout": 5,
             "max_retries": 1,
-            "max_concurrency": 8,
+            "max_concurrency": 12,
             "dead_letter_queue": "upload-processing-dlq-staging",
           },
           {
@@ -431,11 +432,12 @@
           },
           {
             "queue": "upload-processing",
-            // CF Images handles heavy decode — see dev comment above
-            "max_batch_size": 10,
+            // Upload consumer currently reads full objects into memory via arrayBuffer().
+            // Keep per-instance batch tiny and fan out via queue concurrency.
+            "max_batch_size": 1,
             "max_batch_timeout": 5,
             "max_retries": 1,
-            "max_concurrency": 8,
+            "max_concurrency": 12,
             "dead_letter_queue": "upload-processing-dlq",
           },
           {
