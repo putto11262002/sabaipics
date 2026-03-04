@@ -154,6 +154,7 @@ struct ConnectivityGuideConfigureIPStep: View {
         Button { } label: {
             Text("Save")
         }
+        .foregroundStyle(Color(.systemBlue))
         .guideHighlight(active: phase == .tapSave, scale: 1.3, frequency: 0.35)
     }
 
