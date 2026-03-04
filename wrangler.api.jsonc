@@ -90,7 +90,7 @@
         "max_batch_size": 50,
         "max_batch_timeout": 1,
         "max_retries": 1,
-        "max_concurrency": 3,
+        "max_concurrency": 10,
         "dead_letter_queue": "photo-processing-dlq-dev",
       },
       {
@@ -254,7 +254,7 @@
             "max_batch_size": 50,
             "max_batch_timeout": 1,
             "max_retries": 1,
-            "max_concurrency": 3,
+            "max_concurrency": 10,
             "dead_letter_queue": "photo-processing-dlq-staging",
           },
           {
@@ -419,7 +419,7 @@
             "max_batch_size": 50,
             "max_batch_timeout": 1,
             "max_retries": 1,
-            "max_concurrency": 3,
+            "max_concurrency": 10,
             "dead_letter_queue": "photo-processing-dlq",
           },
           {
