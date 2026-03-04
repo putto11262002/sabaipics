@@ -40,8 +40,11 @@ image = (
     cpu=2.0,
     memory=2048,
     timeout=60,
+    scaledown_window=120,
+    max_containers=8,
     secrets=[modal.Secret.from_name("framefast-observability")],
 )
+@modal.concurrent(max_inputs=2, target_inputs=1)
 @modal.fastapi_endpoint(method="POST", requires_proxy_auth=True)
 def process(request: dict) -> dict:
     """Process an image with optional auto-edit, LUT, and upscale."""
