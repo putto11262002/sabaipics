@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/components/ui/table';
+import { cn } from '@/shared/utils/ui';
 
 interface DataTableProps<TData> {
   table: TanstackTable<TData>;
@@ -16,17 +17,20 @@ interface DataTableProps<TData> {
   emptyMessage?: string;
   /** Callback when a row is clicked */
   onRowClick?: (row: TData) => void;
+  /** Additional classes for the wrapper div */
+  className?: string;
 }
 
 export function DataTable<TData>({
   table,
   emptyMessage = 'No results.',
   onRowClick,
+  className,
 }: DataTableProps<TData>) {
   return (
-    <div className="min-w-0 overflow-x-auto rounded-lg border">
+    <div className={cn('min-w-0 overflow-x-auto rounded-lg border', className)}>
       <Table>
-        <TableHeader className="bg-muted/50">
+        <TableHeader className="bg-card">
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
