@@ -8,6 +8,8 @@ Deploy:  modal deploy infra/recognition/modal_app.py
 Serve:   modal serve infra/recognition/modal_app.py  (dev, auto-reload)
 """
 
+from typing import Optional
+
 import modal
 
 _OBSERVABILITY_READY = False
@@ -17,6 +19,7 @@ _OBSERVABILITY_READY = False
 # =============================================================================
 
 app = modal.App(name="framefast-recognition")
+pipeline_scratch = modal.Volume.from_name("framefast-pipeline-scratch", create_if_missing=True)
 
 
 def download_model():
@@ -458,16 +461,117 @@ def create_web_app():
 # Modal Function
 # =============================================================================
 
+@app.function(
+    image=image,
+    gpu="T4",
+    region="us",
+    scaledown_window=120,
+    max_containers=20,
+    secrets=[modal.Secret.from_name("framefast-observability")],
+    volumes={"/vol": pipeline_scratch},
+)
+async def extract_internal(
+    image_url: Optional[str] = None,
+    volume_path: Optional[str] = None,
+    max_faces: int = 100,
+    min_confidence: float = 0.5,
+) -> dict:
+    """Extract face embeddings for internal Modal-to-Modal calls.
+
+    Reads image from shared volume (preferred, no network roundtrip) or URL fallback.
+    Cleans up volume file after reading.
+    """
+    import time
+    from io import BytesIO
+    import numpy as np
+    from PIL import Image
+    import cv2
+    from insightface.app import FaceAnalysis
+    import os
+
+    # Initialize face app (cached per container)
+    model_pack = os.getenv("MODEL_PACK", "buffalo_l")
+    det_size = int(os.getenv("DET_SIZE", "640"))
+    fa = FaceAnalysis(
+        name=model_pack,
+        root="/models",
+        providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+    )
+    fa.prepare(ctx_id=0, det_size=(det_size, det_size))
+
+    # Read image from volume (preferred) or URL (fallback)
+    if volume_path:
+        pipeline_scratch.reload()
+        with open(volume_path, "rb") as f:
+            image_bytes = f.read()
+        # Clean up volume file
+        try:
+            os.remove(volume_path)
+            parent = os.path.dirname(volume_path)
+            if parent and parent != "/vol":
+                os.rmdir(parent)
+            pipeline_scratch.commit()
+        except OSError:
+            pass
+    elif image_url:
+        import httpx
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            resp = await client.get(image_url)
+            resp.raise_for_status()
+            image_bytes = resp.content
+    else:
+        return {"error": "Either volume_path or image_url is required"}
+
+    # Decode image
+    pil_img = Image.open(BytesIO(image_bytes))
+    if pil_img.mode != "RGB":
+        pil_img = pil_img.convert("RGB")
+    img_array = np.array(pil_img)
+    img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+
+    img_height, img_width = img_array.shape[:2]
+
+    # Run face detection
+    start_ms = time.time()
+    detected = fa.get(img_array, max_num=min(max_faces, 100))
+    inference_ms = int((time.time() - start_ms) * 1000)
+
+    # Format faces
+    faces = []
+    for face in detected:
+        if face.det_score < min_confidence:
+            continue
+
+        bbox = face.bbox.astype(int)  # [x1, y1, x2, y2]
+        faces.append({
+            "embedding": face.embedding.tolist(),
+            "bounding_box": {
+                "x": float(bbox[0]) / img_width,
+                "y": float(bbox[1]) / img_height,
+                "width": float(bbox[2] - bbox[0]) / img_width,
+                "height": float(bbox[3] - bbox[1]) / img_height,
+            },
+            "confidence": float(face.det_score),
+        })
+
+    return {
+        "faces": faces,
+        "image_width": img_width,
+        "image_height": img_height,
+        "model": model_pack,
+        "inference_ms": inference_ms,
+    }
+
+
 
 @app.function(
     image=image,
     gpu="T4",
     region="us",
     scaledown_window=120,
-    max_containers=5,
+    max_containers=20,
     secrets=[modal.Secret.from_name("framefast-observability")],
 )
-@modal.concurrent(max_inputs=4, target_inputs=2)
 @modal.asgi_app(requires_proxy_auth=True)
 def serve():
     return create_web_app()

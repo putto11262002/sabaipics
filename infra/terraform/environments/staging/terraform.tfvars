@@ -52,6 +52,8 @@ queues = {
   logo_processing_dlq     = "logo-processing-dlq-staging"
   lut_processing          = "lut-processing-staging"
   lut_processing_dlq      = "lut-processing-dlq-staging"
+  photo_pipeline          = "photo-pipeline-staging"
+  photo_pipeline_dlq      = "photo-pipeline-dlq-staging"
 }
 
 # ------------------------------------------------------------------------------
@@ -62,8 +64,8 @@ queues = {
 bucket_notifications = [
   {
     prefix      = "uploads/"
-    queue_key   = "upload_processing"
-    description = "Trigger upload processing on new uploads"
+    queue_key   = "photo_pipeline"
+    description = "Trigger photo pipeline on new uploads"
   },
   {
     prefix      = "logos/"

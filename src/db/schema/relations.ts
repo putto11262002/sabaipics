@@ -10,6 +10,8 @@ import { participantSearches } from './participant-searches';
 import { giftCodes, giftCodeRedemptions } from './gift-codes';
 import { photoLuts } from './photo-luts';
 import { lineDeliveries } from './line-deliveries';
+import { uploadIntents } from './upload-intents';
+import { photoJobs } from './photo-jobs';
 
 // Photographer relations
 export const photographersRelations = relations(photographers, ({ many }) => ({
@@ -18,6 +20,7 @@ export const photographersRelations = relations(photographers, ({ many }) => ({
   consentRecords: many(consentRecords),
   photoLuts: many(photoLuts),
   lineDeliveries: many(lineDeliveries),
+  photoJobs: many(photoJobs),
 }));
 
 // Credit ledger relations
@@ -51,8 +54,24 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
     references: [photographers.id],
   }),
   photos: many(photos),
+  photoJobs: many(photoJobs),
   participantSearches: many(participantSearches),
   lineDeliveries: many(lineDeliveries),
+}));
+
+export const photoJobsRelations = relations(photoJobs, ({ one }) => ({
+  uploadIntent: one(uploadIntents, {
+    fields: [photoJobs.uploadIntentId],
+    references: [uploadIntents.id],
+  }),
+  event: one(events, {
+    fields: [photoJobs.eventId],
+    references: [events.id],
+  }),
+  photographer: one(photographers, {
+    fields: [photoJobs.photographerId],
+    references: [photographers.id],
+  }),
 }));
 
 // Photo LUT relations

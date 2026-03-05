@@ -56,6 +56,7 @@ locals {
     STRIPE_WEBHOOK_SECRET        = local.infisical["STRIPE_WEBHOOK_SECRET"].value
     MODAL_KEY                    = local.infisical["MODAL_KEY"].value
     MODAL_SECRET                 = local.infisical["MODAL_SECRET"].value
+    PIPELINE_CALLBACK_TOKEN      = local.infisical["PIPELINE_CALLBACK_TOKEN"].value
     FTP_PASSWORD_ENCRYPTION_KEY  = local.infisical["FTP_PASSWORD_ENCRYPTION_KEY"].value
     FTP_JWT_SECRET               = local.infisical["FTP_JWT_SECRET"].value
     DESKTOP_ACCESS_JWT_SECRET    = local.infisical["DESKTOP_ACCESS_JWT_SECRET"].value
