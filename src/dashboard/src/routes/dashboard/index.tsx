@@ -1,14 +1,22 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { differenceInDays, parseISO } from 'date-fns';
+import { differenceInDays, parseISO, format, subDays, eachDayOfInterval } from 'date-fns';
 import {
   AlertCircle,
   Calendar,
+  Clock,
   CreditCard,
-  Image as ImageIcon,
   RefreshCw,
-  Smile,
+  TrendingDown,
+  Wallet,
 } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/shared/components/ui/chart';
 
 import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { useDashboardData } from '../../hooks/dashboard/useDashboardData';
@@ -22,8 +30,8 @@ import { Button } from '@/shared/components/ui/button';
 import {
   Card,
   CardAction,
+  CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/shared/components/ui/card';
@@ -38,7 +46,23 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Spinner } from '@/shared/components/ui/spinner';
 import { CreditTopUpDialog } from '../../components/credits/CreditTopUpDialog';
 import { useValidatePromoCode } from '../../hooks/credits/useValidatePromoCode';
+import { useCreditHistory } from '../../hooks/credits/useCreditHistory';
+import { useUsageBySource } from '../../hooks/credits/useUsageBySource';
 import { LatestAnnouncementBanner } from '../../components/announcements/latest-announcement-card';
+
+const SOURCE_COLORS: Record<string, string> = {
+  upload: 'oklch(0.75 0.12 250)',
+  image_enhancement: 'oklch(0.78 0.10 170)',
+  line_delivery: 'oklch(0.80 0.10 85)',
+  admin_adjustment: 'oklch(0.75 0.10 310)',
+};
+
+const usageChartConfig = {
+  upload: { label: 'Photo Upload', color: 'oklch(0.65 0.15 250 / 0.7)' },
+  image_enhancement: { label: 'Image Enhancement', color: 'oklch(0.70 0.15 170 / 0.7)' },
+  line_delivery: { label: 'LINE Delivery', color: 'oklch(0.75 0.15 85 / 0.7)' },
+  admin_adjustment: { label: 'Admin', color: 'oklch(0.65 0.15 310 / 0.7)' },
+} satisfies ChartConfig;
 
 export function DashboardPage() {
   const [creditDialogOpen, setCreditDialogOpen] = useState(false);
@@ -49,8 +73,31 @@ export function DashboardPage() {
   const { data: eventsData, isLoading: eventsLoading } = useEvents(0, 10);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const downloadQR = useDownloadQR();
+  const { data: creditData, isLoading: creditLoading } = useCreditHistory(0, 1);
+  const { data: usageData, isLoading: usageLoading } = useUsageBySource(14);
 
   const dashboardData = data?.data;
+  const creditSummary = creditData?.data?.summary;
+
+  // Transform usage data into stacked bar format with all 14 days filled
+  const chartData = useMemo(() => {
+    if (!usageData) return [];
+    const byDate = new Map<string, Record<string, number>>();
+    for (const row of usageData) {
+      const existing = byDate.get(row.date) ?? {};
+      byDate.set(row.date, { ...existing, [row.source]: row.credits });
+    }
+    const today = new Date();
+    return eachDayOfInterval({ start: subDays(today, 13), end: today }).map((d) => {
+      const dateStr = format(d, 'yyyy-MM-dd');
+      return { date: dateStr, ...(byDate.get(dateStr) ?? {}) };
+    });
+  }, [usageData]);
+
+  const activeSources = useMemo(() => {
+    if (!usageData) return [];
+    return Array.from(new Set(usageData.map((d) => d.source)));
+  }, [usageData]);
 
   // Validate promo code to determine if it's a gift or discount code
   const validateQuery = useValidatePromoCode(promoCodeFromUrl || '', !!promoCodeFromUrl);
@@ -126,7 +173,7 @@ export function DashboardPage() {
   };
 
   // Create columns with action handlers
-  const columns = useMemo(() => createColumns(tableActions), [tableActions]);
+  const columns = useMemo(() => createColumns(tableActions).filter((c) => c.id !== 'select'), [tableActions]);
 
   // Create table instance - show all 10 items without pagination
   const table = useEventsTable({
@@ -151,11 +198,7 @@ export function DashboardPage() {
         {/* Loading State */}
         {isLoading && (
           <>
-            <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-              <Skeleton className="h-32 w-full rounded-xl" />
-              <Skeleton className="h-32 w-full rounded-xl" />
-              <Skeleton className="h-32 w-full rounded-xl" />
-            </div>
+            <Skeleton className="h-[280px] w-full rounded-xl" />
             <Skeleton className="h-64 w-full rounded-xl" />
           </>
         )}
@@ -201,60 +244,89 @@ export function DashboardPage() {
                 </Alert>
               )}
 
-            {/* Stats Cards Grid */}
-            <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-              {/* Credit Balance Card */}
-              <Card className="@container/card">
-                <CardHeader>
-                  <CardDescription>Credit Balance</CardDescription>
-                  <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-                    {dashboardData.credits.balance} credits
-                  </CardTitle>
-                  <CardAction>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => refetch()}
-                      disabled={isRefetching}
-                      title="Refresh balance"
-                    >
-                      <RefreshCw className={`size-4 ${isRefetching ? 'animate-spin' : ''}`} />
-                    </Button>
-                  </CardAction>
-                </CardHeader>
-                <CardFooter className="text-sm text-muted-foreground">
-                  1 credit per photo
-                </CardFooter>
-              </Card>
+            {/* Credit Overview */}
+            <Card>
+              <CardHeader>
+                <CardDescription className="text-xs">Available Balance</CardDescription>
+                <CardTitle className="text-3xl font-semibold tabular-nums text-primary">
+                  {creditLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <>{(creditSummary?.balance ?? dashboardData.credits.balance).toLocaleString()}</>
+                  )}
+                </CardTitle>
+                <CardAction>
+                  <Button variant="link" size="sm" asChild>
+                    <Link to="/credits">View details</Link>
+                  </Button>
+                </CardAction>
+              </CardHeader>
 
-              {/* Total Photos Card */}
-              <Card className="@container/card">
-                <CardHeader>
-                  <CardDescription>Total Photos</CardDescription>
-                  <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-                    {dashboardData.stats.totalPhotos}
-                  </CardTitle>
-                </CardHeader>
-                <CardFooter className="text-sm text-muted-foreground">
-                  <ImageIcon className="mr-1 size-4" />
-                  Across all events
-                </CardFooter>
-              </Card>
+              <CardContent>
+                {/* Summary stats row */}
+                <div className="mb-4 flex gap-6 text-sm">
+                  {creditLoading ? (
+                    <>
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-32" />
+                    </>
+                  ) : (
+                    <>
+                      {(creditSummary?.expiringSoon ?? 0) > 0 && (
+                        <span className="flex items-center gap-1 text-warning">
+                          <Clock className="size-3.5" />
+                          {creditSummary!.expiringSoon.toLocaleString()} expiring soon
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <TrendingDown className="size-3.5" />
+                        {(creditSummary?.usedThisMonth ?? 0).toLocaleString()} used this month
+                      </span>
+                    </>
+                  )}
+                </div>
 
-              {/* Total Faces Card */}
-              <Card className="@container/card">
-                <CardHeader>
-                  <CardDescription>Total Faces</CardDescription>
-                  <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-                    {dashboardData.stats.totalFaces}
-                  </CardTitle>
-                </CardHeader>
-                <CardFooter className="text-sm text-muted-foreground">
-                  <Smile className="mr-1 size-4" />
-                  Detected and indexed
-                </CardFooter>
-              </Card>
-            </div>
+                {/* Mini usage chart */}
+                {usageLoading ? (
+                  <Skeleton className="h-[160px] w-full" />
+                ) : (
+                  <ChartContainer config={usageChartConfig} className="h-[160px] w-full">
+                    <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        minTickGap={40}
+                        tickFormatter={(value: string) => format(new Date(value), 'MMM d')}
+                      />
+                      <YAxis tickLine={false} axisLine={false} tickMargin={8} width={30} />
+                      <ChartTooltip
+                        cursor={false}
+                        content={
+                          <ChartTooltipContent
+                            indicator="line"
+                            labelFormatter={(value: string) => format(new Date(value), 'MMM d, yyyy')}
+                          />
+                        }
+                      />
+                      {activeSources.map((source) => (
+                        <Bar
+                          key={source}
+                          dataKey={source}
+                          fill={SOURCE_COLORS[source] ?? 'var(--color-chart-5)'}
+                          fillOpacity={0.5}
+                          stackId="a"
+                          radius={[0, 0, 0, 0]}
+                        />
+                      ))}
+                    </BarChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+
+            </Card>
 
             {/* Events Section */}
             <div className="space-y-4">
@@ -312,7 +384,7 @@ export function DashboardPage() {
                 </Empty>
               ) : (
                 /* Just the table - no search, no pagination for dashboard */
-                <DataTable
+                <DataTable className="bg-card"
                   table={table}
                   emptyMessage="No events yet."
                   onRowClick={(event) => navigate(`/events/${event.id}`)}
