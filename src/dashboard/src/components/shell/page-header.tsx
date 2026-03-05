@@ -71,7 +71,7 @@ export function PageHeader({
                     className={index < breadcrumbs.length - 1 ? 'hidden md:block' : ''}
                   >
                     {item.href ? (
-                      <BreadcrumbLink href={item.href}>{item.label}</BreadcrumbLink>
+                      <BreadcrumbLink asChild><Link to={item.href}>{item.label}</Link></BreadcrumbLink>
                     ) : (
                       <BreadcrumbPage>{item.label}</BreadcrumbPage>
                     )}
