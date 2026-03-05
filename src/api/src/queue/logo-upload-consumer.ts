@@ -16,6 +16,8 @@ import { logoUploadIntents, events } from '@/db';
 import { eq } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, type Result } from 'neverthrow';
 import { extractJpegDimensions, validateImageMagicBytes } from '../lib/images';
+import { emitWorkerLog } from '../lib/observability/worker-log';
+import { emitHistogramMetricMs } from '../lib/observability/metrics';
 import {
   LOGO_MAX_FILE_SIZE,
   LOGO_MAX_DIMENSION,
@@ -33,6 +35,12 @@ type LogoProcessingError =
   | { type: 'database'; operation: string; cause: unknown }
   | { type: 'normalization'; key: string; intentId: string; cause: unknown }
   | { type: 'r2'; operation: string; cause: unknown };
+
+function getQueueLagMs(eventTime: string, nowMs: number): number | null {
+  const parsed = Date.parse(eventTime);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, nowMs - parsed);
+}
 
 // =============================================================================
 // Processing
@@ -321,10 +329,39 @@ async function handleLogoProcessingError(env: Bindings, error: LogoProcessingErr
 // =============================================================================
 
 export default {
-  async queue(batch: MessageBatch<R2EventMessage>, env: Bindings): Promise<void> {
+  async queue(
+    batch: MessageBatch<R2EventMessage>,
+    env: Bindings,
+    ctx: ExecutionContext,
+  ): Promise<void> {
     console.log(`[logo-upload-consumer] Processing batch of ${batch.messages.length} messages`);
 
     for (const message of batch.messages) {
+      const startedAt = Date.now();
+      const queueLagMs = getQueueLagMs(message.body.eventTime, startedAt);
+      if (queueLagMs !== null) {
+        emitHistogramMetricMs(env, ctx, 'framefast_queue_message_lag_ms', queueLagMs, {
+          queue: 'logo-processing',
+          operation: 'process_logo_upload',
+        });
+      }
+      if (message.attempts > 1) {
+        emitWorkerLog(
+          env,
+          'warn',
+          'logo_message_redelivery',
+          {
+            area: 'upload',
+            component: 'logo-upload-consumer',
+            operation: 'process_logo_upload',
+            queue: 'logo-processing',
+            r2_key: message.body.object.key,
+            attempt: message.attempts,
+            queue_lag_ms: queueLagMs ?? undefined,
+          },
+          ctx,
+        );
+      }
       const result = await processLogoUpload(env, message.body);
 
       if (result.isErr()) {
