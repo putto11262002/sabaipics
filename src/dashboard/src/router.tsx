@@ -55,6 +55,26 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorFallback />,
   },
 
+  // Auto-edit preset editor (auth required, no sidebar)
+  {
+    path: '/studio/auto-edit/new',
+    element: (
+      <ProtectedRoute>
+        <StudioAutoEditNewPage />
+      </ProtectedRoute>
+    ),
+    errorElement: <RouteErrorFallback />,
+  },
+  {
+    path: '/studio/auto-edit/:id/edit',
+    element: (
+      <ProtectedRoute>
+        <StudioAutoEditNewPage />
+      </ProtectedRoute>
+    ),
+    errorElement: <RouteErrorFallback />,
+  },
+
   // Credits routes (auth required, no sidebar)
   {
     path: '/credits',
@@ -104,14 +124,6 @@ export const router = createBrowserRouter([
       {
         path: '/studio/auto-edit',
         element: <StudioAutoEditPage />,
-      },
-      {
-        path: '/studio/auto-edit/new',
-        element: <StudioAutoEditNewPage />,
-      },
-      {
-        path: '/studio/auto-edit/:id/edit',
-        element: <StudioAutoEditNewPage />,
       },
       {
         path: '/credits',

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
+import { PageHeader } from '../../../components/shell/page-header';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Slider } from '@/shared/components/ui/slider';
@@ -13,7 +13,14 @@ import {
   FieldGroup,
   FieldLabel,
 } from '@/shared/components/ui/field';
-import { Upload, ArrowLeft, Image as ImageIcon } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from '@/shared/components/ui/sheet';
+import { Upload, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/shared/utils/ui';
 import { toast } from 'sonner';
 import { useCreateAutoEditPreset } from '../../../hooks/studio/useCreateAutoEditPreset';
@@ -132,7 +139,6 @@ export default function StudioAutoEditNewPage() {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const originalCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const basePixelsRef = useRef<Uint8ClampedArray | null>(null);
   const baseSizeRef = useRef<{ width: number; height: number } | null>(null);
@@ -204,22 +210,6 @@ export default function StudioAutoEditNewPage() {
       setError(e instanceof Error ? e.message : 'Failed to load sample image');
     }
   };
-
-  useEffect(() => {
-    const base = basePixelsRef.current;
-    const size = baseSizeRef.current;
-    const canvas = originalCanvasRef.current;
-    if (!base || !size || !canvas) return;
-
-    canvas.width = size.width;
-    canvas.height = size.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const outData = new Uint8ClampedArray(base.length);
-    outData.set(base);
-    ctx.putImageData(new ImageData(outData, size.width, size.height), 0, 0);
-  }, [sampleRevision]);
 
   useEffect(() => {
     const base = basePixelsRef.current;
@@ -311,197 +301,181 @@ export default function StudioAutoEditNewPage() {
     }
   };
 
-  return (
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const controlsContent = (
     <>
-      <SidebarPageHeader
-        breadcrumbs={[
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'Studio' },
-          { label: 'Auto Edit', href: '/studio/auto-edit' },
-          { label: isEdit ? 'Edit Preset' : 'New Preset' },
-        ]}
-      >
-        <Button variant="outline" size="sm" onClick={() => navigate('/studio/auto-edit')}>
-          <ArrowLeft className="mr-1 size-4" />
-          Back
-        </Button>
-      </SidebarPageHeader>
+      <FieldGroup>
+        <Field>
+          <FieldLabel>Preset name</FieldLabel>
+          <FieldDescription>Name shown in event settings dropdown</FieldDescription>
+          <Input
+            value={state.name}
+            onChange={(e) => setState((prev) => ({ ...prev, name: e.target.value }))}
+          />
+        </Field>
 
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        {isEdit && !editingPreset && !presets.isLoading ? (
-          <Alert variant="destructive">Preset not found.</Alert>
-        ) : null}
+        {controls.map(([key, label]) => (
+          <Field key={key}>
+            <div className="flex items-center justify-between">
+              <FieldLabel>{label}</FieldLabel>
+              <span className="text-xs tabular-nums text-muted-foreground">{state[key].toFixed(2)}</span>
+            </div>
+            <Slider
+              value={[state[key]]}
+              min={0.5}
+              max={2}
+              step={0.01}
+              onValueChange={(v) => setState((prev) => ({ ...prev, [key]: v[0] ?? 1 }))}
+            />
+          </Field>
+        ))}
 
-        {isEdit && editingPreset?.isBuiltin ? (
-          <Alert variant="destructive">Built-in presets cannot be edited.</Alert>
-        ) : null}
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void handleSample(file);
-            e.target.value = '';
-          }}
-        />
-
-        <div className="space-y-4 rounded-lg border p-4">
-          <FieldGroup>
-            <Field orientation="responsive">
-              <FieldContent>
-                <FieldLabel>Preset name</FieldLabel>
-                <FieldDescription>Name shown in event settings dropdown</FieldDescription>
-              </FieldContent>
-              <div className="w-full flex justify-end">
-                <Input
-                  value={state.name}
-                  onChange={(e) => setState((prev) => ({ ...prev, name: e.target.value }))}
-                  className="max-w-xs"
-                />
-              </div>
-            </Field>
-
-            {controls.map(([key, label]) => (
-              <Field key={key} orientation="responsive">
-                <FieldContent>
-                  <FieldLabel>{label}</FieldLabel>
-                  <FieldDescription>Current: {state[key].toFixed(2)}</FieldDescription>
-                </FieldContent>
-                <div className="w-full flex items-center justify-end gap-3">
-                  <Slider
-                    className="w-56"
-                    value={[state[key]]}
-                    min={0.5}
-                    max={2}
-                    step={0.01}
-                    onValueChange={(v) => setState((prev) => ({ ...prev, [key]: v[0] ?? 1 }))}
-                  />
-                </div>
-              </Field>
-            ))}
-
-            <Field orientation="responsive">
-              <FieldContent>
-                <FieldLabel>Intensity</FieldLabel>
-                <FieldDescription>
-                  Blend edited image with original. Current: {state.intensity}%
-                </FieldDescription>
-              </FieldContent>
-              <div className="w-full flex items-center justify-end">
-                <Slider
-                  value={[state.intensity]}
-                  min={0}
-                  max={100}
-                  step={1}
-                  className="w-56"
-                  onValueChange={(v) => setState((prev) => ({ ...prev, intensity: v[0] ?? 100 }))}
-                />
-              </div>
-            </Field>
-
-            <Field orientation="responsive" align="end">
-              <FieldContent>
-                <FieldLabel>Auto contrast</FieldLabel>
-                <FieldDescription>Auto-level tonal range</FieldDescription>
-              </FieldContent>
-              <Switch
-                checked={state.autoContrast}
-                onCheckedChange={(v) => setState((prev) => ({ ...prev, autoContrast: v }))}
-              />
-            </Field>
-          </FieldGroup>
-
-          <div className="flex justify-end">
-            <Button
-              onClick={savePreset}
-              disabled={
-                !state.name.trim() ||
-                createPreset.isPending ||
-                updatePreset.isPending ||
-                (isEdit && (!editingPreset || editingPreset.isBuiltin))
-              }
-            >
-              {isEdit ? 'Save changes' : 'Save preset'}
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-4 rounded-lg border p-4">
+        <Field>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Preview</p>
-            <p className="text-xs text-muted-foreground">Click or drop image on Before to upload</p>
+            <FieldLabel>Intensity</FieldLabel>
+            <span className="text-xs tabular-nums text-muted-foreground">{state.intensity}%</span>
           </div>
+          <FieldDescription>Blend edited image with original</FieldDescription>
+          <Slider
+            value={[state.intensity]}
+            min={0}
+            max={100}
+            step={1}
+            onValueChange={(v) => setState((prev) => ({ ...prev, intensity: v[0] ?? 100 }))}
+          />
+        </Field>
+
+        <Field>
+          <div className="flex items-center justify-between">
+            <FieldLabel>Auto contrast</FieldLabel>
+            <Switch
+              checked={state.autoContrast}
+              onCheckedChange={(v) => setState((prev) => ({ ...prev, autoContrast: v }))}
+            />
+          </div>
+          <FieldDescription>Auto-level tonal range</FieldDescription>
+        </Field>
+      </FieldGroup>
+
+      <div className="mt-auto pt-4">
+        <Button
+          className="w-full"
+          onClick={savePreset}
+          disabled={
+            !state.name.trim() ||
+            createPreset.isPending ||
+            updatePreset.isPending ||
+            (isEdit && (!editingPreset || editingPreset.isBuiltin))
+          }
+        >
+          {isEdit ? 'Save changes' : 'Save preset'}
+        </Button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex h-dvh flex-col">
+      <PageHeader
+        backHref="/studio/auto-edit"
+        breadcrumbs={[{ label: isEdit ? 'Edit Preset' : 'New Preset' }]}
+      >
+        <Button variant="outline" size="sm" className="md:hidden" onClick={() => setSheetOpen(true)}>
+          <SlidersHorizontal className="mr-1 size-4" />
+          Controls
+        </Button>
+      </PageHeader>
+
+      <div className="flex min-h-0 flex-1">
+        {/* Preview area */}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+          {isEdit && !editingPreset && !presets.isLoading ? (
+            <Alert variant="destructive">Preset not found.</Alert>
+          ) : null}
+
+          {isEdit && editingPreset?.isBuiltin ? (
+            <Alert variant="destructive">Built-in presets cannot be edited.</Alert>
+          ) : null}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleSample(file);
+              e.target.value = '';
+            }}
+          />
 
           {error ? <Alert variant="destructive">{error}</Alert> : null}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <FieldLabel>Before</FieldLabel>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                onDragEnter={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDragging(true);
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDragging(false);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDragging(false);
-                  const f = e.dataTransfer.files?.[0];
-                  if (f) void handleSample(f);
-                }}
-                className={cn(
-                  'h-[320px] w-full overflow-hidden rounded-lg border-2 border-dashed bg-muted text-left transition-colors md:h-[360px]',
-                  isDragging
-                    ? 'border-primary bg-primary/5'
-                    : sampleUrl
-                      ? 'border-muted-foreground/25 hover:border-muted-foreground/40'
-                      : 'border-muted-foreground/25 hover:border-muted-foreground/50',
-                )}
-              >
-                {sampleUrl ? (
-                  <canvas ref={originalCanvasRef} className="h-full w-full object-contain" />
-                ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                    <Upload className="size-8" />
-                    <p className="text-sm font-medium">Drop image here or click to browse</p>
-                    <p className="text-xs">JPEG, PNG, or WebP</p>
-                  </div>
-                )}
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <FieldLabel>After</FieldLabel>
-              <div className="h-[320px] w-full overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted md:h-[360px]">
-                {sampleUrl ? (
-                  <canvas ref={previewCanvasRef} className="h-full w-full object-contain" />
-                ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                    <ImageIcon className="size-8" />
-                    <p className="text-sm font-medium">Preview will appear here</p>
-                    <p className="text-xs">Adjust controls above after uploading</p>
-                  </div>
-                )}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(true);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(false);
+              const f = e.dataTransfer.files?.[0];
+              if (f) void handleSample(f);
+            }}
+            className={cn(
+              'min-h-0 flex-1 w-full overflow-hidden rounded-lg border-2 border-dashed bg-muted text-left transition-colors',
+              isDragging
+                ? 'border-primary bg-primary/5'
+                : sampleUrl
+                  ? 'border-muted-foreground/25 hover:border-muted-foreground/40'
+                  : 'border-muted-foreground/25 hover:border-muted-foreground/50',
+            )}
+          >
+            {sampleUrl ? (
+              <canvas ref={previewCanvasRef} className="h-full w-full object-contain" />
+            ) : (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Upload className="size-8" />
+                <p className="text-sm font-medium">Drop image here or click to browse</p>
+                <p className="text-xs">JPEG, PNG, or WebP</p>
               </div>
-            </div>
-          </div>
+            )}
+          </button>
         </div>
+
+        {/* Desktop sidebar */}
+        <aside className="hidden md:flex w-80 shrink-0 flex-col">
+          <div className="flex flex-1 flex-col overflow-auto p-4">
+            {controlsContent}
+          </div>
+        </aside>
       </div>
-    </>
+
+      {/* Mobile sheet */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="right" className="flex flex-col sm:max-w-md md:hidden">
+          <SheetHeader>
+            <SheetTitle>Adjustments</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-1 flex-col overflow-auto px-4 pb-4">
+            {controlsContent}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
