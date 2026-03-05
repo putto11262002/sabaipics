@@ -66,6 +66,12 @@ function attemptBucket(attempt: number): '1' | '2' | '3_plus' {
   return '3_plus';
 }
 
+function getQueueLagMs(eventTime: string, nowMs: number): number | null {
+  const parsed = Date.parse(eventTime);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, nowMs - parsed);
+}
+
 /**
  * Generate R2 keys for original and processed photos.
  * New structure: events/{eventId}/{photoId}/original.jpeg and processed.jpeg
@@ -1132,6 +1138,8 @@ export async function queue(
       parentBaggage = headForTrace.customMetadata.baggage;
     }
 
+    const startedAt = Date.now();
+    const queueLagMs = getQueueLagMs(event.eventTime, startedAt);
     const traceSpan = new TraceSpan(env, 'upload.queue.process', {
       parentTraceparent,
       baggage: parentBaggage,
@@ -1140,9 +1148,15 @@ export async function queue(
         'queue.name': 'upload-processing',
         'r2.object.key': event.object.key,
         'worker.message_attempt': message.attempts,
+        ...(queueLagMs !== null ? { 'worker.queue_lag_ms': queueLagMs } : {}),
       },
     });
-    const startedAt = Date.now();
+    if (queueLagMs !== null) {
+      emitHistogramMetricMs(env, ctx, 'framefast_queue_message_lag_ms', queueLagMs, {
+        queue: 'upload-processing',
+        operation: 'process_upload',
+      });
+    }
     if (message.attempts > 1) {
       emitWorkerLog(
         env,
@@ -1156,6 +1170,7 @@ export async function queue(
           r2_key: event.object.key,
           attempt: message.attempts,
           attempt_bucket: attemptBucket(message.attempts),
+          queue_lag_ms: queueLagMs ?? undefined,
           trace_id: traceSpan.traceId,
           span_id: traceSpan.spanId,
         },
@@ -1198,6 +1213,7 @@ export async function queue(
             queue: 'upload-processing',
             r2_key: event.object.key,
             status: 'ok',
+            queue_lag_ms: queueLagMs ?? undefined,
             trace_id: traceSpan.traceId,
             span_id: traceSpan.spanId,
           },
@@ -1217,6 +1233,7 @@ export async function queue(
             r2_key: event.object.key,
             status: 'error',
             error_type: error.type,
+            queue_lag_ms: queueLagMs ?? undefined,
             trace_id: traceSpan.traceId,
             span_id: traceSpan.spanId,
           },

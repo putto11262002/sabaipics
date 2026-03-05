@@ -177,7 +177,7 @@ export default {
       return uploadQueue(batch as MessageBatch<any>, env, ctx);
     }
     if (batch.queue.startsWith('logo-processing')) {
-      return logoUploadConsumer.queue(batch as MessageBatch<any>, env);
+      return logoUploadConsumer.queue(batch as MessageBatch<any>, env, ctx);
     }
     if (batch.queue.startsWith('lut-processing')) {
       return lutProcessingConsumer.queue(batch as MessageBatch<any>, env);
