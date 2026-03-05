@@ -54,17 +54,17 @@ export function LineDeliveryButton({ eventId, searchId, selectedIds }: LineDeliv
 
   return (
     <Button
-      size="icon"
-      className="size-12 rounded-full shadow-lg text-white opacity-100"
+      className="flex-1 text-white"
       style={{ backgroundColor: LINE_GREEN }}
       onClick={handleClick}
       disabled={isRedirecting || !hasSelection}
     >
       {isRedirecting ? (
-        <Spinner className="size-5" />
+        <Spinner className="mr-1 size-4" />
       ) : (
-        <LineIcon className="size-5" />
+        <LineIcon className="mr-1 size-4" />
       )}
+      {th.results.lineButton(selectedIds.size)}
     </Button>
   );
 }

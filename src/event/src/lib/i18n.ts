@@ -29,7 +29,7 @@ export const th = {
   results: {
     found: (count: number) => `พบ ${count} รูปที่ตรงกับใบหน้าของคุณ`,
     selected: (count: number) => `เลือก ${count} รูป`,
-    hint: 'แตะรูปเพื่อเลือก แล้วกดดาวน์โหลด หรือรับรูปทาง LINE',
+    hint: 'เลือกรูปทั้งหมดแล้ว แตะรูปที่ไม่ต้องการเพื่อยกเลิก',
     download: (count: number) => `ดาวน์โหลด ${count} รูป`,
     downloadAll: 'ดาวน์โหลดทั้งหมด',
     downloading: 'กำลังดาวน์โหลด...',
