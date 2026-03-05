@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
-import { SidebarPageHeader } from '../../../components/shell/sidebar-page-header';
+import { PageHeader } from '../../../components/shell/page-header';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import {
   Field,
-  FieldContent,
   FieldGroup,
   FieldLabel,
   FieldDescription,
 } from '@/shared/components/ui/field';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/shared/components/ui/sheet';
 import { Alert, AlertTitle, AlertDescription } from '@/shared/components/ui/alert';
 import { Button } from '@/shared/components/ui/button';
 import { Spinner } from '@/shared/components/ui/spinner';
-import { AlertCircle, Image as ImageIcon, RefreshCw, Upload } from 'lucide-react';
+import { AlertCircle, RefreshCw, SlidersHorizontal, Upload } from 'lucide-react';
 import { cn } from '@/shared/utils/ui';
 
 import { useDebounce } from '../../../hooks/useDebounce';
@@ -38,8 +43,6 @@ export default function StudioLutPreviewPage() {
   const [searchParams] = useSearchParams();
   const { getToken } = useAuth();
 
-  // `getToken` identity is not guaranteed stable; keep a ref to avoid re-triggering
-  // preview renders on every auth state re-render.
   const getTokenRef = useRef(getToken);
   useEffect(() => {
     getTokenRef.current = getToken;
@@ -64,16 +67,10 @@ export default function StudioLutPreviewPage() {
   const [renderError, setRenderError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const debouncedIncludeLuminance = useDebounce(includeLuminance, 300);
 
-  // Blob URL revocation is handled imperatively in handleFile (on new file)
-  // and setGradedBaseUrl updater (on new API response). We avoid revoking in
-  // a deps-based cleanup effect because React StrictMode re-runs effects
-  // and URL.revokeObjectURL is irreversible — the second mount would fail to
-  // load the already-revoked URLs.
-
-  // Clear graded base when switching LUT.
   useEffect(() => {
     if (gradedBaseUrl) URL.revokeObjectURL(gradedBaseUrl);
     setGradedBaseUrl(null);
@@ -88,8 +85,6 @@ export default function StudioLutPreviewPage() {
     setGradedBaseUrl(null);
   };
 
-  // Fetch the fully-graded image (intensity=100) from the server.
-  // Intensity blending is handled client-side via canvas compositing.
   const abortRef = useRef<AbortController | null>(null);
   const renderSeqRef = useRef(0);
   useEffect(() => {
@@ -107,8 +102,6 @@ export default function StudioLutPreviewPage() {
     form.set('intensity', '100');
     form.set('includeLuminance', debouncedIncludeLuminance ? 'true' : 'false');
 
-    // Small delay to avoid duplicate requests in React StrictMode (dev)
-    // and coalesce ultra-fast changes.
     const startTimer = setTimeout(() => {
       if (controller.signal.aborted) return;
       if (seq !== renderSeqRef.current) return;
@@ -137,7 +130,6 @@ export default function StudioLutPreviewPage() {
           try {
             const contentType = res.headers.get('content-type') ?? '';
             if (contentType.includes('application/json')) {
-              // Best-effort parse our API error shape
               const json = (await res.json()) as any;
               const apiMsg = json?.error?.message ?? json?.message;
               if (typeof apiMsg === 'string' && apiMsg.trim().length > 0) {
@@ -185,9 +177,6 @@ export default function StudioLutPreviewPage() {
     };
   }, [id, file, debouncedIncludeLuminance, retryCount]);
 
-  // Pre-load images into refs when URLs change. This avoids re-fetching blob
-  // URLs on every intensity tick and is resilient to StrictMode double-execution
-  // (the loaded HTMLImageElement stays valid even if the blob URL is later revoked).
   useEffect(() => {
     if (!originalUrl) {
       originalImgRef.current = null;
@@ -211,7 +200,6 @@ export default function StudioLutPreviewPage() {
     loadImage(gradedBaseUrl).then((img) => {
       if (!cancelled) {
         gradedImgRef.current = img;
-        // Trigger initial blend now that both images are ready.
         const canvas = canvasRef.current;
         if (canvas && originalImgRef.current) {
           blendToCanvas({ canvas, original: originalImgRef.current, graded: img, intensity });
@@ -223,8 +211,6 @@ export default function StudioLutPreviewPage() {
     };
   }, [gradedBaseUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Client-side intensity blending: draw original + graded at current intensity onto canvas.
-  // Runs instantly on every intensity change — no server round-trip needed.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -240,156 +226,159 @@ export default function StudioLutPreviewPage() {
 
   const canRender = Boolean(id) && Boolean(file);
 
-  return (
-    <>
-      <SidebarPageHeader
-        breadcrumbs={[
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'Studio' },
-          { label: 'LUTs', href: '/studio/luts' },
-          { label: 'Preview' },
-        ]}
-      />
-
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        {!id && <Alert variant="destructive">Missing LUT id.</Alert>}
-        {renderError && (
-          <Alert variant="destructive">
-            <AlertCircle className="size-4" />
-            <AlertTitle>Preview failed</AlertTitle>
-            <AlertDescription className="flex items-center justify-between">
-              <span>{renderError}</span>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => {
-                  setRenderError(null);
-                  setRetryCount((c) => c + 1);
-                }}
-              >
-                <RefreshCw className="mr-1 size-3" />
-                Retry
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) handleFile(f);
-            e.target.value = '';
-          }}
-        />
-
-        <FieldGroup>
-          <Field orientation="responsive">
-            <FieldContent>
-              <FieldLabel>Intensity</FieldLabel>
-              <FieldDescription>Strength of the color grade</FieldDescription>
-            </FieldContent>
-            <div className="flex items-center gap-3">
-              <Slider
-                className="flex-1"
-                value={[intensity]}
-                min={0}
-                max={100}
-                step={1}
-                onValueChange={(v) => setIntensity(v[0] ?? 100)}
-                disabled={!canRender}
-              />
-              <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
-                {intensity}%
-              </span>
-            </div>
-          </Field>
-
-          <Field orientation="responsive" align="end">
-            <FieldContent>
-              <FieldLabel>Include luminance</FieldLabel>
-              <FieldDescription>Allow brightness changes</FieldDescription>
-            </FieldContent>
-            <Switch
-              checked={includeLuminance}
-              onCheckedChange={setIncludeLuminance}
-              disabled={!canRender}
-            />
-          </Field>
-        </FieldGroup>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <FieldLabel>Before</FieldLabel>
-            <button
-              type="button"
-              className={cn(
-                'relative aspect-[4/3] w-full overflow-hidden rounded-lg border-2 border-dashed bg-muted transition-colors',
-                isDragging
-                  ? 'border-primary bg-primary/5'
-                  : originalUrl
-                    ? 'border-transparent'
-                    : 'border-muted-foreground/25 hover:border-muted-foreground/50',
-              )}
-              onClick={() => fileInputRef.current?.click()}
-              onDragEnter={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsDragging(true);
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsDragging(false);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsDragging(false);
-                const f = e.dataTransfer.files?.[0];
-                if (f) handleFile(f);
-              }}
-            >
-              {originalUrl ? (
-                <img src={originalUrl} alt="Original" className="h-full w-full object-contain" />
-              ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                  <Upload className="size-8" />
-                  <p className="text-sm font-medium">Drop image here or click to browse</p>
-                  <p className="text-xs">JPEG, PNG, or WebP</p>
-                </div>
-              )}
-            </button>
-            {file && <div className="truncate text-xs text-muted-foreground">{file.name}</div>}
-          </div>
-
-          <div className="space-y-2">
-            <FieldLabel>After</FieldLabel>
-            <div className="relative aspect-[4/3] overflow-hidden rounded-md border bg-muted">
-              {gradedBaseUrl ? (
-                <canvas ref={canvasRef} className="h-full w-full object-contain" />
-              ) : file ? null : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                  <ImageIcon className="size-8" />
-                  <p className="text-sm">Preview will appear here</p>
-                </div>
-              )}
-              {file && isRendering && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm">
-                  <Spinner className="size-6 text-muted-foreground" />
-                </div>
-              )}
-            </div>
-          </div>
+  const controlsContent = (
+    <FieldGroup>
+      <Field>
+        <div className="flex items-center justify-between">
+          <FieldLabel>Intensity</FieldLabel>
+          <span className="text-xs tabular-nums text-muted-foreground">{intensity}%</span>
         </div>
+        <FieldDescription>Strength of the color grade</FieldDescription>
+        <Slider
+          value={[intensity]}
+          min={0}
+          max={100}
+          step={1}
+          onValueChange={(v) => setIntensity(v[0] ?? 100)}
+          disabled={!canRender}
+        />
+      </Field>
+
+      <Field>
+        <div className="flex items-center justify-between">
+          <FieldLabel>Include luminance</FieldLabel>
+          <Switch
+            checked={includeLuminance}
+            onCheckedChange={setIncludeLuminance}
+            disabled={!canRender}
+          />
+        </div>
+        <FieldDescription>Allow brightness changes</FieldDescription>
+      </Field>
+    </FieldGroup>
+  );
+
+  return (
+    <div className="flex h-dvh flex-col">
+      <PageHeader
+        className="border-b"
+        backHref="/studio/luts"
+        breadcrumbs={[{ label: 'LUT Preview' }]}
+      >
+        <Button variant="outline" size="sm" className="md:hidden" onClick={() => setSheetOpen(true)}>
+          <SlidersHorizontal className="mr-1 size-4" />
+          Controls
+        </Button>
+      </PageHeader>
+
+      <div className="flex min-h-0 flex-1">
+        {/* Preview area */}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+          {!id && <Alert variant="destructive">Missing LUT id.</Alert>}
+          {renderError && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertTitle>Preview failed</AlertTitle>
+              <AlertDescription className="flex items-center justify-between">
+                <span>{renderError}</span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    setRenderError(null);
+                    setRetryCount((c) => c + 1);
+                  }}
+                >
+                  <RefreshCw className="mr-1 size-3" />
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleFile(f);
+              e.target.value = '';
+            }}
+          />
+
+          <button
+            type="button"
+            className={cn(
+              'relative min-h-0 flex-1 w-full overflow-hidden rounded-lg border-2 border-dashed bg-muted text-left transition-colors',
+              isDragging
+                ? 'border-primary bg-primary/5'
+                : gradedBaseUrl
+                  ? 'border-muted-foreground/25 hover:border-muted-foreground/40'
+                  : 'border-muted-foreground/25 hover:border-muted-foreground/50',
+            )}
+            onClick={() => fileInputRef.current?.click()}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(true);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(false);
+              const f = e.dataTransfer.files?.[0];
+              if (f) handleFile(f);
+            }}
+          >
+            {gradedBaseUrl ? (
+              <canvas ref={canvasRef} className="h-full w-full object-contain" />
+            ) : file ? null : (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Upload className="size-8" />
+                <p className="text-sm font-medium">Drop image here or click to browse</p>
+                <p className="text-xs">JPEG, PNG, or WebP</p>
+              </div>
+            )}
+            {file && isRendering && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+                <Spinner className="size-6 text-muted-foreground" />
+              </div>
+            )}
+          </button>
+
+          {file && <div className="shrink-0 truncate text-xs text-muted-foreground">{file.name}</div>}
+        </div>
+
+        {/* Desktop sidebar */}
+        <aside className="hidden md:flex w-80 shrink-0 flex-col">
+          <div className="flex flex-1 flex-col overflow-auto p-4">
+            {controlsContent}
+          </div>
+        </aside>
       </div>
-    </>
+
+      {/* Mobile sheet */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="right" className="flex flex-col sm:max-w-md md:hidden">
+          <SheetHeader>
+            <SheetTitle>Adjustments</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-1 flex-col overflow-auto px-4 pb-4">
+            {controlsContent}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }

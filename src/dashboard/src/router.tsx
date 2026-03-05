@@ -55,6 +55,17 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorFallback />,
   },
 
+  // LUT preview (auth required, no sidebar)
+  {
+    path: '/studio/luts/:id/preview',
+    element: (
+      <ProtectedRoute>
+        <StudioLutPreviewPage />
+      </ProtectedRoute>
+    ),
+    errorElement: <RouteErrorFallback />,
+  },
+
   // Auto-edit preset editor (auth required, no sidebar)
   {
     path: '/studio/auto-edit/new',
@@ -112,10 +123,6 @@ export const router = createBrowserRouter([
       {
         path: '/studio/luts',
         element: <StudioLutsPage />,
-      },
-      {
-        path: '/studio/luts/:id/preview',
-        element: <StudioLutPreviewPage />,
       },
       {
         path: '/line-delivery',
