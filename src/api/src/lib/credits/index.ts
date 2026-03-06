@@ -8,7 +8,13 @@ export {
   type DebitIfNotExistsResult,
 } from './debit';
 export { grantCredits, type GrantCreditsParams, type GrantResult } from './grant';
-export { getBalance, getNextExpiry, recomputeBalanceCache } from './balance';
+export {
+  getBalance,
+  getBalanceSummary,
+  getNextExpiry,
+  recomputeBalanceCache,
+  type BalanceSummary,
+} from './balance';
 export {
   getPurchaseFulfillmentBySession,
   getUsageChart,

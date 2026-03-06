@@ -10,6 +10,7 @@ import { creditLedger } from '@/db';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { ResultAsync } from 'neverthrow';
 import type { CreditError } from './error';
+import { getBalanceSummary } from './balance';
 
 type Db = Database | DatabaseTx | Transaction;
 
@@ -96,21 +97,19 @@ export function getCreditHistory(
         .where(and(...conditions));
       const totalCount = countResult?.count ?? 0;
 
-      // Summary stats (always for all types — not filtered)
-      const [summary] = await db
-        .select({
-          balance: sql<number>`coalesce(sum(case when ${creditLedger.expiresAt} > now() then ${creditLedger.amount} else 0 end), 0)::int`,
-          expiringSoon: sql<number>`coalesce(sum(case when ${creditLedger.expiresAt} > now() and ${creditLedger.expiresAt} <= now() + interval '30 days' then ${creditLedger.amount} else 0 end), 0)::int`,
-          usedThisMonth: sql<number>`coalesce(sum(case when ${creditLedger.type} = 'debit' and ${creditLedger.createdAt} >= date_trunc('month', now()) then abs(${creditLedger.amount}) else 0 end), 0)::int`,
-        })
-        .from(creditLedger)
-        .where(eq(creditLedger.photographerId, photographerId));
+      // Summary stats via credit service (single source of truth)
+      const summary = await getBalanceSummary(db, photographerId).match(
+        (value) => value,
+        (error) => {
+          throw error;
+        },
+      );
 
       const totalPages = Math.ceil(totalCount / limit);
 
       return {
         entries,
-        summary: summary ?? { balance: 0, expiringSoon: 0, usedThisMonth: 0 },
+        summary,
         pagination: {
           page,
           limit,
