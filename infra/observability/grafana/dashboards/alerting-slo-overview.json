@@ -5,7 +5,7 @@
   "tags": ["framefast", "alerts", "slo", "observability"],
   "timezone": "browser",
   "schemaVersion": 41,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": { "from": "now-6h", "to": "now" },
   "panels": [
@@ -32,31 +32,31 @@
     {
       "id": 3,
       "type": "timeseries",
-      "title": "Queue Failure Ratio (%)",
+      "title": "Pipeline Failure Ratio (%)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
       "targets": [
-        { "refId": "A", "expr": "100 * sum(rate(framefast_queue_jobs_total{status=\"error\"}[10m])) / clamp_min(sum(rate(framefast_queue_jobs_total[10m])), 0.001)" }
+        { "refId": "A", "expr": "100 * sum(rate(framefast_pipeline_consumer_jobs_total{status=\"error\"}[10m])) / clamp_min(sum(rate(framefast_pipeline_consumer_jobs_total[10m])), 0.001)" }
       ]
     },
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Upload-to-Index Success Rate (%)",
+      "title": "Pipeline Success Rate (%)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
       "targets": [
-        { "refId": "A", "expr": "100 * sum(rate(framefast_upload_e2e_total{status=\"ok\"}[15m])) / clamp_min(sum(rate(framefast_upload_e2e_total[15m])), 0.001)" }
+        { "refId": "A", "expr": "100 * sum(rate(framefast_pipeline_consumer_jobs_total{status=\"ok\"}[15m])) / clamp_min(sum(rate(framefast_pipeline_consumer_jobs_total[15m])), 0.001)" }
       ]
     },
     {
       "id": 5,
       "type": "timeseries",
-      "title": "Upload-to-Index p95 (ms)",
+      "title": "Pipeline E2E p95 (ms)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
       "targets": [
-        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_upload_e2e_duration_ms_milliseconds_bucket[15m])))" }
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_pipeline_callback_e2e_duration_ms_milliseconds_bucket[15m])))" }
       ]
     },
     {
@@ -97,6 +97,33 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
       "targets": [
         { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_recognition_inference_latency_ms_milliseconds_bucket[10m])))" }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Orchestrator Errors by Step (5m)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (step, code) (increase(framefast_orchestrator_errors_total[5m]))",
+          "legendFormat": "{{step}} {{code}}"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Orchestrator Batch Duration p95 (ms)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_orchestrator_batch_duration_ms_milliseconds_bucket[5m])))"
+        }
       ]
     }
   ]
