@@ -134,6 +134,55 @@ export function getBalance(db: Db, photographerId: string): ResultAsync<number, 
   );
 }
 
+export interface BalanceSummary {
+  balance: number;
+  expiringSoon: number;
+  usedThisMonth: number;
+}
+
+/**
+ * Get balance summary stats for a photographer.
+ *
+ * Single source of truth for balance, expiring-soon, and used-this-month.
+ * Uses `remainingCredits` (not `amount`) so it stays consistent with the
+ * cached balance in `recomputeBalanceCache`.
+ */
+export function getBalanceSummary(
+  db: Db,
+  photographerId: string,
+): ResultAsync<BalanceSummary, CreditError> {
+  return ResultAsync.fromPromise(
+    (async () => {
+      const [row] = await db
+        .select({
+          balance: sql<number>`COALESCE(SUM(
+            CASE WHEN ${creditLedger.type} = 'credit'
+              AND ${creditLedger.remainingCredits} > 0
+              AND ${creditLedger.expiresAt} > NOW()
+            THEN ${creditLedger.remainingCredits} ELSE 0 END
+          ), 0)::int`,
+          expiringSoon: sql<number>`COALESCE(SUM(
+            CASE WHEN ${creditLedger.type} = 'credit'
+              AND ${creditLedger.remainingCredits} > 0
+              AND ${creditLedger.expiresAt} > NOW()
+              AND ${creditLedger.expiresAt} <= NOW() + INTERVAL '30 days'
+            THEN ${creditLedger.remainingCredits} ELSE 0 END
+          ), 0)::int`,
+          usedThisMonth: sql<number>`COALESCE(SUM(
+            CASE WHEN ${creditLedger.type} = 'debit'
+              AND ${creditLedger.createdAt} >= date_trunc('month', NOW())
+            THEN abs(${creditLedger.amount}) ELSE 0 END
+          ), 0)::int`,
+        })
+        .from(creditLedger)
+        .where(eq(creditLedger.photographerId, photographerId));
+
+      return row ?? { balance: 0, expiringSoon: 0, usedThisMonth: 0 };
+    })(),
+    (cause): CreditError => ({ type: 'database', cause }),
+  );
+}
+
 /**
  * Get the nearest credit expiry date for a photographer.
  *
