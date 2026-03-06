@@ -29,11 +29,6 @@ It covers:
 - `framefast_api_errors_total`
 - `framefast_api_request_duration_ms`
 - `framefast_client_errors_total`
-- `framefast_queue_jobs_total`
-- `framefast_queue_job_duration_ms`
-- `framefast_upload_e2e_total`
-- `framefast_upload_e2e_duration_ms`
-- `framefast_upload_stage_duration_ms`
 - `framefast_search_e2e_total`
 - `framefast_search_e2e_duration_ms`
 - `framefast_search_stage_duration_ms`
@@ -51,6 +46,26 @@ It covers:
 - `framefast_image_pipeline_request_latency_ms`
 - `framefast_image_pipeline_output_bytes`
 
+### Pipeline V2 consumer metrics (CF Worker)
+- `framefast_pipeline_consumer_jobs_total` — jobs processed (labels: `status`)
+- `framefast_pipeline_consumer_step_duration_ms` — per-step latency (labels: `step`, `status`)
+- `framefast_pipeline_consumer_batch_size` — batch sizes
+- `framefast_pipeline_consumer_credit_insufficient_total` — insufficient credit events
+- `framefast_pipeline_consumer_credit_refund_total` — credit refunds (labels: `reason`)
+
+### Pipeline V2 callback metrics (CF Worker)
+- `framefast_pipeline_callback_jobs_total` — callback results (labels: `status`)
+- `framefast_pipeline_callback_step_duration_ms` — per-step latency (labels: `step`, `status`)
+- `framefast_pipeline_callback_e2e_duration_ms` — end-to-end job latency
+- `framefast_pipeline_callback_faces_detected` — face count per photo
+- `framefast_pipeline_callback_credit_refund_total` — refunds on failure (labels: `reason`)
+
+### Orchestrator metrics (Modal)
+- `framefast_orchestrator_jobs_total` — jobs by status (labels: `status`)
+- `framefast_orchestrator_step_duration_ms` — image_pipeline / recognition step latency (labels: `step`, `status`)
+- `framefast_orchestrator_batch_duration_ms` — full batch processing time
+- `framefast_orchestrator_errors_total` — errors by step (labels: `step`, `code`)
+
 ### FTP metrics
 - `framefast_ftp_uploads_total`
 - `framefast_ftp_upload_bytes`
@@ -60,6 +75,8 @@ It covers:
 - API structured logs to Loki (`service=framefast-api`)
 - FTP structured logs to Loki (`service=framefast-ftp`)
 - Client error ingest logs (`source_service=framefast-dashboard|framefast-event|framefast-ios`)
+- Pipeline V2 consumer logs (`event=pipeline_consumer_*`)
+- Pipeline V2 callback logs (`event=pipeline_callback_*`)
 - Trace correlation fields available in logs: `trace_id`, `span_id`, `traceparent`
 
 ### Traces
@@ -67,6 +84,7 @@ It covers:
 - FTP spans (`service.name=framefast-ftp`)
 - Recognition spans (`service.name=framefast-recognition`)
 - Image pipeline spans (`service.name=framefast-image-pipeline`)
+- Orchestrator spans (`service.name=framefast-orchestrator`)
 
 ## Auth and Access Pattern (API-first)
 
@@ -117,16 +135,16 @@ PromQL:
 sum(rate(framefast_api_errors_total[5m])) / clamp_min(sum(rate(framefast_api_requests_total[5m])), 1)
 ```
 
-### Upload E2E success rate
+### Pipeline success rate
 PromQL:
 ```promql
-sum(rate(framefast_upload_e2e_total{status="ok"}[15m])) / clamp_min(sum(rate(framefast_upload_e2e_total[15m])), 1)
+sum(rate(framefast_pipeline_consumer_jobs_total{status="ok"}[15m])) / clamp_min(sum(rate(framefast_pipeline_consumer_jobs_total[15m])), 1)
 ```
 
-### Upload E2E p95 latency
+### Pipeline E2E p95 latency
 PromQL:
 ```promql
-histogram_quantile(0.95, sum by (le) (rate(framefast_upload_e2e_duration_ms_milliseconds_bucket[15m])))
+histogram_quantile(0.95, sum by (le) (rate(framefast_pipeline_callback_e2e_duration_ms_milliseconds_bucket[15m])))
 ```
 
 ### Search E2E p95 latency
@@ -135,10 +153,28 @@ PromQL:
 histogram_quantile(0.95, sum by (le) (rate(framefast_search_e2e_duration_ms_milliseconds_bucket[15m])))
 ```
 
-### Queue failures by queue
+### Pipeline failures by step
 PromQL:
 ```promql
-sum by (queue) (rate(framefast_queue_jobs_total{status="error"}[5m]))
+sum by (step) (rate(framefast_pipeline_consumer_step_duration_ms_milliseconds_count{status="error"}[5m]))
+```
+
+### Pipeline V2 step latency (avg per step)
+PromQL:
+```promql
+framefast_pipeline_consumer_step_duration_ms_milliseconds_sum / clamp_min(framefast_pipeline_consumer_step_duration_ms_milliseconds_count, 1)
+```
+
+### Pipeline V2 E2E latency (p95)
+PromQL:
+```promql
+histogram_quantile(0.95, sum by (le) (rate(framefast_pipeline_callback_e2e_duration_ms_milliseconds_bucket[15m])))
+```
+
+### Pipeline V2 success rate
+PromQL:
+```promql
+sum(rate(framefast_pipeline_consumer_jobs_total{status="ok"}[15m])) / clamp_min(sum(rate(framefast_pipeline_consumer_jobs_total[15m])), 1)
 ```
 
 ### Cardinality budget (FrameFast-only active series)
@@ -155,9 +191,17 @@ count({__name__=~"framefast_.*"})
 5. Logs: extract concrete error signature and payload context.
 
 ## Trace Query Shortcuts (Tempo / TraceQL)
-- Upload flow:
+- Upload pipeline (consumer):
 ```traceql
-{ span.name = "upload.queue.process" } || { span.name = "photo.queue.process" } || { span.name = "modal.process" }
+{ span.name = "pipeline_consumer.batch" } || { span.name =~ "pipeline_consumer\\..*" }
+```
+- Upload pipeline (callback):
+```traceql
+{ span.name = "pipeline_callback.batch" } || { span.name =~ "pipeline_callback\\..*" }
+```
+- Orchestrator:
+```traceql
+{ resource.service.name = "framefast-orchestrator" }
 ```
 - Recognition:
 ```traceql

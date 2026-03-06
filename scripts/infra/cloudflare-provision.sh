@@ -180,12 +180,15 @@ case "$ENVIRONMENT" in
       "rekognition-cleanup-dlq-staging"
       "upload-processing-staging"
       "upload-processing-dlq-staging"
+      "photo-pipeline-staging"
+      "photo-pipeline-dlq-staging"
       "logo-processing-staging"
       "logo-processing-dlq-staging"
       "lut-processing-staging"
       "lut-processing-dlq-staging"
     )
     UPLOAD_QUEUE="upload-processing-staging"
+    PIPELINE_QUEUE="photo-pipeline-staging"
     LOGO_QUEUE="logo-processing-staging"
     LUT_QUEUE="lut-processing-staging"
     NOTIFICATION_QUEUE="$UPLOAD_QUEUE"
@@ -202,12 +205,15 @@ case "$ENVIRONMENT" in
       "rekognition-cleanup-dlq"
       "upload-processing"
       "upload-processing-dlq"
+      "photo-pipeline"
+      "photo-pipeline-dlq"
       "logo-processing"
       "logo-processing-dlq"
       "lut-processing"
       "lut-processing-dlq"
     )
     UPLOAD_QUEUE="upload-processing"
+    PIPELINE_QUEUE="photo-pipeline"
     LOGO_QUEUE="logo-processing"
     LUT_QUEUE="lut-processing"
     NOTIFICATION_QUEUE="$UPLOAD_QUEUE"
@@ -233,6 +239,9 @@ set_bucket_cors "$PHOTOS_BUCKET"
 
 echo "\n== R2 Notifications =="
 create_bucket_notification "$PHOTOS_BUCKET" "$NOTIFICATION_QUEUE" "uploads/ object-create -> $NOTIFICATION_QUEUE" "uploads/"
+if [[ -n "${PIPELINE_QUEUE:-}" ]]; then
+  create_bucket_notification "$PHOTOS_BUCKET" "$PIPELINE_QUEUE" "uploads/ object-create -> $PIPELINE_QUEUE" "uploads/"
+fi
 create_bucket_notification "$PHOTOS_BUCKET" "$LOGO_NOTIFICATION_QUEUE" "logos/ object-create -> $LOGO_NOTIFICATION_QUEUE" "logos/"
 create_bucket_notification "$PHOTOS_BUCKET" "$LUT_NOTIFICATION_QUEUE" "lut-uploads/ object-create -> $LUT_NOTIFICATION_QUEUE" "lut-uploads/"
 

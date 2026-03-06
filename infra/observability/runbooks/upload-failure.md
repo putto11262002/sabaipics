@@ -6,24 +6,27 @@ Use this runbook when upload-to-index reliability or latency alerts fire.
 ## 1. Confirm blast radius
 - Dashboard: `FrameFast Alerting + SLO` and `FrameFast Pipeline + Recognition Metrics`
 - Check:
-  - `Upload E2E Success Rate (15m)`
-  - `Upload E2E p95 (ms)`
-  - `Queue Jobs by Queue + Status (5m)` for `upload-processing` and `photo-processing`
+  - `Pipeline Consumer Jobs Total` — `framefast_pipeline_consumer_jobs_total`
+  - `Pipeline E2E p95` — `framefast_pipeline_callback_e2e_duration_ms`
+  - `Pipeline Callback Status` — `framefast_pipeline_callback_jobs_total`
 
 ## 2. Identify stage of failure
-- If queue errors spike first: inspect `framefast_queue_jobs_total{status="error"}` split by queue.
-- If upload latency spikes but queue errors are low: inspect `framefast_upload_stage_duration_ms` by stage.
+- Check consumer step durations: `framefast_pipeline_consumer_step_duration_ms` by `step`.
+- Hot steps: `modal_submit` (Modal cold start), `debit_credits` (DB transaction), `head_check` (R2).
+- If callback failures: `framefast_pipeline_callback_jobs_total{status="error"}`.
+- E2E latency: `framefast_pipeline_callback_e2e_duration_ms`.
 - If face extraction stage spikes: inspect recognition service health panels.
 
 ## 3. Trace-level verification
 - Dashboard: `FrameFast Tracing Overview`
-- Query spans:
-  - `{ span.name = "upload.queue.process" }`
-  - `{ span.name = "photo.queue.process" }`
-  - `{ span.name = "modal.process" }`
+- Pipeline spans:
+  - `{ span.name = "pipeline_consumer.batch" }`
+  - `{ span.name =~ "pipeline_consumer\\..*" }`
+  - `{ span.name = "pipeline_callback.batch" }`
+  - `{ resource.service.name = "framefast-orchestrator" }`
 
 ## 4. Log deep dive
-- API logs: filter `event=upload_process_error` or `event=photo_process_error`
+- Pipeline logs: filter `event=~"pipeline_consumer_.*"` or `event=~"pipeline_callback_.*"`
 - FTP logs (if source is ftp): `service=framefast-ftp` and `event=upload_completed|upload_r2_ok|upload_started`
 
 ## 5. Immediate mitigation

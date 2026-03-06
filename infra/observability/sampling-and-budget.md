@@ -12,9 +12,11 @@ Default ratios when unset:
 
 Applied in:
 - API worker (`src/api/src/lib/observability/trace.ts`)
+- API worker V2 pipeline (`src/api/src/lib/observability/instrument.ts`)
 - FTP server (`infra/ftp-server/internal/observability/otel.go`)
 - Recognition service (`infra/recognition/modal_app.py`)
 - Image pipeline service (`image-pipeline/src/image_pipeline/main.py`)
+- Orchestrator service (`infra/recognition/orchestrator_app.py`)
 
 Implementation notes:
 - Parent-based behavior is preserved:
@@ -68,7 +70,8 @@ Current high-risk areas and action:
 
 Target max active series per family (production):
 - API core (`framefast_api_*`): `<= 300`
-- Queue + pipeline (`framefast_queue_*`, upload/search stage/e2e): `<= 1200`
+- Pipeline consumer + callback (`framefast_pipeline_consumer_*`, `framefast_pipeline_callback_*`): `<= 400`
+- Orchestrator (`framefast_orchestrator_*`): `<= 200`
 - Recognition + image pipeline: `<= 900`
 - FTP: `<= 200`
 - Client errors (`framefast_client_errors_total`): `<= 300`
