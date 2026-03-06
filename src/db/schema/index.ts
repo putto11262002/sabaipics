@@ -14,6 +14,7 @@ export * from './photos';
 export * from './face-embeddings';
 export * from './consent-records';
 export * from './upload-intents';
+export * from './photo-jobs';
 export * from './logo-upload-intents';
 export * from './photo-luts';
 export * from './auto-edit-presets';

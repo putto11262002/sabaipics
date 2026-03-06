@@ -7,6 +7,7 @@ import { cleanupCompletedOriginals } from './upload-clean-completed-originals';
 import { cleanupNonRetryableFailed } from './upload-clean-failed';
 import { cleanupStaleRetryable } from './upload-clean-stale-retryable';
 import { expireStalePendingIntents } from './upload-expire-pending';
+import { cleanupStuckSubmitted } from './pipeline-clean-stuck-submitted';
 
 /**
  * Cloudflare Workers scheduled event handler
@@ -46,6 +47,9 @@ export async function scheduled(
       break;
     case '40 23 * * *': // 6:40 AM Bangkok time (UTC+7) - Reconcile stale credit balances
       ctx.waitUntil(reconcileStaleCreditBalances(env));
+      break;
+    case '50 23 * * *': // 6:50 AM Bangkok time (UTC+7) - Recover stuck submitted pipeline jobs
+      ctx.waitUntil(cleanupStuckSubmitted(env));
       break;
     default:
       console.warn('[Cron] Unknown cron schedule', {

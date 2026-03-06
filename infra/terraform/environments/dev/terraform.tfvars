@@ -39,21 +39,25 @@ cors_max_age_seconds = 3600
 # ------------------------------------------------------------------------------
 
 queues = {
-  photo_processing        = "photo-processing-dev"
-  photo_processing_dlq    = "photo-processing-dlq-dev"
+  photo_pipeline          = "photo-pipeline-dev"
+  photo_pipeline_dlq      = "photo-pipeline-dlq-dev"
   rekognition_cleanup     = "rekognition-cleanup-dev"
   rekognition_cleanup_dlq = "rekognition-cleanup-dlq-dev"
-  upload_processing       = "upload-processing-dev"
-  upload_processing_dlq   = "upload-processing-dlq-dev"
   logo_processing         = "logo-processing-dev"
   logo_processing_dlq     = "logo-processing-dlq-dev"
 }
 
 # ------------------------------------------------------------------------------
-# R2 Event Notifications (none for dev - local testing)
+# R2 Event Notifications
 # ------------------------------------------------------------------------------
 
-bucket_notifications = []
+bucket_notifications = [
+  {
+    prefix      = "uploads/"
+    queue_key   = "photo_pipeline"
+    description = "Trigger photo pipeline on new uploads"
+  }
+]
 
 # ------------------------------------------------------------------------------
 # Dev Notification Proxy Configuration

@@ -2,7 +2,7 @@
  * Hard Delete Event Service
  *
  * Permanently deletes an event and all related data:
- * - Database: 6 tables (photos, participants, uploads, logo uploads, ftp, event)
+ * - Database: 7 tables (photos, participants, uploads, logo uploads, photo jobs, ftp, event)
  * - R2: Photos, logos, QR codes, selfies
  *
  * Face embeddings cascade-delete with photos (ON DELETE CASCADE).
@@ -20,6 +20,7 @@ import {
 	logoUploadIntents,
 	ftpCredentials,
 	feedback,
+	photoJobs,
 } from '@/db';
 import { eq, inArray } from 'drizzle-orm';
 import { ResultAsync, okAsync, errAsync } from 'neverthrow';
@@ -32,6 +33,7 @@ export const EVENT_RELATION_STRATEGIES = {
 		participant_searches: 'delete',
 		upload_intents: 'delete',
 		logo_upload_intents: 'delete',
+		photo_jobs: 'delete',
 		ftp_credentials: 'delete',
 		line_deliveries: 'set_null_via_fk',
 		feedback: 'set_null_soft_reference',
@@ -52,6 +54,7 @@ export interface HardDeleteResult {
 			participantSearches: number;
 			uploadIntents: number;
 			logoUploadIntents: number;
+			photoJobs: number;
 			ftpCredentials: number;
 			events: number;
 		};
@@ -185,6 +188,12 @@ export function hardDeleteEvents(
 								.where(eq(participantSearches.eventId, eventId))
 								.returning({ id: participantSearches.id });
 
+							// photo_jobs must be deleted before upload_intents (FK dependency)
+							const photoJobsDeleted = await tx
+								.delete(photoJobs)
+								.where(eq(photoJobs.eventId, eventId))
+								.returning({ id: photoJobs.id });
+
 							const uploadsDeleted = await tx
 								.delete(uploadIntents)
 								.where(eq(uploadIntents.eventId, eventId))
@@ -211,6 +220,7 @@ export function hardDeleteEvents(
 									participantSearches: searchesDeleted.length,
 									uploadIntents: uploadsDeleted.length,
 									logoUploadIntents: logoUploadsDeleted.length,
+									photoJobs: photoJobsDeleted.length,
 									ftpCredentials: ftpDeleted.length,
 									events: eventsDeleted.length,
 								},
@@ -277,6 +287,7 @@ export function hardDeleteEvents(
 										participantSearches: 0,
 										uploadIntents: 0,
 										logoUploadIntents: 0,
+										photoJobs: 0,
 										ftpCredentials: 0,
 										events: 0,
 									},
@@ -313,6 +324,7 @@ export function hardDeleteEvents(
 									participantSearches: 0,
 									uploadIntents: 0,
 									logoUploadIntents: 0,
+									photoJobs: 0,
 									ftpCredentials: 0,
 									events: 0,
 								},

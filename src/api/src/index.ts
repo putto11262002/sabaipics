@@ -25,14 +25,14 @@ import { studioRouter } from './routes/studio';
 import { feedbackRouter } from './routes/feedback';
 import { lineDeliveryRouter } from './routes/line-delivery';
 import { observabilityRouter } from './routes/observability';
+import { internalPipelineV2Router } from './routes/internal-pipeline-v2';
 import type { Env, Bindings } from './types';
 
 // Queue consumers
-import { queue as photoQueue } from './queue/photo-consumer';
 import { queue as cleanupQueue } from './queue/cleanup-consumer';
-import { queue as uploadQueue } from './queue/upload-consumer';
 import logoUploadConsumer from './queue/logo-upload-consumer';
 import lutProcessingConsumer from './queue/lut-processing-consumer';
+import { queue as photoPipelineQueue } from './queue/photo-pipeline-consumer';
 
 // Cron handlers
 import { scheduled } from './crons';
@@ -93,6 +93,8 @@ const app = new Hono<Env>()
   .route('/announcements', publicAnnouncementsRouter)
   // Public observability ingest (dashboard/iOS client error events)
   .route('/observability', observabilityRouter)
+  // Internal callbacks from pipeline orchestrator
+  .route('/internal/photo-pipelines', internalPipelineV2Router)
   // Admin routes - API key auth, no Clerk (must be before Clerk middleware)
   .route('/admin', adminRouter)
   // FTP routes - FTP JWT auth, no Clerk (must be before Clerk middleware)
@@ -167,14 +169,11 @@ export default {
   fetch: app.fetch,
   queue: async (batch: MessageBatch, env: Bindings, ctx: ExecutionContext) => {
     // Route by queue name prefix (handles -dev, -staging, etc.)
-    if (batch.queue.startsWith('photo-processing')) {
-      return photoQueue(batch as MessageBatch<any>, env, ctx);
+    if (batch.queue.startsWith('photo-pipeline')) {
+      return photoPipelineQueue(batch as MessageBatch<any>, env, ctx);
     }
     if (batch.queue.startsWith('rekognition-cleanup')) {
       return cleanupQueue(batch as MessageBatch<any>, env);
-    }
-    if (batch.queue.startsWith('upload-processing')) {
-      return uploadQueue(batch as MessageBatch<any>, env, ctx);
     }
     if (batch.queue.startsWith('logo-processing')) {
       return logoUploadConsumer.queue(batch as MessageBatch<any>, env, ctx);

@@ -5,65 +5,135 @@
   "tags": ["framefast", "pipeline", "recognition", "observability"],
   "timezone": "browser",
   "schemaVersion": 41,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "time": { "from": "now-6h", "to": "now" },
   "panels": [
     {
       "id": 1,
       "type": "timeseries",
-      "title": "Queue Jobs by Queue + Status (5m)",
+      "title": "Pipeline Consumer Jobs by Status (5m)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
-        { "refId": "A", "expr": "sum by (queue, status) (increase(framefast_queue_jobs_total[5m]))" }
+        { "refId": "A", "expr": "sum by (status) (increase(framefast_pipeline_consumer_jobs_total[5m]))" }
       ]
     },
     {
       "id": 2,
       "type": "timeseries",
-      "title": "Queue Job p95 Duration by Queue (ms)",
+      "title": "Pipeline Consumer Step p95 (ms)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, queue) (rate(framefast_queue_job_duration_ms_milliseconds_bucket[5m])))"
+          "expr": "histogram_quantile(0.95, sum by (le, step) (rate(framefast_pipeline_consumer_step_duration_ms_milliseconds_bucket[5m])))",
+          "legendFormat": "{{step}}"
         }
       ]
     },
     {
       "id": 3,
       "type": "timeseries",
-      "title": "Image Pipeline Requests by Status (5m)",
+      "title": "Pipeline Callback Jobs by Status (5m)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (status) (increase(framefast_image_pipeline_requests_total[5m]))"
-        }
+        { "refId": "A", "expr": "sum by (status) (increase(framefast_pipeline_callback_jobs_total[5m]))" }
       ]
     },
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Image Pipeline Errors by Status (5m)",
+      "title": "Pipeline E2E p90 / p95 (ms)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (status) (increase(framefast_image_pipeline_errors_total[5m]))"
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(framefast_pipeline_callback_e2e_duration_ms_milliseconds_bucket[15m])))",
+          "legendFormat": "p90"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_pipeline_callback_e2e_duration_ms_milliseconds_bucket[15m])))",
+          "legendFormat": "p95"
         }
       ]
     },
     {
       "id": 5,
       "type": "timeseries",
-      "title": "Image Pipeline p95 Latency (ms)",
+      "title": "Pipeline Success Rate (15m)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum(rate(framefast_pipeline_consumer_jobs_total{status=\"ok\"}[15m])) / clamp_min(sum(rate(framefast_pipeline_consumer_jobs_total[15m])), 0.001)"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Pipeline Batch Size",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(framefast_pipeline_consumer_batch_size_bucket[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_pipeline_consumer_batch_size_bucket[5m])))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Orchestrator Jobs by Status (5m)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        { "refId": "A", "expr": "sum by (status) (increase(framefast_orchestrator_jobs_total[5m]))" }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Orchestrator Step p95 (ms)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, step) (rate(framefast_orchestrator_step_duration_ms_milliseconds_bucket[5m])))",
+          "legendFormat": "{{step}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Image Pipeline Requests by Status (5m)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        { "refId": "A", "expr": "sum by (status) (increase(framefast_image_pipeline_requests_total[5m]))" }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Image Pipeline p95 Latency (ms)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "targets": [
         {
           "refId": "A",
@@ -72,50 +142,21 @@
       ]
     },
     {
-      "id": 6,
+      "id": 11,
       "type": "timeseries",
-      "title": "Image Pipeline Output Size p95 (bytes)",
+      "title": "Recognition Requests by Status (5m)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
       "targets": [
-        {
-          "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_image_pipeline_output_bytes_bucket[5m])))"
-        }
+        { "refId": "A", "expr": "sum by (source, status) (increase(framefast_recognition_requests_total[5m]))" }
       ]
     },
     {
-      "id": 7,
-      "type": "timeseries",
-      "title": "Recognition Requests by Source + Status (5m)",
-      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (source, status) (increase(framefast_recognition_requests_total[5m]))"
-        }
-      ]
-    },
-    {
-      "id": 8,
-      "type": "timeseries",
-      "title": "Recognition Errors by Source + Status (5m)",
-      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (source, status) (increase(framefast_recognition_errors_total[5m]))"
-        }
-      ]
-    },
-    {
-      "id": 9,
+      "id": 12,
       "type": "timeseries",
       "title": "Recognition Inference p95 (ms)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
       "targets": [
         {
           "refId": "A",
@@ -124,73 +165,45 @@
       ]
     },
     {
-      "id": 10,
+      "id": 13,
       "type": "timeseries",
       "title": "Faces Detected p50 / p95",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.50, sum by (le, source) (rate(framefast_recognition_faces_detected_bucket[5m])))",
-          "legendFormat": "p50 {{source}}"
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(framefast_pipeline_callback_faces_detected_bucket[5m])))",
+          "legendFormat": "p50"
         },
         {
           "refId": "B",
-          "expr": "histogram_quantile(0.95, sum by (le, source) (rate(framefast_recognition_faces_detected_bucket[5m])))",
-          "legendFormat": "p95 {{source}}"
-        }
-      ]
-    },
-    {
-      "id": 11,
-      "type": "timeseries",
-      "title": "Upload E2E p90 / p95 (ms)",
-      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "histogram_quantile(0.90, sum by (le, source) (sum_over_time(framefast_upload_e2e_duration_ms_milliseconds_bucket[15m])))",
-          "legendFormat": "p90 {{source}}"
-        },
-        {
-          "refId": "B",
-          "expr": "histogram_quantile(0.95, sum by (le, source) (sum_over_time(framefast_upload_e2e_duration_ms_milliseconds_bucket[15m])))",
-          "legendFormat": "p95 {{source}}"
-        }
-      ]
-    },
-    {
-      "id": 12,
-      "type": "timeseries",
-      "title": "Upload E2E Success Rate (15m)",
-      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "100 * sum by (source) (sum_over_time(framefast_upload_e2e_total{status=\"ok\"}[15m])) / clamp_min(sum by (source) (sum_over_time(framefast_upload_e2e_total[15m])), 1)",
-          "legendFormat": "{{source}}"
-        }
-      ]
-    },
-    {
-      "id": 13,
-      "type": "timeseries",
-      "title": "Upload Stage p95 (ms)",
-      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, stage, source) (sum_over_time(framefast_upload_stage_duration_ms_milliseconds_bucket[15m])))",
-          "legendFormat": "{{source}} {{stage}}"
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_pipeline_callback_faces_detected_bucket[5m])))",
+          "legendFormat": "p95"
         }
       ]
     },
     {
       "id": 14,
+      "type": "timeseries",
+      "title": "Credit Refunds (5m)",
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (increase(framefast_pipeline_callback_credit_refund_total[5m]))",
+          "legendFormat": "{{reason}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (reason) (increase(framefast_pipeline_consumer_credit_refund_total[5m]))",
+          "legendFormat": "consumer {{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 15,
       "type": "timeseries",
       "title": "Search E2E p90 / p95 (ms)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
@@ -198,18 +211,18 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.90, sum by (le, source) (sum_over_time(framefast_search_e2e_duration_ms_milliseconds_bucket[15m])))",
-          "legendFormat": "p90 {{source}}"
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(framefast_search_e2e_duration_ms_milliseconds_bucket[15m])))",
+          "legendFormat": "p90"
         },
         {
           "refId": "B",
-          "expr": "histogram_quantile(0.95, sum by (le, source) (sum_over_time(framefast_search_e2e_duration_ms_milliseconds_bucket[15m])))",
-          "legendFormat": "p95 {{source}}"
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(framefast_search_e2e_duration_ms_milliseconds_bucket[15m])))",
+          "legendFormat": "p95"
         }
       ]
     },
     {
-      "id": 15,
+      "id": 16,
       "type": "timeseries",
       "title": "Search E2E Success Rate (15m)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
@@ -217,13 +230,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * sum by (source) (sum_over_time(framefast_search_e2e_total{status=\"ok\"}[15m])) / clamp_min(sum by (source) (sum_over_time(framefast_search_e2e_total[15m])), 1)",
-          "legendFormat": "{{source}}"
+          "expr": "100 * sum(rate(framefast_search_e2e_total{status=\"ok\"}[15m])) / clamp_min(sum(rate(framefast_search_e2e_total[15m])), 0.001)"
         }
       ]
     },
     {
-      "id": 16,
+      "id": 17,
       "type": "timeseries",
       "title": "Search Stage p95 (ms)",
       "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
@@ -231,7 +243,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, stage, source) (sum_over_time(framefast_search_stage_duration_ms_milliseconds_bucket[15m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, stage, source) (rate(framefast_search_stage_duration_ms_milliseconds_bucket[15m])))",
           "legendFormat": "{{source}} {{stage}}"
         }
       ]

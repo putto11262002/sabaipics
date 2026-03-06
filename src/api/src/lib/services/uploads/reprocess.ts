@@ -1,4 +1,4 @@
-import { createDb, uploadIntents } from '@/db';
+import { createDb, uploadIntents, photoJobs } from '@/db';
 import { and, eq, type SQL } from 'drizzle-orm';
 import type { Bindings } from '../../../types';
 import type { R2EventMessage } from '../../../types/r2-event';
@@ -10,7 +10,7 @@ import type { R2EventMessage } from '../../../types/r2-event';
  * For each retryable intent:
  * 1. Verify R2 object still exists (HEAD)
  * 2. Reset intent to `pending` (clear error fields)
- * 3. Send synthetic R2 event to UPLOAD_QUEUE
+ * 3. Send synthetic R2 event to PHOTO_PIPELINE_QUEUE
  * 4. If R2 object missing → hard delete the intent (already cleaned up)
  */
 export async function reprocessInsufficientCredits(
@@ -92,7 +92,7 @@ async function reprocessInsufficientCreditsIntents(
         continue;
       }
 
-      // Send synthetic R2 event to upload queue BEFORE updating intent —
+      // Send synthetic R2 event to photo pipeline queue BEFORE updating intent —
       // if queue send fails, intent stays in failed/retryable for next top-up.
       const syntheticEvent: R2EventMessage = {
         account: '',
@@ -106,7 +106,7 @@ async function reprocessInsufficientCreditsIntents(
         eventTime: new Date().toISOString(),
       };
 
-      await env.UPLOAD_QUEUE.send(syntheticEvent);
+      await env.PHOTO_PIPELINE_QUEUE.send(syntheticEvent);
 
       // Queue send succeeded — now reset intent to pending with fresh expiry
       await db
@@ -119,6 +119,27 @@ async function reprocessInsufficientCreditsIntents(
           expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         })
         .where(eq(uploadIntents.id, intent.id));
+
+      // Reset associated photo_job if exists
+      const job = await db.query.photoJobs.findFirst({
+        where: eq(photoJobs.uploadIntentId, intent.id),
+        columns: { id: true, attempt: true },
+      });
+      if (job) {
+        await db
+          .update(photoJobs)
+          .set({
+            status: 'pending',
+            errorCode: null,
+            errorMessage: null,
+            retryable: null,
+            creditsDebited: 0,
+            creditsRefunded: 0,
+            attempt: (job.attempt ?? 1) + 1,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(photoJobs.id, job.id));
+      }
 
       requeued++;
     } catch (error) {

@@ -12,6 +12,7 @@ from typing import Any
 import modal
 
 app = modal.App("framefast-image-pipeline")
+pipeline_scratch = modal.Volume.from_name("framefast-pipeline-scratch", create_if_missing=True)
 _OBSERVABILITY_READY = False
 _TRACER = None
 _REQUEST_COUNTER = None
@@ -41,10 +42,9 @@ image = (
     memory=2048,
     timeout=60,
     scaledown_window=120,
-    max_containers=8,
+    max_containers=20,
     secrets=[modal.Secret.from_name("framefast-observability")],
 )
-@modal.concurrent(max_inputs=2, target_inputs=1)
 @modal.fastapi_endpoint(method="POST", requires_proxy_auth=True)
 def process(request: dict) -> dict:
     """Process an image with optional auto-edit, LUT, and upscale."""
@@ -468,3 +468,197 @@ def process(request: dict) -> dict:
 def health() -> dict:
     """Health check endpoint."""
     return {"status": "ok", "service": "framefast-image-pipeline"}
+
+
+@app.function(
+    image=image,
+    cpu=2.0,
+    memory=2048,
+    timeout=60,
+    scaledown_window=120,
+    max_containers=20,
+    secrets=[modal.Secret.from_name("framefast-observability")],
+    volumes={"/vol": pipeline_scratch},
+)
+def process_internal(
+    input_url: str,
+    output_url: str,
+    output_headers: dict[str, Any],
+    options: dict[str, Any],
+    processed_output_url: str | None = None,
+    processed_output_headers: dict[str, Any] | None = None,
+    job_id: str | None = None,
+) -> dict[str, Any]:
+    """Process image for V2 pipeline.
+
+    Handles dual-output (normalized original + optional processed) and writes
+    normalized image to shared volume for recognition to read.
+    """
+    import sys
+
+    sys.path.insert(0, "/root")
+
+    from PIL import Image, ExifTags
+    from image_pipeline.auto_edit import StylePreset, auto_edit
+
+    # -- EXIF helpers (same as process()) -----------------------------------
+
+    def _rational_to_float(value):
+        try:
+            if isinstance(value, tuple) and len(value) == 2:
+                num, den = value
+                return float(num) / float(den) if den != 0 else None
+            if hasattr(value, "numerator") and hasattr(value, "denominator"):
+                den = getattr(value, "denominator", 0)
+                return float(getattr(value, "numerator", 0)) / float(den) if den != 0 else None
+            if isinstance(value, (int, float, str)):
+                return float(value)
+            return None
+        except Exception:
+            return None
+
+    def _gps_to_degrees(value):
+        if not isinstance(value, (tuple, list)) or len(value) != 3:
+            return None
+        d, m, s = (_rational_to_float(v) for v in value)
+        if d is None or m is None or s is None:
+            return None
+        return d + (m / 60.0) + (s / 3600.0)
+
+    def extract_exif(img):
+        try:
+            raw = img.getexif()
+            if not raw:
+                return None
+            exif: dict[str, Any] = {}
+            gps_info = None
+            for tag_id, value in raw.items():
+                tag = ExifTags.TAGS.get(tag_id, tag_id)
+                if tag == "GPSInfo":
+                    gps_info = value
+                elif tag == "Make":
+                    exif["make"] = str(value)
+                elif tag == "Model":
+                    exif["model"] = str(value)
+                elif tag == "LensModel":
+                    exif["lensModel"] = str(value)
+                elif tag == "FocalLength":
+                    exif["focalLength"] = _rational_to_float(value)
+                elif tag == "ISOSpeedRatings":
+                    exif["iso"] = int(value) if value is not None else None
+                elif tag == "FNumber":
+                    exif["fNumber"] = _rational_to_float(value)
+                elif tag == "ExposureTime":
+                    exif["exposureTime"] = _rational_to_float(value)
+                elif tag == "DateTimeOriginal":
+                    exif["dateTimeOriginal"] = str(value)
+            if gps_info:
+                gps = {}
+                for k, v in gps_info.items():
+                    gps[ExifTags.GPSTAGS.get(k, k)] = v
+                lat = _gps_to_degrees(gps.get("GPSLatitude"))
+                lon = _gps_to_degrees(gps.get("GPSLongitude"))
+                if lat is not None and gps.get("GPSLatitudeRef") in ("S", "s"):
+                    lat = -lat
+                if lon is not None and gps.get("GPSLongitudeRef") in ("W", "w"):
+                    lon = -lon
+                if lat is not None:
+                    exif["gpsLatitude"] = lat
+                if lon is not None:
+                    exif["gpsLongitude"] = lon
+            return exif if exif else None
+        except Exception:
+            return None
+
+    # -- Main pipeline ------------------------------------------------------
+
+    # 1. Download image
+    try:
+        with urllib.request.urlopen(input_url) as response:
+            image_bytes = response.read()
+        img = Image.open(io.BytesIO(image_bytes))
+    except Exception as e:
+        return {"error": f"Invalid image: {e}"}
+
+    exif_data = extract_exif(img)
+    operations_applied: list[str] = []
+
+    # 2. Normalize (thumbnail to max dimension)
+    max_dimension = int(options.get("normalize_max_px", 2500))
+    if max_dimension > 0 and (img.width > max_dimension or img.height > max_dimension):
+        img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+        operations_applied.append("normalize")
+
+    img_rgb = img.convert("RGB")
+
+    # 3. Encode normalized to JPEG
+    norm_buf = io.BytesIO()
+    img_rgb.save(norm_buf, format="JPEG", quality=90)
+    norm_buf.seek(0)
+    normalized_bytes = norm_buf.read()
+
+    # 4. Upload normalized original to output_url
+    try:
+        req = urllib.request.Request(output_url, data=normalized_bytes, method="PUT", headers=output_headers)
+        with urllib.request.urlopen(req) as resp:
+            if resp.status >= 400:
+                return {"error": f"Failed to upload normalized: {resp.status}"}
+    except Exception as e:
+        return {"error": f"Failed to upload normalized: {e}"}
+
+    # 5. Write normalized to volume for recognition
+    if job_id:
+        vol_dir = f"/vol/{job_id}"
+        os.makedirs(vol_dir, exist_ok=True)
+        with open(f"{vol_dir}/normalized.jpeg", "wb") as f:
+            f.write(normalized_bytes)
+        pipeline_scratch.commit()
+
+    # 6. Auto-edit → upload to processed_output_url (if enabled)
+    auto_edit_succeeded = None
+    if options.get("auto_edit") and processed_output_url:
+        try:
+            original_for_blend = img_rgb.copy()
+            style_name = options.get("style")
+            style = StylePreset(style_name) if style_name else None
+            edited = auto_edit(
+                img_rgb,
+                style,
+                contrast=options.get("contrast"),
+                brightness=options.get("brightness"),
+                saturation=options.get("saturation"),
+                sharpness=options.get("sharpness"),
+                auto_contrast=options.get("auto_contrast"),
+            )
+
+            intensity = float(options.get("auto_edit_intensity", 100.0))
+            intensity = max(0.0, min(100.0, intensity))
+            if intensity < 100.0:
+                alpha = intensity / 100.0
+                edited = Image.blend(original_for_blend, edited.convert("RGB"), alpha)
+
+            proc_buf = io.BytesIO()
+            edited.convert("RGB").save(proc_buf, format="JPEG", quality=90)
+            proc_buf.seek(0)
+            processed_bytes = proc_buf.read()
+
+            headers = processed_output_headers or output_headers
+            req = urllib.request.Request(processed_output_url, data=processed_bytes, method="PUT", headers=headers)
+            with urllib.request.urlopen(req) as resp:
+                if resp.status < 400:
+                    auto_edit_succeeded = True
+                    operations_applied.append("auto_edit")
+                else:
+                    auto_edit_succeeded = False
+        except Exception:
+            auto_edit_succeeded = False
+
+    return {
+        "width": img_rgb.width,
+        "height": img_rgb.height,
+        "format": "jpeg",
+        "output_size": len(normalized_bytes),
+        "operations_applied": operations_applied,
+        "exif": exif_data,
+        "auto_edit_succeeded": auto_edit_succeeded,
+    }

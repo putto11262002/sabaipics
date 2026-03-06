@@ -1,4 +1,4 @@
-import { createDb, uploadIntents, photos } from '@/db';
+import { createDb, uploadIntents, photos, photoJobs } from '@/db';
 import { and, eq, lt, or } from 'drizzle-orm';
 import type { Bindings } from '../types';
 
@@ -6,7 +6,8 @@ const BATCH_SIZE = 100;
 
 /**
  * Hard deletes non-retryable failed and expired upload intents older than 3 days.
- * Removes: R2 object + associated photo record (if any) + upload intent record.
+ * Removes: R2 objects (raw upload + V2 normalized/processed) + photo_job +
+ *          photo record (if any) + upload intent record.
  *
  * Schedule: 10 23 * * * (6:10 AM Bangkok)
  */
@@ -48,7 +49,7 @@ export async function cleanupNonRetryableFailed(env: Bindings): Promise<void> {
 
   for (const intent of intents) {
     try {
-      // Delete R2 objects first — if these fail, skip intent deletion so
+      // Delete R2 objects first — if these fail, skip DB deletion so
       // the next cron run can retry (prevents orphaning R2 objects).
       if (intent.r2Key) {
         await env.PHOTOS_BUCKET.delete(intent.r2Key);
@@ -56,6 +57,18 @@ export async function cleanupNonRetryableFailed(env: Bindings): Promise<void> {
       if (intent.photoId) {
         const normalizedKey = `${intent.eventId}/${intent.photoId}.jpg`;
         await env.PHOTOS_BUCKET.delete(normalizedKey);
+      }
+
+      // Delete V2 pipeline R2 artifacts (original + processed)
+      const job = await db.query.photoJobs.findFirst({
+        where: eq(photoJobs.uploadIntentId, intent.id),
+        columns: { id: true, originalR2Key: true, processedR2Key: true },
+      });
+      if (job) {
+        if (job.originalR2Key) await env.PHOTOS_BUCKET.delete(job.originalR2Key);
+        if (job.processedR2Key) await env.PHOTOS_BUCKET.delete(job.processedR2Key);
+        // Delete photo_job (FK restrict — must delete before intent)
+        await db.delete(photoJobs).where(eq(photoJobs.id, job.id));
       }
 
       // Delete associated photo record if any
