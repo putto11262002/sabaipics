@@ -343,6 +343,12 @@ export async function queue(
         return null;
       }
 
+      // Queue wait time: R2 event creation → consumer pickup
+      const eventTimeMs = new Date(event.eventTime).getTime();
+      if (eventTimeMs > 0) {
+        inst.histogram('queue_wait_ms', Date.now() - eventTimeMs);
+      }
+
       const result = await safeTry(async function* () {
         const head = yield* inst
           .traced('head_check', () => headCheckR2(env, event), {
