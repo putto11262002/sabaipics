@@ -3,18 +3,25 @@
  *
  * Modal POSTs batch results here after processing all jobs.
  * Each job result is handled in its own transaction.
+ * Observability via `instrument` combinator — business logic stays clean.
  */
 
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
+import { ResultAsync } from 'neverthrow';
 import { photoJobs, photos, uploadIntents } from '@/db';
 import { grantCredits } from '../lib/credits';
 import { insertFaceEmbeddings } from '../lib/recognition/storage';
 import type { DetectedFace } from '../lib/recognition/types';
 import type { Env } from '../types';
 import type { PipelineApplied } from '@/db';
+import { createInstrument } from '../lib/observability/instrument';
+
+// =============================================================================
+// Zod schemas
+// =============================================================================
 
 const boundingBoxSchema = z.object({
   x: z.number(),
@@ -54,13 +61,213 @@ const jobResultSchema = z.object({
 
 const callbackSchema = z.object({
   results: z.array(jobResultSchema).min(1),
+  traceparent: z.string().nullish(),
+  baggage: z.string().nullish(),
 });
+
+// =============================================================================
+// Error types
+// =============================================================================
+
+type CallbackError =
+  | { type: 'not_found'; jobId: string }
+  | { type: 'already_terminal'; jobId: string; status: string }
+  | { type: 'database'; operation: string; cause: unknown }
+  | { type: 'face_embedding'; cause: unknown };
+
+// =============================================================================
+// Business logic (pure — no observability code)
+// =============================================================================
 
 function oneYearFromNowIso(): string {
   const d = new Date();
   d.setUTCFullYear(d.getUTCFullYear() + 1);
   return d.toISOString();
 }
+
+type JobResultInput = z.infer<typeof jobResultSchema>;
+
+function processCompletedResult(
+  dbTx: ReturnType<typeof import('@/db').createDbTx>,
+  job: typeof photoJobs.$inferSelect,
+  result: JobResultInput,
+  now: string,
+): ResultAsync<{ jobId: string; faceCount: number }, CallbackError> {
+  const artifacts = result.artifacts!;
+
+  return ResultAsync.fromPromise(
+    dbTx.transaction(async (tx) => {
+      // Look up intent
+      const [intent] = await tx
+        .select({
+          id: uploadIntents.id,
+          eventId: uploadIntents.eventId,
+          photoId: uploadIntents.photoId,
+        })
+        .from(uploadIntents)
+        .where(eq(uploadIntents.id, job.uploadIntentId))
+        .limit(1);
+
+      if (!intent) throw new Error('Upload intent missing for photo job');
+
+      const photoId = intent.photoId ?? crypto.randomUUID();
+
+      // Determine photo R2 key
+      const photoR2Key =
+        artifacts.processedR2Key && artifacts.autoEditSucceeded !== false
+          ? artifacts.processedR2Key
+          : artifacts.originalR2Key;
+
+      const pipelineApplied: PipelineApplied = {
+        autoEdit: artifacts.autoEditSucceeded ?? false,
+        autoEditPresetId: null,
+        lutId: null,
+        lutIntensity: 0,
+      };
+
+      // Insert or update photo record
+      if (!intent.photoId) {
+        await tx.insert(photos).values({
+          id: photoId,
+          eventId: intent.eventId,
+          r2Key: photoR2Key,
+          status: 'indexed',
+          faceCount: artifacts.embeddingCount,
+          width: artifacts.width,
+          height: artifacts.height,
+          exif: artifacts.exif as any,
+          pipelineApplied,
+          indexedAt: now,
+        });
+      } else {
+        await tx
+          .update(photos)
+          .set({
+            r2Key: photoR2Key,
+            status: 'indexed',
+            faceCount: artifacts.embeddingCount,
+            width: artifacts.width,
+            height: artifacts.height,
+            exif: artifacts.exif as any,
+            pipelineApplied,
+            indexedAt: now,
+          })
+          .where(eq(photos.id, intent.photoId));
+      }
+
+      // Insert face embeddings
+      if (artifacts.faces.length > 0) {
+        await insertFaceEmbeddings(tx, photoId, artifacts.faces as DetectedFace[]).match(
+          () => {},
+          (e) => { throw e; },
+        );
+      }
+
+      // Refund 1 credit if auto-edit was expected but failed
+      if (artifacts.autoEditSucceeded === false && (job.creditsDebited ?? 0) >= 2) {
+        await grantCredits(tx, {
+          photographerId: job.photographerId,
+          amount: 1,
+          source: 'refund',
+          expiresAt: oneYearFromNowIso(),
+        }).match(
+          () => {},
+          (e) => { throw e; },
+        );
+
+        await tx
+          .update(photoJobs)
+          .set({ creditsRefunded: 1 })
+          .where(eq(photoJobs.id, job.id));
+      }
+
+      // Mark upload intent completed
+      await tx
+        .update(uploadIntents)
+        .set({
+          status: 'completed',
+          completedAt: now,
+          photoId,
+          errorCode: null,
+          errorMessage: null,
+          retryable: null,
+        })
+        .where(eq(uploadIntents.id, intent.id));
+
+      // Mark photo job completed
+      await tx
+        .update(photoJobs)
+        .set({
+          status: 'completed',
+          originalR2Key: artifacts.originalR2Key,
+          processedR2Key: artifacts.processedR2Key ?? null,
+          retryable: null,
+          errorCode: null,
+          errorMessage: null,
+          completedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(photoJobs.id, job.id));
+
+      return { jobId: job.id, faceCount: artifacts.embeddingCount };
+    }),
+    (cause): CallbackError => ({ type: 'database', operation: 'process_completed', cause }),
+  );
+}
+
+function processFailedResult(
+  dbTx: ReturnType<typeof import('@/db').createDbTx>,
+  job: typeof photoJobs.$inferSelect,
+  result: JobResultInput,
+  now: string,
+): ResultAsync<{ jobId: string; refunded: number }, CallbackError> {
+  return ResultAsync.fromPromise(
+    dbTx.transaction(async (tx) => {
+      const refundable = Math.max(0, (job.creditsDebited ?? 0) - (job.creditsRefunded ?? 0));
+      if (refundable > 0) {
+        await grantCredits(tx, {
+          photographerId: job.photographerId,
+          amount: refundable,
+          source: 'refund',
+          expiresAt: oneYearFromNowIso(),
+        }).match(
+          () => {},
+          (e) => { throw e; },
+        );
+      }
+
+      await tx
+        .update(uploadIntents)
+        .set({
+          status: 'failed',
+          errorCode: result.error?.code ?? 'pipeline_failed',
+          errorMessage: result.error?.message ?? 'Pipeline processing failed',
+          retryable: false,
+        })
+        .where(eq(uploadIntents.id, job.uploadIntentId));
+
+      await tx
+        .update(photoJobs)
+        .set({
+          status: 'failed',
+          errorCode: result.error?.code ?? 'pipeline_failed',
+          errorMessage: result.error?.message ?? 'Pipeline processing failed',
+          retryable: false,
+          creditsRefunded: job.creditsDebited,
+          completedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(photoJobs.id, job.id));
+
+      return { jobId: job.id, refunded: refundable };
+    }),
+    (cause): CallbackError => ({ type: 'database', operation: 'process_failed', cause }),
+  );
+}
+
+// =============================================================================
+// Route
+// =============================================================================
 
 export const internalPipelineV2Router = new Hono<Env>().post(
   '/callback',
@@ -82,197 +289,103 @@ export const internalPipelineV2Router = new Hono<Env>().post(
     }
 
     const body = c.req.valid('json');
-    console.log('[callback] Received:', JSON.stringify(body).slice(0, 500));
     const dbTx = c.var.dbTx();
     const db = c.var.db();
     const now = new Date().toISOString();
 
+    const inst = createInstrument({
+      env: c.env as any,
+      ctx: c.executionCtx as unknown as ExecutionContext,
+      component: 'pipeline_callback',
+      parentTraceparent: body.traceparent ?? null,
+      baggage: body.baggage ?? undefined,
+      baseAttributes: { 'callback.result_count': body.results.length },
+    });
+
+    inst.log('info', 'received', { result_count: body.results.length });
+
     const outcomes: Array<{ jobId: string; ok: boolean; error?: string }> = [];
+    let okCount = 0;
+    let failedCount = 0;
 
     for (const result of body.results) {
-      try {
-        const job = await db.query.photoJobs.findFirst({ where: eq(photoJobs.id, result.jobId) });
-        if (!job) {
-          outcomes.push({ jobId: result.jobId, ok: false, error: 'not_found' });
-          continue;
-        }
+      // Look up job
+      const jobResult = await inst.tracedPromise(
+        'lookup_job',
+        () => db.query.photoJobs.findFirst({ where: eq(photoJobs.id, result.jobId) }),
+        { attributes: { 'job.id': result.jobId } },
+      );
 
-        // Skip if already terminal
-        if (job.status === 'completed' || job.status === 'failed') {
-          outcomes.push({ jobId: result.jobId, ok: true });
-          continue;
-        }
+      if (jobResult.isErr()) {
+        outcomes.push({ jobId: result.jobId, ok: false, error: jobResult.error.message });
+        failedCount++;
+        continue;
+      }
 
-        if (result.status === 'completed' && result.artifacts) {
-          const artifacts = result.artifacts;
-          // Determine which R2 key to use for the photo record.
-          // If auto-edit succeeded, use processed key; otherwise use original.
-          const photoR2Key = artifacts.processedR2Key && artifacts.autoEditSucceeded !== false
-            ? artifacts.processedR2Key
-            : artifacts.originalR2Key;
+      const job = jobResult.value;
+      if (!job) {
+        outcomes.push({ jobId: result.jobId, ok: false, error: 'not_found' });
+        failedCount++;
+        continue;
+      }
 
-          const pipelineApplied: PipelineApplied = {
-            autoEdit: artifacts.autoEditSucceeded ?? false,
-            autoEditPresetId: null,
-            lutId: null,
-            lutIntensity: 0,
-          };
+      // Skip already terminal
+      if (job.status === 'completed' || job.status === 'failed') {
+        outcomes.push({ jobId: result.jobId, ok: true });
+        okCount++;
+        continue;
+      }
 
-          await dbTx.transaction(async (tx) => {
-            // Look up intent for photo creation
-            const [intent] = await tx
-              .select({
-                id: uploadIntents.id,
-                eventId: uploadIntents.eventId,
-                photoId: uploadIntents.photoId,
-              })
-              .from(uploadIntents)
-              .where(eq(uploadIntents.id, job.uploadIntentId))
-              .limit(1);
+      if (result.status === 'completed' && result.artifacts) {
+        const processResult = await inst.traced(
+          'process_completed',
+          () => processCompletedResult(dbTx, job, result, now),
+          { attributes: { 'job.id': result.jobId, 'job.face_count': result.artifacts!.embeddingCount } },
+        );
 
-            if (!intent) throw new Error('Upload intent missing for photo job');
-
-            const photoId = intent.photoId ?? crypto.randomUUID();
-
-            // Insert or update photo record
-            if (!intent.photoId) {
-              await tx.insert(photos).values({
-                id: photoId,
-                eventId: intent.eventId,
-                r2Key: photoR2Key,
-                status: 'indexed',
-                faceCount: artifacts.embeddingCount,
-                width: artifacts.width,
-                height: artifacts.height,
-                exif: artifacts.exif as any,
-                pipelineApplied,
-                indexedAt: now,
-              });
-            } else {
-              await tx
-                .update(photos)
-                .set({
-                  r2Key: photoR2Key,
-                  status: 'indexed',
-                  faceCount: artifacts.embeddingCount,
-                  width: artifacts.width,
-                  height: artifacts.height,
-                  exif: artifacts.exif as any,
-                  pipelineApplied,
-                  indexedAt: now,
-                })
-                .where(eq(photos.id, intent.photoId));
+        processResult.match(
+          (val) => {
+            inst.histogram('faces_detected', val.faceCount, {});
+            // Compute e2e duration if job has startedAt
+            if (job.startedAt) {
+              const e2eMs = Math.max(0, Date.now() - new Date(job.startedAt).getTime());
+              inst.histogram('e2e_duration_ms', e2eMs, {});
             }
-
-            // Insert face embeddings
-            if (artifacts.faces.length > 0) {
-              await insertFaceEmbeddings(
-                tx,
-                photoId,
-                artifacts.faces as DetectedFace[],
-              ).match(
-                () => {},
-                (e) => { throw e; },
-              );
+            if (result.artifacts!.autoEditSucceeded === false && (job.creditsDebited ?? 0) >= 2) {
+              inst.count('credit_refund_total', 1, { reason: 'auto_edit_failed' });
             }
+            outcomes.push({ jobId: result.jobId, ok: true });
+            okCount++;
+          },
+          (err) => {
+            outcomes.push({ jobId: result.jobId, ok: false, error: err.type });
+            failedCount++;
+          },
+        );
+      } else if (result.status === 'failed') {
+        const failResult = await inst.traced(
+          'process_failed',
+          () => processFailedResult(dbTx, job, result, now),
+          { attributes: { 'job.id': result.jobId, 'error.code': result.error?.code ?? 'unknown' } },
+        );
 
-            // Refund 1 credit if auto-edit was expected but failed
-            if (artifacts.autoEditSucceeded === false && (job.creditsDebited ?? 0) >= 2) {
-              await grantCredits(tx, {
-                photographerId: job.photographerId,
-                amount: 1,
-                source: 'refund',
-                expiresAt: oneYearFromNowIso(),
-              }).match(
-                () => {},
-                (e) => { throw e; },
-              );
-
-              await tx
-                .update(photoJobs)
-                .set({ creditsRefunded: 1 })
-                .where(eq(photoJobs.id, job.id));
+        failResult.match(
+          (val) => {
+            if (val.refunded > 0) {
+              inst.count('credit_refund_total', val.refunded, { reason: 'pipeline_failed' });
             }
-
-            // Mark upload intent completed
-            await tx
-              .update(uploadIntents)
-              .set({
-                status: 'completed',
-                completedAt: now,
-                photoId,
-                errorCode: null,
-                errorMessage: null,
-                retryable: null,
-              })
-              .where(eq(uploadIntents.id, intent.id));
-
-            // Mark photo job completed
-            await tx
-              .update(photoJobs)
-              .set({
-                status: 'completed',
-                originalR2Key: artifacts.originalR2Key,
-                processedR2Key: artifacts.processedR2Key ?? null,
-                retryable: null,
-                errorCode: null,
-                errorMessage: null,
-                completedAt: now,
-                updatedAt: now,
-              })
-              .where(eq(photoJobs.id, job.id));
-          });
-
-          outcomes.push({ jobId: result.jobId, ok: true });
-        } else if (result.status === 'failed') {
-          await dbTx.transaction(async (tx) => {
-            // Refund ALL pre-debited credits
-            const refundable = Math.max(0, (job.creditsDebited ?? 0) - (job.creditsRefunded ?? 0));
-            if (refundable > 0) {
-              await grantCredits(tx, {
-                photographerId: job.photographerId,
-                amount: refundable,
-                source: 'refund',
-                expiresAt: oneYearFromNowIso(),
-              }).match(
-                () => {},
-                (e) => { throw e; },
-              );
-            }
-
-            // Mark upload intent failed
-            await tx
-              .update(uploadIntents)
-              .set({
-                status: 'failed',
-                errorCode: result.error?.code ?? 'pipeline_failed',
-                errorMessage: result.error?.message ?? 'Pipeline processing failed',
-                retryable: false,
-              })
-              .where(eq(uploadIntents.id, job.uploadIntentId));
-
-            // Mark photo job failed
-            await tx
-              .update(photoJobs)
-              .set({
-                status: 'failed',
-                errorCode: result.error?.code ?? 'pipeline_failed',
-                errorMessage: result.error?.message ?? 'Pipeline processing failed',
-                retryable: false,
-                creditsRefunded: job.creditsDebited,
-                completedAt: now,
-                updatedAt: now,
-              })
-              .where(eq(photoJobs.id, job.id));
-          });
-
-          outcomes.push({ jobId: result.jobId, ok: true });
-        }
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        outcomes.push({ jobId: result.jobId, ok: false, error: message });
+            outcomes.push({ jobId: result.jobId, ok: true });
+            okCount++;
+          },
+          (err) => {
+            outcomes.push({ jobId: result.jobId, ok: false, error: err.type });
+            failedCount++;
+          },
+        );
       }
     }
+
+    inst.complete({ total: body.results.length, ok: okCount, failed: failedCount });
 
     return c.json({ ok: true, outcomes });
   },

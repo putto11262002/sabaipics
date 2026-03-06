@@ -195,7 +195,7 @@ export default {
       return lutProcessingConsumer.queue(batch as MessageBatch<any>, env);
     }
     if (batch.queue.startsWith('photo-pipeline')) {
-      return photoPipelineQueue(batch as MessageBatch<any>, env);
+      return photoPipelineQueue(batch as MessageBatch<any>, env, ctx);
     }
     console.error('[Queue] Unknown queue:', batch.queue);
   },

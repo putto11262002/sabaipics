@@ -13,6 +13,8 @@ import type { DetectedFace } from '../lib/recognition/types';
 
 export interface PipelineBatchRequest {
   jobs: PipelineJob[];
+  traceparent?: string;
+  baggage?: string;
 }
 
 export interface PipelineJob {
