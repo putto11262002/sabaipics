@@ -52,6 +52,7 @@ It covers:
 - `framefast_pipeline_consumer_batch_size` — batch sizes
 - `framefast_pipeline_consumer_credit_insufficient_total` — insufficient credit events
 - `framefast_pipeline_consumer_credit_refund_total` — credit refunds (labels: `reason`)
+- `framefast_pipeline_consumer_queue_wait_ms` — time from R2 event to consumer pickup
 
 ### Pipeline V2 callback metrics (CF Worker)
 - `framefast_pipeline_callback_jobs_total` — callback results (labels: `status`)
