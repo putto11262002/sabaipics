@@ -6,10 +6,11 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5175",
-    "beforeDevCommand": "pnpm dev -- --port 5175",
+    "beforeDevCommand": "pnpm dev:desktop -- --port 5175",
     "beforeBuildCommand": "pnpm build"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "FrameFast",
