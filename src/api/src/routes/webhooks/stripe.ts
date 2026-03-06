@@ -35,7 +35,6 @@ import { eventBus } from '../../events';
 import type { StripeEvents } from '../../lib/stripe/events';
 import { safeHandler } from '../../lib/safe-handler';
 import type { HandlerError } from '../../lib/error';
-import { reprocessInsufficientCredits } from '../../lib/services/uploads/reprocess';
 import { capturePostHogEvent } from '../../lib/posthog';
 
 /**
@@ -45,11 +44,6 @@ type StripeWebhookBindings = {
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
   POSTHOG_API_KEY: string;
-  // Needed for reprocessing insufficient_credits intents after credit top-up
-  DATABASE_URL: string;
-  PHOTOS_BUCKET: R2Bucket;
-  UPLOAD_QUEUE: Queue;
-  PHOTO_BUCKET_NAME: string;
 };
 
 type StripeWebhookVariables = {
@@ -289,23 +283,6 @@ export const stripeWebhookRouter = new Hono<{
               `Stripe fulfillment failed for session ${session.id}: ${result.reason}`,
             ),
           });
-        }
-
-        // Best-effort: reprocess any insufficient_credits intents for this photographer
-        const photographerId = metadata.photographer_id;
-        if (photographerId) {
-          try {
-            c.executionCtx.waitUntil(
-              reprocessInsufficientCredits(c.env as any, photographerId).catch((err) => {
-                console.error('[Stripe Webhook] Reprocess failed', {
-                  photographerId,
-                  error: err instanceof Error ? err.message : String(err),
-                });
-              }),
-            );
-          } catch {
-            // Hono unit tests do not always provide ExecutionContext.
-          }
         }
 
         // Track credit purchase in PostHog

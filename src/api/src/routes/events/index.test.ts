@@ -745,7 +745,6 @@ describe("POST /events/:id/photos - Photo Upload", () => {
       Bindings: {
         EVENT_FRONTEND_URL: string;
         PHOTOS_BUCKET: R2Bucket;
-        PHOTO_QUEUE: typeof mockQueue;
         PHOTO_R2_BASE_URL: string;
       };
       Variables: PhotographerVariables;
@@ -790,7 +789,6 @@ describe("POST /events/:id/photos - Photo Upload", () => {
   ) => ({
     EVENT_FRONTEND_URL: "https://event.sabaipics.com",
     PHOTOS_BUCKET: mockBucket,
-    PHOTO_QUEUE: mockQueue,
     PHOTO_R2_BASE_URL: "https://photos.sabaipics.com",
   });
 
@@ -961,13 +959,6 @@ describe("POST /events/:id/photos - Photo Upload", () => {
       expect(mockBucket.put).toHaveBeenCalled();
 
       // Note: normalizeImage is mocked at module level
-
-      // Verify queue send was called
-      expect(mockQueue.send).toHaveBeenCalledWith({
-        photo_id: mockPhoto.id,
-        event_id: MOCK_EVENT_ID,
-        r2_key: expect.stringContaining(".jpg"),
-      });
     } else {
       throw new Error("Expected data response");
     }

@@ -65,16 +65,12 @@
   "queues": {
     "producers": [
       {
-        "queue": "photo-processing-dev",
-        "binding": "PHOTO_QUEUE",
+        "queue": "photo-pipeline-dev",
+        "binding": "PHOTO_PIPELINE_QUEUE",
       },
       {
         "queue": "rekognition-cleanup-dev",
         "binding": "CLEANUP_QUEUE",
-      },
-      {
-        "queue": "upload-processing-dev",
-        "binding": "UPLOAD_QUEUE",
       },
       {
         "queue": "logo-processing-dev",
@@ -84,19 +80,15 @@
         "queue": "lut-processing-dev",
         "binding": "LUT_QUEUE",
       },
-      {
-        "queue": "photo-pipeline-dev",
-        "binding": "PHOTO_PIPELINE_QUEUE",
-      },
     ],
     "consumers": [
       {
-        "queue": "photo-processing-dev",
+        "queue": "photo-pipeline-dev",
         "max_batch_size": 50,
-        "max_batch_timeout": 1,
-        "max_retries": 1,
-        "max_concurrency": 10,
-        "dead_letter_queue": "photo-processing-dlq-dev",
+        "max_batch_timeout": 2,
+        "max_retries": 2,
+        "max_concurrency": 20,
+        "dead_letter_queue": "photo-pipeline-dlq-dev",
       },
       {
         "queue": "rekognition-cleanup-dev",
@@ -105,16 +97,6 @@
         "max_retries": 3,
         "max_concurrency": 1,
         "dead_letter_queue": "rekognition-cleanup-dlq-dev",
-      },
-      {
-        "queue": "upload-processing-dev",
-        // Upload consumer currently reads full objects into memory via arrayBuffer().
-        // Keep per-instance batch tiny and fan out via queue concurrency.
-        "max_batch_size": 1,
-        "max_batch_timeout": 5,
-        "max_retries": 1,
-        "max_concurrency": 12,
-        "dead_letter_queue": "upload-processing-dlq-dev",
       },
       {
         "queue": "logo-processing-dev",
@@ -131,14 +113,6 @@
         "max_retries": 3,
         "max_concurrency": 1,
         "dead_letter_queue": "lut-processing-dlq-dev",
-      },
-      {
-        "queue": "photo-pipeline-dev",
-        "max_batch_size": 50,
-        "max_batch_timeout": 2,
-        "max_retries": 2,
-        "max_concurrency": 20,
-        "dead_letter_queue": "photo-pipeline-dlq-dev",
       },
     ],
   },
@@ -242,16 +216,12 @@
       "queues": {
         "producers": [
           {
-            "queue": "photo-processing-staging",
-            "binding": "PHOTO_QUEUE",
+            "queue": "photo-pipeline-staging",
+            "binding": "PHOTO_PIPELINE_QUEUE",
           },
           {
             "queue": "rekognition-cleanup-staging",
             "binding": "CLEANUP_QUEUE",
-          },
-          {
-            "queue": "upload-processing-staging",
-            "binding": "UPLOAD_QUEUE",
           },
           {
             "queue": "logo-processing-staging",
@@ -261,19 +231,15 @@
             "queue": "lut-processing-staging",
             "binding": "LUT_QUEUE",
           },
-          {
-            "queue": "photo-pipeline-staging",
-            "binding": "PHOTO_PIPELINE_QUEUE",
-          },
         ],
         "consumers": [
           {
-            "queue": "photo-processing-staging",
+            "queue": "photo-pipeline-staging",
             "max_batch_size": 50,
-            "max_batch_timeout": 1,
-            "max_retries": 1,
-            "max_concurrency": 10,
-            "dead_letter_queue": "photo-processing-dlq-staging",
+            "max_batch_timeout": 2,
+            "max_retries": 2,
+            "max_concurrency": 20,
+            "dead_letter_queue": "photo-pipeline-dlq-staging",
           },
           {
             "queue": "rekognition-cleanup-staging",
@@ -282,16 +248,6 @@
             "max_retries": 3,
             "max_concurrency": 1,
             "dead_letter_queue": "rekognition-cleanup-dlq-staging",
-          },
-          {
-            "queue": "upload-processing-staging",
-            // Upload consumer currently reads full objects into memory via arrayBuffer().
-            // Keep per-instance batch tiny and fan out via queue concurrency.
-            "max_batch_size": 1,
-            "max_batch_timeout": 5,
-            "max_retries": 1,
-            "max_concurrency": 12,
-            "dead_letter_queue": "upload-processing-dlq-staging",
           },
           {
             "queue": "logo-processing-staging",
@@ -308,14 +264,6 @@
             "max_retries": 3,
             "max_concurrency": 1,
             "dead_letter_queue": "lut-processing-dlq-staging",
-          },
-          {
-            "queue": "photo-pipeline-staging",
-            "max_batch_size": 50,
-            "max_batch_timeout": 2,
-            "max_retries": 2,
-            "max_concurrency": 20,
-            "dead_letter_queue": "photo-pipeline-dlq-staging",
           },
         ],
       },
@@ -421,16 +369,12 @@
       "queues": {
         "producers": [
           {
-            "queue": "photo-processing",
-            "binding": "PHOTO_QUEUE",
+            "queue": "photo-pipeline",
+            "binding": "PHOTO_PIPELINE_QUEUE",
           },
           {
             "queue": "rekognition-cleanup",
             "binding": "CLEANUP_QUEUE",
-          },
-          {
-            "queue": "upload-processing",
-            "binding": "UPLOAD_QUEUE",
           },
           {
             "queue": "logo-processing",
@@ -440,19 +384,15 @@
             "queue": "lut-processing",
             "binding": "LUT_QUEUE",
           },
-          {
-            "queue": "photo-pipeline",
-            "binding": "PHOTO_PIPELINE_QUEUE",
-          },
         ],
         "consumers": [
           {
-            "queue": "photo-processing",
+            "queue": "photo-pipeline",
             "max_batch_size": 50,
-            "max_batch_timeout": 1,
-            "max_retries": 1,
-            "max_concurrency": 10,
-            "dead_letter_queue": "photo-processing-dlq",
+            "max_batch_timeout": 2,
+            "max_retries": 2,
+            "max_concurrency": 20,
+            "dead_letter_queue": "photo-pipeline-dlq",
           },
           {
             "queue": "rekognition-cleanup",
@@ -461,16 +401,6 @@
             "max_retries": 3,
             "max_concurrency": 1,
             "dead_letter_queue": "rekognition-cleanup-dlq",
-          },
-          {
-            "queue": "upload-processing",
-            // Upload consumer currently reads full objects into memory via arrayBuffer().
-            // Keep per-instance batch tiny and fan out via queue concurrency.
-            "max_batch_size": 1,
-            "max_batch_timeout": 5,
-            "max_retries": 1,
-            "max_concurrency": 12,
-            "dead_letter_queue": "upload-processing-dlq",
           },
           {
             "queue": "logo-processing",
@@ -487,14 +417,6 @@
             "max_retries": 3,
             "max_concurrency": 1,
             "dead_letter_queue": "lut-processing-dlq",
-          },
-          {
-            "queue": "photo-pipeline",
-            "max_batch_size": 50,
-            "max_batch_timeout": 2,
-            "max_retries": 2,
-            "max_concurrency": 20,
-            "dead_letter_queue": "photo-pipeline-dlq",
           },
         ],
       },

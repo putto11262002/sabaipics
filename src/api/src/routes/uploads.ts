@@ -3,7 +3,7 @@
  *
  * Generates presigned URLs for direct R2 uploads.
  * Client uploads directly to R2, triggering event notification
- * which is processed by the upload-consumer queue.
+ * which is processed by the photo-pipeline queue consumer.
  */
 
 import { Hono } from 'hono';

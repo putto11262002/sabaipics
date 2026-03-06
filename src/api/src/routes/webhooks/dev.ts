@@ -42,9 +42,7 @@ export const devWebhookRouter = new Hono<Env>().post(
       ? c.env.LUT_QUEUE
       : key.startsWith('logos/')
         ? c.env.LOGO_QUEUE
-        : key.startsWith('uploads/')
-          ? c.env.PHOTO_PIPELINE_QUEUE
-          : c.env.UPLOAD_QUEUE;
+        : c.env.PHOTO_PIPELINE_QUEUE;
 
     await queue.send({
       account: notification.account,

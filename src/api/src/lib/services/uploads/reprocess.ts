@@ -10,7 +10,7 @@ import type { R2EventMessage } from '../../../types/r2-event';
  * For each retryable intent:
  * 1. Verify R2 object still exists (HEAD)
  * 2. Reset intent to `pending` (clear error fields)
- * 3. Send synthetic R2 event to UPLOAD_QUEUE
+ * 3. Send synthetic R2 event to PHOTO_PIPELINE_QUEUE
  * 4. If R2 object missing → hard delete the intent (already cleaned up)
  */
 export async function reprocessInsufficientCredits(

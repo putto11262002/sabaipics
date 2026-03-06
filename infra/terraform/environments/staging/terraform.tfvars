@@ -42,18 +42,14 @@ cors_max_age_seconds = 3600
 # ------------------------------------------------------------------------------
 
 queues = {
-  photo_processing        = "photo-processing-staging"
-  photo_processing_dlq    = "photo-processing-dlq-staging"
+  photo_pipeline          = "photo-pipeline-staging"
+  photo_pipeline_dlq      = "photo-pipeline-dlq-staging"
   rekognition_cleanup     = "rekognition-cleanup-staging"
   rekognition_cleanup_dlq = "rekognition-cleanup-dlq-staging"
-  upload_processing       = "upload-processing-staging"
-  upload_processing_dlq   = "upload-processing-dlq-staging"
   logo_processing         = "logo-processing-staging"
   logo_processing_dlq     = "logo-processing-dlq-staging"
   lut_processing          = "lut-processing-staging"
   lut_processing_dlq      = "lut-processing-dlq-staging"
-  photo_pipeline          = "photo-pipeline-staging"
-  photo_pipeline_dlq      = "photo-pipeline-dlq-staging"
 }
 
 # ------------------------------------------------------------------------------
