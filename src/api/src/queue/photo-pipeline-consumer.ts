@@ -241,24 +241,33 @@ function submitBatchToModal(
       };
 
       for (let attempt = 0; attempt <= MODAL_MAX_RETRIES; attempt++) {
-        const response = await fetch(orchestratorUrl, {
-          method: 'POST',
-          headers,
-          body,
-          signal: AbortSignal.timeout(MODAL_TIMEOUT_MS),
-        });
+        try {
+          const response = await fetch(orchestratorUrl, {
+            method: 'POST',
+            headers,
+            body,
+            signal: AbortSignal.timeout(MODAL_TIMEOUT_MS),
+          });
 
-        // 524 = CF proxy timeout (Modal cold start). Retry after delay.
-        if (response.status === 524 && attempt < MODAL_MAX_RETRIES) {
-          await new Promise((r) => setTimeout(r, MODAL_RETRY_DELAY_MS));
-          continue;
-        }
+          // 524 = CF proxy timeout (Modal cold start). Retry after delay.
+          if (response.status === 524 && attempt < MODAL_MAX_RETRIES) {
+            await new Promise((r) => setTimeout(r, MODAL_RETRY_DELAY_MS));
+            continue;
+          }
 
-        if (!response.ok) {
-          const text = await response.text().catch(() => '');
-          throw new Error(`Modal rejected: ${response.status} ${text}`);
+          if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            throw new Error(`Modal rejected: ${response.status} ${text}`);
+          }
+          return;
+        } catch (err) {
+          // Timeout or network error — retry if attempts remain
+          if (attempt < MODAL_MAX_RETRIES) {
+            await new Promise((r) => setTimeout(r, MODAL_RETRY_DELAY_MS));
+            continue;
+          }
+          throw err;
         }
-        return;
       }
     })(),
     (cause): PipelineError => ({
