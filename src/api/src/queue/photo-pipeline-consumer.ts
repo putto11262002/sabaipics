@@ -22,6 +22,8 @@ import { createInstrument, type Instrument, type TracedError } from '../lib/obse
 const MAX_OBJECT_SIZE = 50 * 1024 * 1024; // 50 MB
 const PRESIGN_EXPIRY_SECONDS = 600; // 10 min
 const MODAL_TIMEOUT_MS = 180_000;
+const MODAL_RETRY_DELAY_MS = 5_000;
+const MODAL_MAX_RETRIES = 1;
 
 // =============================================================================
 // Error types
@@ -231,19 +233,32 @@ function submitBatchToModal(
 
   return ResultAsync.fromPromise(
     (async () => {
-      const response = await fetch(orchestratorUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Modal-Key': modalKey,
-          'Modal-Secret': modalSecret,
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(MODAL_TIMEOUT_MS),
-      });
-      if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        throw new Error(`Modal rejected: ${response.status} ${text}`);
+      const body = JSON.stringify(payload);
+      const headers = {
+        'Content-Type': 'application/json',
+        'Modal-Key': modalKey,
+        'Modal-Secret': modalSecret,
+      };
+
+      for (let attempt = 0; attempt <= MODAL_MAX_RETRIES; attempt++) {
+        const response = await fetch(orchestratorUrl, {
+          method: 'POST',
+          headers,
+          body,
+          signal: AbortSignal.timeout(MODAL_TIMEOUT_MS),
+        });
+
+        // 524 = CF proxy timeout (Modal cold start). Retry after delay.
+        if (response.status === 524 && attempt < MODAL_MAX_RETRIES) {
+          await new Promise((r) => setTimeout(r, MODAL_RETRY_DELAY_MS));
+          continue;
+        }
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+          throw new Error(`Modal rejected: ${response.status} ${text}`);
+        }
+        return;
       }
     })(),
     (cause): PipelineError => ({
