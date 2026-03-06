@@ -418,6 +418,9 @@ export async function queue(
           if ('type' in err && err.type === 'insufficient_credits') {
             inst.count('credit_insufficient_total', 1);
             await markInsufficientCredits(db, event.object.key).catch(() => {});
+            // Ack — don't auto-retry. Intent is marked retryable for user-initiated retry.
+            message.ack();
+            return null;
           }
           if ('type' in err && isSkippable(err as PipelineError)) {
             message.ack();
