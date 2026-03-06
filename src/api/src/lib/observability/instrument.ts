@@ -109,7 +109,7 @@ export function createInstrument(config: InstrumentConfig): Instrument {
           return val;
         })
         .mapErr((err) => {
-          const errStr = err instanceof Error ? err.message : String(err);
+          const errStr = err instanceof Error ? err.message : (typeof err === 'object' && err !== null ? JSON.stringify(err) : String(err));
           span.end('error', { statusMessage: errStr });
           emitHistogramMetricMs(env, ctx, `${prefix}_step_duration_ms`, Date.now() - start, {
             step,
@@ -146,7 +146,7 @@ export function createInstrument(config: InstrumentConfig): Instrument {
         type: 'traced_error',
         step,
         cause,
-        message: cause instanceof Error ? cause.message : String(cause),
+        message: cause instanceof Error ? cause.message : (typeof cause === 'object' && cause !== null ? JSON.stringify(cause) : String(cause)),
       }))
         .map((val) => {
           span.end('ok');
