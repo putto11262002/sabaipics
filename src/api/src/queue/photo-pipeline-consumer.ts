@@ -10,7 +10,7 @@
 
 import { createDb, createDbTx, events, photoJobs, uploadIntents } from '@/db';
 import { and, eq } from 'drizzle-orm';
-import { ResultAsync, okAsync, errAsync } from 'neverthrow';
+import { ResultAsync, safeTry, ok, err, errAsync } from 'neverthrow';
 import type { Bindings } from '../types';
 import type { R2EventMessage } from '../types/r2-event';
 import type { PipelineBatchRequest, PipelineJob } from '../types/pipeline-v2';
@@ -328,104 +328,105 @@ export async function queue(
         return null;
       }
 
-      const result = await inst
-        .traced('head_check', () => headCheckR2(env, event), {
-          attributes: { 'r2.key': event.object.key },
-        })
-        .andThen((head) =>
-          inst.traced('match_intent', () => matchIntent(db, event.object.key)),
-        )
-        .andThen((intent) =>
-          inst.traced('cas_claim', () => casClaimIntent(db, intent.id)),
-        )
-        .andThen((claimed) =>
-          inst.traced('ensure_job', () => ensurePhotoJob(db, claimed)).map((job) => ({ claimed, job })),
-        )
-        .andThen(({ claimed, job }) =>
-          inst.tracedPromise('load_event', () =>
+      const result = await safeTry(async function* () {
+        const head = yield* inst
+          .traced('head_check', () => headCheckR2(env, event), {
+            attributes: { 'r2.key': event.object.key },
+          })
+          .safeUnwrap();
+
+        const intent = yield* inst
+          .traced('match_intent', () => matchIntent(db, event.object.key))
+          .safeUnwrap();
+
+        const claimed = yield* inst
+          .traced('cas_claim', () => casClaimIntent(db, intent.id))
+          .safeUnwrap();
+
+        const job = yield* inst
+          .traced('ensure_job', () => ensurePhotoJob(db, claimed))
+          .safeUnwrap();
+
+        const eventRecord = yield* inst
+          .tracedPromise('load_event', () =>
             db.query.events.findFirst({
               where: eq(events.id, claimed.eventId),
               columns: { settings: true },
             }),
-          ).map((eventRecord) => {
-            const colorGrade = eventRecord?.settings?.colorGrade;
-            const hasAutoEdit = colorGrade?.autoEdit === true || !!colorGrade?.lutId;
-            const creditsToDebit = hasAutoEdit ? 2 : 1;
-            return { claimed, job, colorGrade, hasAutoEdit, creditsToDebit };
-          }),
-        )
-        .andThen((ctx) =>
-          inst.traced('debit_credits', () =>
-            preDebitCredits(dbTx, {
-              intent: ctx.claimed,
-              job: ctx.job,
-              creditsToDebit: ctx.creditsToDebit,
-              hasAutoEdit: ctx.hasAutoEdit,
-            }),
-          ).map(() => ctx),
-        )
-        .andThen((ctx) =>
-          inst.tracedPromise('update_credits', () =>
-            db.update(photoJobs).set({ creditsDebited: ctx.creditsToDebit }).where(eq(photoJobs.id, ctx.job.id)),
-          ).map(() => ctx),
-        )
-        .andThen((ctx) =>
-          inst.traced('presign', () =>
-            generateUrls(env, ctx.claimed.eventId, ctx.claimed.id, ctx.claimed.r2Key, ctx.hasAutoEdit),
-          ).map((urls) => ({ ...ctx, urls })),
-        )
-        .andThen((ctx) =>
-          inst.tracedPromise('update_r2_keys', () =>
+          )
+          .safeUnwrap();
+
+        const colorGrade = eventRecord?.settings?.colorGrade;
+        const hasAutoEdit = colorGrade?.autoEdit === true || !!colorGrade?.lutId;
+        const creditsToDebit = hasAutoEdit ? 2 : 1;
+
+        yield* inst
+          .traced('debit_credits', () =>
+            preDebitCredits(dbTx, { intent: claimed, job, creditsToDebit, hasAutoEdit }),
+          )
+          .safeUnwrap();
+
+        yield* inst
+          .tracedPromise('update_credits', () =>
+            db.update(photoJobs).set({ creditsDebited: creditsToDebit }).where(eq(photoJobs.id, job.id)),
+          )
+          .safeUnwrap();
+
+        const urls = yield* inst
+          .traced('presign', () =>
+            generateUrls(env, claimed.eventId, claimed.id, claimed.r2Key, hasAutoEdit),
+          )
+          .safeUnwrap();
+
+        yield* inst
+          .tracedPromise('update_r2_keys', () =>
             db.update(photoJobs).set({
-              originalR2Key: ctx.urls.originalR2Key,
-              processedR2Key: ctx.urls.processedR2Key ?? null,
+              originalR2Key: urls.originalR2Key,
+              processedR2Key: urls.processedR2Key ?? null,
               startedAt: new Date().toISOString(),
-            }).where(eq(photoJobs.id, ctx.job.id)),
-          ).map(() => ctx),
-        )
-        .match(
-          (ctx): ClaimedJob => {
-            const pipelineJob: PipelineJob = {
-              jobId: ctx.job.id,
-              eventId: ctx.claimed.eventId,
-              photographerId: ctx.claimed.photographerId,
-              source: toSource(ctx.claimed.source),
-              inputUrl: ctx.urls.inputGet.url,
-              originalPutUrl: ctx.urls.originalPut.url,
-              processedPutUrl: ctx.urls.processedPut?.url,
-              sourceR2Key: ctx.claimed.r2Key,
-              originalR2Key: ctx.urls.originalR2Key,
-              processedR2Key: ctx.urls.processedR2Key,
-              contentType: ctx.claimed.contentType,
-              options: ctx.colorGrade
-                ? {
-                    autoEdit: ctx.colorGrade.autoEdit,
-                    autoEditIntensity: ctx.colorGrade.autoEditIntensity,
-                    lutId: ctx.colorGrade.lutId,
-                    lutIntensity: ctx.colorGrade.lutIntensity,
-                    maxFaces: 100,
-                  }
-                : { maxFaces: 100 },
-            };
-            return { job: pipelineJob, photoJobId: ctx.job.id, message };
-          },
-          async (err): Promise<null> => {
-            // Handle insufficient credits — mark intent+job failed, retryable
-            if ('type' in err && (err as PipelineError).type === 'insufficient_credits') {
-              const pErr = err as PipelineError & { type: 'insufficient_credits' };
-              inst.count('credit_insufficient_total', 1);
-              // Best-effort mark as failed — intent/job IDs may not be available if error was early
-              await markInsufficientCredits(db, event.object.key).catch(() => {});
-            }
-            // Skippable errors (not found, already terminal, CAS) → ack
-            if ('type' in err && isSkippable(err as PipelineError)) {
-              message.ack();
-            } else {
-              message.retry();
-            }
-            return null;
-          },
-        );
+            }).where(eq(photoJobs.id, job.id)),
+          )
+          .safeUnwrap();
+
+        const pipelineJob: PipelineJob = {
+          jobId: job.id,
+          eventId: claimed.eventId,
+          photographerId: claimed.photographerId,
+          source: toSource(claimed.source),
+          inputUrl: urls.inputGet.url,
+          originalPutUrl: urls.originalPut.url,
+          processedPutUrl: urls.processedPut?.url,
+          sourceR2Key: claimed.r2Key,
+          originalR2Key: urls.originalR2Key,
+          processedR2Key: urls.processedR2Key,
+          contentType: claimed.contentType,
+          options: colorGrade
+            ? {
+                autoEdit: colorGrade.autoEdit,
+                autoEditIntensity: colorGrade.autoEditIntensity,
+                lutId: colorGrade.lutId,
+                lutIntensity: colorGrade.lutIntensity,
+                maxFaces: 100,
+              }
+            : { maxFaces: 100 },
+        };
+
+        return ok({ job: pipelineJob, photoJobId: job.id, message } as ClaimedJob);
+      }).match(
+        (claimed): ClaimedJob => claimed,
+        async (err): Promise<null> => {
+          if ('type' in err && err.type === 'insufficient_credits') {
+            inst.count('credit_insufficient_total', 1);
+            await markInsufficientCredits(db, event.object.key).catch(() => {});
+          }
+          if ('type' in err && isSkippable(err as PipelineError)) {
+            message.ack();
+          } else {
+            message.retry();
+          }
+          return null;
+        },
+      );
 
       return result;
     }),
