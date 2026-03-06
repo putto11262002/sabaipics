@@ -15,8 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/shared/components/ui/sheet';
 import { ToggleGroup, ToggleGroupItem } from '@/shared/components/ui/toggle-group';
-import { Monitor, Tablet, Smartphone } from 'lucide-react';
+import { Maximize, Monitor, Tablet, Smartphone, SlidersHorizontal } from 'lucide-react';
 import {
   SlideshowPlayer,
   templateOptions,
@@ -42,18 +48,14 @@ const devicePresets: Record<DevicePreset, { label: string; aspectRatio: number }
 };
 
 const defaultConfig: SlideshowConfig = {
-  primaryColor: '#ff6320', // oklch(0.693 0.203 40.2) - shadcn light mode primary
-  background: '#fdfdfd', // oklch(0.993 0 0) - shadcn light mode background
+  primaryColor: '#ff6320',
+  background: '#fdfdfd',
 };
 
-// Image URL builder - for preview URLs, just return them directly
-// For R2 keys, build the URL
 const imageUrlBuilder = (keyOrUrl: string, width: number) => {
-  // If it's already a full URL, return it
   if (keyOrUrl.startsWith('http')) {
     return keyOrUrl;
   }
-  // Otherwise build R2 URL
   const bucket = import.meta.env.VITE_R2_PUBLIC_BUCKET_URL;
   return `${bucket}/${keyOrUrl}?w=${width}`;
 };
@@ -64,16 +66,14 @@ export default function SlideshowPage() {
   const [config, setConfig] = useState<SlideshowConfig>(defaultConfig);
   const [devicePreset, setDevicePreset] = useState<DevicePreset>('desktop');
   const [showFullscreen, setShowFullscreen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  // Fetch event data
   const { data: eventData } = useEvent(id);
   const event = eventData?.data;
 
-  // Fetch saved slideshow settings
   const { data: savedSettingsResponse } = useSlideshowSettings(id);
   const savedSettings = savedSettingsResponse?.data;
 
-  // Load saved settings into local state when they arrive
   useEffect(() => {
     if (savedSettings) {
       setTemplateId((savedSettings.template as SlideshowTemplateId) ?? 'carousel');
@@ -84,13 +84,9 @@ export default function SlideshowPage() {
     }
   }, [savedSettings]);
 
-  // Save mutation
   const saveMutation = useSaveSlideshowSettings(id);
-
-  // Fetch photos with ring buffer management
   const slideshowPhotos = useSlideshowPhotos(id);
 
-  // Transform event data to slideshow format
   const slideshowEvent: SlideshowEvent = useMemo(() => ({
     id: event?.id ?? '',
     name: event?.name ?? 'Event',
@@ -98,18 +94,26 @@ export default function SlideshowPage() {
     logoUrl: event?.logoUrl,
   }), [event]);
 
-  // Stats - placeholder for now (could fetch from a stats endpoint)
   const slideshowStats: SlideshowStats = useMemo(() => ({
     photoCount: 0,
     searchCount: 0,
     downloadCount: 0,
   }), []);
 
-  // Container ref and size
+  // Force mobile preset on small screens
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handle = () => {
+      if (mq.matches) setDevicePreset('mobile');
+    };
+    handle();
+    mq.addEventListener('change', handle);
+    return () => mq.removeEventListener('change', handle);
+  }, []);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [previewDimensions, setPreviewDimensions] = useState({ width: 0, height: 0 });
 
-  // Calculate preview dimensions to fit container while maintaining aspect ratio
   useEffect(() => {
     const updateDimensions = () => {
       if (!containerRef.current) return;
@@ -119,12 +123,10 @@ export default function SlideshowPage() {
       const containerHeight = container.clientHeight;
       const aspectRatio = devicePresets[devicePreset].aspectRatio;
 
-      // Calculate dimensions that fit in container with correct aspect ratio
       let width: number;
       let height: number;
 
       if (aspectRatio >= 1) {
-        // Landscape: try to fill width first
         width = containerWidth;
         height = width / aspectRatio;
         if (height > containerHeight) {
@@ -132,7 +134,6 @@ export default function SlideshowPage() {
           width = height * aspectRatio;
         }
       } else {
-        // Portrait: try to fill height first
         height = containerHeight;
         width = height * aspectRatio;
         if (width > containerWidth) {
@@ -170,7 +171,6 @@ export default function SlideshowPage() {
     );
   };
 
-  // Fullscreen view - wraps in h-screen w-screen container
   if (showFullscreen) {
     return (
       <div className="relative h-screen w-screen">
@@ -194,72 +194,79 @@ export default function SlideshowPage() {
     );
   }
 
-  // Determine if we should force mobile layout based on device preset
-  return (
-    <div className="flex h-screen flex-col bg-background">
-      <PageHeader
-        backHref={`/events/${id}`}
-        leftContent={
-          <div className="ml-2">
-            <h1 className="text-lg font-semibold">Slideshow</h1>
-            <p className="text-sm text-muted-foreground">Configure the live photo slideshow</p>
-          </div>
-        }
+  const controlsContent = (
+    <>
+    <FieldGroup>
+      <Field orientation="vertical">
+        <FieldLabel>Template</FieldLabel>
+        <Select value={templateId} onValueChange={(v) => setTemplateId(v as SlideshowTemplateId)}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {templateOptions.map((opt) => (
+              <SelectItem key={opt.id} value={opt.id}>
+                {opt.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {templateOptions.find((t) => t.id === templateId)?.description}
+        </p>
+      </Field>
+
+      <Field orientation="vertical">
+        <FieldLabel>Primary Color</FieldLabel>
+        <ColorPicker
+          value={config.primaryColor?.startsWith('#') ? config.primaryColor : '#ff6320'}
+          onChange={(value) => setConfig({ ...config, primaryColor: value })}
+        />
+      </Field>
+
+      <Field orientation="vertical">
+        <FieldLabel>Background</FieldLabel>
+        <ColorPicker
+          value={config.background?.startsWith('#') ? config.background : '#fdfdfd'}
+          onChange={(value) => setConfig({ ...config, background: value })}
+        />
+      </Field>
+    </FieldGroup>
+
+    <div className="mt-auto pt-4">
+      <Button
+        className="w-full"
+        onClick={handleSave}
+        disabled={saveMutation.isPending}
       >
-        <Button onClick={() => setShowFullscreen(true)} variant="outline" size="sm">
+        {saveMutation.isPending ? 'Saving...' : 'Save'}
+      </Button>
+    </div>
+    </>
+  );
+
+  return (
+    <div className="flex h-dvh flex-col">
+      <PageHeader
+        className="border-b"
+        backHref={`/events/${id}`}
+        breadcrumbs={[{ label: 'Slideshow' }]}
+      >
+        <Button onClick={() => setShowFullscreen(true)} variant="outline" size="icon-sm" className="md:hidden">
+          <Maximize className="size-4" />
+        </Button>
+        <Button onClick={() => setShowFullscreen(true)} variant="outline" size="sm" className="hidden md:inline-flex">
           Fullscreen
         </Button>
-        <Button onClick={handleSave} size="sm" disabled={saveMutation.isPending}>
-          {saveMutation.isPending ? 'Saving...' : 'Save'}
+        <Button variant="outline" size="icon-sm" className="md:hidden" onClick={() => setSheetOpen(true)}>
+          <SlidersHorizontal className="size-4" />
         </Button>
       </PageHeader>
 
-      {/* Content - fills remaining height */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: Settings */}
-        <div className="w-80 shrink-0 overflow-y-auto border-r p-4">
-          <FieldGroup>
-            <Field orientation="vertical">
-              <FieldLabel>Template</FieldLabel>
-              <Select value={templateId} onValueChange={(v) => setTemplateId(v as SlideshowTemplateId)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {templateOptions.map((opt) => (
-                    <SelectItem key={opt.id} value={opt.id}>
-                      {opt.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {templateOptions.find((t) => t.id === templateId)?.description}
-              </p>
-            </Field>
-
-            <Field orientation="vertical">
-              <FieldLabel>Primary Color</FieldLabel>
-              <ColorPicker
-                value={config.primaryColor?.startsWith('#') ? config.primaryColor : '#ff6320'}
-                onChange={(value) => setConfig({ ...config, primaryColor: value })}
-              />
-            </Field>
-
-            <Field orientation="vertical">
-              <FieldLabel>Background</FieldLabel>
-              <ColorPicker
-                value={config.background?.startsWith('#') ? config.background : '#fdfdfd'}
-                onChange={(value) => setConfig({ ...config, background: value })}
-              />
-            </Field>
-          </FieldGroup>
-        </div>
-
-        {/* Right: Preview with iframe */}
-        <div className="flex flex-1 flex-col bg-muted/50 p-4">
-          {/* Device selector */}
-          <div className="mb-3 flex shrink-0 justify-center">
+      <div className="flex min-h-0 flex-1">
+        {/* Preview area */}
+        <div className="flex min-h-0 flex-1 flex-col p-4">
+          <div className="mb-3 hidden shrink-0 justify-center md:flex">
             <ToggleGroup
               type="single"
               value={devicePreset}
@@ -277,7 +284,6 @@ export default function SlideshowPage() {
             </ToggleGroup>
           </div>
 
-          {/* Preview container - direct render, no iframe */}
           <div ref={containerRef} className="relative flex-1 flex items-center justify-center overflow-hidden">
             {previewDimensions.width > 0 && previewDimensions.height > 0 && (
               <div
@@ -300,7 +306,24 @@ export default function SlideshowPage() {
             )}
           </div>
         </div>
+
+        {/* Desktop sidebar */}
+        <aside className="hidden md:flex w-80 shrink-0 flex-col overflow-auto p-4 min-h-0">
+          {controlsContent}
+        </aside>
       </div>
+
+      {/* Mobile sheet */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="right" className="flex flex-col sm:max-w-md md:hidden">
+          <SheetHeader>
+            <SheetTitle>Settings</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-auto px-4 pb-4">
+            {controlsContent}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
