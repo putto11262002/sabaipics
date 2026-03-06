@@ -378,6 +378,7 @@ export default function StudioAutoEditNewPage() {
   return (
     <div className="flex h-dvh flex-col">
       <PageHeader
+        className="border-b"
         backHref="/studio/auto-edit"
         breadcrumbs={[{ label: isEdit ? 'Edit Preset' : 'New Preset' }]}
       >
