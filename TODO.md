@@ -28,7 +28,8 @@
 
 ### 1. Real Upload Pipeline
 - [ ] Wire `HttpApiClient` — presign URL → PUT to R2/S3 → poll until completed
-- [ ] Auth token flow — pass keyring token to upload worker for API calls
+- [x] Auth token storage — SQLite `auth_kv` table (replaced keychain/keyring)
+- [ ] Auth token flow — pass token to upload worker for API calls
 - [ ] Handle presign URL expiry — re-request if URL expired before upload starts
 - [ ] Upload progress tracking — report bytes uploaded per file to frontend
 
@@ -64,7 +65,9 @@
 - [ ] Duplicate files across different folders (same content, different path)
 
 ### 5. UI Polish
-- [ ] Show event name instead of raw event ID
+- [x] Show event name instead of raw event ID
+- [x] User menu dropdown in sidebar (name, email, sign out)
+- [x] Credit balance display on Home page (balance, expiring soon, used this month)
 - [ ] Better progress display — progress bar, speed indicator, ETA
 - [ ] Per-file status list — show individual file states (uploading, done, failed)
 - [ ] Error details panel — click failed files to see error reason
