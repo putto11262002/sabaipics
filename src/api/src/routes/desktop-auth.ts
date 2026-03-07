@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { and, eq, gt, isNull, or, sql } from 'drizzle-orm';
-import { desktopAuthCodes, desktopSessions } from '@/db';
+import { desktopAuthCodes, desktopSessions, photographers } from '@/db';
 import { requireAuth } from '@/auth/middleware';
 import { ResultAsync, err, ok, safeTry } from 'neverthrow';
 import { apiError, type HandlerError } from '../lib/error';
@@ -207,11 +207,20 @@ export const desktopAuthRouter = new Hono<Env>()
         }),
       );
 
+      // Fetch photographer name for the client
+      const db = c.var.db();
+      const [photographer] = await db
+        .select({ name: photographers.name, email: photographers.email })
+        .from(photographers)
+        .where(eq(photographers.clerkId, result.clerkUserId))
+        .limit(1);
+
       return ok({
         accessToken: access.token,
         accessTokenExpiresAt: access.expiresAtMs,
         refreshToken: result.refreshToken,
         refreshTokenExpiresAt: result.refreshExpiresAtMs,
+        user: { name: photographer?.name ?? null, email: photographer?.email ?? null },
       });
     })
       .orTee((e) => e.cause && console.error('[desktop-auth/redeem]', e.code + ':', e.cause))
@@ -330,12 +339,21 @@ export const desktopAuthRouter = new Hono<Env>()
         }),
       );
 
+      // Fetch photographer name for the client
+      const db = c.var.db();
+      const [photographer] = await db
+        .select({ name: photographers.name, email: photographers.email })
+        .from(photographers)
+        .where(eq(photographers.clerkId, rotated.clerkUserId))
+        .limit(1);
+
       return ok({
         accessToken: access.token,
         accessTokenExpiresAt: access.expiresAtMs,
         refreshToken: rotated.refreshToken,
         refreshTokenExpiresAt: rotated.refreshExpiresAtMs,
         refreshTokenUnchanged: rotated.refreshToken === null,
+        user: { name: photographer?.name ?? null, email: photographer?.email ?? null },
       });
     })
       .orTee((e) => e.cause && console.error('[desktop-auth/refresh]', e.code + ':', e.cause))

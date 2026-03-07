@@ -5,6 +5,11 @@ import { getStoredRefreshToken, setStoredRefreshToken } from '../lib/auth-token'
 
 type AuthStatus = 'signed_out' | 'signing_in' | 'signed_in' | 'error';
 
+type UserInfo = {
+  name: string | null;
+  email: string | null;
+};
+
 type AuthState = {
   status: AuthStatus;
   callbackUrl?: string;
@@ -12,6 +17,7 @@ type AuthState = {
   error?: string;
   accessToken?: string | null;
   accessTokenExpiresAt?: number | null;
+  user?: UserInfo | null;
 };
 
 type AuthContextValue = AuthState & {
@@ -93,6 +99,7 @@ async function redeemDesktopAuthCode(params: { code: string; deviceName?: string
     accessTokenExpiresAt: number;
     refreshToken: string;
     refreshTokenExpiresAt: number;
+    user?: { name: string | null; email: string | null };
   };
 }
 
@@ -128,6 +135,7 @@ async function refreshDesktopSession(params: { refreshToken: string }): Promise<
     refreshToken: string | null;
     refreshTokenExpiresAt: number;
     refreshTokenUnchanged?: boolean;
+    user?: { name: string | null; email: string | null };
   };
 }
 
@@ -182,6 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               params: { refreshToken: tokens.refreshToken },
               accessToken: tokens.accessToken,
               accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+              user: tokens.user ?? null,
             };
             setState(nextState);
             storeAuth(nextState);
@@ -236,6 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           params: { refreshToken: refreshTokenRef.current ?? refreshToken },
           accessToken: refreshed.accessToken,
           accessTokenExpiresAt: refreshed.accessTokenExpiresAt,
+          user: refreshed.user ?? null,
         });
       } catch {
         refreshTokenRef.current = null;
@@ -273,6 +283,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             params: { refreshToken: nextRefreshToken },
             accessToken: refreshed.accessToken,
             accessTokenExpiresAt: refreshed.accessTokenExpiresAt,
+            user: refreshed.user ?? prev.user,
           };
         });
 
