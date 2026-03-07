@@ -7,6 +7,8 @@ export {
   type DebitAllocation,
   type DebitIfNotExistsResult,
 } from './debit';
+export { debitLedgerOnly } from './debit-ledger-only';
+export { fastDebitBalance, fastDebitBalanceIfNotExists } from './fast-debit';
 export { grantCredits, type GrantCreditsParams, type GrantResult } from './grant';
 export {
   getBalance,

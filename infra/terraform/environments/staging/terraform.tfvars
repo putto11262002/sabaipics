@@ -50,6 +50,8 @@ queues = {
   logo_processing_dlq     = "logo-processing-dlq-staging"
   lut_processing          = "lut-processing-staging"
   lut_processing_dlq      = "lut-processing-dlq-staging"
+  credit_ledger           = "credit-ledger-staging"
+  credit_ledger_dlq       = "credit-ledger-dlq-staging"
 }
 
 # ------------------------------------------------------------------------------

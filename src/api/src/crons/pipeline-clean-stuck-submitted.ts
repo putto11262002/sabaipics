@@ -1,7 +1,7 @@
 import { createDb, createDbTx, photoJobs, uploadIntents } from '@/db';
 import { and, eq, lt } from 'drizzle-orm';
-import { grantCredits } from '../lib/credits';
 import type { Bindings } from '../types';
+import type { CreditRefundMessage } from '../types/credit-queue';
 
 const BATCH_SIZE = 100;
 const STUCK_THRESHOLD_MINUTES = 30;
@@ -58,21 +58,6 @@ export async function cleanupStuckSubmitted(env: Bindings): Promise<void> {
       const now = new Date().toISOString();
 
       await dbTx.transaction(async (tx) => {
-        // Refund pre-debited credits
-        if (refundable > 0) {
-          const oneYearFromNow = new Date();
-          oneYearFromNow.setUTCFullYear(oneYearFromNow.getUTCFullYear() + 1);
-          await grantCredits(tx, {
-            photographerId: job.photographerId,
-            amount: refundable,
-            source: 'refund',
-            expiresAt: oneYearFromNow.toISOString(),
-          }).match(
-            () => {},
-            (e) => { throw e; },
-          );
-        }
-
         // Mark photo_job failed + retryable
         await tx
           .update(photoJobs)
@@ -98,6 +83,17 @@ export async function cleanupStuckSubmitted(env: Bindings): Promise<void> {
           })
           .where(eq(uploadIntents.id, job.uploadIntentId));
       });
+
+      // Send refund to credit queue after transaction commits
+      if (refundable > 0) {
+        await env.CREDIT_QUEUE.send({
+          type: 'refund',
+          photographerId: job.photographerId,
+          amount: refundable,
+          source: 'refund',
+          reason: 'callback_timeout',
+        } satisfies CreditRefundMessage);
+      }
 
       recovered++;
     } catch (error) {

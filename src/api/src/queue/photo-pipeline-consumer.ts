@@ -8,14 +8,15 @@
  * Observability is handled by the `instrument` combinator — business logic stays clean.
  */
 
-import { createDb, createDbTx, events, photoJobs, uploadIntents } from '@/db';
+import { createDb, events, photoJobs, uploadIntents } from '@/db';
 import { and, eq } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, errAsync } from 'neverthrow';
 import type { Bindings } from '../types';
 import type { R2EventMessage } from '../types/r2-event';
 import type { PipelineBatchRequest, PipelineJob } from '../types/pipeline-v2';
-import { debitCreditsIfNotExists, type CreditError } from '../lib/credits';
-import { grantCredits } from '../lib/credits';
+import type { CreditError } from '../lib/credits';
+import { fastDebitBalanceIfNotExists } from '../lib/credits/fast-debit';
+import type { CreditRefundMessage } from '../types/credit-queue';
 import { generatePresignedGetUrl, generatePresignedPutUrl } from '../lib/r2/presign';
 import { createInstrument, type Instrument, type TracedError } from '../lib/observability/instrument';
 
@@ -139,30 +140,24 @@ interface DebitContext {
 }
 
 function preDebitCredits(
-  dbTx: ReturnType<typeof createDbTx>,
+  db: ReturnType<typeof createDb>,
+  env: Bindings,
   ctx: DebitContext,
 ): ResultAsync<DebitContext, PipelineError> {
-  return ResultAsync.fromPromise(
-    dbTx.transaction(async (tx) => {
-      const debit = await debitCreditsIfNotExists(tx, {
-        photographerId: ctx.intent.photographerId,
-        amount: ctx.creditsToDebit,
-        operationType: 'image_upload',
-        operationId: ctx.intent.id,
-      });
-      if (debit.isErr()) {
-        if (debit.error.type === 'insufficient_credits') {
-          throw { type: 'insufficient_credits', photographerId: ctx.intent.photographerId };
-        }
-        throw debit.error;
-      }
-      return ctx;
-    }),
-    (e): PipelineError => {
-      if (e && typeof e === 'object' && 'type' in e) return e as PipelineError;
-      return { type: 'database', operation: 'debit_credits', cause: e };
-    },
-  );
+  return fastDebitBalanceIfNotExists(db, env.CREDIT_QUEUE, {
+    photographerId: ctx.intent.photographerId,
+    amount: ctx.creditsToDebit,
+    operationType: 'image_upload',
+    operationId: ctx.intent.id,
+    source: 'upload',
+    intentId: ctx.intent.id,
+  })
+    .mapErr((e): PipelineError =>
+      e.type === 'insufficient_credits'
+        ? { type: 'insufficient_credits', photographerId: ctx.intent.photographerId }
+        : { type: 'database', operation: 'debit_credits', cause: e.cause },
+    )
+    .map(() => ctx);
 }
 
 interface PresignedUrls {
@@ -319,7 +314,6 @@ export async function queue(
   ctx: ExecutionContext,
 ): Promise<void> {
   const db = createDb(env.DATABASE_URL);
-  const dbTx = createDbTx(env.DATABASE_URL);
 
   // Read trace context from first R2 object's custom metadata (set by upload route)
   let parentTraceparent: string | null = null;
@@ -394,7 +388,7 @@ export async function queue(
 
         yield* inst
           .traced('debit_credits', () =>
-            preDebitCredits(dbTx, { intent: claimed, job, creditsToDebit, hasAutoEdit }),
+            preDebitCredits(db, env, { intent: claimed, job, creditsToDebit, hasAutoEdit }),
           )
           .safeUnwrap();
 
@@ -501,8 +495,7 @@ export async function queue(
       inst.complete({ total: batch.messages.length, ok: claimedJobs.length, failed: 0 });
     },
     async () => {
-      // Modal failed — refund credits, mark all jobs as failed, ack messages
-      const dbTxConn = createDbTx(env.DATABASE_URL);
+      // Modal failed — send refund to credit queue, mark all jobs as failed, ack messages
       const now = new Date().toISOString();
       await Promise.all(
         claimedJobs.map(async (claimed) => {
@@ -512,33 +505,27 @@ export async function queue(
           });
           const refundable = job?.creditsDebited ?? 0;
 
-          await dbTxConn.transaction(async (tx) => {
-            if (refundable > 0) {
-              const oneYearFromNow = new Date();
-              oneYearFromNow.setUTCFullYear(oneYearFromNow.getUTCFullYear() + 1);
-              await grantCredits(tx, {
-                photographerId: job!.photographerId,
-                amount: refundable,
-                source: 'refund',
-                expiresAt: oneYearFromNow.toISOString(),
-              }).match(
-                () => {},
-                (e) => { throw e; },
-              );
-            }
+          if (refundable > 0) {
+            await env.CREDIT_QUEUE.send({
+              type: 'refund',
+              photographerId: job!.photographerId,
+              amount: refundable,
+              source: 'refund',
+              reason: 'modal_submit_failed',
+            } satisfies CreditRefundMessage);
+          }
 
-            await tx
-              .update(photoJobs)
-              .set({
-                status: 'failed',
-                errorCode: 'modal_submit_failed',
-                errorMessage: 'Modal batch submission failed',
-                retryable: false,
-                creditsRefunded: refundable,
-                updatedAt: now,
-              })
-              .where(eq(photoJobs.id, claimed.photoJobId));
-          });
+          await db
+            .update(photoJobs)
+            .set({
+              status: 'failed',
+              errorCode: 'modal_submit_failed',
+              errorMessage: 'Modal batch submission failed',
+              retryable: false,
+              creditsRefunded: refundable,
+              updatedAt: now,
+            })
+            .where(eq(photoJobs.id, claimed.photoJobId));
 
           claimed.message.ack();
         }),

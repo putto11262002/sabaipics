@@ -30,6 +30,7 @@ import type { Env, Bindings } from './types';
 
 // Queue consumers
 import { queue as cleanupQueue } from './queue/cleanup-consumer';
+import { queue as creditQueue } from './queue/credit-consumer';
 import logoUploadConsumer from './queue/logo-upload-consumer';
 import lutProcessingConsumer from './queue/lut-processing-consumer';
 import { queue as photoPipelineQueue } from './queue/photo-pipeline-consumer';
@@ -180,6 +181,9 @@ export default {
     }
     if (batch.queue.startsWith('lut-processing')) {
       return lutProcessingConsumer.queue(batch as MessageBatch<any>, env);
+    }
+    if (batch.queue.startsWith('credit-ledger')) {
+      return creditQueue(batch as MessageBatch<any>, env);
     }
     console.error('[Queue] Unknown queue:', batch.queue);
   },

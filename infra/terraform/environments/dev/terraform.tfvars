@@ -45,6 +45,8 @@ queues = {
   rekognition_cleanup_dlq = "rekognition-cleanup-dlq-dev"
   logo_processing         = "logo-processing-dev"
   logo_processing_dlq     = "logo-processing-dlq-dev"
+  credit_ledger           = "credit-ledger-dev"
+  credit_ledger_dlq       = "credit-ledger-dlq-dev"
 }
 
 # ------------------------------------------------------------------------------
