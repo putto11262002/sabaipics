@@ -53,6 +53,15 @@ export const dashboardRouter = new Hono<Env>()
                 SELECT ${events.id} FROM ${events} WHERE ${events.photographerId} = ${photographer.id}
               )
             ), 0)`,
+            totalStorage: sql<number>`COALESCE((
+              SELECT SUM(${photos.fileSize})::float8 FROM ${photos}
+              WHERE ${photos.eventId} IN (
+                SELECT ${events.id} FROM ${events} WHERE ${events.photographerId} = ${photographer.id}
+              )
+            ), 0)`,
+            totalEvents: sql<number>`COALESCE((
+              SELECT COUNT(*)::int FROM ${events} WHERE ${events.photographerId} = ${photographer.id}
+            ), 0)`,
           })
           .from(events)
           .where(eq(events.photographerId, photographer.id))
@@ -105,6 +114,8 @@ export const dashboardRouter = new Hono<Env>()
         stats: {
           totalPhotos: statsResult?.totalPhotos ?? 0,
           totalFaces: statsResult?.totalFaces ?? 0,
+          totalStorage: statsResult?.totalStorage ?? 0,
+          totalEvents: statsResult?.totalEvents ?? 0,
         },
       };
 

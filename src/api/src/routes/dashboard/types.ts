@@ -18,5 +18,7 @@ export type DashboardResponse = {
   stats: {
     totalPhotos: number;
     totalFaces: number;
+    totalStorage: number;
+    totalEvents: number;
   };
 };
