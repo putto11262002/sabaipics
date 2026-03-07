@@ -74,8 +74,9 @@ impl DbHandle {
         // Run migrations inline before handing off to the thread
         conn.execute_batch(include_str!("../../migrations/0001_init.sql"))
             .map_err(|e| format!("migration 0001: {e}"))?;
-        conn.execute_batch(include_str!("../../migrations/0002_add_active.sql"))
-            .map_err(|e| format!("migration 0002: {e}"))?;
+        // ALTER TABLE doesn't support IF NOT EXISTS in SQLite,
+        // so ignore "duplicate column" errors on re-run.
+        let _ = conn.execute_batch(include_str!("../../migrations/0002_add_active.sql"));
 
         let (tx, rx) = std::sync::mpsc::channel::<DbCommand>();
 

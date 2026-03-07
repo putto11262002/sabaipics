@@ -1,5 +1,6 @@
 use super::db::{DbHandle, JobLease};
-use crate::api::ApiClient;
+use super::retry;
+use crate::api::{ApiClient, ApiError};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
@@ -92,6 +93,22 @@ async fn upload_one(db: &DbHandle, api: &Arc<dyn ApiClient>, job: JobLease) {
         .to_string_lossy()
         .to_string();
 
+    // Check file exists before attempting upload
+    if !path.exists() {
+        log::warn!("[upload] file missing: {file_name} (job={})", job.id);
+        let _ = db
+            .mark_job_failed(
+                job.id,
+                "File no longer exists".to_string(),
+                None,
+                Some("file_error".to_string()),
+                false,
+                None,
+            )
+            .await;
+        return;
+    }
+
     match api.upload_photo(&job.event_id, &path).await {
         Ok(()) => {
             log::info!("[upload] done: {file_name} (job={})", job.id);
@@ -99,11 +116,36 @@ async fn upload_one(db: &DbHandle, api: &Arc<dyn ApiClient>, job: JobLease) {
                 log::error!("[upload] mark done failed: {e}");
             }
         }
-        Err(e) => {
+        Err(ref e) => {
             log::warn!("[upload] failed: {file_name} (job={}): {e}", job.id);
-            // When real API is wired, use retry::from_http_status here
+            let decision = retry::from_api_error(job.attempt_count, e);
+
+            // Log terminal event-level errors prominently
+            if let ApiError::Http { code, .. } = e {
+                if code.is_terminal_for_event() {
+                    log::error!(
+                        "[upload] event {} is terminal ({code}), job {} will not retry",
+                        job.event_id,
+                        job.id
+                    );
+                }
+                if code.is_user_retryable() {
+                    log::warn!(
+                        "[upload] job {} requires user action ({code})",
+                        job.id
+                    );
+                }
+            }
+
             if let Err(e2) = db
-                .mark_job_failed(job.id, e.to_string(), None, None, true, None)
+                .mark_job_failed(
+                    job.id,
+                    e.to_string(),
+                    e.http_status().map(|s| s as i64),
+                    decision.error_code,
+                    decision.retryable,
+                    decision.next_retry_at,
+                )
                 .await
             {
                 log::error!("[upload] mark failed error: {e2}");
