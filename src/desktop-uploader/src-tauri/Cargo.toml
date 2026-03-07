@@ -25,7 +25,20 @@ tauri = { version = "2.10.0", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-oauth = "2"
 tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
 keyring = "2.3.2"
+async-trait = "0.1"
+uuid = { version = "1", features = ["v4"] }
+tokio = { version = "1", features = ["sync", "time", "fs", "macros"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+blake3 = "1"
+rusqlite = { version = "0.31", features = ["bundled"] }
+walkdir = "2"
+notify = "7"
+tauri-plugin-mcp = { git = "https://github.com/P3GLEG/tauri-plugin-mcp", optional = true }
+
+[features]
+debug-mcp = ["tauri-plugin-mcp"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.26.0"
