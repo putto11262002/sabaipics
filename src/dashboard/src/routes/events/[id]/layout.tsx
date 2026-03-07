@@ -21,6 +21,7 @@ import { useDeleteEvent } from '../../../hooks/events/useDeleteEvent';
 import { useHardDeleteEvent } from '../../../hooks/events/useHardDeleteEvent';
 import { DeleteConfirmDialog } from '../../../components/events/DeleteConfirmDialog';
 
+import { ScrollArea, ScrollBar } from '@/shared/components/ui/scroll-area';
 import { cn } from '@/shared/utils/ui';
 
 const tabs = [
@@ -190,32 +191,35 @@ export default function EventDetailLayout() {
       </SidebarPageHeader>
 
       {/* Tab Navigation (sticky) */}
-      <div className="sticky top-16 z-10 border-b bg-background px-4">
-        <div className="flex gap-6 -mb-px">
-          {tabs.map((tab) => (
-            <NavLink
-              key={tab.path}
-              to={`/events/${id}/${tab.path}`}
-              className={({ isActive }) =>
-                cn(
-                  'pb-3 text-sm font-medium transition-colors border-b-2',
-                  isActive
-                    ? 'border-primary text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground',
-                )
-              }
+      <div className="sticky top-16 z-10 border-b bg-background">
+        <ScrollArea className="w-full">
+          <div className="flex gap-6 px-4 -mb-px">
+            {tabs.map((tab) => (
+              <NavLink
+                key={tab.path}
+                to={`/events/${id}/${tab.path}`}
+                className={({ isActive }) =>
+                  cn(
+                    'shrink-0 pb-3 text-sm font-medium transition-colors border-b-2',
+                    isActive
+                      ? 'border-primary text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
+                  )
+                }
+              >
+                {tab.name}
+              </NavLink>
+            ))}
+            <Link
+              to={`/events/${id}/slideshow-editor`}
+              className="flex shrink-0 items-center gap-1.5 border-b-2 border-transparent pb-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              {tab.name}
-            </NavLink>
-          ))}
-          <Link
-            to={`/events/${id}/slideshow-editor`}
-            className="flex items-center gap-1.5 border-b-2 border-transparent pb-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Slideshow
-            <ExternalLink className="size-3" />
-          </Link>
-        </div>
+              Slideshow
+              <ExternalLink className="size-3" />
+            </Link>
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </div>
 
       {/* Tab Content */}

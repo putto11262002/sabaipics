@@ -1,7 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useBlocker } from 'react-router';
 import { toast } from 'sonner';
-import { SidebarProvider, SidebarInset } from '@/shared/components/ui/sidebar';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/shared/components/ui/sheet';
 import { Spinner } from '@/shared/components/ui/spinner';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import {
@@ -14,7 +19,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/shared/components/ui/alert-dialog';
-import { AlertCircle } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
+import { AlertCircle, SlidersHorizontal } from 'lucide-react';
 import { PageHeader } from '../../../../components/shell/page-header';
 import { useEvent } from '../../../../hooks/events/useEvent';
 import {
@@ -40,7 +46,7 @@ import { DEVICE_DEFAULT_ORIENTATION } from './types';
 import { DEFAULT_CONFIG, TEMPLATES, type TemplateId } from './lib/templates';
 import { createBlock, getBlockDef } from './blocks/registry';
 import { IframeCanvas } from './components/iframe-canvas';
-import { EditorSidebar } from './components/sidebar';
+import { EditorSidebarContent } from './components/sidebar';
 import { Toolbar } from './components/toolbar';
 
 // ─── Feature Flags ────────────────────────────────────────────────────────────
@@ -352,6 +358,8 @@ export default function EventSlideshowTab() {
     toast.success('Template applied');
   };
 
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   const handleSave = () => {
     updateConfig.mutate(config, {
       onSuccess: () => {
@@ -360,6 +368,20 @@ export default function EventSlideshowTab() {
       },
       onError: () => toast.error('Failed to save. Please try again.'),
     });
+  };
+
+  const sidebarProps = {
+    selectedBlock: ENABLE_BLOCK_EDITING ? selectedBlock : null,
+    parentBlock: ENABLE_BLOCK_EDITING ? parentBlock : null,
+    onUpdateBlock: handleUpdateBlock,
+    onToggleBlock: handleToggleBlock,
+    onDeleteBlock: handleDeleteBlock,
+    onSelectBlock: handleSelectBlock,
+    theme: config.theme,
+    onThemeChange: handleThemeChange,
+    layout: config.layout ?? DEFAULT_LAYOUT,
+    onLayoutChange: handleLayoutChange,
+    onApplyTemplate: handleApplyTemplate,
   };
 
   return (
@@ -379,15 +401,11 @@ export default function EventSlideshowTab() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="flex h-screen flex-col overflow-hidden bg-background">
+      <div className="flex h-dvh flex-col">
         <PageHeader
           className="border-b"
           backHref={`/events/${id}/details`}
-          breadcrumbs={[
-            { label: 'Events', href: '/events' },
-            { label: event.name, href: `/events/${id}/details` },
-            { label: 'Slideshow Editor' },
-          ]}
+          breadcrumbs={[{ label: 'Slideshow Editor' }]}
         >
           <Toolbar
             eventId={id!}
@@ -402,14 +420,15 @@ export default function EventSlideshowTab() {
             isSaving={updateConfig.isPending}
             showAddBlock={ENABLE_BLOCK_EDITING}
           />
+          <Button variant="outline" size="sm" className="md:hidden" onClick={() => setSheetOpen(true)}>
+            <SlidersHorizontal className="mr-1 size-4" />
+            Settings
+          </Button>
         </PageHeader>
 
-        <SidebarProvider
-          defaultOpen={true}
-          className="!min-h-0"
-          style={{ '--sidebar-width': '320px', flex: 1 } as React.CSSProperties}
-        >
-          <SidebarInset className="min-h-0">
+        <div className="flex min-h-0 flex-1">
+          {/* Canvas area */}
+          <div className="min-h-0 flex-1">
             {isLoading ? (
               <div className="flex h-full items-center justify-center bg-muted/50 p-8">
                 <Spinner className="size-6" />
@@ -432,22 +451,23 @@ export default function EventSlideshowTab() {
                 onConfigUpdate={ENABLE_BLOCK_EDITING ? handleConfigUpdate : undefined}
               />
             )}
-          </SidebarInset>
+          </div>
 
-          <EditorSidebar
-            selectedBlock={ENABLE_BLOCK_EDITING ? selectedBlock : null}
-            parentBlock={ENABLE_BLOCK_EDITING ? parentBlock : null}
-            onUpdateBlock={handleUpdateBlock}
-            onToggleBlock={handleToggleBlock}
-            onDeleteBlock={handleDeleteBlock}
-            onSelectBlock={handleSelectBlock}
-            theme={config.theme}
-            onThemeChange={handleThemeChange}
-            layout={config.layout ?? DEFAULT_LAYOUT}
-            onLayoutChange={handleLayoutChange}
-            onApplyTemplate={handleApplyTemplate}
-          />
-        </SidebarProvider>
+          {/* Desktop sidebar */}
+          <aside className="hidden md:flex w-80 shrink-0 flex-col">
+            <EditorSidebarContent {...sidebarProps} />
+          </aside>
+        </div>
+
+        {/* Mobile sheet */}
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetContent side="right" className="flex flex-col sm:max-w-md md:hidden">
+            <SheetHeader>
+              <SheetTitle>Settings</SheetTitle>
+            </SheetHeader>
+            <EditorSidebarContent {...sidebarProps} />
+          </SheetContent>
+        </Sheet>
       </div>
     </>
   );
