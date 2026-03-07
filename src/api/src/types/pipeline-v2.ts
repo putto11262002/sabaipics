@@ -21,7 +21,7 @@ export interface PipelineJob {
   jobId: string; // photo_jobs.id
   eventId: string;
   photographerId: string;
-  source: 'web' | 'ios' | 'ftp';
+  source: 'web' | 'ios' | 'ftp' | 'desktop';
 
   // Presigned URLs
   inputUrl: string; // GET raw upload from R2

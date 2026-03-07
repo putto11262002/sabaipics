@@ -52,7 +52,7 @@ const presignRequestSchema = z.object({
       `File size must be less than ${PHOTO_MAX_FILE_SIZE / 1024 / 1024} MB`,
     ),
   filename: z.string().optional(),
-  source: z.enum(['web', 'ios']).optional(),
+  source: z.enum(['web', 'ios', 'desktop']).optional(),
 });
 
 const statusQuerySchema = z.object({

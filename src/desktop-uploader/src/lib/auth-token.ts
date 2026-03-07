@@ -1,5 +1,3 @@
-const TOKEN_KEY = 'framefast.desktop.refresh_token';
-
 function isTauri() {
   return typeof window !== 'undefined' && '__TAURI__' in window;
 }
@@ -12,31 +10,47 @@ async function tauriInvoke<T>(command: string, args?: Record<string, unknown>) {
   return tauri.core.invoke(command, args) as Promise<T>;
 }
 
-export async function getStoredRefreshToken(): Promise<string | null> {
-  if (isTauri()) {
-    try {
-      const token = await tauriInvoke<string | null>('get_auth_token');
-      return token ?? null;
-    } catch {
-      return null;
-    }
-  }
-  return localStorage.getItem(TOKEN_KEY);
+export type AuthStatus = {
+  signedIn: boolean;
+  user?: { name: string | null; email: string | null } | null;
+};
+
+/** Initialize the Rust token manager with the API base URL. Restores session if possible. */
+export async function initTokenManager(baseUrl: string): Promise<AuthStatus> {
+  return tauriInvoke<AuthStatus>('init_token_manager', { baseUrl });
 }
 
-export async function setStoredRefreshToken(token: string | null): Promise<void> {
-  if (isTauri()) {
-    if (!token) {
-      await tauriInvoke('clear_auth_token');
-      return;
-    }
-    await tauriInvoke('set_auth_token', { token });
-    return;
-  }
-
-  if (!token) {
-    localStorage.removeItem(TOKEN_KEY);
-    return;
-  }
-  localStorage.setItem(TOKEN_KEY, token);
+/** Store tokens in Rust after OAuth redeem. */
+export async function setAuthTokens(params: {
+  accessToken: string;
+  expiresAt: number;
+  refreshToken: string;
+  userName?: string | null;
+  userEmail?: string | null;
+}): Promise<void> {
+  await tauriInvoke('set_auth_tokens', {
+    accessToken: params.accessToken,
+    expiresAt: params.expiresAt,
+    refreshToken: params.refreshToken,
+    userName: params.userName ?? null,
+    userEmail: params.userEmail ?? null,
+  });
 }
+
+/** Get a valid access token from Rust (auto-refreshes if expired). */
+export async function getAccessToken(): Promise<string> {
+  return tauriInvoke<string>('get_access_token');
+}
+
+/** Get current auth status. */
+export async function getAuthStatus(): Promise<AuthStatus> {
+  return tauriInvoke<AuthStatus>('get_auth_status');
+}
+
+/** Sign out — clears all tokens. */
+export async function signOutRust(): Promise<void> {
+  await tauriInvoke('sign_out');
+}
+
+/** Check if running in Tauri. */
+export { isTauri };

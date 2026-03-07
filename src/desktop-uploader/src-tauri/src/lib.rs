@@ -1,23 +1,28 @@
 mod api;
+mod http_client;
 mod sync;
+mod token_manager;
 
 use std::sync::Arc;
 use sync::SyncManager;
 use tauri::Manager;
+use token_manager::{AuthStatus, TokenManager, UserInfo};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let api_client = Arc::new(api::MockApiClient);
-
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_oauth::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            set_auth_token,
-            get_auth_token,
-            clear_auth_token,
+            // Auth
+            init_token_manager,
+            set_auth_tokens,
+            get_access_token,
+            get_auth_status,
+            sign_out,
+            // Sync
             add_sync,
             remove_sync,
             list_syncs,
@@ -49,7 +54,7 @@ pub fn run() {
                 )?;
             }
 
-            // Initialize DB actor thread and sync manager
+            // Initialize DB actor thread
             let mut db_path = app
                 .handle()
                 .path()
@@ -59,7 +64,17 @@ pub fn run() {
             db_path.push("sync.db");
 
             let db = sync::db::DbHandle::spawn(&db_path).expect("start db actor");
+
+            // Token manager (owns refresh logic, shared with HttpApiClient)
+            let token_mgr = Arc::new(TokenManager::new(db.clone()));
+
+            // Real HTTP upload client
+            let api_client = Arc::new(http_client::HttpApiClient::new(token_mgr.clone()));
+
+            // Sync manager (owns engines + upload worker)
             let manager = SyncManager::new(db, api_client);
+
+            app.handle().manage(token_mgr);
             app.handle().manage(manager);
 
             // Auto-start syncs that were active when the app last closed
@@ -77,28 +92,61 @@ pub fn run() {
 
 // ── Auth commands ──────────────────────────────────────────────────────
 
-const AUTH_TOKEN_KEY: &str = "refresh_token";
-
+/// Called once on app start. Sets API base URL and restores session.
 #[tauri::command]
-async fn set_auth_token(
-    state: tauri::State<'_, SyncManager>,
-    token: String,
-) -> Result<(), String> {
-    state.db().kv_set(AUTH_TOKEN_KEY.to_string(), token).await
+async fn init_token_manager(
+    tm: tauri::State<'_, Arc<TokenManager>>,
+    base_url: String,
+) -> Result<AuthStatus, String> {
+    Ok(tm.init(base_url).await)
 }
 
+/// Called after OAuth redeem to store all tokens.
 #[tauri::command]
-async fn get_auth_token(
-    state: tauri::State<'_, SyncManager>,
-) -> Result<Option<String>, String> {
-    state.db().kv_get(AUTH_TOKEN_KEY.to_string()).await
+async fn set_auth_tokens(
+    tm: tauri::State<'_, Arc<TokenManager>>,
+    access_token: String,
+    expires_at: i64,
+    refresh_token: String,
+    user_name: Option<String>,
+    user_email: Option<String>,
+) -> Result<(), String> {
+    let user = if user_name.is_some() || user_email.is_some() {
+        Some(UserInfo {
+            name: user_name,
+            email: user_email,
+        })
+    } else {
+        None
+    };
+    tm.set_tokens(access_token, expires_at, refresh_token, user)
+        .await;
+    Ok(())
 }
 
+/// Get a valid access token (auto-refreshes if expired).
 #[tauri::command]
-async fn clear_auth_token(
-    state: tauri::State<'_, SyncManager>,
+async fn get_access_token(
+    tm: tauri::State<'_, Arc<TokenManager>>,
+) -> Result<String, String> {
+    tm.get_token().await.map_err(|e| e.to_string())
+}
+
+/// Check current auth status.
+#[tauri::command]
+async fn get_auth_status(
+    tm: tauri::State<'_, Arc<TokenManager>>,
+) -> Result<AuthStatus, String> {
+    Ok(tm.auth_status().await)
+}
+
+/// Sign out — clear all tokens.
+#[tauri::command]
+async fn sign_out(
+    tm: tauri::State<'_, Arc<TokenManager>>,
 ) -> Result<(), String> {
-    state.db().kv_delete(AUTH_TOKEN_KEY.to_string()).await
+    tm.clear().await;
+    Ok(())
 }
 
 // ── Sync commands ──────────────────────────────────────────────────────
