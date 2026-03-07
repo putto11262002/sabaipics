@@ -79,7 +79,7 @@ export function DashboardPage() {
     if (code) {
       // Gift codes → redirect to credits page which handles redemption
       if (code.startsWith('GIFT-')) {
-        navigate(`/credits?code=${encodeURIComponent(code)}`, { replace: true });
+        navigate(`/settings/credits?code=${encodeURIComponent(code)}`, { replace: true });
       } else {
         // Discount codes → validate via Stripe then open CreditTopUpDialog
         setPromoCodeFromUrl(code);

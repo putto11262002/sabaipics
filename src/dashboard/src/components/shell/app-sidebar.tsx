@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { LayoutDashboard, CalendarDays, Sparkles, Wallet, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Sparkles, MessageCircle } from 'lucide-react';
 
 import { LogoMark } from '@/shared/components/icons/logo-mark';
 import { NavMain } from './nav-main';
@@ -38,11 +38,6 @@ const data = {
           url: '/studio/auto-edit',
         },
       ],
-    },
-    {
-      title: 'Credits',
-      url: '/credits',
-      icon: Wallet,
     },
     {
       title: 'LINE Delivery',

@@ -1,7 +1,7 @@
 import { ChevronsUpDown, LogOut, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import posthog from 'posthog-js';
-import { useAuth, useClerk, useUser } from '@/auth/react';
+import { useAuth, useUser } from '@/auth/react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/avatar';
 import {
@@ -23,7 +23,6 @@ export function NavUser() {
   const { isMobile } = useSidebar();
   const { user } = useUser();
   const { signOut } = useAuth();
-  const { openUserProfile } = useClerk();
   const navigate = useNavigate();
 
   const displayName = user?.fullName || user?.emailAddresses[0]?.emailAddress || 'User';
@@ -81,7 +80,7 @@ export function NavUser() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => openUserProfile()}>
+            <DropdownMenuItem onClick={() => navigate('/settings')}>
               <Settings />
               Settings
             </DropdownMenuItem>
