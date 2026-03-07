@@ -1,14 +1,27 @@
 /**
- * Photo Pipeline V2 — CF ↔ Modal Contracts
+ * Photo Pipeline V2/V3 — CF ↔ Modal Contracts
  *
- * CF sends a batch of jobs to Modal (PipelineBatchRequest).
- * Modal processes all jobs and POSTs results back (PipelineBatchCallback).
+ * V3: CF normalizes at the edge, then dispatches single recognition jobs to Modal.
+ * Modal processes auto-edit (optional) + recognition, then POSTs per-image callback.
+ *
+ * V2 batch types are kept for backwards compatibility during rollout.
  */
 
 import type { DetectedFace } from '../lib/recognition/types';
 
 // =============================================================================
-// CF → Modal (batch request)
+// CF → Modal (single job — V3)
+// =============================================================================
+
+export interface PipelineSingleJobRequest {
+  job: PipelineJob;
+  callback: { url: string; token?: string };
+  traceparent?: string;
+  baggage?: string;
+}
+
+// =============================================================================
+// CF → Modal (batch request — V2 legacy)
 // =============================================================================
 
 export interface PipelineBatchRequest {
@@ -19,13 +32,14 @@ export interface PipelineBatchRequest {
 
 export interface PipelineJob {
   jobId: string; // photo_jobs.id
+  photoId?: string; // photos.id (V3: created before recognition)
   eventId: string;
   photographerId: string;
   source: 'web' | 'ios' | 'ftp';
 
   // Presigned URLs
-  inputUrl: string; // GET raw upload from R2
-  originalPutUrl: string; // PUT normalized original to R2
+  inputUrl: string; // GET normalized image from R2
+  originalPutUrl?: string; // PUT normalized original to R2 (V2 only)
   processedPutUrl?: string; // PUT processed to R2 (if auto-edit enabled)
 
   // R2 keys (for DB records)
@@ -41,13 +55,20 @@ export interface PipelineJob {
 export interface PipelineJobOptions {
   autoEdit?: boolean;
   autoEditIntensity?: number;
+  autoEditPresetId?: string | null;
+  contrast?: number;
+  brightness?: number;
+  saturation?: number;
+  sharpness?: number;
+  autoContrast?: boolean;
   lutId?: string | null;
+  lutBase64?: string | null;
   lutIntensity?: number;
   maxFaces?: number;
 }
 
 // =============================================================================
-// Modal → CF (batch callback)
+// Modal → CF (callback — works for both single and batch)
 // =============================================================================
 
 export interface PipelineBatchCallback {

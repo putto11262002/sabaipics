@@ -1,30 +1,32 @@
 /**
- * Photo Pipeline V2 Consumer
+ * Photo Pipeline V3 Consumer
  *
- * Single-stage pipeline: R2 event → HEAD check → claim intent → debit credits →
- * presign URLs → batch POST to Modal → callback handles completion.
+ * Per-message processing: R2 event → HEAD check → claim intent → debit credits →
+ * normalize via CF Images binding (streaming) → insert photo as "indexing" →
+ * ACK immediately → fire recognition job to Modal (fire-and-forget).
  *
- * No image bytes are read by the CF worker. Modal handles all compute.
- * Observability is handled by the `instrument` combinator — business logic stays clean.
+ * Photos become visible to guests immediately after normalization.
+ * Recognition (face detection + embedding) happens asynchronously.
  */
 
-import { createDb, events, photoJobs, uploadIntents } from '@/db';
+import { createDb, events, photos, photoJobs, uploadIntents, autoEditPresets } from '@/db';
 import { and, eq } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, errAsync } from 'neverthrow';
 import type { Bindings } from '../types';
 import type { R2EventMessage } from '../types/r2-event';
-import type { PipelineBatchRequest, PipelineJob } from '../types/pipeline-v2';
+import type { PipelineSingleJobRequest, PipelineJob } from '../types/pipeline-v2';
 import type { CreditError } from '../lib/credits';
 import { fastDebitBalanceIfNotExists } from '../lib/credits/fast-debit';
 import type { CreditRefundMessage } from '../types/credit-queue';
 import { generatePresignedGetUrl, generatePresignedPutUrl } from '../lib/r2/presign';
-import { createInstrument, type Instrument, type TracedError } from '../lib/observability/instrument';
+import { createInstrument } from '../lib/observability/instrument';
 
 const MAX_OBJECT_SIZE = 50 * 1024 * 1024; // 50 MB
 const PRESIGN_EXPIRY_SECONDS = 600; // 10 min
 const MODAL_TIMEOUT_MS = 180_000;
 const MODAL_BASE_RETRY_DELAY_MS = 10_000;
 const MODAL_MAX_RETRIES = 2;
+const NORMALIZE_MAX_PX = 2500;
 
 // =============================================================================
 // Error types
@@ -39,10 +41,11 @@ type PipelineError =
   | { type: 'insufficient_credits'; photographerId: string }
   | { type: 'database'; operation: string; cause: unknown }
   | { type: 'presign_failed'; cause: unknown }
+  | { type: 'normalize_failed'; cause: unknown }
   | { type: 'modal_submit_failed'; error: string };
 
 // =============================================================================
-// Pipeline steps (pure business logic — no observability code)
+// Pipeline steps (pure business logic)
 // =============================================================================
 
 function headCheckR2(
@@ -160,75 +163,110 @@ function preDebitCredits(
     .map(() => ctx);
 }
 
-interface PresignedUrls {
-  inputGet: { url: string };
-  originalPut: { url: string };
-  processedPut?: { url: string };
-  originalR2Key: string;
-  processedR2Key?: string;
+interface NormalizeResult {
+  width: number | null;
+  height: number | null;
+  fileSize: number | null;
 }
 
-function generateUrls(
+/**
+ * Normalize image via CF Images binding (streaming — no memory bloat).
+ * Reads from R2 → transforms at edge → streams back to R2.
+ * Returns dimensions and file size of the normalized image.
+ */
+function normalizeImage(
   env: Bindings,
-  eventId: string,
-  intentId: string,
   sourceR2Key: string,
-  hasAutoEdit: boolean,
-): ResultAsync<PresignedUrls, PipelineError> {
-  const originalR2Key = `events/${eventId}/${intentId}/original.jpeg`;
-  const processedR2Key = hasAutoEdit ? `events/${eventId}/${intentId}/processed.jpeg` : undefined;
-
+  destR2Key: string,
+): ResultAsync<NormalizeResult, PipelineError> {
   return ResultAsync.fromPromise(
     (async () => {
-      const [inputGet, originalPut, processedPut] = await Promise.all([
-        generatePresignedGetUrl(env.CF_ACCOUNT_ID, env.R2_ACCESS_KEY_ID, env.R2_SECRET_ACCESS_KEY, {
-          bucket: env.PHOTO_BUCKET_NAME,
-          key: sourceR2Key,
-          expiresIn: PRESIGN_EXPIRY_SECONDS,
-        }),
-        generatePresignedPutUrl(env.CF_ACCOUNT_ID, env.R2_ACCESS_KEY_ID, env.R2_SECRET_ACCESS_KEY, {
-          bucket: env.PHOTO_BUCKET_NAME,
-          key: originalR2Key,
-          contentType: 'image/jpeg',
-          expiresIn: PRESIGN_EXPIRY_SECONDS,
-        }),
-        processedR2Key
-          ? generatePresignedPutUrl(env.CF_ACCOUNT_ID, env.R2_ACCESS_KEY_ID, env.R2_SECRET_ACCESS_KEY, {
-              bucket: env.PHOTO_BUCKET_NAME,
-              key: processedR2Key,
-              contentType: 'image/jpeg',
-              expiresIn: PRESIGN_EXPIRY_SECONDS,
-            })
-          : undefined,
-      ]);
-      return { inputGet, originalPut, processedPut, originalR2Key, processedR2Key };
+      const r2Obj = await env.PHOTOS_BUCKET.get(sourceR2Key);
+      if (!r2Obj || !r2Obj.body) {
+        throw { type: 'not_found', entity: 'r2_object', key: sourceR2Key };
+      }
+
+      // CF Images binding: input(stream) → transform → output → response
+      // The entire chain must be awaited; .output() returns a promise.
+      const transformed = await env.IMAGES
+        .input(r2Obj.body)
+        .transform({
+          width: NORMALIZE_MAX_PX,
+          height: NORMALIZE_MAX_PX,
+          fit: 'scale-down',
+        })
+        .output({ format: 'image/jpeg', quality: 90 });
+
+      const response = transformed.response();
+      if (!response.ok) {
+        throw new Error(`CF Images transform failed: HTTP ${response.status}`);
+      }
+
+      // Stream directly to R2
+      await env.PHOTOS_BUCKET.put(destR2Key, response.body, {
+        httpMetadata: { contentType: 'image/jpeg' },
+      });
+
+      // HEAD to get file size
+      const head = await env.PHOTOS_BUCKET.head(destR2Key);
+
+      return {
+        width: null,  // Set by recognition callback
+        height: null, // Set by recognition callback
+        fileSize: head?.size ?? null,
+      };
     })(),
-    (cause): PipelineError => ({ type: 'presign_failed', cause }),
+    (e): PipelineError => {
+      if (e && typeof e === 'object' && 'type' in e) return e as PipelineError;
+      const cause = e instanceof Error
+        ? `${e.name}: ${e.message}`
+        : typeof e === 'string'
+          ? e
+          : JSON.stringify(e, Object.getOwnPropertyNames(e ?? {}));
+      return { type: 'normalize_failed', cause };
+    },
   );
 }
 
-function submitBatchToModal(
+/**
+ * Insert photo as "indexing" — visible to guests immediately.
+ */
+function insertVisiblePhoto(
+  db: ReturnType<typeof createDb>,
+  photoId: string,
+  eventId: string,
+  r2Key: string,
+  dimensions: NormalizeResult,
+): ResultAsync<void, PipelineError> {
+  return ResultAsync.fromPromise(
+    db.insert(photos).values({
+      id: photoId,
+      eventId,
+      r2Key,
+      status: 'indexing',
+      width: dimensions.width,
+      height: dimensions.height,
+      fileSize: dimensions.fileSize,
+    }),
+    (cause): PipelineError => ({ type: 'database', operation: 'insert_photo', cause }),
+  ).map(() => undefined);
+}
+
+function submitSingleJobToModal(
   env: Bindings,
-  batchRequest: PipelineBatchRequest,
+  request: PipelineSingleJobRequest,
 ): ResultAsync<void, PipelineError> {
   const orchestratorUrl = (env as unknown as Record<string, string | undefined>).MODAL_ORCHESTRATOR_URL;
   const modalKey = (env as unknown as Record<string, string | undefined>).MODAL_KEY?.trim();
   const modalSecret = (env as unknown as Record<string, string | undefined>).MODAL_SECRET?.trim();
-  const callbackToken = (env as unknown as Record<string, string | undefined>).PIPELINE_CALLBACK_TOKEN;
 
   if (!orchestratorUrl || !modalKey || !modalSecret) {
     return errAsync({ type: 'modal_submit_failed', error: 'Missing MODAL_ORCHESTRATOR_URL/MODAL_KEY/MODAL_SECRET' });
   }
 
-  const callbackUrl = callbackUrlFromEnv(env);
-  const payload = {
-    ...batchRequest,
-    callback: { url: callbackUrl, token: callbackToken },
-  };
-
   return ResultAsync.fromPromise(
     (async () => {
-      const body = JSON.stringify(payload);
+      const body = JSON.stringify(request);
       const headers = {
         'Content-Type': 'application/json',
         'Modal-Key': modalKey,
@@ -244,7 +282,6 @@ function submitBatchToModal(
             signal: AbortSignal.timeout(MODAL_TIMEOUT_MS),
           });
 
-          // 524 = CF proxy timeout (Modal cold start). Retry with exponential backoff.
           if (response.status === 524 && attempt < MODAL_MAX_RETRIES) {
             const delay = MODAL_BASE_RETRY_DELAY_MS * 2 ** attempt;
             await new Promise((r) => setTimeout(r, delay));
@@ -257,7 +294,6 @@ function submitBatchToModal(
           }
           return;
         } catch (err) {
-          // Timeout or network error — retry with exponential backoff
           if (attempt < MODAL_MAX_RETRIES) {
             const delay = MODAL_BASE_RETRY_DELAY_MS * 2 ** attempt;
             await new Promise((r) => setTimeout(r, delay));
@@ -299,14 +335,8 @@ function isSkippable(err: PipelineError): boolean {
 }
 
 // =============================================================================
-// Queue handler
+// Queue handler (V3 — per-message processing)
 // =============================================================================
-
-interface ClaimedJob {
-  job: PipelineJob;
-  photoJobId: string;
-  message: Message<R2EventMessage>;
-}
 
 export async function queue(
   batch: MessageBatch<R2EventMessage>,
@@ -315,7 +345,7 @@ export async function queue(
 ): Promise<void> {
   const db = createDb(env.DATABASE_URL);
 
-  // Read trace context from first R2 object's custom metadata (set by upload route)
+  // Read trace context from first R2 object's custom metadata
   let parentTraceparent: string | null = null;
   let parentBaggage: string | undefined;
   if (batch.messages.length > 0) {
@@ -338,17 +368,20 @@ export async function queue(
 
   inst.log('info', 'batch_start', { batch_size: batch.messages.length });
 
-  // Process all messages in parallel — claim intents, debit credits, presign URLs
-  const results = await Promise.all(
-    batch.messages.map(async (message): Promise<ClaimedJob | null> => {
+  let okCount = 0;
+  let failedCount = 0;
+
+  // Process each message independently — normalize + ack, then fire recognition
+  await Promise.all(
+    batch.messages.map(async (message) => {
       const event = message.body;
 
       if (!isUploadEvent(event)) {
         message.ack();
-        return null;
+        return;
       }
 
-      // Queue wait time: R2 event creation → consumer pickup
+      // Queue wait time
       const eventTimeMs = new Date(event.eventTime).getTime();
       if (eventTimeMs > 0) {
         inst.histogram('queue_wait_ms', Date.now() - eventTimeMs);
@@ -386,6 +419,30 @@ export async function queue(
         const hasAutoEdit = colorGrade?.autoEdit === true || !!colorGrade?.lutId;
         const creditsToDebit = hasAutoEdit ? 2 : 1;
 
+        // Fetch auto-edit preset if configured
+        let preset: typeof autoEditPresets.$inferSelect | null = null;
+        if (colorGrade?.autoEdit && colorGrade.autoEditPresetId) {
+          const presetResult = yield* inst
+            .tracedPromise('load_preset', () =>
+              db.query.autoEditPresets.findFirst({
+                where: eq(autoEditPresets.id, colorGrade.autoEditPresetId!),
+              }),
+            )
+            .safeUnwrap();
+          preset = presetResult ?? null;
+        }
+
+        // DEBUG: trace auto-edit decision
+        inst.log('info', 'auto_edit_decision', {
+          has_color_grade: !!colorGrade,
+          auto_edit: colorGrade?.autoEdit,
+          auto_edit_preset_id: colorGrade?.autoEditPresetId ?? null,
+          preset_name: preset?.name ?? null,
+          lut_id: colorGrade?.lutId ?? null,
+          has_auto_edit: hasAutoEdit,
+          credits_to_debit: creditsToDebit,
+        });
+
         yield* inst
           .traced('debit_credits', () =>
             preDebitCredits(db, env, { intent: claimed, job, creditsToDebit, hasAutoEdit }),
@@ -398,142 +455,214 @@ export async function queue(
           )
           .safeUnwrap();
 
-        const urls = yield* inst
-          .traced('presign', () =>
-            generateUrls(env, claimed.eventId, claimed.id, claimed.r2Key, hasAutoEdit),
+        // V3: Normalize at the edge via CF Images binding (streaming)
+        const normalizedR2Key = `events/${claimed.eventId}/${claimed.id}/original.jpeg`;
+
+        const normalizeResult = yield* inst
+          .traced('normalize', () => normalizeImage(env, claimed.r2Key, normalizedR2Key))
+          .safeUnwrap();
+
+        // V3: Insert photo as "indexing" — visible to guests immediately
+        const photoId = crypto.randomUUID();
+
+        yield* inst
+          .traced('insert_photo', () => insertVisiblePhoto(db, photoId, claimed.eventId, normalizedR2Key, normalizeResult))
+          .safeUnwrap();
+
+        // Update intent + job with photoId and R2 keys
+        const processedR2Key = hasAutoEdit ? `events/${claimed.eventId}/${claimed.id}/processed.jpeg` : undefined;
+
+        yield* inst
+          .tracedPromise('update_intent_and_job', () =>
+            Promise.all([
+              db.update(uploadIntents)
+                .set({ photoId })
+                .where(eq(uploadIntents.id, claimed.id)),
+              db.update(photoJobs)
+                .set({
+                  photoId,
+                  originalR2Key: normalizedR2Key,
+                  processedR2Key: processedR2Key ?? null,
+                  startedAt: new Date().toISOString(),
+                  status: 'submitted',
+                  updatedAt: new Date().toISOString(),
+                })
+                .where(eq(photoJobs.id, job.id)),
+            ]),
           )
           .safeUnwrap();
 
-        yield* inst
-          .tracedPromise('update_r2_keys', () =>
-            db.update(photoJobs).set({
-              originalR2Key: urls.originalR2Key,
-              processedR2Key: urls.processedR2Key ?? null,
-              startedAt: new Date().toISOString(),
-            }).where(eq(photoJobs.id, job.id)),
+        // ACK immediately — photo is now visible
+        message.ack();
+
+        // Fire recognition job to Modal (non-blocking via ctx.waitUntil)
+        const inputGetUrl = yield* inst
+          .traced('presign_get', () =>
+            ResultAsync.fromPromise(
+              generatePresignedGetUrl(env.CF_ACCOUNT_ID, env.R2_ACCESS_KEY_ID, env.R2_SECRET_ACCESS_KEY, {
+                bucket: env.PHOTO_BUCKET_NAME,
+                key: normalizedR2Key,
+                expiresIn: PRESIGN_EXPIRY_SECONDS,
+              }),
+              (cause): PipelineError => ({ type: 'presign_failed', cause }),
+            ),
           )
           .safeUnwrap();
+
+        let processedPutUrl: { url: string } | undefined;
+        if (processedR2Key) {
+          processedPutUrl = yield* inst
+            .traced('presign_put_processed', () =>
+              ResultAsync.fromPromise(
+                generatePresignedPutUrl(env.CF_ACCOUNT_ID, env.R2_ACCESS_KEY_ID, env.R2_SECRET_ACCESS_KEY, {
+                  bucket: env.PHOTO_BUCKET_NAME,
+                  key: processedR2Key,
+                  contentType: 'image/jpeg',
+                  expiresIn: PRESIGN_EXPIRY_SECONDS,
+                  allowOverwrite: true,
+                }),
+                (cause): PipelineError => ({ type: 'presign_failed', cause }),
+              ),
+            )
+            .safeUnwrap();
+        }
+
+        const callbackUrl = callbackUrlFromEnv(env);
+        const callbackToken = (env as unknown as Record<string, string | undefined>).PIPELINE_CALLBACK_TOKEN;
+
+        // Fetch LUT file from R2 if configured
+        let lutBase64: string | null = null;
+        if (colorGrade?.lutId) {
+          const lutR2Key = `luts/${claimed.photographerId}/${colorGrade.lutId}.cube`;
+          const lutObj = await env.PHOTOS_BUCKET.get(lutR2Key);
+          if (lutObj) {
+            const lutBytes = await lutObj.arrayBuffer();
+            lutBase64 = btoa(String.fromCharCode(...new Uint8Array(lutBytes)));
+          } else {
+            inst.log('warn', 'lut_not_found', { lut_id: colorGrade.lutId, r2_key: lutR2Key });
+          }
+        }
 
         const pipelineJob: PipelineJob = {
           jobId: job.id,
+          photoId,
           eventId: claimed.eventId,
           photographerId: claimed.photographerId,
           source: toSource(claimed.source),
-          inputUrl: urls.inputGet.url,
-          originalPutUrl: urls.originalPut.url,
-          processedPutUrl: urls.processedPut?.url,
+          inputUrl: inputGetUrl.url,
+          processedPutUrl: processedPutUrl?.url,
           sourceR2Key: claimed.r2Key,
-          originalR2Key: urls.originalR2Key,
-          processedR2Key: urls.processedR2Key,
+          originalR2Key: normalizedR2Key,
+          processedR2Key,
           contentType: claimed.contentType,
           options: colorGrade
             ? {
                 autoEdit: colorGrade.autoEdit,
                 autoEditIntensity: colorGrade.autoEditIntensity,
+                autoEditPresetId: colorGrade.autoEditPresetId,
+                contrast: preset?.contrast ?? undefined,
+                brightness: preset?.brightness ?? undefined,
+                saturation: preset?.saturation ?? undefined,
+                sharpness: preset?.sharpness ?? undefined,
+                autoContrast: preset?.autoContrast ?? undefined,
                 lutId: colorGrade.lutId,
+                lutBase64,
                 lutIntensity: colorGrade.lutIntensity,
                 maxFaces: 100,
               }
             : { maxFaces: 100 },
         };
 
-        return ok({ job: pipelineJob, photoJobId: job.id, message } as ClaimedJob);
+        // DEBUG: log what we're sending to Modal
+        inst.log('info', 'modal_dispatch_options', {
+          job_id: job.id,
+          has_processed_put_url: !!processedPutUrl,
+          options_auto_edit: pipelineJob.options?.autoEdit ?? null,
+          options_lut_id: pipelineJob.options?.lutId ?? null,
+          options_lut_base64_len: pipelineJob.options?.lutBase64?.length ?? 0,
+          options_auto_edit_intensity: pipelineJob.options?.autoEditIntensity ?? null,
+        });
+
+        const singleJobRequest: PipelineSingleJobRequest = {
+          job: pipelineJob,
+          callback: { url: callbackUrl!, token: callbackToken },
+          traceparent: inst.rootSpan.traceparent(),
+          baggage: inst.rootSpan.baggage,
+        };
+
+        // Fire-and-forget — don't block the consumer
+        ctx.waitUntil(
+          submitSingleJobToModal(env, singleJobRequest).match(
+            () => {
+              inst.log('info', 'modal_dispatched', { job_id: job.id, photo_id: photoId });
+            },
+            async (submitErr) => {
+              const errMsg = submitErr.type === 'modal_submit_failed' ? submitErr.error : submitErr.type;
+              inst.log('error', 'modal_submit_failed', { job_id: job.id, error: errMsg });
+              // Refund credits on modal failure
+              const refundable = creditsToDebit;
+              if (refundable > 0) {
+                await env.CREDIT_QUEUE.send({
+                  type: 'refund',
+                  photographerId: claimed.photographerId,
+                  amount: refundable,
+                  source: 'refund',
+                  reason: 'modal_submit_failed',
+                } satisfies CreditRefundMessage);
+              }
+              // Mark photo, job, and intent as failed
+              const now = new Date().toISOString();
+              await Promise.all([
+                db.update(photos)
+                  .set({ status: 'failed' })
+                  .where(eq(photos.id, photoId)),
+                db.update(photoJobs)
+                  .set({
+                    status: 'failed',
+                    errorCode: 'modal_submit_failed',
+                    errorMessage: 'Modal submission failed',
+                    retryable: false,
+                    creditsRefunded: refundable,
+                    updatedAt: now,
+                  })
+                  .where(eq(photoJobs.id, job.id)),
+                db.update(uploadIntents)
+                  .set({
+                    status: 'failed',
+                    errorCode: 'modal_submit_failed',
+                    errorMessage: 'Modal submission failed',
+                    retryable: true,
+                  })
+                  .where(eq(uploadIntents.id, claimed.id)),
+              ]);
+              inst.count('credit_refund_total', 1, { reason: 'modal_submit_failed' });
+            },
+          ),
+        );
+
+        return ok(undefined);
       }).match(
-        (claimed): ClaimedJob => claimed,
-        async (err): Promise<null> => {
-          if ('type' in err && err.type === 'insufficient_credits') {
+        () => {
+          okCount++;
+        },
+        async (rawErr) => {
+          const pErr = rawErr as PipelineError;
+          if ('type' in pErr && pErr.type === 'insufficient_credits') {
             inst.count('credit_insufficient_total', 1);
             await markInsufficientCredits(db, event.object.key).catch(() => {});
-            // Ack — don't auto-retry. Intent is marked retryable for user-initiated retry.
             message.ack();
-            return null;
-          }
-          if ('type' in err && isSkippable(err as PipelineError)) {
+          } else if ('type' in pErr && isSkippable(pErr)) {
             message.ack();
           } else {
             message.retry();
           }
-          return null;
+          failedCount++;
         },
       );
-
-      return result;
     }),
   );
 
-  // Collect claimed jobs
-  const claimedJobs = results.filter((r): r is ClaimedJob => r !== null);
-  if (claimedJobs.length === 0) {
-    inst.complete({ total: batch.messages.length, ok: 0, failed: 0 });
-    return;
-  }
-
-  // Batch POST to Modal
-  const batchRequest: PipelineBatchRequest = {
-    jobs: claimedJobs.map((c) => c.job),
-    traceparent: inst.rootSpan.traceparent(),
-    baggage: inst.rootSpan.baggage,
-  };
-
-  const submitResult = await inst.traced('modal_submit', () =>
-    submitBatchToModal(env, batchRequest),
-  );
-
-  await submitResult.match(
-    async () => {
-      // Mark all jobs as submitted, ack messages
-      const now = new Date().toISOString();
-      await Promise.all(
-        claimedJobs.map(async (claimed) => {
-          await db
-            .update(photoJobs)
-            .set({ status: 'submitted', updatedAt: now })
-            .where(eq(photoJobs.id, claimed.photoJobId));
-          claimed.message.ack();
-        }),
-      );
-      inst.complete({ total: batch.messages.length, ok: claimedJobs.length, failed: 0 });
-    },
-    async () => {
-      // Modal failed — send refund to credit queue, mark all jobs as failed, ack messages
-      const now = new Date().toISOString();
-      await Promise.all(
-        claimedJobs.map(async (claimed) => {
-          const job = await db.query.photoJobs.findFirst({
-            where: eq(photoJobs.id, claimed.photoJobId),
-            columns: { creditsDebited: true, photographerId: true },
-          });
-          const refundable = job?.creditsDebited ?? 0;
-
-          if (refundable > 0) {
-            await env.CREDIT_QUEUE.send({
-              type: 'refund',
-              photographerId: job!.photographerId,
-              amount: refundable,
-              source: 'refund',
-              reason: 'modal_submit_failed',
-            } satisfies CreditRefundMessage);
-          }
-
-          await db
-            .update(photoJobs)
-            .set({
-              status: 'failed',
-              errorCode: 'modal_submit_failed',
-              errorMessage: 'Modal batch submission failed',
-              retryable: false,
-              creditsRefunded: refundable,
-              updatedAt: now,
-            })
-            .where(eq(photoJobs.id, claimed.photoJobId));
-
-          claimed.message.ack();
-        }),
-      );
-      inst.count('credit_refund_total', claimedJobs.length, { reason: 'modal_submit_failed' });
-      inst.complete({ total: batch.messages.length, ok: 0, failed: claimedJobs.length });
-    },
-  );
+  inst.complete({ total: batch.messages.length, ok: okCount, failed: failedCount });
 }
 
 // =============================================================================

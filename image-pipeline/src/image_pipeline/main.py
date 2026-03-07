@@ -41,10 +41,11 @@ image = (
     cpu=2.0,
     memory=2048,
     timeout=60,
-    scaledown_window=120,
-    max_containers=20,
+    scaledown_window=60,
+    max_containers=5,
     secrets=[modal.Secret.from_name("framefast-observability")],
 )
+@modal.concurrent(max_inputs=10)
 @modal.fastapi_endpoint(method="POST", requires_proxy_auth=True)
 def process(request: dict) -> dict:
     """Process an image with optional auto-edit, LUT, and upscale."""
@@ -359,108 +360,111 @@ def process(request: dict) -> dict:
         except Exception:
             max_dimension = 2500
 
+        # Normalize (resize) — skipped when normalize_max_px=0 (V3: already done at CF edge)
         if max_dimension and max_dimension > 0:
             if img.width > max_dimension or img.height > max_dimension:
                 resample = Image.Resampling.LANCZOS
                 img.thumbnail((max_dimension, max_dimension), resample)
                 operations_applied.append("normalize")
 
-            if options.get("auto_edit"):
-                original_for_auto_edit = img.copy()
-                style_name = options.get("style")
-                style = StylePreset(style_name) if style_name else None
-                img = auto_edit(
-                    img,
-                    style,
-                    contrast=options.get("contrast"),
-                    brightness=options.get("brightness"),
-                    saturation=options.get("saturation"),
-                    sharpness=options.get("sharpness"),
-                    auto_contrast=options.get("auto_contrast"),
-                )
+        # Auto-edit — independent of normalization
+        if options.get("auto_edit"):
+            original_for_auto_edit = img.copy()
+            style_name = options.get("style")
+            style = StylePreset(style_name) if style_name else None
+            img = auto_edit(
+                img,
+                style,
+                contrast=options.get("contrast"),
+                brightness=options.get("brightness"),
+                saturation=options.get("saturation"),
+                sharpness=options.get("sharpness"),
+                auto_contrast=options.get("auto_contrast"),
+            )
 
-                auto_edit_intensity = float(options.get("auto_edit_intensity", 100.0))
-                auto_edit_intensity = max(0.0, min(100.0, auto_edit_intensity))
-                if auto_edit_intensity < 100.0:
-                    alpha = auto_edit_intensity / 100.0
-                    img = Image.blend(original_for_auto_edit.convert("RGB"), img.convert("RGB"), alpha)
+            auto_edit_intensity = float(options.get("auto_edit_intensity", 100.0))
+            auto_edit_intensity = max(0.0, min(100.0, auto_edit_intensity))
+            if auto_edit_intensity < 100.0:
+                alpha = auto_edit_intensity / 100.0
+                img = Image.blend(original_for_auto_edit.convert("RGB"), img.convert("RGB"), alpha)
 
-                operations_applied.append("auto_edit")
+            operations_applied.append("auto_edit")
 
-            lut_base64 = options.get("lut_base64")
-            if lut_base64:
-                try:
-                    lut_bytes = base64.b64decode(lut_base64)
-                    lut = load_lut_from_bytes(lut_bytes)
-                    lut_options = ApplyLutOptions(
-                        intensity=options.get("lut_intensity", 100.0),
-                        preserve_luminance=options.get("lut_preserve_luminance", False),
-                    )
-                    img = apply_lut(img, lut, lut_options)
-                    operations_applied.append("lut")
-                except Exception as e:
-                    record_metrics("invalid_lut")
-                    span.record_exception(e)
-                    span.set_attribute("framefast.status", "invalid_lut")
-                    return {"error": f"Invalid LUT: {e}"}
-
-            if options.get("upscale"):
-                upscale_options = UpscaleOptions(scale=options.get("upscale_scale", 2))
-                img = upscale(img, upscale_options)
-                operations_applied.append("upscale")
-
-            output = io.BytesIO()
-            format_name = options.get("output_format", "jpeg").upper()
-            quality = options.get("output_quality", 90)
-
-            if format_name == "JPEG":
-                img = img.convert("RGB")
-                img.save(output, format="JPEG", quality=quality)
-            elif format_name == "PNG":
-                img.save(output, format="PNG")
-            elif format_name == "WEBP":
-                img.save(output, format="WEBP", quality=quality)
-            else:
-                record_metrics("unsupported_format")
-                span.set_attribute("framefast.status", "unsupported_format")
-                return {"error": f"Unsupported format: {format_name}"}
-
-            output.seek(0)
-            output_bytes = output.read()
-
+        # LUT application — independent of normalization
+        lut_base64 = options.get("lut_base64")
+        if lut_base64:
             try:
-                req = urllib.request.Request(
-                    output_url,
-                    data=output_bytes,
-                    method="PUT",
-                    headers=output_headers,
+                lut_bytes = base64.b64decode(lut_base64)
+                lut = load_lut_from_bytes(lut_bytes)
+                lut_options = ApplyLutOptions(
+                    intensity=options.get("lut_intensity", 100.0),
+                    preserve_luminance=options.get("lut_preserve_luminance", False),
                 )
-                with urllib.request.urlopen(req) as resp:
-                    if resp.status >= 400:
-                        record_metrics("upload_failed")
-                        span.set_attribute("framefast.status", "upload_failed")
-                        return {"error": f"Failed to upload output: {resp.status}"}
+                img = apply_lut(img, lut, lut_options)
+                operations_applied.append("lut")
             except Exception as e:
-                record_metrics("upload_failed")
+                record_metrics("invalid_lut")
                 span.record_exception(e)
-                span.set_attribute("framefast.status", "upload_failed")
-                return {"error": f"Failed to upload output: {e}"}
+                span.set_attribute("framefast.status", "invalid_lut")
+                return {"error": f"Invalid LUT: {e}"}
 
-            span.set_attribute("framefast.status", "ok")
-            span.set_attribute("framefast.output_size", len(output_bytes))
-            span.set_attribute("framefast.output_format", format_name.lower())
-            span.set_attribute("framefast.operations_count", len(operations_applied))
-            for idx, op in enumerate(operations_applied):
-                span.set_attribute(f"framefast.operation.{idx}", op)
-            record_metrics("ok", output_size=len(output_bytes))
-            return {
-                "width": img.width,
-                "height": img.height,
-                "format": format_name.lower(),
-                "output_size": len(output_bytes),
-                "operations_applied": operations_applied,
-                "exif": exif_data,
-            }
+        if options.get("upscale"):
+            upscale_options = UpscaleOptions(scale=options.get("upscale_scale", 2))
+            img = upscale(img, upscale_options)
+            operations_applied.append("upscale")
+
+        output = io.BytesIO()
+        format_name = options.get("output_format", "jpeg").upper()
+        quality = options.get("output_quality", 90)
+
+        if format_name == "JPEG":
+            img = img.convert("RGB")
+            img.save(output, format="JPEG", quality=quality)
+        elif format_name == "PNG":
+            img.save(output, format="PNG")
+        elif format_name == "WEBP":
+            img.save(output, format="WEBP", quality=quality)
+        else:
+            record_metrics("unsupported_format")
+            span.set_attribute("framefast.status", "unsupported_format")
+            return {"error": f"Unsupported format: {format_name}"}
+
+        output.seek(0)
+        output_bytes = output.read()
+
+        try:
+            req = urllib.request.Request(
+                output_url,
+                data=output_bytes,
+                method="PUT",
+                headers=output_headers,
+            )
+            with urllib.request.urlopen(req) as resp:
+                if resp.status >= 400:
+                    record_metrics("upload_failed")
+                    span.set_attribute("framefast.status", "upload_failed")
+                    return {"error": f"Failed to upload output: {resp.status}"}
+        except Exception as e:
+            record_metrics("upload_failed")
+            span.record_exception(e)
+            span.set_attribute("framefast.status", "upload_failed")
+            return {"error": f"Failed to upload output: {e}"}
+
+        span.set_attribute("framefast.status", "ok")
+        span.set_attribute("framefast.output_size", len(output_bytes))
+        span.set_attribute("framefast.output_format", format_name.lower())
+        span.set_attribute("framefast.operations_count", len(operations_applied))
+        for idx, op in enumerate(operations_applied):
+            span.set_attribute(f"framefast.operation.{idx}", op)
+        record_metrics("ok", output_size=len(output_bytes))
+        return {
+            "width": img.width,
+            "height": img.height,
+            "format": format_name.lower(),
+            "output_size": len(output_bytes),
+            "operations_applied": operations_applied,
+            "exif": exif_data,
+        }
 
 
 @app.function(image=image, secrets=[modal.Secret.from_name("framefast-observability")])
@@ -475,11 +479,12 @@ def health() -> dict:
     cpu=2.0,
     memory=2048,
     timeout=60,
-    scaledown_window=120,
-    max_containers=20,
+    scaledown_window=60,
+    max_containers=5,
     secrets=[modal.Secret.from_name("framefast-observability")],
     volumes={"/vol": pipeline_scratch},
 )
+@modal.concurrent(max_inputs=10)
 def process_internal(
     input_url: str,
     output_url: str,
@@ -585,7 +590,8 @@ def process_internal(
 
     # 2. Normalize (thumbnail to max dimension)
     max_dimension = int(options.get("normalize_max_px", 2500))
-    if max_dimension > 0 and (img.width > max_dimension or img.height > max_dimension):
+    skip_normalize = max_dimension == 0
+    if not skip_normalize and (img.width > max_dimension or img.height > max_dimension):
         img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
         operations_applied.append("normalize")
 
@@ -597,61 +603,102 @@ def process_internal(
     norm_buf.seek(0)
     normalized_bytes = norm_buf.read()
 
-    # 4. Upload normalized original to output_url
-    try:
-        req = urllib.request.Request(output_url, data=normalized_bytes, method="PUT", headers=output_headers)
-        with urllib.request.urlopen(req) as resp:
-            if resp.status >= 400:
-                return {"error": f"Failed to upload normalized: {resp.status}"}
-    except Exception as e:
-        return {"error": f"Failed to upload normalized: {e}"}
+    # 4. Upload normalized original to output_url (skip in V3 — already done at CF edge)
+    if not skip_normalize:
+        try:
+            req = urllib.request.Request(output_url, data=normalized_bytes, method="PUT", headers=output_headers)
+            with urllib.request.urlopen(req) as resp:
+                if resp.status >= 400:
+                    return {"error": f"Failed to upload normalized: {resp.status}"}
+        except Exception as e:
+            return {"error": f"Failed to upload normalized: {e}"}
 
-    # 5. Write normalized to volume for recognition
-    if job_id:
+    # 5. Write normalized to volume for recognition (skip in V3 — recognition reads from R2)
+    if not skip_normalize and job_id:
         vol_dir = f"/vol/{job_id}"
         os.makedirs(vol_dir, exist_ok=True)
         with open(f"{vol_dir}/normalized.jpeg", "wb") as f:
             f.write(normalized_bytes)
         pipeline_scratch.commit()
 
-    # 6. Auto-edit → upload to processed_output_url (if enabled)
+    # 6. Auto-edit + LUT → upload to processed_output_url (if enabled)
     auto_edit_succeeded = None
-    if options.get("auto_edit") and processed_output_url:
+    processing_applied = False
+    # DEBUG: log auto-edit gate
+    print(f"[process_internal] AUTO_EDIT_GATE job={job_id} "
+          f"processed_output_url={'set' if processed_output_url else 'MISSING'} "
+          f"auto_edit={options.get('auto_edit')} lut_base64_len={len(options.get('lut_base64') or '')} "
+          f"skip_normalize={skip_normalize}")
+    if processed_output_url and (options.get("auto_edit") or options.get("lut_base64")):
+        from image_pipeline.lut import ApplyLutOptions, apply_lut, load_lut_from_bytes
+
         try:
-            original_for_blend = img_rgb.copy()
-            style_name = options.get("style")
-            style = StylePreset(style_name) if style_name else None
-            edited = auto_edit(
-                img_rgb,
-                style,
-                contrast=options.get("contrast"),
-                brightness=options.get("brightness"),
-                saturation=options.get("saturation"),
-                sharpness=options.get("sharpness"),
-                auto_contrast=options.get("auto_contrast"),
-            )
+            processed = img_rgb.copy()
 
-            intensity = float(options.get("auto_edit_intensity", 100.0))
-            intensity = max(0.0, min(100.0, intensity))
-            if intensity < 100.0:
-                alpha = intensity / 100.0
-                edited = Image.blend(original_for_blend, edited.convert("RGB"), alpha)
+            # Auto-edit
+            if options.get("auto_edit"):
+                print(f"[process_internal] APPLYING_AUTO_EDIT job={job_id} intensity={options.get('auto_edit_intensity', 100)}")
+                original_for_blend = processed.copy()
+                style_name = options.get("style")
+                style = StylePreset(style_name) if style_name else None
+                processed = auto_edit(
+                    processed,
+                    style,
+                    contrast=options.get("contrast"),
+                    brightness=options.get("brightness"),
+                    saturation=options.get("saturation"),
+                    sharpness=options.get("sharpness"),
+                    auto_contrast=options.get("auto_contrast"),
+                )
 
+                intensity = float(options.get("auto_edit_intensity", 100.0))
+                intensity = max(0.0, min(100.0, intensity))
+                if intensity < 100.0:
+                    alpha = intensity / 100.0
+                    processed = Image.blend(original_for_blend, processed.convert("RGB"), alpha)
+
+                auto_edit_succeeded = True
+                operations_applied.append("auto_edit")
+                print(f"[process_internal] AUTO_EDIT_DONE job={job_id}")
+
+            # LUT
+            lut_base64 = options.get("lut_base64")
+            if lut_base64:
+                lut_bytes = base64.b64decode(lut_base64)
+                lut = load_lut_from_bytes(lut_bytes)
+                lut_options = ApplyLutOptions(
+                    intensity=options.get("lut_intensity", 100.0),
+                    preserve_luminance=options.get("lut_preserve_luminance", False),
+                )
+                processed = apply_lut(processed, lut, lut_options)
+                operations_applied.append("lut")
+
+            # Upload processed
             proc_buf = io.BytesIO()
-            edited.convert("RGB").save(proc_buf, format="JPEG", quality=90)
+            processed.convert("RGB").save(proc_buf, format="JPEG", quality=90)
             proc_buf.seek(0)
             processed_bytes = proc_buf.read()
 
             headers = processed_output_headers or output_headers
             req = urllib.request.Request(processed_output_url, data=processed_bytes, method="PUT", headers=headers)
+            print(f"[process_internal] UPLOADING_PROCESSED job={job_id} size={len(processed_bytes)} url_prefix={processed_output_url[:80]}...")
             with urllib.request.urlopen(req) as resp:
+                print(f"[process_internal] UPLOAD_RESPONSE job={job_id} status={resp.status}")
                 if resp.status < 400:
-                    auto_edit_succeeded = True
-                    operations_applied.append("auto_edit")
+                    processing_applied = True
                 else:
                     auto_edit_succeeded = False
-        except Exception:
+                    operations_applied = [op for op in operations_applied if op not in ("auto_edit", "lut")]
+                    print(f"[process_internal] UPLOAD_FAILED job={job_id} status={resp.status}")
+        except Exception as exc:
+            import traceback
+            print(f"[process_internal] AUTO_EDIT_EXCEPTION job={job_id}: {exc}\n{traceback.format_exc()}")
             auto_edit_succeeded = False
+            operations_applied = [op for op in operations_applied if op not in ("auto_edit", "lut")]
+
+    # DEBUG: log final result
+    print(f"[process_internal] RESULT job={job_id} ops={operations_applied} "
+          f"auto_edit_succeeded={auto_edit_succeeded} processing_applied={processing_applied}")
 
     return {
         "width": img_rgb.width,

@@ -260,6 +260,13 @@
       "when": 1772885200083,
       "tag": "0036_wild_brood",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1772876162512,
+      "tag": "0037_charming_zombie",
+      "breakpoints": true
     }
   ]
 }

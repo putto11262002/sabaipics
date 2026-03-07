@@ -10,7 +10,7 @@ const BUFFER_SIZE = 10;
  */
 export function useSlideshowPhotos(eventId: string | undefined): SlideshowPhoto[] {
   // Fetch photos with polling
-  const { data } = usePhotos({ eventId, status: ['indexed'] });
+  const { data } = usePhotos({ eventId, status: ['indexing', 'indexed'] });
 
   // Flatten pages and get all photos - memoize to prevent unnecessary re-renders
   const photos = useMemo(() => {

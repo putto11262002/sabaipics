@@ -59,6 +59,7 @@
   // Images API binding for transformation
   "images": {
     "binding": "IMAGES",
+    "remote": true,
   },
 
   // Queue bindings (local emulation for dev)

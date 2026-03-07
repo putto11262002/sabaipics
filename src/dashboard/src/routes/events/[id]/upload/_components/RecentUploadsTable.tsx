@@ -65,7 +65,7 @@ function StatusBadge({ intent }: { intent: UploadIntent }) {
     );
   }
 
-  if (intent.photo?.status === 'indexed') {
+  if (intent.photo?.status === 'indexed' || intent.photo?.status === 'indexing') {
     return (
       <Badge variant="success">
         <CheckCircle />
@@ -343,6 +343,8 @@ function IntentRow({
             <Users className="size-3.5" />
             <span className="text-xs">{intent.photo.faceCount}</span>
           </div>
+        ) : intent.photo?.status === 'indexing' ? (
+          <Loader2 className="size-3.5 animate-spin text-muted-foreground ml-auto" />
         ) : intent.photo?.status === 'failed' ||
           intent.status === 'failed' ||
           intent.status === 'expired' ? (

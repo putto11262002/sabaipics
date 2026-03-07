@@ -74,8 +74,8 @@ function UploadLogRow({ entry }: UploadLogRowProps) {
         };
       case 'indexing':
         return {
-          icon: <Loader2 className="size-4 animate-spin text-warning" />,
-          text: 'Indexing faces...',
+          icon: <CheckCircle className="size-4 text-success" />,
+          text: 'Uploaded — indexing faces...',
         };
       case 'indexed':
         return {
@@ -128,7 +128,7 @@ function UploadLogRow({ entry }: UploadLogRowProps) {
 
       {/* File Size */}
       <TableCell className="text-right">
-        {entry.status === 'uploading' || entry.status === 'indexing' ? (
+        {entry.status === 'uploading' ? (
           <Skeleton className="h-6 w-16 ml-auto" />
         ) : entry.fileSize ? (
           <div className="flex items-center justify-end gap-1.5 text-muted-foreground">
@@ -143,7 +143,11 @@ function UploadLogRow({ entry }: UploadLogRowProps) {
       {/* Face Count */}
       <TableCell className="text-right">
         {entry.status === 'uploading' || entry.status === 'indexing' ? (
-          <Skeleton className="h-6 w-16 ml-auto" />
+          entry.status === 'indexing' ? (
+            <Loader2 className="size-4 animate-spin text-muted-foreground ml-auto" />
+          ) : (
+            <Skeleton className="h-6 w-16 ml-auto" />
+          )
         ) : entry.faceCount !== undefined ? (
           <div className="flex items-center justify-end gap-1.5 text-muted-foreground">
             <Users className="size-4" />

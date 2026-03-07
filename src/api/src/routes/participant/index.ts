@@ -748,7 +748,7 @@ export const participantRouter = new Hono<Env>()
               and(
                 eq(photos.id, photoId),
                 eq(photos.eventId, eventId),
-                eq(photos.status, 'indexed'),
+                inArray(photos.status, ['indexing', 'indexed']),
                 isNull(photos.deletedAt),
               ),
             )
@@ -827,7 +827,7 @@ export const participantRouter = new Hono<Env>()
               and(
                 eq(photos.eventId, eventId),
                 inArray(photos.id, photoIds),
-                eq(photos.status, 'indexed'),
+                inArray(photos.status, ['indexing', 'indexed']),
                 isNull(photos.deletedAt),
               ),
             ),
@@ -1025,7 +1025,7 @@ export const participantRouter = new Hono<Env>()
               SELECT COUNT(*)::int
               FROM ${photos}
               WHERE ${photos.eventId} = ${activeEvents.id}
-                AND ${photos.status} = 'indexed'
+                AND ${photos.status} IN ('indexing', 'indexed')
                 AND ${photos.deletedAt} IS NULL
             )`,
             searchCount: sql<number>`(
@@ -1113,7 +1113,7 @@ export const participantRouter = new Hono<Env>()
           return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Event not found' });
         }
 
-        // Fetch photos (only indexed, not deleted)
+        // Fetch photos (indexing + indexed = visible to guests, not deleted)
         // Fetch limit + 1 to determine if there are more results
         const cursorLimit = limit + 1;
 
@@ -1130,7 +1130,7 @@ export const participantRouter = new Hono<Env>()
             .where(
               and(
                 eq(photos.eventId, eventId),
-                eq(photos.status, 'indexed'),
+                inArray(photos.status, ['indexing', 'indexed']),
                 isNull(photos.deletedAt),
                 cursor ? lt(photos.uploadedAt, cursor) : undefined,
               ),
