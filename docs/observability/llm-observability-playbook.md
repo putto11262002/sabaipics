@@ -160,10 +160,12 @@ PromQL:
 sum by (step) (rate(framefast_pipeline_consumer_step_duration_ms_milliseconds_count{status="error"}[5m]))
 ```
 
-### Pipeline V2 step latency (avg per step)
+### Pipeline V2 step latency (avg per step, recent window)
+Use `rate()` to get recent averages — raw counters are cumulative and misleading.
 PromQL:
 ```promql
-framefast_pipeline_consumer_step_duration_ms_milliseconds_sum / clamp_min(framefast_pipeline_consumer_step_duration_ms_milliseconds_count, 1)
+rate(framefast_pipeline_consumer_step_duration_ms_milliseconds_sum{deployment_environment="staging"}[15m])
+  / clamp_min(rate(framefast_pipeline_consumer_step_duration_ms_milliseconds_count{deployment_environment="staging"}[15m]), 0.0001)
 ```
 
 ### Pipeline V2 E2E latency (p95)
@@ -194,11 +196,11 @@ count({__name__=~"framefast_.*"})
 ## Trace Query Shortcuts (Tempo / TraceQL)
 - Upload pipeline (consumer):
 ```traceql
-{ span.name = "pipeline_consumer.batch" } || { span.name =~ "pipeline_consumer\\..*" }
+{ resource.service.name = "framefast-api" && resource.deployment.environment = "staging" && name =~ "pipeline_consumer.*" }
 ```
 - Upload pipeline (callback):
 ```traceql
-{ span.name = "pipeline_callback.batch" } || { span.name =~ "pipeline_callback\\..*" }
+{ resource.service.name = "framefast-api" && resource.deployment.environment = "staging" && name =~ "pipeline_callback.*" }
 ```
 - Orchestrator:
 ```traceql
@@ -212,6 +214,36 @@ count({__name__=~"framefast_.*"})
 ```traceql
 { resource.service.name = "framefast-api" && span.name = "http.request" }
 ```
+
+### Fetching trace span details via API
+
+**1. Search for trace IDs** (via Grafana datasource query):
+```bash
+curl -sS -H "Authorization: Bearer $GRAFANA_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -X POST "$GRAFANA_URL/api/ds/query" \
+  -d '{
+    "queries": [{
+      "refId": "A",
+      "datasource": {"uid":"grafanacloud-traces"},
+      "queryType": "traceql",
+      "query": "{ resource.service.name = \"framefast-api\" && resource.deployment.environment = \"staging\" && name =~ \"pipeline_consumer.*\" }",
+      "limit": 20,
+      "tableType": "traces"
+    }],
+    "from": "now-30m",
+    "to": "now"
+  }'
+```
+Response contains `traceID` and `startTime` in `frames[].data.values`.
+
+**2. Fetch full trace spans** (via Tempo datasource proxy):
+```bash
+curl -sS -H "Authorization: Bearer $GRAFANA_API_TOKEN" \
+  "$GRAFANA_URL/api/datasources/proxy/uid/grafanacloud-traces/api/traces/$TRACE_ID"
+```
+Response is OTLP format: `batches[].scopeSpans[].spans[]` with `name`, `startTimeUnixNano`, `endTimeUnixNano`.
+Compute span duration: `(endTimeUnixNano - startTimeUnixNano) / 1e6` → milliseconds.
 
 ## Guardrails for Agents
 - Never print secret values in output/logs.
