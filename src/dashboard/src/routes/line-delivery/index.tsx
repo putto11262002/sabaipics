@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { MessageCircle, Send, ImageIcon, Wallet, Save, Loader2 } from 'lucide-react';
+import { AlertCircle, MessageCircle, Send, ImageIcon, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Card,
@@ -8,12 +8,11 @@ import {
   CardTitle,
   CardFooter,
   CardDescription,
-  CardContent,
 } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Switch } from '@/shared/components/ui/switch';
-import { Field, FieldContent, FieldGroup, FieldLabel, FieldDescription } from '@/shared/components/ui/field';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
 import { Badge } from '@/shared/components/ui/badge';
 import {
   Table,
@@ -72,24 +71,16 @@ export default function LineDeliveryPage() {
   const history = historyData?.data;
   const settings = settingsData?.data;
 
-  // Local state for settings form
-  const [photoCap, setPhotoCap] = useState<string | undefined>(undefined);
-  const [overageEnabled, setOverageEnabled] = useState<boolean | undefined>(undefined);
+  const currentPhotoCap = settings?.photoCap === null ? 'all' : String(settings?.photoCap ?? 'all');
+  const currentOverageEnabled = settings?.overageEnabled ?? false;
 
-  // Sync local state from server data
-  const currentPhotoCap = photoCap ?? (settings?.photoCap === null ? 'all' : String(settings?.photoCap ?? 'all'));
-  const currentOverageEnabled = overageEnabled ?? (settings?.overageEnabled ?? false);
-
-  const handleSaveSettings = () => {
-    const capValue = currentPhotoCap === 'all' ? null : (parseInt(currentPhotoCap) as 5 | 10 | 15 | 20);
+  const handleUpdateSetting = (patch: Partial<{ photoCap: string; overageEnabled: boolean }>) => {
+    const capStr = patch.photoCap ?? currentPhotoCap;
+    const overage = patch.overageEnabled ?? currentOverageEnabled;
+    const capValue = capStr === 'all' ? null : (parseInt(capStr) as 5 | 10 | 15 | 20);
     updateSettings.mutate(
-      { photoCap: capValue, overageEnabled: currentOverageEnabled },
+      { photoCap: capValue, overageEnabled: overage },
       {
-        onSuccess: () => {
-          toast.success('Settings saved');
-          setPhotoCap(undefined);
-          setOverageEnabled(undefined);
-        },
         onError: (err) => {
           toast.error('Failed to save settings', { description: err.message });
         },
@@ -162,78 +153,78 @@ export default function LineDeliveryPage() {
         </Card>
       </div>
 
-      {/* Settings Card */}
+      {/* Low Allowance Warning */}
+      {stats && stats.allowance.used >= stats.allowance.limit * 0.8 && (
+        <div className="px-4">
+          <Alert variant={stats.allowance.remaining === 0 ? 'destructive' : 'warning'}>
+            <AlertCircle className="size-4" />
+            <AlertTitle>
+              {stats.allowance.remaining === 0
+                ? 'Monthly message allowance exhausted'
+                : `${stats.allowance.remaining} free messages remaining`}
+            </AlertTitle>
+            <AlertDescription>
+              {stats.allowance.remaining === 0
+                ? currentOverageEnabled
+                  ? 'All further deliveries will be charged 1 credit per message.'
+                  : 'Overage is disabled — deliveries are blocked until next month. Enable overage below to continue sending.'
+                : currentOverageEnabled
+                  ? `You've used ${stats.allowance.used} of ${stats.allowance.limit} free messages. After that, each message costs 1 credit.`
+                  : `You've used ${stats.allowance.used} of ${stats.allowance.limit} free messages. Enable overage below to keep sending after the limit.`}
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* Settings */}
       <div className="px-4 pb-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Delivery Settings</CardTitle>
-            <CardDescription>Configure how many photos are sent per LINE delivery</CardDescription>
           </CardHeader>
-          <CardContent>
-            <FieldGroup>
-              <Field orientation="responsive">
-                <div>
-                  <FieldLabel>Photo cap per delivery</FieldLabel>
-                  <FieldDescription>
-                    Maximum photos sent in a single delivery
-                  </FieldDescription>
-                </div>
-                <FieldContent>
-                  {settingsLoading ? (
-                    <Skeleton className="h-10 w-full" />
-                  ) : (
-                    <Select
-                      value={currentPhotoCap}
-                      onValueChange={(v) => setPhotoCap(v)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PHOTO_CAP_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </FieldContent>
-              </Field>
-              <Field orientation="responsive">
-                <div>
-                  <FieldLabel>Allow overage</FieldLabel>
-                  <FieldDescription>
-                    Use credits when free monthly messages are exhausted
-                  </FieldDescription>
-                </div>
-                <FieldContent>
-                  {settingsLoading ? (
-                    <Skeleton className="h-6 w-11" />
-                  ) : (
-                    <Switch
-                      variant="primary"
-                      checked={currentOverageEnabled}
-                      onCheckedChange={(v) => setOverageEnabled(v)}
-                    />
-                  )}
-                </FieldContent>
-              </Field>
-            </FieldGroup>
-          </CardContent>
-          <CardFooter>
-            <Button
-              size="sm"
-              onClick={handleSaveSettings}
-              disabled={updateSettings.isPending}
-            >
-              {updateSettings.isPending ? (
-                <Loader2 className="mr-1 size-4 animate-spin" />
+          <CardFooter className="flex flex-col items-stretch gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Allow overage</p>
+                <p className="text-xs text-muted-foreground">Use credits when free messages are exhausted</p>
+              </div>
+              {settingsLoading ? (
+                <Skeleton className="h-6 w-11" />
               ) : (
-                <Save className="mr-1 size-4" />
+                <Switch
+                  variant="primary"
+                  checked={currentOverageEnabled}
+                  onCheckedChange={(v) => handleUpdateSetting({ overageEnabled: v })}
+                  disabled={updateSettings.isPending}
+                />
               )}
-              Save Settings
-            </Button>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Photo cap</p>
+                <p className="text-xs text-muted-foreground">Max photos per delivery</p>
+              </div>
+              {settingsLoading ? (
+                <Skeleton className="h-9 w-32" />
+              ) : (
+                <Select
+                  value={currentPhotoCap}
+                  onValueChange={(v) => handleUpdateSetting({ photoCap: v })}
+                  disabled={updateSettings.isPending}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PHOTO_CAP_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </CardFooter>
         </Card>
       </div>
