@@ -100,11 +100,17 @@ export function ImagePipelineCard({ eventId }: { eventId: string }) {
       )}
 
       <section className="space-y-4">
-        <div className="space-y-1">
-          <h3 className="text-sm font-medium">Auto-Edit</h3>
-          <p className="text-sm text-muted-foreground">
-            Automatically enhance colors and exposure on new uploads.
-          </p>
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <h3 className="text-sm font-medium">Auto-Edit</h3>
+            <p className="text-sm text-muted-foreground">
+              Automatically enhance colors and exposure on new uploads.
+            </p>
+          </div>
+          <Button onClick={save} disabled={update.isPending}>
+            {update.isPending && <Spinner className="mr-1 size-3" />}
+            Save
+          </Button>
         </div>
 
         <FieldGroup>
@@ -276,12 +282,6 @@ export function ImagePipelineCard({ eventId }: { eventId: string }) {
         </FieldGroup>
       </section>
 
-      <div className="flex gap-2">
-        <Button size="sm" onClick={save} disabled={update.isPending}>
-          {update.isPending && <Spinner className="mr-1 size-3" />}
-          Save
-        </Button>
-      </div>
     </div>
   );
 }

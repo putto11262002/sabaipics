@@ -78,22 +78,32 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
         <div className="space-y-1">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-medium">Color grade</h2>
-            <Button
-              variant="link"
-              size="sm"
-              onClick={() => {
-                if (!lutId) return;
-                const query = new URLSearchParams({
-                  intensity: String(lutIntensity),
-                  includeLuminance: includeLuminance ? 'true' : 'false',
-                });
-                navigate(`/studio/luts/${lutId}/preview?${query.toString()}`);
-              }}
-              disabled={lutControlsDisabled || !lutEnabled || !lutId}
-            >
-              <Eye className="mr-1 size-3" />
-              Preview
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="link"
+                size="sm"
+                onClick={() => {
+                  if (!lutId) return;
+                  const query = new URLSearchParams({
+                    intensity: String(lutIntensity),
+                    includeLuminance: includeLuminance ? 'true' : 'false',
+                  });
+                  navigate(`/studio/luts/${lutId}/preview?${query.toString()}`);
+                }}
+                disabled={lutControlsDisabled || !lutEnabled || !lutId}
+              >
+                <Eye className="mr-1 size-3" />
+                Preview
+              </Button>
+              <Button
+                onClick={save}
+                disabled={update.isPending || Boolean(disabledReason)}
+                title={disabledReason ?? undefined}
+              >
+                {update.isPending && <Spinner className="mr-1 size-3" />}
+                Save
+              </Button>
+            </div>
           </div>
           <p className="text-sm text-muted-foreground">
             Apply a Studio LUT automatically to new uploads for this event.
@@ -178,17 +188,6 @@ export function ColorGradeCard({ eventId }: { eventId: string }) {
           </Field>
         </FieldGroup>
 
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            onClick={save}
-            disabled={update.isPending || Boolean(disabledReason)}
-            title={disabledReason ?? undefined}
-          >
-            {update.isPending && <Spinner className="mr-1 size-3" />}
-            Save
-          </Button>
-        </div>
       </section>
     </div>
   );

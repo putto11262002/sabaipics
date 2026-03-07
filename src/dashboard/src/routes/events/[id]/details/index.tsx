@@ -7,6 +7,7 @@ import {
   FieldContent,
   FieldGroup,
   FieldLabel,
+  FieldDescription,
   FieldError,
 } from '@/shared/components/ui/field';
 import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
@@ -197,7 +198,16 @@ export default function EventDetailsTab() {
     <div className="mx-auto max-w-4xl space-y-6 py-6">
       {/* Event details */}
       <section className="space-y-4">
-        <h2 className="text-base font-medium">Event details</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-medium">Details</h2>
+          <Button
+            onClick={form.handleSubmit(handleSave)}
+            disabled={updateEvent.isPending}
+          >
+            {updateEvent.isPending && <Spinner className="mr-1 size-3" />}
+            Save
+          </Button>
+        </div>
         <FieldGroup>
           <Controller
             name="name"
@@ -235,32 +245,14 @@ export default function EventDetailsTab() {
               </Field>
             )}
           />
-          <Field orientation="responsive">
-            <FieldLabel>Created</FieldLabel>
-            <p className="text-sm">{new Date(event.createdAt).toLocaleString()}</p>
-          </Field>
-          <Field orientation="responsive">
-            <FieldLabel>Expires</FieldLabel>
-            <p className="text-sm">{new Date(event.expiresAt).toLocaleString()}</p>
-          </Field>
         </FieldGroup>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            onClick={form.handleSubmit(handleSave)}
-            disabled={updateEvent.isPending}
-          >
-            {updateEvent.isPending && <Spinner className="mr-1 size-3" />}
-            Save
-          </Button>
-        </div>
       </section>
 
       <Separator />
 
       {/* Event links & QR code */}
       <section className="space-y-4">
-        <h2 className="text-base font-medium">Event links</h2>
+        <h2 className="text-base font-medium">Sharing</h2>
         <FieldGroup>
           <Field orientation="responsive">
             <FieldLabel>QR code</FieldLabel>
@@ -327,7 +319,7 @@ export default function EventDetailsTab() {
               </div>
             </FieldContent>
           </Field>
-          <Field>
+          <Field orientation="responsive">
             <FieldLabel>Slideshow link</FieldLabel>
             <InputGroup>
               <InputGroupInput
@@ -362,7 +354,7 @@ export default function EventDetailsTab() {
               </InputGroupAddon>
             </InputGroup>
           </Field>
-          <Field>
+          <Field orientation="responsive">
             <FieldLabel>Face search link</FieldLabel>
             <InputGroup>
               <InputGroupInput readOnly value={searchUrl} />
@@ -395,10 +387,13 @@ export default function EventDetailsTab() {
 
       {/* Event logo */}
       <section className="space-y-4">
-        <h2 className="text-base font-medium">Event logo</h2>
+        <h2 className="text-base font-medium">Logo</h2>
         <FieldGroup>
           <Field orientation="responsive">
-            <FieldLabel>Logo</FieldLabel>
+            <FieldContent>
+              <FieldLabel>Logo</FieldLabel>
+              <FieldDescription>JPEG, PNG, WebP · Max 5MB</FieldDescription>
+            </FieldContent>
             <FieldContent>
               {logoPreviewUrl ? (
                 <div className="relative flex aspect-square w-48 items-center justify-center rounded-lg border bg-muted">
@@ -425,9 +420,6 @@ export default function EventDetailsTab() {
                   ) : (
                     <ImageIcon className="mb-2 size-8 text-muted-foreground" />
                   )}
-                  <p className="text-sm font-medium">Upload logo</p>
-                  <p className="text-xs text-muted-foreground">JPEG, PNG, WebP · Max 5MB</p>
-                  <p className="text-xs text-muted-foreground">Recommended 512×512px</p>
                 </button>
               )}
 
