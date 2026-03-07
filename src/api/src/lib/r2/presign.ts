@@ -17,6 +17,8 @@ export interface PresignOptions {
   contentLength?: number;
   customMetadata?: Record<string, string>;
   expiresIn: number; // seconds
+  /** Allow overwriting existing objects. Default: false (signs If-None-Match: *). */
+  allowOverwrite?: boolean;
 }
 
 export interface PresignGetOptions {
@@ -39,8 +41,8 @@ export interface PresignResult {
  *
  * Signed headers:
  * - Content-Type: must match exactly
- * - Content-Length: must match exactly
- * - If-None-Match: * (prevent overwrite)
+ * - Content-Length: must match exactly (if provided)
+ * - If-None-Match: * (prevent overwrite, unless allowOverwrite is true)
  */
 export async function generatePresignedPutUrl(
   accountId: string,
@@ -64,8 +66,10 @@ export async function generatePresignedPutUrl(
   // Sign the request with required headers
   const headers: Record<string, string> = {
     'Content-Type': options.contentType,
-    'If-None-Match': '*',
   };
+  if (!options.allowOverwrite) {
+    headers['If-None-Match'] = '*';
+  }
 
   if (options.contentLength !== undefined) {
     headers['Content-Length'] = options.contentLength.toString();

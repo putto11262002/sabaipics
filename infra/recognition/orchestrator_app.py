@@ -1,4 +1,10 @@
-"""FrameFast Upload Orchestrator V2 (batch processing)."""
+"""FrameFast Upload Orchestrator V3 (single-job processing).
+
+V3: CF normalizes at the edge. Orchestrator handles auto-edit (optional) + recognition per image.
+Callback is per-image, not batch.
+
+V2 batch endpoint is kept for backwards compatibility during rollout.
+"""
 
 from __future__ import annotations
 
@@ -29,6 +35,7 @@ image = modal.Image.debian_slim(python_version="3.11").pip_install(
 
 _OBSERVABILITY_READY = False
 _tracer = None
+_tracer_provider = None
 _meter = None
 
 # Metrics (set after init)
@@ -39,16 +46,20 @@ _errors_total = None
 
 
 def _init_observability() -> None:
-    global _OBSERVABILITY_READY, _tracer, _meter
+    global _OBSERVABILITY_READY, _tracer, _tracer_provider, _meter
     global _jobs_total, _step_duration, _batch_duration, _errors_total
 
     if _OBSERVABILITY_READY:
         return
 
-    otlp_endpoint = os.getenv("OTLP_ENDPOINT")
-    otlp_user = os.getenv("OTLP_USER")
-    otlp_token = os.getenv("OTLP_TOKEN")
+    otlp_endpoint = os.getenv("GRAFANA_OTLP_TRACES_URL", "") or os.getenv("OTLP_ENDPOINT", "")
+    otlp_user = os.getenv("OTLP_TRACES_USER", "") or os.getenv("OTLP_USER", "")
+    otlp_token = os.getenv("OTLP_TRACES_TOKEN", "") or os.getenv("OTLP_TOKEN", "")
+    otlp_endpoint = otlp_endpoint.strip()
+    otlp_user = otlp_user.strip()
+    otlp_token = otlp_token.strip()
     if not otlp_endpoint or not otlp_user or not otlp_token:
+        print(f"[orchestrator] OTel skipped: endpoint={'set' if otlp_endpoint else 'missing'}, user={'set' if otlp_user else 'missing'}, token={'set' if otlp_token else 'missing'}")
         _OBSERVABILITY_READY = True
         return
 
@@ -68,7 +79,7 @@ def _init_observability() -> None:
 
         resource = Resource.create({
             "service.name": "framefast-orchestrator",
-            "service.version": "2.0.0",
+            "service.version": "3.0.0",
             "deployment.environment": env_name,
         })
 
@@ -85,24 +96,26 @@ def _init_observability() -> None:
             headers={"Authorization": f"Basic {auth_b64}"},
         )
         sampler = ParentBased(root=TraceIdRatioBased(sample_ratio))
-        tracer_provider = TracerProvider(resource=resource, sampler=sampler)
-        tracer_provider.add_span_processor(BatchSpanProcessor(trace_exporter))
-        trace.set_tracer_provider(tracer_provider)
-        _tracer = trace.get_tracer("framefast-orchestrator", "2.0.0")
+        _tracer_provider = TracerProvider(resource=resource, sampler=sampler)
+        _tracer_provider.add_span_processor(BatchSpanProcessor(trace_exporter))
+        trace.set_tracer_provider(_tracer_provider)
+        _tracer = trace.get_tracer("framefast-orchestrator", "3.0.0")
 
         # Metrics
-        metrics_endpoint = otlp_endpoint.rstrip("/")
-        if not metrics_endpoint.endswith("/v1/metrics"):
-            metrics_endpoint = metrics_endpoint + "/v1/metrics"
+        metrics_base = (os.getenv("GRAFANA_OTLP_METRICS_URL", "") or otlp_endpoint).strip().rstrip("/")
+        metrics_user = (os.getenv("OTLP_METRICS_USER", "") or otlp_user).strip()
+        metrics_token_val = (os.getenv("OTLP_METRICS_TOKEN", "") or otlp_token).strip()
+        metrics_endpoint = metrics_base if metrics_base.endswith("/v1/metrics") else metrics_base + "/v1/metrics"
+        metrics_auth = base64.b64encode(f"{metrics_user}:{metrics_token_val}".encode()).decode()
 
         metric_exporter = OTLPMetricExporter(
             endpoint=metrics_endpoint,
-            headers={"Authorization": f"Basic {auth_b64}"},
+            headers={"Authorization": f"Basic {metrics_auth}"},
         )
         reader = PeriodicExportingMetricReader(metric_exporter, export_interval_millis=15000)
         meter_provider = MeterProvider(resource=resource, metric_readers=[reader])
         metrics.set_meter_provider(meter_provider)
-        _meter = metrics.get_meter("framefast-orchestrator", "2.0.0")
+        _meter = metrics.get_meter("framefast-orchestrator", "3.0.0")
 
         _jobs_total = _meter.create_counter(
             "framefast_orchestrator_jobs_total",
@@ -160,7 +173,7 @@ def _parse_traceparent(traceparent: Optional[str]):
 
 
 # ============================================================================
-# V2 Models (batch processing)
+# Models
 # ============================================================================
 
 
@@ -172,18 +185,26 @@ class CallbackTarget(BaseModel):
 class PipelineJobOptions(BaseModel):
     autoEdit: Optional[bool] = None
     autoEditIntensity: Optional[int] = None
+    autoEditPresetId: Optional[str] = None
+    contrast: Optional[float] = None
+    brightness: Optional[float] = None
+    saturation: Optional[float] = None
+    sharpness: Optional[float] = None
+    autoContrast: Optional[bool] = None
     lutId: Optional[str] = None
+    lutBase64: Optional[str] = None
     lutIntensity: Optional[int] = None
     maxFaces: Optional[int] = None
 
 
 class PipelineJob(BaseModel):
     jobId: str
+    photoId: Optional[str] = None
     eventId: str
     photographerId: str
     source: Literal["web", "ios", "ftp"]
     inputUrl: str
-    originalPutUrl: str
+    originalPutUrl: Optional[str] = None
     processedPutUrl: Optional[str] = None
     sourceR2Key: str
     originalR2Key: str
@@ -192,6 +213,15 @@ class PipelineJob(BaseModel):
     options: Optional[PipelineJobOptions] = None
 
 
+# V3: Single job request
+class PipelineSingleJobRequest(BaseModel):
+    job: PipelineJob
+    callback: CallbackTarget
+    traceparent: Optional[str] = None
+    baggage: Optional[str] = None
+
+
+# V2: Batch request (kept for backwards compatibility)
 class PipelineBatchRequest(BaseModel):
     jobs: List[PipelineJob]
     callback: CallbackTarget
@@ -216,6 +246,9 @@ class PipelineJobArtifacts(BaseModel):
     originalR2Key: str
     processedR2Key: Optional[str] = None
     autoEditSucceeded: Optional[bool] = None
+    lutApplied: Optional[bool] = None
+    lutId: Optional[str] = None
+    lutIntensity: Optional[int] = None
     embeddingCount: int
     faces: List[DetectedFace]
     exif: Optional[Dict[str, Any]] = None
@@ -246,31 +279,36 @@ class PipelineBatchCallback(BaseModel):
 # ============================================================================
 
 
-async def call_image_pipeline(job: PipelineJob) -> Dict[str, Any]:
-    """Call image pipeline via Modal native Function.from_name()."""
+async def call_image_pipeline_auto_edit(job: PipelineJob) -> Dict[str, Any]:
+    """Call image pipeline for auto-edit/LUT only (V3: normalization done at CF edge)."""
     process_fn = modal.Function.from_name("framefast-image-pipeline", "process_internal")
 
     output_headers = {
         "Content-Type": "image/jpeg",
-        "If-None-Match": "*",
     }
 
+    opts = job.options
     options = {
-        "normalize_max_px": 2500,
-        "auto_edit": bool(job.options.autoEdit) if job.options else False,
-        "auto_edit_intensity": job.options.autoEditIntensity if job.options else 100,
-        "lut_id": job.options.lutId if job.options else None,
-        "lut_intensity": job.options.lutIntensity if job.options else 100,
+        "normalize_max_px": 0,  # Skip normalization — already done at CF edge
+        "auto_edit": bool(opts.autoEdit) if opts else False,
+        "auto_edit_intensity": opts.autoEditIntensity if opts else 100,
+        "contrast": opts.contrast if opts else None,
+        "brightness": opts.brightness if opts else None,
+        "saturation": opts.saturation if opts else None,
+        "sharpness": opts.sharpness if opts else None,
+        "auto_contrast": opts.autoContrast if opts else None,
+        "lut_base64": opts.lutBase64 if opts else None,
+        "lut_intensity": opts.lutIntensity if opts else 100,
         "lut_preserve_luminance": False,
     }
 
     result = await process_fn.remote.aio(
         input_url=job.inputUrl,
-        output_url=job.originalPutUrl,
+        output_url=job.processedPutUrl,
         output_headers=output_headers,
         options=options,
         processed_output_url=job.processedPutUrl,
-        processed_output_headers=output_headers if job.processedPutUrl else None,
+        processed_output_headers=output_headers,
         job_id=job.jobId,
     )
 
@@ -280,14 +318,15 @@ async def call_image_pipeline(job: PipelineJob) -> Dict[str, Any]:
 async def call_recognition(job: PipelineJob) -> Dict[str, Any]:
     """Call recognition via Modal native Function.from_name().
 
-    Reads normalized image from shared volume (written by image pipeline).
+    V3: Downloads normalized image from R2 via presigned URL (no shared volume).
     """
     extract_fn = modal.Function.from_name("framefast-recognition", "extract_internal")
 
     max_faces = job.options.maxFaces if job.options and job.options.maxFaces else 100
 
+    # V3: Pass presigned URL for recognition to download from R2 directly
     result = await extract_fn.remote.aio(
-        volume_path=f"/vol/{job.jobId}/normalized.jpeg",
+        image_url=job.inputUrl,
         max_faces=max_faces,
         min_confidence=0.5,
     )
@@ -296,34 +335,68 @@ async def call_recognition(job: PipelineJob) -> Dict[str, Any]:
 
 
 async def process_single_job(job: PipelineJob) -> PipelineJobResult:
-    """Process a single job: image pipeline -> recognition -> result."""
+    """Process a single job: auto-edit (optional) + recognition."""
     _init_observability()
 
     try:
-        # Image pipeline
+        # Auto-edit / LUT (optional) — only if enabled and processedPutUrl provided
+        auto_edit_succeeded = None
+        lut_applied = None
+        operations_applied = []
+        has_auto_edit = (
+            job.options
+            and (job.options.autoEdit or job.options.lutId)
+            and job.processedPutUrl
+        )
+
+        # DEBUG: log auto-edit decision
+        print(f"[orchestrator] AUTO_EDIT_DECISION job={job.jobId} has_auto_edit={has_auto_edit} "
+              f"options.autoEdit={job.options.autoEdit if job.options else None} "
+              f"options.lutId={job.options.lutId if job.options else None} "
+              f"processedPutUrl={'set' if job.processedPutUrl else 'MISSING'}")
+
+        if has_auto_edit:
+            start = time.monotonic()
+            try:
+                if _tracer:
+                    with _tracer.start_as_current_span("orchestrator.auto_edit", attributes={"job.id": job.jobId}):
+                        image_result = await call_image_pipeline_auto_edit(job)
+                else:
+                    image_result = await call_image_pipeline_auto_edit(job)
+                ip_duration = (time.monotonic() - start) * 1000
+                if _step_duration:
+                    _step_duration.record(ip_duration, {"step": "auto_edit", "status": "ok"})
+
+                # DEBUG: log full image pipeline result
+                print(f"[orchestrator] IMAGE_PIPELINE_RESULT job={job.jobId} result={image_result}")
+
+                if isinstance(image_result, dict) and image_result.get("error"):
+                    auto_edit_succeeded = False
+                    lut_applied = False
+                    print(f"[orchestrator] AUTO_EDIT_ERROR job={job.jobId} error={image_result.get('error')}")
+                    if _errors_total:
+                        _errors_total.add(1, {"step": "auto_edit", "code": "AUTO_EDIT_FAILED"})
+                else:
+                    operations_applied = image_result.get("operations_applied", []) if isinstance(image_result, dict) else []
+                    auto_edit_succeeded = "auto_edit" in operations_applied
+                    lut_applied = "lut" in operations_applied
+                    print(f"[orchestrator] AUTO_EDIT_OK job={job.jobId} ops={operations_applied} "
+                          f"auto_edit_succeeded={auto_edit_succeeded} lut_applied={lut_applied}")
+            except Exception as exc:
+                auto_edit_succeeded = False
+                lut_applied = False
+                if _errors_total:
+                    _errors_total.add(1, {"step": "auto_edit", "code": "AUTO_EDIT_EXCEPTION"})
+                import traceback
+                print(f"[orchestrator] AUTO_EDIT_EXCEPTION job={job.jobId}: {exc}\n{traceback.format_exc()}")
+
+        # Recognition — always runs
         start = time.monotonic()
-        image_result = await call_image_pipeline(job)
-        ip_duration = (time.monotonic() - start) * 1000
-        if _step_duration:
-            _step_duration.record(ip_duration, {"step": "image_pipeline", "status": "ok"})
-
-        if isinstance(image_result, dict) and image_result.get("error"):
-            if _errors_total:
-                _errors_total.add(1, {"step": "image_pipeline", "code": "IMAGE_PIPELINE_FAILED"})
-            return PipelineJobResult(
-                jobId=job.jobId,
-                status="failed",
-                error=PipelineJobError(
-                    code="IMAGE_PIPELINE_FAILED",
-                    message=str(image_result["error"]),
-                ),
-            )
-
-        auto_edit_succeeded = image_result.get("auto_edit_succeeded")
-
-        # Recognition
-        start = time.monotonic()
-        recognition_result = await call_recognition(job)
+        if _tracer:
+            with _tracer.start_as_current_span("orchestrator.recognition", attributes={"job.id": job.jobId}):
+                recognition_result = await call_recognition(job)
+        else:
+            recognition_result = await call_recognition(job)
         rec_duration = (time.monotonic() - start) * 1000
         if _step_duration:
             _step_duration.record(rec_duration, {"step": "recognition", "status": "ok"})
@@ -355,15 +428,24 @@ async def process_single_job(job: PipelineJob) -> PipelineJobResult:
             for f in faces_data
         ]
 
+        # Get image dimensions from recognition result (or auto-edit result)
+        width = recognition_result.get("width")
+        height = recognition_result.get("height")
+
+        # auto_edit_succeeded reflects whether any processing was applied (auto-edit or LUT)
+        any_processing_succeeded = auto_edit_succeeded or lut_applied
         artifacts = PipelineJobArtifacts(
             originalR2Key=job.originalR2Key,
-            processedR2Key=job.processedR2Key if auto_edit_succeeded else None,
+            processedR2Key=job.processedR2Key if any_processing_succeeded else None,
             autoEditSucceeded=auto_edit_succeeded,
+            lutApplied=lut_applied,
+            lutId=job.options.lutId if job.options and lut_applied else None,
+            lutIntensity=job.options.lutIntensity if job.options and lut_applied else None,
             embeddingCount=len(faces),
             faces=faces,
-            exif=image_result.get("exif"),
-            width=image_result.get("width"),
-            height=image_result.get("height"),
+            exif=recognition_result.get("exif"),
+            width=width,
+            height=height,
         )
 
         if _jobs_total:
@@ -394,7 +476,7 @@ async def post_callback(
     callback: CallbackTarget,
     payload: PipelineBatchCallback,
 ) -> None:
-    """Post batch callback to CF."""
+    """Post callback to CF."""
     import httpx
 
     headers = {"Content-Type": "application/json"}
@@ -407,7 +489,7 @@ async def post_callback(
 
 
 # ============================================================================
-# Modal Function (V2 batch processing)
+# Modal Function — V3 single-job endpoint
 # ============================================================================
 
 
@@ -421,55 +503,119 @@ async def post_callback(
 )
 @modal.fastapi_endpoint(method="POST")
 async def process_batch(request: Dict[str, Any]) -> Dict[str, Any]:
-    """Process a batch of upload jobs in parallel."""
+    """Process a single job or batch of jobs.
+
+    V3: Receives single job via PipelineSingleJobRequest.
+    V2: Receives batch via PipelineBatchRequest (backwards compatible).
+    """
     _init_observability()
 
-    req = PipelineBatchRequest.model_validate(request)
-    batch_start = time.monotonic()
+    # Detect V3 single-job vs V2 batch
+    if "job" in request:
+        # V3: Single job
+        req = PipelineSingleJobRequest.model_validate(request)
+        job_start = time.monotonic()
 
-    # Continue trace from CF
-    parent_context = _parse_traceparent(req.traceparent)
+        parent_context = _parse_traceparent(req.traceparent)
 
-    if _tracer and parent_context:
-        from opentelemetry import trace as trace_api
-        with _tracer.start_as_current_span(
-            "orchestrator.process_batch",
-            context=parent_context,
-            attributes={
-                "batch.size": len(req.jobs),
-            },
-        ) as batch_span:
-            results = await asyncio.gather(*[process_single_job(job) for job in req.jobs])
+        if _tracer and parent_context:
+            from opentelemetry import trace as trace_api
 
-            completed = sum(1 for r in results if r.status == "completed")
-            failed = sum(1 for r in results if r.status == "failed")
-            batch_span.set_attribute("batch.completed", completed)
-            batch_span.set_attribute("batch.failed", failed)
+            with _tracer.start_as_current_span(
+                "orchestrator.process_job",
+                context=parent_context,
+                attributes={
+                    "job.id": req.job.jobId,
+                    "job.event_id": req.job.eventId,
+                    "job.photo_id": req.job.photoId or "",
+                },
+            ) as job_span:
+                result = await process_single_job(req.job)
 
-            if failed > 0:
-                batch_span.set_status(trace_api.StatusCode.ERROR)
+                job_duration = (time.monotonic() - job_start) * 1000
+                if _batch_duration:
+                    _batch_duration.record(job_duration, {})
 
-            # Get current span's traceparent for callback propagation
-            current_span = trace_api.get_current_span()
-            ctx = current_span.get_span_context()
-            cb_traceparent = f"00-{format(ctx.trace_id, '032x')}-{format(ctx.span_id, '016x')}-01"
+                job_span.set_attribute("job.status", result.status)
+                if result.artifacts:
+                    job_span.set_attribute("job.face_count", result.artifacts.embeddingCount)
+                if result.status == "failed":
+                    job_span.set_status(trace_api.StatusCode.ERROR)
+                    if result.error:
+                        job_span.set_attribute("error.code", result.error.code)
+
+                # Propagate trace context to callback
+                ctx = job_span.get_span_context()
+                cb_traceparent = f"00-{format(ctx.trace_id, '032x')}-{format(ctx.span_id, '016x')}-01"
+        else:
+            result = await process_single_job(req.job)
+            job_duration = (time.monotonic() - job_start) * 1000
+            if _batch_duration:
+                _batch_duration.record(job_duration, {})
+            cb_traceparent = req.traceparent
+
+        callback_payload = PipelineBatchCallback(
+            results=[result],
+            traceparent=cb_traceparent,
+            baggage=req.baggage,
+        )
+        await post_callback(req.callback, callback_payload)
+
+        # Force flush spans before container may shut down
+        if _tracer_provider:
+            _tracer_provider.force_flush(timeout_millis=5000)
+
+        return {"status": "ok", "processed": 1}
+
     else:
-        results = await asyncio.gather(*[process_single_job(job) for job in req.jobs])
-        cb_traceparent = req.traceparent
+        # V2: Batch processing (backwards compatible)
+        req = PipelineBatchRequest.model_validate(request)
+        batch_start = time.monotonic()
 
-    batch_duration = (time.monotonic() - batch_start) * 1000
-    if _batch_duration:
-        _batch_duration.record(batch_duration, {})
+        parent_context = _parse_traceparent(req.traceparent)
 
-    # Post callback with trace context
-    callback_payload = PipelineBatchCallback(
-        results=list(results),
-        traceparent=cb_traceparent,
-        baggage=req.baggage,
-    )
-    await post_callback(req.callback, callback_payload)
+        if _tracer and parent_context:
+            from opentelemetry import trace as trace_api
+            with _tracer.start_as_current_span(
+                "orchestrator.process_batch",
+                context=parent_context,
+                attributes={
+                    "batch.size": len(req.jobs),
+                },
+            ) as batch_span:
+                results = await asyncio.gather(*[process_single_job(job) for job in req.jobs])
 
-    return {"status": "ok", "processed": len(results)}
+                completed = sum(1 for r in results if r.status == "completed")
+                failed = sum(1 for r in results if r.status == "failed")
+                batch_span.set_attribute("batch.completed", completed)
+                batch_span.set_attribute("batch.failed", failed)
+
+                if failed > 0:
+                    batch_span.set_status(trace_api.StatusCode.ERROR)
+
+                current_span = trace_api.get_current_span()
+                ctx = current_span.get_span_context()
+                cb_traceparent = f"00-{format(ctx.trace_id, '032x')}-{format(ctx.span_id, '016x')}-01"
+        else:
+            results = await asyncio.gather(*[process_single_job(job) for job in req.jobs])
+            cb_traceparent = req.traceparent
+
+        batch_duration = (time.monotonic() - batch_start) * 1000
+        if _batch_duration:
+            _batch_duration.record(batch_duration, {})
+
+        callback_payload = PipelineBatchCallback(
+            results=list(results),
+            traceparent=cb_traceparent,
+            baggage=req.baggage,
+        )
+        await post_callback(req.callback, callback_payload)
+
+        # Force flush spans before container may shut down
+        if _tracer_provider:
+            _tracer_provider.force_flush(timeout_millis=5000)
+
+        return {"status": "ok", "processed": len(results)}
 
 
 @app.function(image=image)
@@ -477,6 +623,6 @@ def health() -> Dict[str, Any]:
     """Health check endpoint."""
     return {
         "status": "ok",
-        "service": "framefast-orchestrator-v2",
+        "service": "framefast-orchestrator-v3",
         "environment": os.getenv("NODE_ENV", "production"),
     }

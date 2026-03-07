@@ -92,6 +92,8 @@ export function ImagePipelineCard({ eventId }: { eventId: string }) {
     autoEditPresets.isLoading;
   const autoEditDisabled = controlsDisabled;
   const lutControlsDisabled = controlsDisabled;
+  const hasPresets = (autoEditPresets.data ?? []).length > 0;
+  const autoEditMissingPreset = autoEdit && !autoEditPresetId;
 
   return (
     <div className="space-y-8">
@@ -119,26 +121,41 @@ export function ImagePipelineCard({ eventId }: { eventId: string }) {
           <Field orientation="responsive">
             <FieldLabel>Auto-edit preset</FieldLabel>
             <FieldContent>
-              <Select
-                value={autoEditPresetId ?? ''}
-                onValueChange={(v) => setAutoEditPresetId(v || null)}
-                disabled={autoEditDisabled || !autoEdit}
-              >
-                <SelectTrigger className="w-full" disabled={autoEditDisabled || !autoEdit}>
-                  <SelectValue placeholder="Select a preset" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(autoEditPresets.data ?? []).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {hasPresets ? (
+                <Select
+                  value={autoEditPresetId ?? ''}
+                  onValueChange={(v) => setAutoEditPresetId(v || null)}
+                  disabled={autoEditDisabled || !autoEdit}
+                >
+                  <SelectTrigger className="w-full" disabled={autoEditDisabled || !autoEdit}>
+                    <SelectValue placeholder="Select a preset" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(autoEditPresets.data ?? []).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No presets yet.{' '}
+                  <a className="underline" href="/studio/auto-edit/new">
+                    Create one in Studio
+                  </a>{' '}
+                  to enable auto-edit.
+                </p>
+              )}
+              {autoEditMissingPreset && hasPresets && (
+                <p className="text-sm text-destructive">
+                  A preset is required when auto-edit is enabled.
+                </p>
+              )}
               <FieldDescription>
                 Manage presets in{' '}
                 <a className="underline" href="/studio/auto-edit">
-                  Studio Auto Edit
+                  Studio
                 </a>
               </FieldDescription>
             </FieldContent>
@@ -162,7 +179,7 @@ export function ImagePipelineCard({ eventId }: { eventId: string }) {
                 </span>
               </div>
               <FieldDescription>
-                Preset selection will be added in Studio Auto Edit.
+                Blend strength between the original and the auto-edited image.
               </FieldDescription>
             </FieldContent>
           </Field>
@@ -277,7 +294,7 @@ export function ImagePipelineCard({ eventId }: { eventId: string }) {
       </section>
 
       <div className="flex gap-2">
-        <Button size="sm" onClick={save} disabled={update.isPending}>
+        <Button size="sm" onClick={save} disabled={update.isPending || autoEditMissingPreset}>
           {update.isPending && <Spinner className="mr-1 size-3" />}
           Save
         </Button>

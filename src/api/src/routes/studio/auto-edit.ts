@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { and, desc, eq, or } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { autoEditPresets } from '@/db';
 import { ResultAsync, safeTry, ok, err, Result } from 'neverthrow';
 import { PhotonImage } from '@cf-wasm/photon/workerd';
@@ -292,13 +292,8 @@ export const studioAutoEditRouter = new Hono<Env>()
         db
           .select()
           .from(autoEditPresets)
-          .where(
-            or(
-              eq(autoEditPresets.photographerId, photographer.id),
-              eq(autoEditPresets.isBuiltin, true),
-            ),
-          )
-          .orderBy(desc(autoEditPresets.isBuiltin), desc(autoEditPresets.createdAt))
+          .where(eq(autoEditPresets.photographerId, photographer.id))
+          .orderBy(desc(autoEditPresets.createdAt))
           .limit(limit),
         (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
       );
@@ -384,18 +379,7 @@ export const studioAutoEditRouter = new Hono<Env>()
           (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
         );
 
-        if (!existing) {
-          return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Preset not found' });
-        }
-
-        if (existing.isBuiltin) {
-          return err<never, HandlerError>({
-            code: 'FORBIDDEN',
-            message: 'Cannot modify built-in presets',
-          });
-        }
-
-        if (existing.photographerId !== photographer.id) {
+        if (!existing || existing.photographerId !== photographer.id) {
           return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Preset not found' });
         }
 
@@ -435,18 +419,7 @@ export const studioAutoEditRouter = new Hono<Env>()
         (cause): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause }),
       );
 
-      if (!existing) {
-        return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Preset not found' });
-      }
-
-      if (existing.isBuiltin) {
-        return err<never, HandlerError>({
-          code: 'FORBIDDEN',
-          message: 'Cannot delete built-in presets',
-        });
-      }
-
-      if (existing.photographerId !== photographer.id) {
+      if (!existing || existing.photographerId !== photographer.id) {
         return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Preset not found' });
       }
 
@@ -483,10 +456,7 @@ export const studioAutoEditRouter = new Hono<Env>()
             .where(
               and(
                 eq(autoEditPresets.id, id),
-                or(
-                  eq(autoEditPresets.photographerId, photographer.id),
-                  eq(autoEditPresets.isBuiltin, true),
-                ),
+                eq(autoEditPresets.photographerId, photographer.id),
               ),
             )
             .limit(1),

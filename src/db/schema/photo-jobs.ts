@@ -4,6 +4,7 @@ import { createdAtCol, timestamptz } from './common';
 import { uploadIntents } from './upload-intents';
 import { events } from './events';
 import { photographers } from './photographers';
+import { photos } from './photos';
 
 export const photoJobStatuses = [
   'pending',
@@ -24,6 +25,9 @@ export const photoJobs = pgTable(
     uploadIntentId: uuid('upload_intent_id')
       .notNull()
       .references(() => uploadIntents.id, { onDelete: 'restrict' }),
+
+    // Photo created during normalization (before recognition)
+    photoId: uuid('photo_id').references(() => photos.id),
 
     // Ownership context (denormalized for fast queries)
     eventId: uuid('event_id')

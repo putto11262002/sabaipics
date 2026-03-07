@@ -11,7 +11,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { ResultAsync } from 'neverthrow';
-import { photoJobs, photos, uploadIntents } from '@/db';
+import { events, photoJobs, photos, uploadIntents } from '@/db';
 import { insertFaceEmbeddings } from '../lib/recognition/storage';
 import type { CreditRefundMessage } from '../types/credit-queue';
 import type { DetectedFace } from '../lib/recognition/types';
@@ -44,6 +44,9 @@ const jobResultSchema = z.object({
       originalR2Key: z.string(),
       processedR2Key: z.string().nullish(),
       autoEditSucceeded: z.boolean().nullish(),
+      lutApplied: z.boolean().nullish(),
+      lutId: z.string().nullish(),
+      lutIntensity: z.number().int().nullish(),
       embeddingCount: z.number().int().nonnegative(),
       faces: z.array(detectedFaceSchema),
       exif: z.record(z.unknown()).nullish(),
@@ -106,9 +109,17 @@ function processCompletedResult(
 
         if (!intent) throw new Error('Upload intent missing for photo job');
 
-        const photoId = intent.photoId ?? crypto.randomUUID();
+        // Look up event settings for autoEditPresetId
+        const [eventRecord] = await tx
+          .select({ settings: events.settings })
+          .from(events)
+          .where(eq(events.id, intent.eventId))
+          .limit(1);
 
-        // Determine photo R2 key
+        // V3: photoId from job (created during normalization) or intent, fallback to new UUID
+        const photoId = job.photoId ?? intent.photoId ?? crypto.randomUUID();
+
+        // Determine photo R2 key — prefer processed if auto-edit succeeded
         const photoR2Key =
           artifacts.processedR2Key && artifacts.autoEditSucceeded !== false
             ? artifacts.processedR2Key
@@ -116,26 +127,21 @@ function processCompletedResult(
 
         const pipelineApplied: PipelineApplied = {
           autoEdit: artifacts.autoEditSucceeded ?? false,
-          autoEditPresetId: null,
-          lutId: null,
-          lutIntensity: 0,
+          autoEditPresetId: artifacts.autoEditSucceeded
+            ? (eventRecord?.settings?.colorGrade?.autoEditPresetId ?? null)
+            : null,
+          lutId: artifacts.lutApplied ? (artifacts.lutId ?? null) : null,
+          lutIntensity: artifacts.lutApplied ? (artifacts.lutIntensity ?? 0) : 0,
         };
 
-        // Insert or update photo record
-        if (!intent.photoId) {
-          await tx.insert(photos).values({
-            id: photoId,
-            eventId: intent.eventId,
-            r2Key: photoR2Key,
-            status: 'indexed',
-            faceCount: artifacts.embeddingCount,
-            width: artifacts.width,
-            height: artifacts.height,
-            exif: artifacts.exif as any,
-            pipelineApplied,
-            indexedAt: now,
-          });
-        } else {
+        // V3: Photo may already exist as "indexing" (created during normalization).
+        // Update it to "indexed" with face data. V2 fallback: insert if not exists.
+        const existingPhoto = job.photoId
+          ? await tx.select({ id: photos.id }).from(photos).where(eq(photos.id, photoId)).limit(1).then(r => r[0])
+          : null;
+
+        if (existingPhoto) {
+          // V3 path: update existing "indexing" photo → "indexed"
           await tx
             .update(photos)
             .set({
@@ -148,7 +154,21 @@ function processCompletedResult(
               pipelineApplied,
               indexedAt: now,
             })
-            .where(eq(photos.id, intent.photoId));
+            .where(eq(photos.id, photoId));
+        } else {
+          // V2 fallback: insert new photo directly as "indexed"
+          await tx.insert(photos).values({
+            id: photoId,
+            eventId: intent.eventId,
+            r2Key: photoR2Key,
+            status: 'indexed',
+            faceCount: artifacts.embeddingCount,
+            width: artifacts.width,
+            height: artifacts.height,
+            exif: artifacts.exif as any,
+            pipelineApplied,
+            indexedAt: now,
+          });
         }
 
         // Insert face embeddings
@@ -250,6 +270,14 @@ function processFailedResult(
             updatedAt: now,
           })
           .where(eq(photoJobs.id, job.id));
+
+        // V3: Mark photo as failed if it was created during normalization
+        if (job.photoId) {
+          await tx
+            .update(photos)
+            .set({ status: 'failed' })
+            .where(eq(photos.id, job.photoId));
+        }
       });
 
       // Send refund to credit queue after transaction commits

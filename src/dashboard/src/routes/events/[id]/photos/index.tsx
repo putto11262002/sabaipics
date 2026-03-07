@@ -29,8 +29,8 @@ export default function EventPhotosTab() {
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-  // Fetch photos for the event (only indexed photos)
-  const photosQuery = usePhotos({ eventId: id, status: ['indexed'] });
+  // Fetch photos for the event (indexing = visible, indexed = fully processed)
+  const photosQuery = usePhotos({ eventId: id, status: ['indexing', 'indexed'] });
 
   // Delete mutation
   const deleteMutation = useDeletePhotos();

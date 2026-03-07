@@ -465,11 +465,12 @@ def create_web_app():
     image=image,
     gpu="T4",
     region="us",
-    scaledown_window=120,
-    max_containers=20,
+    scaledown_window=60,
+    max_containers=3,
     secrets=[modal.Secret.from_name("framefast-observability")],
     volumes={"/vol": pipeline_scratch},
 )
+@modal.concurrent(max_inputs=10)
 async def extract_internal(
     image_url: Optional[str] = None,
     volume_path: Optional[str] = None,
@@ -568,10 +569,11 @@ async def extract_internal(
     image=image,
     gpu="T4",
     region="us",
-    scaledown_window=120,
-    max_containers=20,
+    scaledown_window=60,
+    max_containers=3,
     secrets=[modal.Secret.from_name("framefast-observability")],
 )
+@modal.concurrent(max_inputs=10)
 @modal.asgi_app(requires_proxy_auth=True)
 def serve():
     return create_web_app()
