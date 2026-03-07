@@ -22,8 +22,8 @@ import { createInstrument, type Instrument, type TracedError } from '../lib/obse
 const MAX_OBJECT_SIZE = 50 * 1024 * 1024; // 50 MB
 const PRESIGN_EXPIRY_SECONDS = 600; // 10 min
 const MODAL_TIMEOUT_MS = 180_000;
-const MODAL_RETRY_DELAY_MS = 5_000;
-const MODAL_MAX_RETRIES = 1;
+const MODAL_BASE_RETRY_DELAY_MS = 10_000;
+const MODAL_MAX_RETRIES = 2;
 
 // =============================================================================
 // Error types
@@ -249,9 +249,10 @@ function submitBatchToModal(
             signal: AbortSignal.timeout(MODAL_TIMEOUT_MS),
           });
 
-          // 524 = CF proxy timeout (Modal cold start). Retry after delay.
+          // 524 = CF proxy timeout (Modal cold start). Retry with exponential backoff.
           if (response.status === 524 && attempt < MODAL_MAX_RETRIES) {
-            await new Promise((r) => setTimeout(r, MODAL_RETRY_DELAY_MS));
+            const delay = MODAL_BASE_RETRY_DELAY_MS * 2 ** attempt;
+            await new Promise((r) => setTimeout(r, delay));
             continue;
           }
 
@@ -261,9 +262,10 @@ function submitBatchToModal(
           }
           return;
         } catch (err) {
-          // Timeout or network error — retry if attempts remain
+          // Timeout or network error — retry with exponential backoff
           if (attempt < MODAL_MAX_RETRIES) {
-            await new Promise((r) => setTimeout(r, MODAL_RETRY_DELAY_MS));
+            const delay = MODAL_BASE_RETRY_DELAY_MS * 2 ** attempt;
+            await new Promise((r) => setTimeout(r, delay));
             continue;
           }
           throw err;
