@@ -25,6 +25,9 @@ pub fn run() {
             stop_sync,
             get_sync_stats,
             get_dir_size,
+            retry_job,
+            retry_event_failed,
+            resume_all_syncs,
         ]);
 
     #[cfg(feature = "debug-mcp")]
@@ -74,34 +77,28 @@ pub fn run() {
 
 // ── Auth commands ──────────────────────────────────────────────────────
 
-const TOKEN_SERVICE: &str = "FrameFast";
-const TOKEN_ACCOUNT: &str = "auth_token";
+const AUTH_TOKEN_KEY: &str = "refresh_token";
 
 #[tauri::command]
-fn set_auth_token(token: String) -> Result<(), String> {
-    let entry = keyring::Entry::new(TOKEN_SERVICE, TOKEN_ACCOUNT).map_err(|e| e.to_string())?;
-    entry.set_password(&token).map_err(|e| e.to_string())?;
-    Ok(())
+async fn set_auth_token(
+    state: tauri::State<'_, SyncManager>,
+    token: String,
+) -> Result<(), String> {
+    state.db().kv_set(AUTH_TOKEN_KEY.to_string(), token).await
 }
 
 #[tauri::command]
-fn get_auth_token() -> Result<Option<String>, String> {
-    let entry = keyring::Entry::new(TOKEN_SERVICE, TOKEN_ACCOUNT).map_err(|e| e.to_string())?;
-    match entry.get_password() {
-        Ok(token) => Ok(Some(token)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(err) => Err(err.to_string()),
-    }
+async fn get_auth_token(
+    state: tauri::State<'_, SyncManager>,
+) -> Result<Option<String>, String> {
+    state.db().kv_get(AUTH_TOKEN_KEY.to_string()).await
 }
 
 #[tauri::command]
-fn clear_auth_token() -> Result<(), String> {
-    let entry = keyring::Entry::new(TOKEN_SERVICE, TOKEN_ACCOUNT).map_err(|e| e.to_string())?;
-    match entry.delete_password() {
-        Ok(_) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
-        Err(err) => Err(err.to_string()),
-    }
+async fn clear_auth_token(
+    state: tauri::State<'_, SyncManager>,
+) -> Result<(), String> {
+    state.db().kv_delete(AUTH_TOKEN_KEY.to_string()).await
 }
 
 // ── Sync commands ──────────────────────────────────────────────────────
@@ -155,6 +152,30 @@ async fn get_sync_stats(
     sync_id: String,
 ) -> Result<sync::db::JobStats, String> {
     state.get_stats(&sync_id).await
+}
+
+#[tauri::command]
+async fn retry_job(
+    state: tauri::State<'_, SyncManager>,
+    job_id: String,
+) -> Result<(), String> {
+    state.retry_job(&job_id).await
+}
+
+#[tauri::command]
+async fn retry_event_failed(
+    state: tauri::State<'_, SyncManager>,
+    event_id: String,
+) -> Result<u64, String> {
+    state.retry_event_failed(&event_id).await
+}
+
+#[tauri::command]
+async fn resume_all_syncs(
+    state: tauri::State<'_, SyncManager>,
+) -> Result<(), String> {
+    state.resume_all().await;
+    Ok(())
 }
 
 #[tauri::command]

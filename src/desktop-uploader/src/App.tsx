@@ -29,7 +29,16 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useEvents } from './hooks/use-events';
-import { FolderIcon, ChevronRightIcon, PlusIcon, Trash2Icon, PlayIcon, SquareIcon, ArrowLeftIcon } from 'lucide-react';
+import { useCreditSummary } from './hooks/use-credit-summary';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/shared/components/ui/dropdown-menu';
+import { FolderIcon, ChevronRightIcon, PlusIcon, Trash2Icon, PlayIcon, SquareIcon, ArrowLeftIcon, RotateCcwIcon, AlertTriangleIcon, XIcon, ChevronsUpDown, LogOutIcon } from 'lucide-react';
 
 type SyncStats = {
   pending: number;
@@ -55,9 +64,41 @@ type StatsEvent = {
   stats: SyncStats;
 };
 
+function PaymentBanner({ onDismiss }: { onDismiss: () => void }) {
+  const handleResume = async () => {
+    try {
+      await invoke('resume_all_syncs');
+      onDismiss();
+    } catch (err) {
+      console.error('resume_all_syncs failed:', err);
+    }
+  };
+
+  return (
+    <div className="bg-warning/10 border-warning/30 border backdrop-blur-md px-4 py-2 flex items-center gap-2 text-warning text-sm">
+      <AlertTriangleIcon className="size-4 shrink-0" />
+      <span className="flex-1">No credits remaining. Uploads are paused.</span>
+      <Button variant="ghost" size="sm" className="h-6 text-warning hover:text-warning" onClick={handleResume}>
+        Resume
+      </Button>
+      <button onClick={onDismiss} className="text-warning/60 hover:text-warning">
+        <XIcon className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function AppShell() {
   const location = useLocation();
   const { status, startAuth, signOut } = useAuth();
+  const [paymentRequired, setPaymentRequired] = React.useState(false);
+
+  React.useEffect(() => {
+    const unlisten = listen('sync://payment-required', () => {
+      setPaymentRequired(true);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
 
   if (status !== 'signed_in') {
     return <SignedOutGuard />;
@@ -71,6 +112,7 @@ function AppShell() {
       >
         <h1 className="text-primary text-xs font-semibold text-center">FrameFast</h1>
       </div>
+      {paymentRequired && <PaymentBanner onDismiss={() => setPaymentRequired(false)} />}
       <div className="flex-1">
         <SidebarProvider>
           <Sidebar collapsible="icon" className="">
@@ -100,21 +142,7 @@ function AppShell() {
               <SidebarSeparator />
             </SidebarContent>
             <SidebarFooter className="p-2">
-              {status === 'signed_in' ? (
-                <Button variant="secondary" size="sm" className="w-full" onClick={signOut}>
-                  Sign out
-                </Button>
-              ) : (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="w-full"
-                  onClick={startAuth}
-                  disabled={status === 'signing_in'}
-                >
-                  {status === 'signing_in' ? 'Signing in...' : 'Sign in'}
-                </Button>
-              )}
+              <NavUser />
             </SidebarFooter>
           </Sidebar>
           <SidebarInset className="min-h-svh">
@@ -156,16 +184,52 @@ function SignedOutGuard() {
 }
 
 function Home() {
-  const { status, error } = useAuth();
+  const { error } = useAuth();
+  const credits = useCreditSummary();
 
   return (
-    <div className="space-y-2">
-      <h2 className="text-base font-semibold">Home</h2>
-      <p className="text-muted-foreground text-sm">
-        Overview stats and recent activity will appear here.
-      </p>
-      <p className="text-muted-foreground text-xs">Auth status: {status}</p>
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-semibold">Home</h2>
+        <p className="text-muted-foreground text-sm">Overview and credit balance.</p>
+      </div>
       {error ? <p className="text-destructive text-xs">{error}</p> : null}
+
+      {credits.isLoading ? (
+        <div className="grid grid-cols-3 gap-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="border border-border/60 rounded-lg p-4 animate-pulse">
+              <div className="h-3 w-16 bg-muted rounded mb-2" />
+              <div className="h-6 w-12 bg-muted rounded" />
+            </div>
+          ))}
+        </div>
+      ) : credits.data ? (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="border border-border/60 rounded-lg p-4">
+              <p className="text-muted-foreground text-xs">Balance</p>
+              <p className="text-xl font-semibold">{credits.data.balance.toLocaleString()}</p>
+            </div>
+            <div className="border border-border/60 rounded-lg p-4">
+              <p className="text-muted-foreground text-xs">Expiring soon</p>
+              <p className="text-xl font-semibold">{credits.data.expiringSoon.toLocaleString()}</p>
+            </div>
+            <div className="border border-border/60 rounded-lg p-4">
+              <p className="text-muted-foreground text-xs">Used this month</p>
+              <p className="text-xl font-semibold">{credits.data.usedThisMonth.toLocaleString()}</p>
+            </div>
+          </div>
+          {credits.data.expiringSoon > 0 && (
+            <div className="bg-warning/10 border-warning/30 text-warning border backdrop-blur-md rounded-lg px-4 py-2 text-sm flex items-center gap-2">
+              <AlertTriangleIcon className="size-4 shrink-0" />
+              <span>{credits.data.expiringSoon.toLocaleString()} credits expiring within 30 days</span>
+            </div>
+          )}
+        </>
+      ) : credits.isError ? (
+        <p className="text-destructive text-sm">Failed to load credits.</p>
+      ) : null}
     </div>
   );
 }
@@ -234,6 +298,53 @@ const folderStatusConfig: Record<FolderStatus, { label: string; variant: 'second
   complete: { label: 'Complete', variant: 'success' },
   failed: { label: 'Failed', variant: 'destructive' },
 };
+
+function NavUser() {
+  const { signOut, user } = useAuth();
+  const displayName = user?.name || user?.email || 'User';
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton size="lg">
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-medium">{displayName}</span>
+                {user?.email && user.name && (
+                  <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                )}
+              </div>
+              <ChevronsUpDown className="ml-auto size-4" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-48 rounded-lg"
+            side="right"
+            align="end"
+            sideOffset={4}
+          >
+            <DropdownMenuLabel className="p-0 font-normal">
+              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium">{displayName}</span>
+                  {user?.email && (
+                    <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                  )}
+                </div>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={signOut}>
+              <LogOutIcon className="size-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
 
 // ── Syncs list page ───────────────────────────────────────────────────
 
@@ -360,6 +471,18 @@ function EventDetail() {
     };
   }, []);
 
+  const totalFailed = syncs.reduce((n, s) => n + s.stats.failed, 0);
+
+  const handleRetryAllFailed = async () => {
+    if (!eventId) return;
+    try {
+      await invoke('retry_event_failed', { eventId });
+      refreshSyncs();
+    } catch (err) {
+      console.error('retry_event_failed failed:', err);
+    }
+  };
+
   const handleAddFolder = async () => {
     if (!eventId) return;
     const selected = await open({ directory: true, multiple: false, title: 'Select photo folder' });
@@ -415,10 +538,18 @@ function EventDetail() {
             {syncs.length} {syncs.length === 1 ? 'folder' : 'folders'}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleAddFolder}>
-          <PlusIcon className="mr-1 size-3.5" />
-          Add folder
-        </Button>
+        <div className="flex items-center gap-2">
+          {totalFailed > 0 && (
+            <Button variant="outline" size="sm" onClick={handleRetryAllFailed}>
+              <RotateCcwIcon className="mr-1 size-3.5" />
+              Retry failed ({totalFailed})
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={handleAddFolder}>
+            <PlusIcon className="mr-1 size-3.5" />
+            Add folder
+          </Button>
+        </div>
       </div>
 
       {syncs.length === 0 ? (

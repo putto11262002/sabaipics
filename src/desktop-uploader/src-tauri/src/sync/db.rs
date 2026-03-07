@@ -77,6 +77,8 @@ impl DbHandle {
         // ALTER TABLE doesn't support IF NOT EXISTS in SQLite,
         // so ignore "duplicate column" errors on re-run.
         let _ = conn.execute_batch(include_str!("../../migrations/0002_add_active.sql"));
+        conn.execute_batch(include_str!("../../migrations/0003_auth_kv.sql"))
+            .map_err(|e| format!("migration 0003: {e}"))?;
 
         let (tx, rx) = std::sync::mpsc::channel::<DbCommand>();
 
@@ -429,6 +431,65 @@ impl DbHandle {
         .await
     }
 
+    // ── Manual retry ─────────────────────────────────────────────────────
+
+    /// Reset a single failed job so it re-enters the queue fresh.
+    pub async fn retry_job(&self, job_id: String) -> Result<(), String> {
+        self.exec(move |conn| {
+            let now = now_ms();
+            conn.execute(
+                "UPDATE upload_jobs
+                 SET state = 'pending', attempt_count = 0, updated_at = ?2,
+                     last_error = NULL, last_http_status = NULL, error_code = NULL,
+                     retryable = 0, next_retry_at = NULL
+                 WHERE id = ?1 AND state = 'failed'",
+                params![job_id, now],
+            )
+            .map_err(|e| e.to_string())?;
+            Ok(())
+        })
+        .await
+    }
+
+    /// Retry all failed jobs for an event (across all its syncs).
+    pub async fn retry_event_failed(&self, event_id: String) -> Result<u64, String> {
+        self.exec(move |conn| {
+            let now = now_ms();
+            let changed = conn
+                .execute(
+                    "UPDATE upload_jobs
+                     SET state = 'pending', attempt_count = 0, updated_at = ?2,
+                         last_error = NULL, last_http_status = NULL, error_code = NULL,
+                         retryable = 0, next_retry_at = NULL
+                     WHERE sync_id IN (SELECT id FROM sync WHERE event_id = ?1)
+                       AND state = 'failed'",
+                    params![event_id, now],
+                )
+                .map_err(|e| e.to_string())?;
+            Ok(changed as u64)
+        })
+        .await
+    }
+
+    /// Fail all non-terminal jobs for an event (used when event is 404/410).
+    pub async fn fail_event_jobs(&self, event_id: String, reason: String) -> Result<u64, String> {
+        self.exec(move |conn| {
+            let now = now_ms();
+            let changed = conn
+                .execute(
+                    "UPDATE upload_jobs
+                     SET state = 'failed', updated_at = ?3,
+                         last_error = ?2, retryable = 0, next_retry_at = NULL
+                     WHERE sync_id IN (SELECT id FROM sync WHERE event_id = ?1)
+                       AND state NOT IN ('done', 'failed')",
+                    params![event_id, reason, now],
+                )
+                .map_err(|e| e.to_string())?;
+            Ok(changed as u64)
+        })
+        .await
+    }
+
     // ── Auto-retry ──────────────────────────────────────────────────────
 
     pub async fn auto_requeue_retryable(&self, sync_id: String) -> Result<u64, String> {
@@ -444,6 +505,43 @@ impl DbHandle {
                 )
                 .map_err(|e| e.to_string())?;
             Ok(changed as u64)
+        })
+        .await
+    }
+
+    // ── Auth KV ──────────────────────────────────────────────────────────
+
+    pub async fn kv_get(&self, key: String) -> Result<Option<String>, String> {
+        self.exec(move |conn| {
+            conn.query_row(
+                "SELECT value FROM auth_kv WHERE key = ?1",
+                [&key],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())
+        })
+        .await
+    }
+
+    pub async fn kv_set(&self, key: String, value: String) -> Result<(), String> {
+        self.exec(move |conn| {
+            conn.execute(
+                "INSERT INTO auth_kv (key, value) VALUES (?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![key, value],
+            )
+            .map_err(|e| e.to_string())?;
+            Ok(())
+        })
+        .await
+    }
+
+    pub async fn kv_delete(&self, key: String) -> Result<(), String> {
+        self.exec(move |conn| {
+            conn.execute("DELETE FROM auth_kv WHERE key = ?1", [&key])
+                .map_err(|e| e.to_string())?;
+            Ok(())
         })
         .await
     }

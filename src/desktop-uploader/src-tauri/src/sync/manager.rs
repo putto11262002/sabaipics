@@ -1,10 +1,11 @@
 use super::db::{DbHandle, JobStats, SyncRow, now_ms};
 use super::engine::Engine;
-use super::upload::UploadWorker;
+use super::upload::{UploadSignal, UploadWorker};
 use crate::api::ApiClient;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tauri::Emitter;
 use tokio::sync::Mutex;
 
 // ── Types for frontend ──────────────────────────────────────────────────
@@ -26,7 +27,7 @@ pub struct SyncInfo {
 pub struct SyncManager {
     db: DbHandle,
     api: Arc<dyn ApiClient>,
-    engines: Mutex<HashMap<String, Engine>>,
+    engines: Arc<Mutex<HashMap<String, Engine>>>,
     upload_worker: Mutex<Option<UploadWorker>>,
 }
 
@@ -35,16 +36,78 @@ impl SyncManager {
         Self {
             db,
             api,
-            engines: Mutex::new(HashMap::new()),
+            engines: Arc::new(Mutex::new(HashMap::new())),
             upload_worker: Mutex::new(None),
         }
     }
 
+    pub fn db(&self) -> &DbHandle {
+        &self.db
+    }
+
     /// Ensure the upload worker is running. Called lazily on first engine start.
-    async fn ensure_upload_worker(&self) {
+    async fn ensure_upload_worker(&self, app_handle: &tauri::AppHandle) {
         let mut worker = self.upload_worker.lock().await;
         if worker.is_none() {
-            *worker = Some(UploadWorker::spawn(self.db.clone(), self.api.clone()));
+            let (signal_tx, signal_rx) = tokio::sync::mpsc::unbounded_channel();
+            *worker = Some(UploadWorker::spawn(
+                self.db.clone(),
+                self.api.clone(),
+                signal_tx,
+            ));
+
+            // Spawn signal listener
+            let db = self.db.clone();
+            let engines = self.engines.clone();
+            let app = app_handle.clone();
+            tokio::spawn(async move {
+                Self::signal_listener(signal_rx, db, engines, app).await;
+            });
+        }
+    }
+
+    /// Process signals from the upload worker.
+    async fn signal_listener(
+        mut rx: tokio::sync::mpsc::UnboundedReceiver<UploadSignal>,
+        db: DbHandle,
+        engines: Arc<Mutex<HashMap<String, Engine>>>,
+        app: tauri::AppHandle,
+    ) {
+        while let Some(signal) = rx.recv().await {
+            match signal {
+                UploadSignal::PaymentRequired => {
+                    log::warn!("[manager] payment required — pausing all engines");
+                    // Pause all running engines
+                    let guard = engines.lock().await;
+                    for engine in guard.values() {
+                        engine.pause();
+                    }
+                    // Notify frontend
+                    let _ = app.emit("sync://payment-required", ());
+                }
+                UploadSignal::EventTerminal { event_id, reason } => {
+                    log::warn!("[manager] event {event_id} is terminal: {reason}");
+                    // Stop engines for this event
+                    let syncs = db.sync_list().await.unwrap_or_default();
+                    let mut guard = engines.lock().await;
+                    for row in &syncs {
+                        if row.event_id == event_id {
+                            if let Some(engine) = guard.remove(&row.id) {
+                                engine.stop();
+                            }
+                            let _ = db.sync_set_active(row.id.clone(), false).await;
+                        }
+                    }
+                    drop(guard);
+                    // Fail all remaining jobs for this event
+                    let _ = db.fail_event_jobs(event_id.clone(), reason.clone()).await;
+                    // Notify frontend
+                    let _ = app.emit(
+                        "sync://event-terminal",
+                        serde_json::json!({ "eventId": event_id, "reason": reason }),
+                    );
+                }
+            }
         }
     }
 
@@ -165,6 +228,24 @@ impl SyncManager {
         }
     }
 
+    /// Resume all paused engines (after user buys credits).
+    pub async fn resume_all(&self) {
+        let guard = self.engines.lock().await;
+        for engine in guard.values() {
+            engine.resume();
+        }
+    }
+
+    /// Retry a single failed job.
+    pub async fn retry_job(&self, job_id: &str) -> Result<(), String> {
+        self.db.retry_job(job_id.to_string()).await
+    }
+
+    /// Retry all failed jobs for an event.
+    pub async fn retry_event_failed(&self, event_id: &str) -> Result<u64, String> {
+        self.db.retry_event_failed(event_id.to_string()).await
+    }
+
     pub async fn get_stats(&self, sync_id: &str) -> Result<JobStats, String> {
         self.db.job_stats(sync_id.to_string()).await
     }
@@ -176,7 +257,7 @@ impl SyncManager {
         row: &SyncRow,
         app_handle: tauri::AppHandle,
     ) -> Result<(), String> {
-        self.ensure_upload_worker().await;
+        self.ensure_upload_worker(&app_handle).await;
         let mut engines = self.engines.lock().await;
         if engines.contains_key(&row.id) {
             return Ok(());
