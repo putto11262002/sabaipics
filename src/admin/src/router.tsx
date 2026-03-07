@@ -53,6 +53,10 @@ export const router = createBrowserRouter([
         path: '/settings',
         lazy: () => import('./routes/settings'),
       },
+      {
+        path: '/settings/cleanup',
+        lazy: () => import('./routes/settings/cleanup'),
+      },
     ],
   },
 

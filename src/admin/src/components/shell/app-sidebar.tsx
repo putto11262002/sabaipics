@@ -46,6 +46,10 @@ const data = {
       title: 'Settings',
       url: '/settings',
       icon: Settings,
+      items: [
+        { title: 'General', url: '/settings' },
+        { title: 'Cleanup', url: '/settings/cleanup' },
+      ],
     },
   ],
 };

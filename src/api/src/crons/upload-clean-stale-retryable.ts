@@ -1,6 +1,7 @@
-import { createDb, uploadIntents, photos, photoJobs } from '@/db';
+import { createDb, uploadIntents } from '@/db';
 import { and, eq, lt } from 'drizzle-orm';
 import type { Bindings } from '../types';
+import { hardDeleteUploadIntents } from '../lib/services/uploads/hard-delete-intents';
 
 const BATCH_SIZE = 100;
 
@@ -41,49 +42,7 @@ export async function cleanupStaleRetryable(env: Bindings): Promise<void> {
     return;
   }
 
-  let deleted = 0;
-  let failed = 0;
-
-  for (const intent of intents) {
-    try {
-      // Delete R2 objects first — if these fail, skip DB deletion so
-      // the next cron run can retry (prevents orphaning R2 objects).
-      if (intent.r2Key) {
-        await env.PHOTOS_BUCKET.delete(intent.r2Key);
-      }
-      if (intent.photoId) {
-        const normalizedKey = `${intent.eventId}/${intent.photoId}.jpg`;
-        await env.PHOTOS_BUCKET.delete(normalizedKey);
-      }
-
-      // Delete V2 pipeline R2 artifacts (original + processed)
-      const job = await db.query.photoJobs.findFirst({
-        where: eq(photoJobs.uploadIntentId, intent.id),
-        columns: { id: true, originalR2Key: true, processedR2Key: true },
-      });
-      if (job) {
-        if (job.originalR2Key) await env.PHOTOS_BUCKET.delete(job.originalR2Key);
-        if (job.processedR2Key) await env.PHOTOS_BUCKET.delete(job.processedR2Key);
-        await db.delete(photoJobs).where(eq(photoJobs.id, job.id));
-      }
-
-      // Delete associated photo record if any
-      if (intent.photoId) {
-        await db.delete(photos).where(eq(photos.id, intent.photoId));
-      }
-
-      // Delete the upload intent record (only after R2 + photo cleanup succeeds)
-      await db.delete(uploadIntents).where(eq(uploadIntents.id, intent.id));
-
-      deleted++;
-    } catch (error) {
-      failed++;
-      console.error('[UploadIntentCleanup] Failed to clean stale retryable intent', {
-        intentId: intent.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
+  const { deleted, failed } = await hardDeleteUploadIntents(db, env.PHOTOS_BUCKET, intents);
 
   console.log('[UploadIntentCleanup] Stale retryable cleanup done', {
     processed: intents.length,
