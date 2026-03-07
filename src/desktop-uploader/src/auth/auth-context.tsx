@@ -1,7 +1,12 @@
 import React from 'react';
 import { start, cancel, onUrl, onInvalidUrl } from '@fabianlars/tauri-plugin-oauth';
 import { open } from '@tauri-apps/plugin-shell';
-import { getStoredRefreshToken, setStoredRefreshToken } from '../lib/auth-token';
+import {
+  initTokenManager,
+  setAuthTokens,
+  getAccessToken as getAccessTokenRust,
+  signOutRust,
+} from '../lib/auth-token';
 
 type AuthStatus = 'signed_out' | 'signing_in' | 'signed_in' | 'error';
 
@@ -12,11 +17,7 @@ type UserInfo = {
 
 type AuthState = {
   status: AuthStatus;
-  callbackUrl?: string;
-  params?: Record<string, string>;
   error?: string;
-  accessToken?: string | null;
-  accessTokenExpiresAt?: number | null;
   user?: UserInfo | null;
 };
 
@@ -28,58 +29,12 @@ type AuthContextValue = AuthState & {
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
-function loadStoredAuth(): AuthState {
-  return { status: 'signed_out' };
-}
+const API_URL = import.meta.env.VITE_API_URL as string;
 
-function storeAuth(state: AuthState) {
-  if (state.status === 'signed_in') {
-    void setStoredRefreshToken(state.params?.refreshToken ?? null);
-    return;
-  }
-  if (state.status === 'signed_out') {
-    void setStoredRefreshToken(null);
-  }
-}
-
-function buildAuthUrl(redirectUrl: string) {
-  const baseUrl = import.meta.env.VITE_AUTH_URL as string;
-  if (!baseUrl) {
-    throw new Error('VITE_AUTH_URL is not set');
-  }
-
-  const redirectParam = (import.meta.env.VITE_AUTH_REDIRECT_PARAM as string) || 'redirect_url';
-
-  const url = new URL(baseUrl);
-  if (redirectParam) {
-    url.searchParams.set(redirectParam, redirectUrl);
-  }
-
-  // Signal dashboard bridge to use code flow.
-  url.searchParams.set('flow', 'code');
-
-  return url.toString();
-}
-
-function isValidCallbackUrl(url: URL, port: number) {
-  return (
-    (url.hostname === '127.0.0.1' || url.hostname === 'localhost') &&
-    url.port === String(port) &&
-    url.pathname === '/callback'
-  );
-}
-
-async function redeemDesktopAuthCode(params: { code: string; deviceName?: string }): Promise<{
-  accessToken: string;
-  accessTokenExpiresAt: number;
-  refreshToken: string;
-  refreshTokenExpiresAt: number;
-}> {
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/desktop/auth/redeem`, {
+async function redeemDesktopAuthCode(params: { code: string; deviceName?: string }) {
+  const res = await fetch(`${API_URL}/desktop/auth/redeem`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code: params.code, deviceName: params.deviceName }),
   });
 
@@ -103,54 +58,51 @@ async function redeemDesktopAuthCode(params: { code: string; deviceName?: string
   };
 }
 
-async function refreshDesktopSession(params: { refreshToken: string }): Promise<{
-  accessToken: string;
-  accessTokenExpiresAt: number;
-  refreshToken: string | null;
-  refreshTokenExpiresAt: number;
-  refreshTokenUnchanged?: boolean;
-}> {
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/desktop/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refreshToken: params.refreshToken }),
-  });
-
-  if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try {
-      const json = (await res.json()) as { error?: { message?: string } };
-      message = json?.error?.message ?? message;
-    } catch {
-      // ignore
-    }
-    throw new Error(message);
-  }
-
-  return (await res.json()) as {
-    accessToken: string;
-    accessTokenExpiresAt: number;
-    refreshToken: string | null;
-    refreshTokenExpiresAt: number;
-    refreshTokenUnchanged?: boolean;
-    user?: { name: string | null; email: string | null };
-  };
+function isValidCallbackUrl(url: URL, port: number) {
+  return (
+    (url.hostname === '127.0.0.1' || url.hostname === 'localhost') &&
+    url.port === String(port) &&
+    url.pathname === '/callback'
+  );
 }
 
-function shouldRefresh(expiresAt: number | null | undefined) {
-  if (!expiresAt) return true;
-  // Refresh 60s early.
-  return Date.now() + 60_000 >= expiresAt;
+function buildAuthUrl(redirectUrl: string) {
+  const baseUrl = import.meta.env.VITE_AUTH_URL as string;
+  if (!baseUrl) throw new Error('VITE_AUTH_URL is not set');
+
+  const redirectParam = (import.meta.env.VITE_AUTH_REDIRECT_PARAM as string) || 'redirect_url';
+  const url = new URL(baseUrl);
+  if (redirectParam) url.searchParams.set(redirectParam, redirectUrl);
+  url.searchParams.set('flow', 'code');
+
+  return url.toString();
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = React.useState<AuthState>(loadStoredAuth);
+  const [state, setState] = React.useState<AuthState>({ status: 'signing_in' });
   const portRef = React.useRef<number | null>(null);
-  const refreshTokenRef = React.useRef<string | null>(null);
-  const refreshInFlightRef = React.useRef<Promise<string | null> | null>(null);
 
+  // Initialize Rust token manager and restore session
+  React.useEffect(() => {
+    const init = async () => {
+      try {
+        const result = await initTokenManager(API_URL);
+        if (result.signedIn) {
+          setState({
+            status: 'signed_in',
+            user: result.user ?? null,
+          });
+        } else {
+          setState({ status: 'signed_out' });
+        }
+      } catch {
+        setState({ status: 'signed_out' });
+      }
+    };
+    void init();
+  }, []);
+
+  // Listen for OAuth callback
   React.useEffect(() => {
     const setup = async () => {
       const unlistenUrl = await onUrl((url) => {
@@ -158,10 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const parsed = new URL(url);
 
         if (!isValidCallbackUrl(parsed, portRef.current)) {
-          setState({
-            status: 'error',
-            error: 'Invalid callback URL received',
-          });
+          setState({ status: 'error', error: 'Invalid callback URL received' });
           return;
         }
 
@@ -172,28 +121,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const code = params.code || '';
         if (!code) {
-          setState({
-            status: 'error',
-            error: 'Missing code in callback URL',
-          });
+          setState({ status: 'error', error: 'Missing code in callback URL' });
           return;
         }
 
         setState({ status: 'signing_in' });
 
         void redeemDesktopAuthCode({ code, deviceName: 'FrameFast Desktop' })
-          .then((tokens) => {
-            refreshTokenRef.current = tokens.refreshToken;
-            const nextState: AuthState = {
-              status: 'signed_in',
-              callbackUrl: parsed.toString(),
-              params: { refreshToken: tokens.refreshToken },
+          .then(async (tokens) => {
+            // Store all tokens in Rust
+            await setAuthTokens({
               accessToken: tokens.accessToken,
-              accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+              expiresAt: tokens.accessTokenExpiresAt,
+              refreshToken: tokens.refreshToken,
+              userName: tokens.user?.name,
+              userEmail: tokens.user?.email,
+            });
+
+            setState({
+              status: 'signed_in',
               user: tokens.user ?? null,
-            };
-            setState(nextState);
-            storeAuth(nextState);
+            });
           })
           .catch((err) => {
             setState({
@@ -225,83 +173,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  React.useEffect(() => {
-    const load = async () => {
-      const refreshToken = await getStoredRefreshToken();
-      if (!refreshToken) return;
-
-      refreshTokenRef.current = refreshToken;
-      setState({ status: 'signing_in' });
-
-      try {
-        const refreshed = await refreshDesktopSession({ refreshToken });
-        if (refreshed.refreshToken) {
-          refreshTokenRef.current = refreshed.refreshToken;
-          await setStoredRefreshToken(refreshed.refreshToken);
-        }
-
-        setState({
-          status: 'signed_in',
-          params: { refreshToken: refreshTokenRef.current ?? refreshToken },
-          accessToken: refreshed.accessToken,
-          accessTokenExpiresAt: refreshed.accessTokenExpiresAt,
-          user: refreshed.user ?? null,
-        });
-      } catch {
-        refreshTokenRef.current = null;
-        await setStoredRefreshToken(null);
-        setState({ status: 'signed_out' });
-      }
-    };
-    void load();
-  }, []);
-
   const getAccessToken = React.useCallback(async () => {
     if (state.status !== 'signed_in') return null;
-
-    if (!shouldRefresh(state.accessTokenExpiresAt ?? null) && state.accessToken) {
-      return state.accessToken;
+    try {
+      return await getAccessTokenRust();
+    } catch {
+      setState({ status: 'signed_out' });
+      return null;
     }
-
-    const refreshToken = refreshTokenRef.current;
-    if (!refreshToken) return null;
-
-    if (!refreshInFlightRef.current) {
-      refreshInFlightRef.current = (async () => {
-        const refreshed = await refreshDesktopSession({ refreshToken });
-
-        const nextRefreshToken = refreshed.refreshToken ?? refreshToken;
-        refreshTokenRef.current = nextRefreshToken;
-        if (refreshed.refreshToken) {
-          await setStoredRefreshToken(refreshed.refreshToken);
-        }
-
-        setState((prev) => {
-          if (prev.status !== 'signed_in') return prev;
-          return {
-            ...prev,
-            params: { refreshToken: nextRefreshToken },
-            accessToken: refreshed.accessToken,
-            accessTokenExpiresAt: refreshed.accessTokenExpiresAt,
-            user: refreshed.user ?? prev.user,
-          };
-        });
-
-        return refreshed.accessToken;
-      })()
-        .catch(async () => {
-          refreshTokenRef.current = null;
-          await setStoredRefreshToken(null);
-          setState({ status: 'signed_out' });
-          return null;
-        })
-        .finally(() => {
-          refreshInFlightRef.current = null;
-        });
-    }
-
-    return refreshInFlightRef.current;
-  }, [state.accessToken, state.accessTokenExpiresAt, state.status]);
+  }, [state.status]);
 
   const startAuth = React.useCallback(async () => {
     try {
@@ -316,23 +196,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const redirectUrl = `http://127.0.0.1:${port}/callback`;
       const authUrl = buildAuthUrl(redirectUrl);
-
       await open(authUrl);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : `Failed to start auth: ${String(error)}`;
       setState({
         status: 'error',
-        error: errorMessage,
+        error: error instanceof Error ? error.message : `Failed to start auth: ${String(error)}`,
       });
     }
   }, []);
 
   const signOut = React.useCallback(() => {
-    refreshTokenRef.current = null;
-    const nextState: AuthState = { status: 'signed_out' };
-    setState(nextState);
-    storeAuth(nextState);
+    void signOutRust();
+    setState({ status: 'signed_out' });
   }, []);
 
   const value: AuthContextValue = {
