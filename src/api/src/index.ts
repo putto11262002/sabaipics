@@ -25,7 +25,7 @@ import { studioRouter } from './routes/studio';
 import { feedbackRouter } from './routes/feedback';
 import { lineDeliveryRouter } from './routes/line-delivery';
 import { observabilityRouter } from './routes/observability';
-import { internalPipelineV2Router } from './routes/internal-pipeline-v2';
+import { internalPipelineRouter } from './routes/internal-pipeline';
 import { participantSessionMiddleware } from './middleware/participant-session';
 import type { Env, Bindings } from './types';
 
@@ -98,7 +98,7 @@ const app = new Hono<Env>()
   // Public observability ingest (dashboard/iOS client error events)
   .route('/observability', observabilityRouter)
   // Internal callbacks from pipeline orchestrator
-  .route('/internal/photo-pipelines', internalPipelineV2Router)
+  .route('/internal/photo-pipelines', internalPipelineRouter)
   // Admin routes - API key auth, no Clerk (must be before Clerk middleware)
   .route('/admin', adminRouter)
   // FTP routes - FTP JWT auth, no Clerk (must be before Clerk middleware)

@@ -1,5 +1,5 @@
 """
-InsightFace Recognition Service — v2 Extraction API
+InsightFace Recognition Service — Extraction API
 
 Stateless face extraction service: image in → embeddings out.
 No collections, no search, no state. All similarity search is done via pgvector.

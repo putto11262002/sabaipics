@@ -1,5 +1,5 @@
 /**
- * Photo Pipeline V3 Consumer
+ * Photo Pipeline Consumer
  *
  * Per-message processing: R2 event → HEAD check → claim intent → debit credits →
  * normalize via CF Images binding (streaming) → insert photo as "indexing" →
@@ -14,7 +14,7 @@ import { and, eq } from 'drizzle-orm';
 import { ResultAsync, safeTry, ok, err, errAsync } from 'neverthrow';
 import type { Bindings } from '../types';
 import type { R2EventMessage } from '../types/r2-event';
-import type { PipelineSingleJobRequest, PipelineJob } from '../types/pipeline-v2';
+import type { PipelineSingleJobRequest, PipelineJob } from '../types/pipeline';
 import type { CreditError } from '../lib/credits';
 import { fastDebitBalanceIfNotExists } from '../lib/credits/fast-debit';
 import type { CreditRefundMessage } from '../types/credit-queue';
@@ -335,7 +335,7 @@ function isSkippable(err: PipelineError): boolean {
 }
 
 // =============================================================================
-// Queue handler (V3 — per-message processing)
+// Queue handler (per-message processing)
 // =============================================================================
 
 export async function queue(
@@ -455,14 +455,14 @@ export async function queue(
           )
           .safeUnwrap();
 
-        // V3: Normalize at the edge via CF Images binding (streaming)
+        // Normalize at the edge via CF Images binding (streaming)
         const normalizedR2Key = `events/${claimed.eventId}/${claimed.id}/original.jpeg`;
 
         const normalizeResult = yield* inst
           .traced('normalize', () => normalizeImage(env, claimed.r2Key, normalizedR2Key))
           .safeUnwrap();
 
-        // V3: Insert photo as "indexing" — visible to guests immediately
+        // Insert photo as "indexing" — visible to guests immediately
         const photoId = crypto.randomUUID();
 
         yield* inst
