@@ -1,49 +1,66 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useParams } from 'react-router';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { searchPhotos, getEventPublic, type SearchResult } from '../../lib/api';
-import { th } from '../../lib/i18n';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useOutletContext } from 'react-router';
+import type { EventLayoutContext } from '../../components/EventLayout';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { searchPhotos, getEventPublic, getSessionState, acceptConsent, type SearchResult } from '../../lib/api';
 import { resizeImage } from '../../lib/resize-image';
 import { ConsentStep } from '../../components/ConsentStep';
-import { UploadStep } from '../../components/UploadStep';
-import { PreviewStep } from '../../components/PreviewStep';
+import { CameraStep } from '../../components/CameraStep';
 import { SearchingStep } from '../../components/SearchingStep';
-import { ResultsStep } from '../../components/ResultsStep';
-import { EmptyStep } from '../../components/EmptyStep';
 import { ErrorStep } from '../../components/ErrorStep';
+import { HomeStep } from '../../components/HomeStep';
+import { BottomNav } from '../../components/BottomNav';
 
-type PageState = 'consent' | 'upload' | 'preview' | 'searching' | 'results' | 'empty' | 'error';
+type PageState = 'loading' | 'consent' | 'home' | 'camera' | 'searching' | 'error';
 
 type ErrorType = 'NO_FACE' | 'RATE_LIMITED' | 'NOT_FOUND' | 'SERVER' | null;
 
 export function SearchPage() {
   const { eventId } = useParams<{ eventId: string }>();
-  const [state, setState] = useState<PageState>('consent');
-  const [consentAccepted, setConsentAccepted] = useState(false);
-  const [selfieFile, setSelfieFile] = useState<File | null>(null);
-  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
-  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { setHideBanner } = useOutletContext<EventLayoutContext>();
+  const [state, setState] = useState<PageState>('loading');
   const [errorType, setErrorType] = useState<ErrorType>(null);
+  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
 
-  // Revoke object URL on unmount to prevent memory leaks
+  // Track the selfie file or existing selfie ID for the current search
+  const selfieFileRef = useRef<File | null>(null);
+  const selfieIdRef = useRef<string | null>(null);
+
+  // Hide event banner when camera is fullscreen
+  useEffect(() => {
+    setHideBanner(state === 'camera');
+  }, [state, setHideBanner]);
+
+  // Revoke object URL on unmount
   useEffect(() => {
     return () => {
       if (selfiePreview) URL.revokeObjectURL(selfiePreview);
     };
   }, [selfiePreview]);
 
-  // Check sessionStorage for existing consent in this session
-  useEffect(() => {
-    const hasConsented = sessionStorage.getItem('pdpa_consent_accepted');
-    if (hasConsented === 'true' && state === 'consent') {
-      setConsentAccepted(true);
-      // Skip to upload immediately if already consented in this session
-      setState('upload');
-    }
-  }, [state]);
+  // Check session state for existing consent + selfie
+  const sessionQuery = useQuery({
+    queryKey: ['participant', 'session'],
+    queryFn: getSessionState,
+    staleTime: 60_000,
+  });
 
-  // Fetch event info (name)
+  // Route to correct initial state based on session
+  useEffect(() => {
+    if (sessionQuery.isLoading) return;
+    if (state !== 'loading') return;
+
+    const session = sessionQuery.data;
+    if (session?.hasConsent) {
+      setState('home');
+    } else {
+      setState('consent');
+    }
+  }, [sessionQuery.isLoading, sessionQuery.data, state]);
+
+  // Fetch event info
   const eventQuery = useQuery({
     queryKey: ['event', eventId, 'public'],
     queryFn: () => getEventPublic(eventId!),
@@ -52,16 +69,23 @@ export function SearchPage() {
 
   const searchMutation = useMutation({
     mutationFn: async () => {
-      if (!eventId || !selfieFile) throw new Error('Missing data');
-      return searchPhotos(eventId, selfieFile, consentAccepted);
-    },
-    onSuccess: (result) => {
-      setSearchResult(result);
-      if (result.photos.length === 0) {
-        setState('empty');
-      } else {
-        setState('results');
+      if (!eventId) throw new Error('Missing data');
+
+      if (selfieIdRef.current) {
+        return searchPhotos(eventId, { selfieId: selfieIdRef.current }, true);
       }
+      if (selfieFileRef.current) {
+        return searchPhotos(eventId, { selfie: selfieFileRef.current }, true);
+      }
+      throw new Error('Missing selfie');
+    },
+    onSuccess: (result: SearchResult) => {
+      // Navigate to results route with data in state
+      navigate(`/${eventId}/results/${result.searchId}`, {
+        state: result,
+      });
+      // Invalidate session to pick up new selfie
+      queryClient.invalidateQueries({ queryKey: ['participant', 'session'] });
     },
     onError: (error: Error) => {
       const code = error.message;
@@ -78,119 +102,90 @@ export function SearchPage() {
     },
   });
 
-  const handleConsentAccept = useCallback(() => {
-    setConsentAccepted(true);
-    // Store consent in sessionStorage for this session
-    sessionStorage.setItem('pdpa_consent_accepted', 'true');
-    setState('upload');
-  }, []);
+  const handleConsentAccept = useCallback(async () => {
+    await acceptConsent();
+    queryClient.invalidateQueries({ queryKey: ['participant', 'session'] });
+    setState('home');
+  }, [queryClient]);
 
-  const handleFileSelect = useCallback(async (file: File) => {
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error(th.errors.fileSize.title, {
-        description: th.errors.fileSize.description,
-      });
-      return;
-    }
+  // Camera captured a selfie -> resize + immediately search
+  const handleCapture = useCallback(
+    async (file: File) => {
+      const resized = await resizeImage(file);
+      selfieFileRef.current = resized;
+      selfieIdRef.current = null;
+      setSelfiePreview(URL.createObjectURL(resized));
+      setState('searching');
+      searchMutation.mutate();
+    },
+    [searchMutation],
+  );
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error(th.errors.fileType.title, {
-        description: th.errors.fileType.description,
-      });
-      return;
-    }
-
-    // Resize large images client-side before upload
-    const resized = await resizeImage(file);
-
-    setSelfieFile(resized);
-    setSelfiePreview(URL.createObjectURL(resized));
-    setState('preview');
-  }, []);
-
-  const handleRetake = useCallback(() => {
-    if (selfiePreview) {
-      URL.revokeObjectURL(selfiePreview);
-    }
-    setSelfieFile(null);
-    setSelfiePreview(null);
-    setState('upload');
-  }, [selfiePreview]);
-
-  const handleSearch = useCallback(() => {
+  // Search with a specific selfie by ID
+  const handleSearchWithSelfie = useCallback((selfieId: string) => {
+    const selfie = sessionQuery.data?.selfies.find((s) => s.id === selfieId);
+    if (!selfie) return;
+    selfieIdRef.current = selfie.id;
+    selfieFileRef.current = null;
+    setSelfiePreview(selfie.thumbnailUrl);
     setState('searching');
     searchMutation.mutate();
-  }, [searchMutation]);
+  }, [sessionQuery.data, searchMutation]);
+
+  const handleNewSelfie = useCallback(() => {
+    selfieFileRef.current = null;
+    selfieIdRef.current = null;
+    setState('camera');
+  }, []);
 
   const handleRetry = useCallback(() => {
     setErrorType(null);
-    setSearchResult(null);
-    setState('upload');
+    setState('home');
   }, []);
 
   const handleBack = useCallback(() => {
-    switch (state) {
-      case 'upload':
-        setState('consent');
-        setConsentAccepted(false);
-        break;
-      case 'preview':
-        handleRetake();
-        break;
-      case 'results':
-      case 'empty':
-      case 'error':
-        handleRetry();
-        break;
+    if (state === 'camera') {
+      setState('home');
+    } else if (state === 'error') {
+      handleRetry();
     }
-  }, [state, handleRetake, handleRetry]);
+  }, [state, handleRetry]);
 
   if (!eventId) {
     return <ErrorStep type="NOT_FOUND" onRetry={() => window.location.reload()} />;
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={state === 'camera' ? 'flex flex-1 min-h-0 flex-col overflow-hidden' : 'flex flex-1 min-h-0 flex-col pb-14'}>
+      {state === 'loading' && null}
+
       {state === 'consent' && (
         <ConsentStep
           eventName={eventQuery.data?.name}
           isLoading={eventQuery.isLoading}
-          accepted={consentAccepted}
-          onAcceptChange={setConsentAccepted}
           onContinue={handleConsentAccept}
         />
       )}
 
-      {state === 'upload' && <UploadStep onFileSelect={handleFileSelect} onBack={handleBack} />}
-
-      {state === 'preview' && selfiePreview && (
-        <PreviewStep
-          previewUrl={selfiePreview}
-          onSearch={handleSearch}
-          onRetake={handleRetake}
-          onBack={handleBack}
-        />
+      {state === 'home' && (
+        <>
+          <HomeStep
+            selfies={sessionQuery.data?.selfies ?? []}
+            onSearch={handleSearchWithSelfie}
+            onNewSelfie={handleNewSelfie}
+          />
+          <BottomNav eventId={eventId} />
+        </>
       )}
+
+      {state === 'camera' && <CameraStep onCapture={handleCapture} onBack={handleBack} />}
 
       {state === 'searching' && <SearchingStep />}
-
-      {state === 'results' && searchResult && eventId && (
-        <ResultsStep
-          eventId={eventId}
-          searchId={searchResult.searchId}
-          photos={searchResult.photos}
-          onSearchAgain={handleRetry}
-        />
-      )}
-
-      {state === 'empty' && <EmptyStep onRetry={handleRetry} />}
 
       {state === 'error' && (
         <ErrorStep
           type={errorType}
-          onRetry={errorType === 'NO_FACE' ? handleRetake : handleRetry}
+          onRetry={errorType === 'NO_FACE' ? handleNewSelfie : handleRetry}
         />
       )}
     </div>

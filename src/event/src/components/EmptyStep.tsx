@@ -15,7 +15,7 @@ interface EmptyStepProps {
 
 export function EmptyStep({ onRetry }: EmptyStepProps) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6">
+    <div className="flex flex-1 flex-col items-center justify-center px-6">
       <Empty className="border-none">
         <EmptyHeader>
           <EmptyMedia>

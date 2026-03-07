@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -7,33 +7,14 @@ import { th } from '../lib/i18n';
 interface ConsentStepProps {
   eventName: string | undefined;
   isLoading: boolean;
-  accepted: boolean;
-  onAcceptChange: (accepted: boolean) => void;
   onContinue: () => void;
 }
 
-const CONSENT_STORAGE_KEY = 'pdpa_consent_accepted';
+export function ConsentStep({ eventName, isLoading, onContinue }: ConsentStepProps) {
+  const [accepted, setAccepted] = useState(false);
 
-export function ConsentStep({
-  eventName,
-  isLoading,
-  accepted,
-  onAcceptChange,
-  onContinue,
-}: ConsentStepProps) {
-  // Check sessionStorage for existing consent in this session
-  useEffect(() => {
-    const hasConsented = sessionStorage.getItem(CONSENT_STORAGE_KEY);
-    if (hasConsented === 'true' && !accepted) {
-      onAcceptChange(true);
-      // Auto-continue after brief delay to allow UI to update
-      setTimeout(() => {
-        onContinue();
-      }, 100);
-    }
-  }, [onAcceptChange, onContinue]);
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6 py-12">
+    <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
       <div className="w-full max-w-sm space-y-8">
         {/* Event Name */}
         <div className="text-center">
@@ -58,7 +39,7 @@ export function ConsentStep({
           <Checkbox
             id="consent"
             checked={accepted}
-            onCheckedChange={(checked) => onAcceptChange(checked === true)}
+            onCheckedChange={(checked) => setAccepted(checked === true)}
             className="mt-0.5 data-[state=checked]:border-primary data-[state=checked]:bg-primary"
           />
           <span className="text-sm leading-relaxed">

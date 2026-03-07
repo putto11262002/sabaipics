@@ -1,9 +1,8 @@
 import { useState, useCallback } from 'react';
-import { Download, Check, RefreshCw, Image } from 'lucide-react';
+import { Download, Check, RefreshCw, Image, Share2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/shared/components/ui/button';
 import { ButtonGroup } from '@/shared/components/ui/button-group';
-import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Spinner } from '@/shared/components/ui/spinner';
 import { th } from '../lib/i18n';
 import { LineDeliveryButton } from './LineDeliveryButton';
@@ -17,6 +16,20 @@ interface ResultPhoto {
   similarity: number;
 }
 
+const MAX_PRESELECT = 5;
+
+/** Check if Web Share API supports sharing image files. */
+function canShareFiles(): boolean {
+  if (!navigator.share || !navigator.canShare) return false;
+  try {
+    return navigator.canShare({
+      files: [new File([], 'test.jpg', { type: 'image/jpeg' })],
+    });
+  } catch {
+    return false;
+  }
+}
+
 interface ResultsStepProps {
   eventId: string;
   searchId: string;
@@ -25,11 +38,14 @@ interface ResultsStepProps {
 }
 
 export function ResultsStep({ eventId, searchId, photos, onSearchAgain }: ResultsStepProps) {
+  // Photos are already sorted by similarity desc from the API
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    () => new Set(photos.map((p) => p.photoId)),
+    () => new Set(photos.slice(0, MAX_PRESELECT).map((p) => p.photoId)),
   );
-  const { data: lineStatus } = useLineStatus({ eventId });
-  const { mutateAsync: downloadAsync, isPending: isDownloadPending } = useDownloadBulk();
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { data: lineStatus, isLoading: isLineLoading } = useLineStatus({ eventId });
+  const { mutateAsync: downloadAsync, isPending: isZipPending } = useDownloadBulk();
+  const shareSupported = canShareFiles();
 
   const toggleSelection = useCallback((photoId: string) => {
     setSelectedIds((prev) => {
@@ -43,7 +59,36 @@ export function ResultsStep({ eventId, searchId, photos, onSearchAgain }: Result
     });
   }, []);
 
-  const handleDownloadSelected = useCallback(async () => {
+  const handleShareSelected = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setIsDownloading(true);
+
+    try {
+      const selectedPhotos = photos.filter((p) => selectedIds.has(p.photoId));
+
+      // Fetch all selected photos as files
+      const files = await Promise.all(
+        selectedPhotos.map(async (photo, i) => {
+          const response = await fetch(photo.previewUrl, { cache: 'no-store' });
+          const blob = await response.blob();
+          return new File([blob], `photo-${i + 1}.jpg`, { type: 'image/jpeg' });
+        }),
+      );
+
+      await navigator.share({ files });
+      toast.success(th.results.downloadSuccess);
+    } catch (e) {
+      // User cancelled the share sheet — not an error
+      if (e instanceof Error && e.name === 'AbortError') return;
+      toast.error(th.results.downloadError.title, {
+        description: th.results.downloadError.description,
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [selectedIds, photos]);
+
+  const handleZipDownload = useCallback(async () => {
     if (selectedIds.size === 0) return;
 
     try {
@@ -64,27 +109,32 @@ export function ResultsStep({ eventId, searchId, photos, onSearchAgain }: Result
     }
   }, [eventId, selectedIds, downloadAsync]);
 
+  const isPending = isDownloading || isZipPending;
   const lineAvailable = lineStatus?.available ?? false;
+  const linePhotoCap = lineStatus?.photoCap ?? null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex flex-1 min-h-0 flex-col">
       {/* Top Bar */}
       <div className="sticky top-0 z-30 flex items-center justify-between bg-background px-4 py-4">
         <Button variant="outline" size="sm" onClick={onSearchAgain}>
           <RefreshCw className="mr-1 size-4" />
           {th.results.searchAgain}
         </Button>
-        <Button variant="ghost" size="sm">
-          <Image className="mr-1 size-4" />
-          {photos.length}
-        </Button>
-      </div>
-
-      {/* Hint Alert */}
-      <div className="px-4 pb-4">
-        <Alert>
-          <AlertDescription>{th.results.hint}</AlertDescription>
-        </Alert>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+              <X className="mr-1 size-4" />
+              {th.results.clearSelection}
+            </Button>
+          )}
+          <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Image className="size-4" />
+            {selectedIds.size > 0
+              ? th.results.selected(selectedIds.size)
+              : photos.length}
+          </span>
+        </div>
       </div>
 
       {/* Photo Grid */}
@@ -125,23 +175,28 @@ export function ResultsStep({ eventId, searchId, photos, onSearchAgain }: Result
         <ButtonGroup className="w-full">
           <Button
             className="flex-1"
-            onClick={handleDownloadSelected}
-            disabled={isDownloadPending || selectedIds.size === 0}
+            onClick={shareSupported ? handleShareSelected : handleZipDownload}
+            disabled={isPending || selectedIds.size === 0}
           >
-            {isDownloadPending ? (
+            {isPending ? (
               <Spinner className="mr-1 size-4" />
+            ) : shareSupported ? (
+              <Share2 className="mr-1 size-4" />
             ) : (
               <Download className="mr-1 size-4" />
             )}
             {th.results.download(selectedIds.size)}
           </Button>
-          {lineAvailable && (
+          {isLineLoading ? (
+            <div className="h-10 flex-1 animate-pulse rounded-md bg-muted" />
+          ) : lineAvailable ? (
             <LineDeliveryButton
               eventId={eventId}
               searchId={searchId}
               selectedIds={selectedIds}
+              photoCap={linePhotoCap}
             />
-          )}
+          ) : null}
         </ButtonGroup>
       </div>
     </div>

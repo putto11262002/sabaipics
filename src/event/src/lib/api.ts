@@ -26,6 +26,59 @@ export interface EventPublic {
   name: string;
 }
 
+// =============================================================================
+// Session
+// =============================================================================
+
+export interface SessionSelfie {
+  id: string;
+  thumbnailUrl: string;
+}
+
+export interface SessionState {
+  hasConsent: boolean;
+  lineUserId: string | null;
+  isFriend: boolean;
+  selfies: SessionSelfie[];
+}
+
+export async function getSessionState(): Promise<SessionState | null> {
+  const response = await tracingFetch(`${API_URL}/participant/session`);
+  if (!response.ok) return null;
+  const result = (await response.json()) as { data: SessionState | null };
+  return result.data;
+}
+
+export async function acceptConsent(): Promise<void> {
+  await tracingFetch(`${API_URL}/participant/session/consent`, { method: 'POST' });
+}
+
+export async function deleteSession(): Promise<void> {
+  const response = await tracingFetch(`${API_URL}/participant/session`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = (await response.json()) as ApiError;
+    throw new Error(error.error?.code || 'UNKNOWN_ERROR');
+  }
+}
+
+export async function deleteSelfie(selfieId: string): Promise<void> {
+  const response = await tracingFetch(`${API_URL}/participant/session/selfies/${selfieId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = (await response.json()) as ApiError;
+    throw new Error(error.error?.code || 'UNKNOWN_ERROR');
+  }
+}
+
+// =============================================================================
+// Events
+// =============================================================================
+
 export async function getEventPublic(eventId: string): Promise<EventPublic> {
   const response = await tracingFetch(`${API_URL}/participant/events/${eventId}`);
 
@@ -40,11 +93,15 @@ export async function getEventPublic(eventId: string): Promise<EventPublic> {
 
 export async function searchPhotos(
   eventId: string,
-  selfie: File,
+  input: { selfie: File } | { selfieId: string },
   consentAccepted: boolean,
 ): Promise<SearchResult> {
   const formData = new FormData();
-  formData.append('selfie', selfie);
+  if ('selfie' in input) {
+    formData.append('selfie', input.selfie);
+  } else {
+    formData.append('selfieId', input.selfieId);
+  }
   formData.append('consentAccepted', String(consentAccepted));
 
   const response = await tracingFetch(`${API_URL}/participant/events/${eventId}/search`, {
@@ -58,6 +115,24 @@ export async function searchPhotos(
   }
 
   const result = (await response.json()) as SearchResponse;
+  return result.data;
+}
+
+export interface MatchedPhoto {
+  photoId: string;
+  thumbnailUrl: string;
+  previewUrl: string;
+}
+
+export async function getMatchedPhotos(eventId: string): Promise<MatchedPhoto[]> {
+  const response = await tracingFetch(`${API_URL}/participant/events/${eventId}/photos/matched`);
+
+  if (!response.ok) {
+    const error = (await response.json()) as ApiError;
+    throw new Error(error.error?.code || 'UNKNOWN_ERROR');
+  }
+
+  const result = (await response.json()) as { data: MatchedPhoto[] };
   return result.data;
 }
 
@@ -95,6 +170,7 @@ export interface LineDeliveryResult {
 
 export interface LineStatus {
   available: boolean;
+  photoCap: number | null;
 }
 
 export async function getLineStatus(eventId: string): Promise<LineStatus> {
@@ -103,7 +179,7 @@ export async function getLineStatus(eventId: string): Promise<LineStatus> {
 
   if (!response.ok) {
     // Default to available if check fails — don't block the button on network errors
-    return { available: true };
+    return { available: true, photoCap: null };
   }
 
   const result = (await response.json()) as { data: LineStatus };
@@ -132,6 +208,7 @@ export async function createPendingLineDelivery(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ eventId, searchId, photoIds }),
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -167,7 +244,9 @@ export interface FriendshipStatus {
 
 export async function checkFriendshipStatus(lineUserId: string): Promise<FriendshipStatus> {
   const params = new URLSearchParams({ lineUserId });
-  const response = await fetch(`${API_URL}/participant/line/friendship?${params.toString()}`);
+  const response = await fetch(`${API_URL}/participant/line/friendship?${params.toString()}`, {
+    credentials: 'include',
+  });
 
   if (!response.ok) {
     // On error, assume not friend
