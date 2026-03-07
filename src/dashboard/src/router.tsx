@@ -7,9 +7,6 @@ import { SignUpPage } from './routes/sign-up';
 import { DesktopAuthPage } from './routes/auth/desktop';
 import { DashboardPage } from './routes/dashboard';
 import { CreditSuccessPage } from './routes/credits/success';
-import CreditsLayout from './routes/credits/layout';
-import CreditPurchasesTab from './routes/credits/purchases';
-import CreditUsageTab from './routes/credits/usage';
 import EventsPage from './routes/events';
 import EventDetailLayout from './routes/events/[id]/layout';
 import EventDetailsTab from './routes/events/[id]/details';
@@ -24,6 +21,10 @@ import StudioLutPreviewPage from './routes/studio/luts/preview';
 import LineDeliveryPage from './routes/line-delivery';
 import StudioAutoEditPage from './routes/studio/auto-edit';
 import StudioAutoEditNewPage from './routes/studio/auto-edit/new';
+import SettingsLayout from './routes/settings/layout';
+import SettingsProfileTab from './routes/settings/profile';
+import SettingsCreditsTab from './routes/settings/credits';
+import SettingsUsageTab from './routes/settings/usage';
 import { SidebarLayout } from './components/shell/sidebar-layout';
 import RouteErrorFallback from './components/errors/RouteErrorFallback';
 export const router = createBrowserRouter([
@@ -86,6 +87,23 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorFallback />,
   },
 
+  // Settings (auth required, own sidebar)
+  {
+    path: '/settings',
+    element: (
+      <ProtectedRoute>
+        <SettingsLayout />
+      </ProtectedRoute>
+    ),
+    errorElement: <RouteErrorFallback />,
+    children: [
+      { index: true, element: <Navigate to="profile" replace /> },
+      { path: 'profile', element: <SettingsProfileTab /> },
+      { path: 'credits', element: <SettingsCreditsTab /> },
+      { path: 'usage', element: <SettingsUsageTab /> },
+    ],
+  },
+
   // Credits routes (auth required, no sidebar)
   {
     path: '/credits',
@@ -96,6 +114,10 @@ export const router = createBrowserRouter([
     ),
     errorElement: <RouteErrorFallback />,
     children: [
+      // Redirect /credits to /settings/credits
+      { index: true, element: <Navigate to="/settings/credits" replace /> },
+      { path: 'purchases', element: <Navigate to="/settings/credits" replace /> },
+      { path: 'usage', element: <Navigate to="/settings/credits" replace /> },
       {
         path: 'success',
         element: <CreditSuccessPage />,
@@ -131,15 +153,6 @@ export const router = createBrowserRouter([
       {
         path: '/studio/auto-edit',
         element: <StudioAutoEditPage />,
-      },
-      {
-        path: '/credits',
-        element: <CreditsLayout />,
-        children: [
-          { index: true, element: <Navigate to="purchases" replace /> },
-          { path: 'purchases', element: <CreditPurchasesTab /> },
-          { path: 'usage', element: <CreditUsageTab /> },
-        ],
       },
       {
         path: '/events/:id',
