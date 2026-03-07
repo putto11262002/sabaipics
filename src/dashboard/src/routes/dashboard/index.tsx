@@ -8,6 +8,7 @@ import {
   Gift,
   HardDrive,
   Image,
+  MessageCircle,
   RefreshCw,
   TrendingDown,
   Users,
@@ -45,6 +46,8 @@ import { CreditTopUpDialog } from '../../components/credits/CreditTopUpDialog';
 import { GiftCodeDialog } from '../../components/credits/GiftCodeDialog';
 import { useValidatePromoCode } from '../../hooks/credits/useValidatePromoCode';
 import { useCreditHistory } from '../../hooks/credits/useCreditHistory';
+import { useLineDeliveryStats } from '../../hooks/line-delivery/useLineDeliveryStats';
+import { useLineDeliverySettings } from '../../hooks/line-delivery/useLineDeliverySettings';
 import { LatestAnnouncementBanner } from '../../components/announcements/latest-announcement-card';
 
 function formatBytes(bytes: number): string {
@@ -65,7 +68,11 @@ export function DashboardPage() {
   const { copyToClipboard, isCopied } = useCopyToClipboard();
   const downloadQR = useDownloadQR();
   const { data: creditData, isLoading: creditLoading } = useCreditHistory(0, 1);
+  const { data: lineStatsData } = useLineDeliveryStats();
+  const { data: lineSettingsData } = useLineDeliverySettings();
   const dashboardData = data?.data;
+  const lineStats = lineStatsData?.data;
+  const lineOverageEnabled = lineSettingsData?.data?.overageEnabled ?? false;
   const creditSummary = creditData?.data?.summary;
 
   // Validate promo code to determine if it's a gift or discount code
@@ -216,6 +223,25 @@ export function DashboardPage() {
                   </AlertDescription>
                 </Alert>
               )}
+
+            {/* LINE Allowance Warning */}
+            {lineStats && lineStats.allowance.used >= lineStats.allowance.limit * 0.8 && (
+              <Alert variant={lineStats.allowance.remaining === 0 ? 'destructive' : 'warning'}>
+                <MessageCircle className="size-4" />
+                <AlertTitle>
+                  {lineStats.allowance.remaining === 0
+                    ? 'LINE message allowance exhausted'
+                    : `${lineStats.allowance.remaining} free LINE messages remaining`}
+                </AlertTitle>
+                <AlertDescription>
+                  {lineStats.allowance.remaining === 0
+                    ? lineOverageEnabled
+                      ? 'All further deliveries will be charged 1 credit per message.'
+                      : 'Overage is disabled — LINE deliveries are blocked until next month.'
+                    : `You've used ${lineStats.allowance.used} of ${lineStats.allowance.limit} free messages this month.`}
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Credit Stats */}
             <div className="grid auto-rows-min gap-4 md:grid-cols-2">
