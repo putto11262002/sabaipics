@@ -6,6 +6,7 @@ import { adminSettingsRouter } from './settings';
 import { adminEventsRouter } from './events';
 import { announcementsRouter } from './announcements';
 import { adminFeedbackRouter } from './feedback';
+import { adminCleanupRouter } from './cleanup';
 import type { Env } from '../../types';
 
 export const adminRouter = new Hono<Env>()
@@ -15,4 +16,5 @@ export const adminRouter = new Hono<Env>()
   .route('/settings', adminSettingsRouter)
   .route('/events', adminEventsRouter)
   .route('/announcements', announcementsRouter)
-  .route('/feedback', adminFeedbackRouter);
+  .route('/feedback', adminFeedbackRouter)
+  .route('/cleanup', adminCleanupRouter);
