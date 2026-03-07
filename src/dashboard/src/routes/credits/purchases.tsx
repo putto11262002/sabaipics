@@ -3,13 +3,22 @@ import { useReactTable, getCoreRowModel, createColumnHelper } from '@tanstack/re
 import { Badge } from '@/shared/components/ui/badge';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+  CardDescription,
+} from '@/shared/components/ui/card';
+import {
   Empty,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
   EmptyDescription,
 } from '@/shared/components/ui/empty';
-import { ExternalLink, Wallet } from 'lucide-react';
+import { ExternalLink, Wallet, Clock, TrendingDown, RefreshCw } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
+import { CardAction } from '@/shared/components/ui/card';
 import { format, parseISO } from 'date-fns';
 import { DataTable } from '../../components/events-table/data-table';
 import { DataTablePagination } from '../../components/events-table/data-table-pagination';
@@ -76,6 +85,9 @@ export default function CreditPurchasesTab() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
 
+  const { data: summaryData, isLoading: summaryLoading, refetch: refetchSummary, isRefetching: summaryRefetching } = useCreditHistory(0, 1);
+  const summary = summaryData?.data?.summary;
+
   const { data, isLoading } = useCreditHistory(page, pageSize, 'credit');
 
   const entries = data?.data?.entries ?? [];
@@ -132,6 +144,72 @@ export default function CreditPurchasesTab() {
 
   return (
     <div className="space-y-4 py-4">
+      {/* Summary Cards */}
+      <div className="grid auto-rows-min gap-4 md:grid-cols-3">
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Balance</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {summaryLoading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                (summary?.balance ?? 0).toLocaleString()
+              )}
+            </CardTitle>
+            <CardAction>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => refetchSummary()}
+                disabled={summaryRefetching}
+              >
+                <RefreshCw className={summaryRefetching ? 'animate-spin' : ''} />
+              </Button>
+            </CardAction>
+          </CardHeader>
+          <CardFooter className="text-sm text-muted-foreground">
+            <Wallet className="mr-1 size-4" />
+            Available credits
+          </CardFooter>
+        </Card>
+
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Expiring Soon</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {summaryLoading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                (summary?.expiringSoon ?? 0).toLocaleString()
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardFooter
+            className={`text-sm ${(summary?.expiringSoon ?? 0) > 0 ? 'text-warning' : 'text-muted-foreground'}`}
+          >
+            <Clock className="mr-1 size-4" />
+            Credits expiring in 30 days
+          </CardFooter>
+        </Card>
+
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Used This Month</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {summaryLoading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                (summary?.usedThisMonth ?? 0).toLocaleString()
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardFooter className="text-sm text-destructive">
+            <TrendingDown className="mr-1 size-4" />
+            Credits used this month
+          </CardFooter>
+        </Card>
+      </div>
+
       <DataTable table={table} />
       {(pagination?.totalPages ?? 0) > 1 && (
         <DataTablePagination table={table} showSelectedCount={false} />

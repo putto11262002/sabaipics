@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from '@/shared/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/shared/components/ui/toggle-group';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Legend } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -39,10 +39,10 @@ import { useCreditHistory, type CreditEntry } from '../../hooks/credits/useCredi
 import { useUsageBySource } from '../../hooks/credits/useUsageBySource';
 
 const SOURCE_COLORS: Record<string, string> = {
-  upload: 'var(--color-chart-1)',
-  image_enhancement: 'var(--color-chart-2)',
-  line_delivery: 'var(--color-chart-3)',
-  admin_adjustment: 'var(--color-chart-4)',
+  upload: 'oklch(0.75 0.12 250)',
+  image_enhancement: 'oklch(0.78 0.10 170)',
+  line_delivery: 'oklch(0.80 0.10 85)',
+  admin_adjustment: 'oklch(0.75 0.10 310)',
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -55,19 +55,19 @@ const SOURCE_LABELS: Record<string, string> = {
 const chartConfig = {
   upload: {
     label: 'Photo Upload',
-    color: 'var(--color-chart-1)',
+    color: 'oklch(0.65 0.15 250 / 0.7)',
   },
   image_enhancement: {
     label: 'Image Enhancement',
-    color: 'var(--color-chart-2)',
+    color: 'oklch(0.70 0.15 170 / 0.7)',
   },
   line_delivery: {
     label: 'LINE Delivery',
-    color: 'var(--color-chart-3)',
+    color: 'oklch(0.75 0.15 85 / 0.7)',
   },
   admin_adjustment: {
     label: 'Admin',
-    color: 'var(--color-chart-4)',
+    color: 'oklch(0.65 0.15 310 / 0.7)',
   },
 } satisfies ChartConfig;
 
@@ -217,12 +217,12 @@ export default function CreditUsageTab() {
                 />
                 <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                 <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                <Legend />
                 {activeSources.map((source) => (
                   <Bar
                     key={source}
                     dataKey={source}
                     fill={SOURCE_COLORS[source] ?? 'var(--color-chart-5)'}
+                    fillOpacity={0.5}
                     stackId="a"
                     radius={[0, 0, 0, 0]}
                   />
