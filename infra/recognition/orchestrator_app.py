@@ -1,14 +1,11 @@
-"""FrameFast Upload Orchestrator V3 (single-job processing).
+"""FrameFast Upload Orchestrator.
 
-V3: CF normalizes at the edge. Orchestrator handles auto-edit (optional) + recognition per image.
-Callback is per-image, not batch.
-
-V2 batch endpoint is kept for backwards compatibility during rollout.
+CF normalizes at the edge. Orchestrator handles auto-edit (optional) + recognition per image.
+Callback is per-image.
 """
 
 from __future__ import annotations
 
-import asyncio
 import os
 import time
 from typing import Any, Dict, List, Literal, Optional
@@ -213,17 +210,8 @@ class PipelineJob(BaseModel):
     options: Optional[PipelineJobOptions] = None
 
 
-# V3: Single job request
 class PipelineSingleJobRequest(BaseModel):
     job: PipelineJob
-    callback: CallbackTarget
-    traceparent: Optional[str] = None
-    baggage: Optional[str] = None
-
-
-# V2: Batch request (kept for backwards compatibility)
-class PipelineBatchRequest(BaseModel):
-    jobs: List[PipelineJob]
     callback: CallbackTarget
     traceparent: Optional[str] = None
     baggage: Optional[str] = None
@@ -268,7 +256,7 @@ class PipelineJobResult(BaseModel):
     error: Optional[PipelineJobError] = None
 
 
-class PipelineBatchCallback(BaseModel):
+class PipelineCallback(BaseModel):
     results: List[PipelineJobResult]
     traceparent: Optional[str] = None
     baggage: Optional[str] = None
@@ -280,7 +268,7 @@ class PipelineBatchCallback(BaseModel):
 
 
 async def call_image_pipeline_auto_edit(job: PipelineJob) -> Dict[str, Any]:
-    """Call image pipeline for auto-edit/LUT only (V3: normalization done at CF edge)."""
+    """Call image pipeline for auto-edit/LUT only (normalization done at CF edge)."""
     process_fn = modal.Function.from_name("framefast-image-pipeline", "process_internal")
 
     output_headers = {
@@ -316,15 +304,10 @@ async def call_image_pipeline_auto_edit(job: PipelineJob) -> Dict[str, Any]:
 
 
 async def call_recognition(job: PipelineJob) -> Dict[str, Any]:
-    """Call recognition via Modal native Function.from_name().
-
-    V3: Downloads normalized image from R2 via presigned URL (no shared volume).
-    """
+    """Call recognition via Modal native Function.from_name()."""
     extract_fn = modal.Function.from_name("framefast-recognition", "extract_internal")
 
     max_faces = job.options.maxFaces if job.options and job.options.maxFaces else 100
-
-    # V3: Pass presigned URL for recognition to download from R2 directly
     result = await extract_fn.remote.aio(
         image_url=job.inputUrl,
         max_faces=max_faces,
@@ -349,12 +332,6 @@ async def process_single_job(job: PipelineJob) -> PipelineJobResult:
             and job.processedPutUrl
         )
 
-        # DEBUG: log auto-edit decision
-        print(f"[orchestrator] AUTO_EDIT_DECISION job={job.jobId} has_auto_edit={has_auto_edit} "
-              f"options.autoEdit={job.options.autoEdit if job.options else None} "
-              f"options.lutId={job.options.lutId if job.options else None} "
-              f"processedPutUrl={'set' if job.processedPutUrl else 'MISSING'}")
-
         if has_auto_edit:
             start = time.monotonic()
             try:
@@ -367,28 +344,21 @@ async def process_single_job(job: PipelineJob) -> PipelineJobResult:
                 if _step_duration:
                     _step_duration.record(ip_duration, {"step": "auto_edit", "status": "ok"})
 
-                # DEBUG: log full image pipeline result
-                print(f"[orchestrator] IMAGE_PIPELINE_RESULT job={job.jobId} result={image_result}")
-
                 if isinstance(image_result, dict) and image_result.get("error"):
                     auto_edit_succeeded = False
                     lut_applied = False
-                    print(f"[orchestrator] AUTO_EDIT_ERROR job={job.jobId} error={image_result.get('error')}")
                     if _errors_total:
                         _errors_total.add(1, {"step": "auto_edit", "code": "AUTO_EDIT_FAILED"})
                 else:
                     operations_applied = image_result.get("operations_applied", []) if isinstance(image_result, dict) else []
                     auto_edit_succeeded = "auto_edit" in operations_applied
                     lut_applied = "lut" in operations_applied
-                    print(f"[orchestrator] AUTO_EDIT_OK job={job.jobId} ops={operations_applied} "
-                          f"auto_edit_succeeded={auto_edit_succeeded} lut_applied={lut_applied}")
             except Exception as exc:
                 auto_edit_succeeded = False
                 lut_applied = False
                 if _errors_total:
                     _errors_total.add(1, {"step": "auto_edit", "code": "AUTO_EDIT_EXCEPTION"})
-                import traceback
-                print(f"[orchestrator] AUTO_EDIT_EXCEPTION job={job.jobId}: {exc}\n{traceback.format_exc()}")
+                print(f"[orchestrator] auto-edit exception job={job.jobId}: {exc}")
 
         # Recognition — always runs
         start = time.monotonic()
@@ -474,7 +444,7 @@ async def process_single_job(job: PipelineJob) -> PipelineJobResult:
 
 async def post_callback(
     callback: CallbackTarget,
-    payload: PipelineBatchCallback,
+    payload: PipelineCallback,
 ) -> None:
     """Post callback to CF."""
     import httpx
@@ -489,7 +459,7 @@ async def post_callback(
 
 
 # ============================================================================
-# Modal Function — V3 single-job endpoint
+# Modal Function
 # ============================================================================
 
 
@@ -502,120 +472,63 @@ async def post_callback(
     secrets=[modal.Secret.from_name("framefast-observability")],
 )
 @modal.fastapi_endpoint(method="POST")
-async def process_batch(request: Dict[str, Any]) -> Dict[str, Any]:
-    """Process a single job or batch of jobs.
-
-    V3: Receives single job via PipelineSingleJobRequest.
-    V2: Receives batch via PipelineBatchRequest (backwards compatible).
-    """
+async def process_job(request: Dict[str, Any]) -> Dict[str, Any]:
+    """Process a single recognition job."""
     _init_observability()
 
-    # Detect V3 single-job vs V2 batch
-    if "job" in request:
-        # V3: Single job
-        req = PipelineSingleJobRequest.model_validate(request)
-        job_start = time.monotonic()
+    req = PipelineSingleJobRequest.model_validate(request)
+    job_start = time.monotonic()
 
-        parent_context = _parse_traceparent(req.traceparent)
+    parent_context = _parse_traceparent(req.traceparent)
 
-        if _tracer and parent_context:
-            from opentelemetry import trace as trace_api
+    if _tracer and parent_context:
+        from opentelemetry import trace as trace_api
 
-            with _tracer.start_as_current_span(
-                "orchestrator.process_job",
-                context=parent_context,
-                attributes={
-                    "job.id": req.job.jobId,
-                    "job.event_id": req.job.eventId,
-                    "job.photo_id": req.job.photoId or "",
-                },
-            ) as job_span:
-                result = await process_single_job(req.job)
-
-                job_duration = (time.monotonic() - job_start) * 1000
-                if _batch_duration:
-                    _batch_duration.record(job_duration, {})
-
-                job_span.set_attribute("job.status", result.status)
-                if result.artifacts:
-                    job_span.set_attribute("job.face_count", result.artifacts.embeddingCount)
-                if result.status == "failed":
-                    job_span.set_status(trace_api.StatusCode.ERROR)
-                    if result.error:
-                        job_span.set_attribute("error.code", result.error.code)
-
-                # Propagate trace context to callback
-                ctx = job_span.get_span_context()
-                cb_traceparent = f"00-{format(ctx.trace_id, '032x')}-{format(ctx.span_id, '016x')}-01"
-        else:
+        with _tracer.start_as_current_span(
+            "orchestrator.process_job",
+            context=parent_context,
+            attributes={
+                "job.id": req.job.jobId,
+                "job.event_id": req.job.eventId,
+                "job.photo_id": req.job.photoId or "",
+            },
+        ) as job_span:
             result = await process_single_job(req.job)
+
             job_duration = (time.monotonic() - job_start) * 1000
             if _batch_duration:
                 _batch_duration.record(job_duration, {})
-            cb_traceparent = req.traceparent
 
-        callback_payload = PipelineBatchCallback(
-            results=[result],
-            traceparent=cb_traceparent,
-            baggage=req.baggage,
-        )
-        await post_callback(req.callback, callback_payload)
+            job_span.set_attribute("job.status", result.status)
+            if result.artifacts:
+                job_span.set_attribute("job.face_count", result.artifacts.embeddingCount)
+            if result.status == "failed":
+                job_span.set_status(trace_api.StatusCode.ERROR)
+                if result.error:
+                    job_span.set_attribute("error.code", result.error.code)
 
-        # Force flush spans before container may shut down
-        if _tracer_provider:
-            _tracer_provider.force_flush(timeout_millis=5000)
-
-        return {"status": "ok", "processed": 1}
-
+            # Propagate trace context to callback
+            ctx = job_span.get_span_context()
+            cb_traceparent = f"00-{format(ctx.trace_id, '032x')}-{format(ctx.span_id, '016x')}-01"
     else:
-        # V2: Batch processing (backwards compatible)
-        req = PipelineBatchRequest.model_validate(request)
-        batch_start = time.monotonic()
-
-        parent_context = _parse_traceparent(req.traceparent)
-
-        if _tracer and parent_context:
-            from opentelemetry import trace as trace_api
-            with _tracer.start_as_current_span(
-                "orchestrator.process_batch",
-                context=parent_context,
-                attributes={
-                    "batch.size": len(req.jobs),
-                },
-            ) as batch_span:
-                results = await asyncio.gather(*[process_single_job(job) for job in req.jobs])
-
-                completed = sum(1 for r in results if r.status == "completed")
-                failed = sum(1 for r in results if r.status == "failed")
-                batch_span.set_attribute("batch.completed", completed)
-                batch_span.set_attribute("batch.failed", failed)
-
-                if failed > 0:
-                    batch_span.set_status(trace_api.StatusCode.ERROR)
-
-                current_span = trace_api.get_current_span()
-                ctx = current_span.get_span_context()
-                cb_traceparent = f"00-{format(ctx.trace_id, '032x')}-{format(ctx.span_id, '016x')}-01"
-        else:
-            results = await asyncio.gather(*[process_single_job(job) for job in req.jobs])
-            cb_traceparent = req.traceparent
-
-        batch_duration = (time.monotonic() - batch_start) * 1000
+        result = await process_single_job(req.job)
+        job_duration = (time.monotonic() - job_start) * 1000
         if _batch_duration:
-            _batch_duration.record(batch_duration, {})
+            _batch_duration.record(job_duration, {})
+        cb_traceparent = req.traceparent
 
-        callback_payload = PipelineBatchCallback(
-            results=list(results),
-            traceparent=cb_traceparent,
-            baggage=req.baggage,
-        )
-        await post_callback(req.callback, callback_payload)
+    callback_payload = PipelineCallback(
+        results=[result],
+        traceparent=cb_traceparent,
+        baggage=req.baggage,
+    )
+    await post_callback(req.callback, callback_payload)
 
-        # Force flush spans before container may shut down
-        if _tracer_provider:
-            _tracer_provider.force_flush(timeout_millis=5000)
+    # Force flush spans before container may shut down
+    if _tracer_provider:
+        _tracer_provider.force_flush(timeout_millis=5000)
 
-        return {"status": "ok", "processed": len(results)}
+    return {"status": "ok", "processed": 1}
 
 
 @app.function(image=image)
@@ -623,6 +536,6 @@ def health() -> Dict[str, Any]:
     """Health check endpoint."""
     return {
         "status": "ok",
-        "service": "framefast-orchestrator-v3",
+        "service": "framefast-orchestrator",
         "environment": os.getenv("NODE_ENV", "production"),
     }

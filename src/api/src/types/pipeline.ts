@@ -1,16 +1,14 @@
 /**
- * Photo Pipeline V2/V3 — CF ↔ Modal Contracts
+ * Photo Pipeline — CF ↔ Modal Contracts
  *
- * V3: CF normalizes at the edge, then dispatches single recognition jobs to Modal.
+ * CF normalizes at the edge, then dispatches single recognition jobs to Modal.
  * Modal processes auto-edit (optional) + recognition, then POSTs per-image callback.
- *
- * V2 batch types are kept for backwards compatibility during rollout.
  */
 
 import type { DetectedFace } from '../lib/recognition/types';
 
 // =============================================================================
-// CF → Modal (single job — V3)
+// CF → Modal (single job request)
 // =============================================================================
 
 export interface PipelineSingleJobRequest {
@@ -20,26 +18,15 @@ export interface PipelineSingleJobRequest {
   baggage?: string;
 }
 
-// =============================================================================
-// CF → Modal (batch request — V2 legacy)
-// =============================================================================
-
-export interface PipelineBatchRequest {
-  jobs: PipelineJob[];
-  traceparent?: string;
-  baggage?: string;
-}
-
 export interface PipelineJob {
   jobId: string; // photo_jobs.id
-  photoId?: string; // photos.id (V3: created before recognition)
+  photoId?: string; // photos.id (created before recognition)
   eventId: string;
   photographerId: string;
   source: 'web' | 'ios' | 'ftp';
 
   // Presigned URLs
   inputUrl: string; // GET normalized image from R2
-  originalPutUrl?: string; // PUT normalized original to R2 (V2 only)
   processedPutUrl?: string; // PUT processed to R2 (if auto-edit enabled)
 
   // R2 keys (for DB records)
@@ -68,10 +55,10 @@ export interface PipelineJobOptions {
 }
 
 // =============================================================================
-// Modal → CF (callback — works for both single and batch)
+// Modal → CF (callback)
 // =============================================================================
 
-export interface PipelineBatchCallback {
+export interface PipelineCallback {
   results: PipelineJobResult[];
 }
 

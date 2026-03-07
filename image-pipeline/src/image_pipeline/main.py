@@ -360,7 +360,7 @@ def process(request: dict) -> dict:
         except Exception:
             max_dimension = 2500
 
-        # Normalize (resize) — skipped when normalize_max_px=0 (V3: already done at CF edge)
+        # Normalize (resize) — skipped when normalize_max_px=0 (already done at CF edge)
         if max_dimension and max_dimension > 0:
             if img.width > max_dimension or img.height > max_dimension:
                 resample = Image.Resampling.LANCZOS
@@ -494,7 +494,7 @@ def process_internal(
     processed_output_headers: dict[str, Any] | None = None,
     job_id: str | None = None,
 ) -> dict[str, Any]:
-    """Process image for V2 pipeline.
+    """Process image for pipeline.
 
     Handles dual-output (normalized original + optional processed) and writes
     normalized image to shared volume for recognition to read.
@@ -603,7 +603,7 @@ def process_internal(
     norm_buf.seek(0)
     normalized_bytes = norm_buf.read()
 
-    # 4. Upload normalized original to output_url (skip in V3 — already done at CF edge)
+    # 4. Upload normalized original to output_url (skip when normalize_max_px=0)
     if not skip_normalize:
         try:
             req = urllib.request.Request(output_url, data=normalized_bytes, method="PUT", headers=output_headers)
@@ -613,7 +613,7 @@ def process_internal(
         except Exception as e:
             return {"error": f"Failed to upload normalized: {e}"}
 
-    # 5. Write normalized to volume for recognition (skip in V3 — recognition reads from R2)
+    # 5. Write normalized to volume for recognition (skip when normalize_max_px=0)
     if not skip_normalize and job_id:
         vol_dir = f"/vol/{job_id}"
         os.makedirs(vol_dir, exist_ok=True)
@@ -624,11 +624,6 @@ def process_internal(
     # 6. Auto-edit + LUT → upload to processed_output_url (if enabled)
     auto_edit_succeeded = None
     processing_applied = False
-    # DEBUG: log auto-edit gate
-    print(f"[process_internal] AUTO_EDIT_GATE job={job_id} "
-          f"processed_output_url={'set' if processed_output_url else 'MISSING'} "
-          f"auto_edit={options.get('auto_edit')} lut_base64_len={len(options.get('lut_base64') or '')} "
-          f"skip_normalize={skip_normalize}")
     if processed_output_url and (options.get("auto_edit") or options.get("lut_base64")):
         from image_pipeline.lut import ApplyLutOptions, apply_lut, load_lut_from_bytes
 
@@ -637,7 +632,6 @@ def process_internal(
 
             # Auto-edit
             if options.get("auto_edit"):
-                print(f"[process_internal] APPLYING_AUTO_EDIT job={job_id} intensity={options.get('auto_edit_intensity', 100)}")
                 original_for_blend = processed.copy()
                 style_name = options.get("style")
                 style = StylePreset(style_name) if style_name else None
@@ -659,7 +653,6 @@ def process_internal(
 
                 auto_edit_succeeded = True
                 operations_applied.append("auto_edit")
-                print(f"[process_internal] AUTO_EDIT_DONE job={job_id}")
 
             # LUT
             lut_base64 = options.get("lut_base64")
@@ -681,24 +674,16 @@ def process_internal(
 
             headers = processed_output_headers or output_headers
             req = urllib.request.Request(processed_output_url, data=processed_bytes, method="PUT", headers=headers)
-            print(f"[process_internal] UPLOADING_PROCESSED job={job_id} size={len(processed_bytes)} url_prefix={processed_output_url[:80]}...")
             with urllib.request.urlopen(req) as resp:
-                print(f"[process_internal] UPLOAD_RESPONSE job={job_id} status={resp.status}")
                 if resp.status < 400:
                     processing_applied = True
                 else:
                     auto_edit_succeeded = False
                     operations_applied = [op for op in operations_applied if op not in ("auto_edit", "lut")]
-                    print(f"[process_internal] UPLOAD_FAILED job={job_id} status={resp.status}")
         except Exception as exc:
-            import traceback
-            print(f"[process_internal] AUTO_EDIT_EXCEPTION job={job_id}: {exc}\n{traceback.format_exc()}")
+            print(f"[process_internal] auto-edit exception job={job_id}: {exc}")
             auto_edit_succeeded = False
             operations_applied = [op for op in operations_applied if op not in ("auto_edit", "lut")]
-
-    # DEBUG: log final result
-    print(f"[process_internal] RESULT job={job_id} ops={operations_applied} "
-          f"auto_edit_succeeded={auto_edit_succeeded} processing_applied={processing_applied}")
 
     return {
         "width": img_rgb.width,

@@ -1,7 +1,7 @@
 /**
- * Photo Pipeline V2 — Callback Endpoint
+ * Photo Pipeline — Callback Endpoint
  *
- * Modal POSTs batch results here after processing all jobs.
+ * Modal POSTs results here after processing each job.
  * Each job result is handled in its own transaction.
  * Observability via `instrument` combinator — business logic stays clean.
  */
@@ -116,7 +116,7 @@ function processCompletedResult(
           .where(eq(events.id, intent.eventId))
           .limit(1);
 
-        // V3: photoId from job (created during normalization) or intent, fallback to new UUID
+        // photoId from job (created during normalization) or intent, fallback to new UUID
         const photoId = job.photoId ?? intent.photoId ?? crypto.randomUUID();
 
         // Determine photo R2 key — prefer processed if auto-edit succeeded
@@ -134,14 +134,14 @@ function processCompletedResult(
           lutIntensity: artifacts.lutApplied ? (artifacts.lutIntensity ?? 0) : 0,
         };
 
-        // V3: Photo may already exist as "indexing" (created during normalization).
-        // Update it to "indexed" with face data. V2 fallback: insert if not exists.
+        // Photo may already exist as "indexing" (created during normalization).
+        // Update it to "indexed" with face data, or insert if not exists.
         const existingPhoto = job.photoId
           ? await tx.select({ id: photos.id }).from(photos).where(eq(photos.id, photoId)).limit(1).then(r => r[0])
           : null;
 
         if (existingPhoto) {
-          // V3 path: update existing "indexing" photo → "indexed"
+          // Update existing "indexing" photo → "indexed"
           await tx
             .update(photos)
             .set({
@@ -156,7 +156,7 @@ function processCompletedResult(
             })
             .where(eq(photos.id, photoId));
         } else {
-          // V2 fallback: insert new photo directly as "indexed"
+          // Fallback: insert new photo directly as "indexed"
           await tx.insert(photos).values({
             id: photoId,
             eventId: intent.eventId,
@@ -271,7 +271,7 @@ function processFailedResult(
           })
           .where(eq(photoJobs.id, job.id));
 
-        // V3: Mark photo as failed if it was created during normalization
+        // Mark photo as failed if it was created during normalization
         if (job.photoId) {
           await tx
             .update(photos)
@@ -301,7 +301,7 @@ function processFailedResult(
 // Route
 // =============================================================================
 
-export const internalPipelineV2Router = new Hono<Env>().post(
+export const internalPipelineRouter = new Hono<Env>().post(
   '/callback',
   zValidator('json', callbackSchema, (result, c) => {
     if (!result.success) {
