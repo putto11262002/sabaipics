@@ -1,20 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useSearchParams } from 'react-router';
 import { Button } from '@/shared/components/ui/button';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-  CardDescription,
-} from '@/shared/components/ui/card';
-import { Skeleton } from '@/shared/components/ui/skeleton';
-import { CreditCard, Gift, Wallet, Clock, TrendingDown } from 'lucide-react';
+import { CreditCard, Gift } from 'lucide-react';
 import { cn } from '@/shared/utils/ui';
 import { SidebarPageHeader } from '../../components/shell/sidebar-page-header';
 import { CreditTopUpDialog } from '../../components/credits/CreditTopUpDialog';
 import { GiftCodeDialog } from '../../components/credits/GiftCodeDialog';
-import { useCreditHistory } from '../../hooks/credits/useCreditHistory';
 
 const tabs = [
   { name: 'Purchase History', path: 'purchases' },
@@ -26,9 +17,6 @@ export default function CreditsLayout() {
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftCode, setGiftCode] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
-  // Fetch just for summary stats (page 0, limit 1 to minimize data)
-  const { data, isLoading } = useCreditHistory(0, 1);
-  const summary = data?.data?.summary;
 
   // Handle ?code=GIFT-XXX from URL
   useEffect(() => {
@@ -54,62 +42,6 @@ export default function CreditsLayout() {
           Buy Credits
         </Button>
       </SidebarPageHeader>
-
-      {/* Summary Cards */}
-      <div className="grid auto-rows-min gap-4 px-4 py-4 md:grid-cols-3">
-        <Card className="@container/card">
-          <CardHeader>
-            <CardDescription>Balance</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-              {isLoading ? (
-                <Skeleton className="h-8 w-20" />
-              ) : (
-                (summary?.balance ?? 0).toLocaleString()
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardFooter className="text-sm text-muted-foreground">
-            <Wallet className="mr-1 size-4" />
-            Available credits
-          </CardFooter>
-        </Card>
-
-        <Card className="@container/card">
-          <CardHeader>
-            <CardDescription>Expiring Soon</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-              {isLoading ? (
-                <Skeleton className="h-8 w-20" />
-              ) : (
-                (summary?.expiringSoon ?? 0).toLocaleString()
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardFooter
-            className={`text-sm ${(summary?.expiringSoon ?? 0) > 0 ? 'text-warning' : 'text-muted-foreground'}`}
-          >
-            <Clock className="mr-1 size-4" />
-            Credits expiring in 30 days
-          </CardFooter>
-        </Card>
-
-        <Card className="@container/card">
-          <CardHeader>
-            <CardDescription>Used This Month</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-              {isLoading ? (
-                <Skeleton className="h-8 w-20" />
-              ) : (
-                (summary?.usedThisMonth ?? 0).toLocaleString()
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardFooter className="text-sm text-destructive">
-            <TrendingDown className="mr-1 size-4" />
-            Credits used this month
-          </CardFooter>
-        </Card>
-      </div>
 
       {/* Tab Navigation */}
       <div className="flex-shrink-0 border-b px-4">
