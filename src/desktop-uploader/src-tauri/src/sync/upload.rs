@@ -3,11 +3,21 @@ use super::retry;
 use crate::api::{ApiClient, ApiError};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 const POLL_MS: u64 = 500;
 const UPLOAD_CONCURRENCY: usize = 4;
+
+/// Signals the upload worker sends back to the manager.
+#[derive(Debug)]
+pub enum UploadSignal {
+    /// 402 — pause everything, surface "no credits" to user.
+    PaymentRequired,
+    /// 404/410 — event is gone, stop its syncs.
+    EventTerminal { event_id: String, reason: String },
+}
 
 /// Shared upload worker. Polls the DB for ready jobs across all syncs
 /// and uploads with bounded global concurrency.
@@ -17,13 +27,17 @@ pub struct UploadWorker {
 }
 
 impl UploadWorker {
-    pub fn spawn(db: DbHandle, api: Arc<dyn ApiClient>) -> Self {
+    pub fn spawn(
+        db: DbHandle,
+        api: Arc<dyn ApiClient>,
+        signal_tx: mpsc::UnboundedSender<UploadSignal>,
+    ) -> Self {
         let cancel = CancellationToken::new();
 
         let task = {
             let cancel = cancel.clone();
             tokio::spawn(async move {
-                upload_loop(db, api, cancel).await;
+                upload_loop(db, api, cancel, signal_tx).await;
             })
         };
 
@@ -36,7 +50,12 @@ impl UploadWorker {
     }
 }
 
-async fn upload_loop(db: DbHandle, api: Arc<dyn ApiClient>, cancel: CancellationToken) {
+async fn upload_loop(
+    db: DbHandle,
+    api: Arc<dyn ApiClient>,
+    cancel: CancellationToken,
+    signal_tx: mpsc::UnboundedSender<UploadSignal>,
+) {
     let sem = Arc::new(tokio::sync::Semaphore::new(UPLOAD_CONCURRENCY));
 
     loop {
@@ -74,10 +93,11 @@ async fn upload_loop(db: DbHandle, api: Arc<dyn ApiClient>, cancel: Cancellation
             };
             let api = api.clone();
             let db = db.clone();
+            let sig_tx = signal_tx.clone();
 
             tokio::spawn(async move {
                 let _permit = permit;
-                upload_one(&db, &api, job).await;
+                upload_one(&db, &api, job, &sig_tx).await;
             });
         }
     }
@@ -85,7 +105,12 @@ async fn upload_loop(db: DbHandle, api: Arc<dyn ApiClient>, cancel: Cancellation
     log::info!("[upload-worker] stopped");
 }
 
-async fn upload_one(db: &DbHandle, api: &Arc<dyn ApiClient>, job: JobLease) {
+async fn upload_one(
+    db: &DbHandle,
+    api: &Arc<dyn ApiClient>,
+    job: JobLease,
+    signal_tx: &mpsc::UnboundedSender<UploadSignal>,
+) {
     let path = PathBuf::from(&job.path);
     let file_name = path
         .file_name()
@@ -120,7 +145,7 @@ async fn upload_one(db: &DbHandle, api: &Arc<dyn ApiClient>, job: JobLease) {
             log::warn!("[upload] failed: {file_name} (job={}): {e}", job.id);
             let decision = retry::from_api_error(job.attempt_count, e);
 
-            // Log terminal event-level errors prominently
+            // Signal manager for actionable errors
             if let ApiError::Http { code, .. } = e {
                 if code.is_terminal_for_event() {
                     log::error!(
@@ -128,12 +153,17 @@ async fn upload_one(db: &DbHandle, api: &Arc<dyn ApiClient>, job: JobLease) {
                         job.event_id,
                         job.id
                     );
+                    let _ = signal_tx.send(UploadSignal::EventTerminal {
+                        event_id: job.event_id.clone(),
+                        reason: format!("Event is {code}"),
+                    });
                 }
                 if code.is_user_retryable() {
                     log::warn!(
                         "[upload] job {} requires user action ({code})",
                         job.id
                     );
+                    let _ = signal_tx.send(UploadSignal::PaymentRequired);
                 }
             }
 

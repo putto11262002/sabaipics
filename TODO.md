@@ -33,17 +33,22 @@
 - [ ] Upload progress tracking — report bytes uploaded per file to frontend
 
 ### 2. Error Handling & Resilience
+- [x] API error mapping — structured `ApiError`/`ApiErrorCode`/`PipelineErrorCode` types
+- [x] Retry logic — exponential backoff, Retry-After support, per-error-type decisions
+- [x] 402 (no credits) — pause ALL engines, surface banner to user, resume on dismiss
+- [x] 404/410 (event gone) — stop event engines, fail all pending jobs
+- [x] Manual retry — single job or all failed for an event, resets attempt count to 0
+- [x] Signal channel — upload worker → manager for cross-cutting error actions
 - [ ] Network failure handling — offline detection, queue pause, resume on reconnect
-- [ ] API error mapping — map HTTP status codes to typed errors for UI display
 - [ ] File permission errors — graceful skip + log when file becomes unreadable
 - [ ] Corrupt/truncated file handling — detect and mark as failed with reason
 - [ ] Upload timeout — cancel uploads that stall beyond threshold
 - [ ] Disk full / quota exceeded — detect and surface to user
 
 ### 3. Upload Pacing & Backoff
-- [ ] Rate limiting — respect API rate limits (429 → honor Retry-After header)
+- [x] Rate limiting — respect API rate limits (429 → honor Retry-After header)
+- [x] Backoff on presign expiry — quick retry (1s) for re-presign
 - [ ] Adaptive concurrency — reduce upload slots on repeated failures, restore on success
-- [ ] Backoff on re-signed URLs — if presign fails, back off before retrying
 - [ ] Upload bandwidth throttling — optional user-configurable max bandwidth
 
 ### 4. Thorough File Scenario Testing
@@ -77,10 +82,10 @@
 - [ ] Log rotation / cleanup for long-running syncs
 
 ### 7. Retry Design
-- [ ] Manual retry from UI — retry individual failed files or all failed in a sync
+- [x] Manual retry from UI — retry all failed for an event (resets attempt_count=0)
+- [x] Retry reason tracking — `last_error`, `error_code`, `last_http_status` stored per job
 - [ ] Retry policy configuration — max attempts, backoff multiplier, max delay
 - [ ] Dead letter queue — files that exceed max retries, with manual re-enqueue
-- [ ] Retry reason tracking — store why each attempt failed for debugging
 
 ### 8. Configurable Settings
 
@@ -93,7 +98,7 @@
 - [ ] Upload concurrency limit (default 4, configurable 1-8)
 - [ ] Max retry attempts (default 5)
 - [ ] Stabilization delay (default N ticks)
-- [ ] Auto-start engines on app launch for previously-running syncs
+- [x] Auto-start engines on app launch for previously-running syncs
 - [ ] Startup with OS / login item
 - [ ] Storage location for local DB
 
