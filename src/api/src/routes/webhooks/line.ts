@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
 import { verifyLineSignature } from '../../lib/line/webhook';
 import {
   WebhookRequestBodySchema,
@@ -7,6 +8,8 @@ import {
   type WebhookRequestBody,
 } from '../../lib/line/schemas';
 import { apiError } from '../../lib/error';
+import { participantSessions } from '@/db';
+import { createDbHttp } from '@/db';
 
 /**
  * LINE Webhook Bindings
@@ -14,6 +17,7 @@ import { apiError } from '../../lib/error';
 type LineWebhookBindings = {
   LINE_CHANNEL_SECRET: string;
   LINE_CHANNEL_ACCESS_TOKEN: string;
+  DATABASE_URL: string;
 };
 
 /**
@@ -70,8 +74,9 @@ export const lineWebhookRouter = new Hono<{
   console.log('[LINE Webhook] Events received:', webhookBody.events.length);
 
   // Process each event
+  const db = createDbHttp(c.env.DATABASE_URL);
   for (const event of webhookBody.events) {
-    await handleEvent(event);
+    await handleEvent(event, db);
   }
 
   return c.json({ success: true }, 200);
@@ -79,10 +84,8 @@ export const lineWebhookRouter = new Hono<{
 
 /**
  * Handle a single LINE webhook event
- *
- * Logs all events for now. Specific handlers can be added later.
  */
-async function handleEvent(event: WebhookEvent): Promise<void> {
+async function handleEvent(event: WebhookEvent, db: ReturnType<typeof createDbHttp>): Promise<void> {
   const timestamp = new Date(event.timestamp).toISOString();
   const source = formatSource(event.source);
 
@@ -100,16 +103,32 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
       console.log('Reply Token:', event.replyToken);
       break;
 
-    case 'follow':
+    case 'follow': {
       console.log('Action: User added bot as friend');
       console.log('Reply Token:', event.replyToken);
-      // TODO: Set line_linked=true in database when tables exist
+      const followUserId = event.source?.type === 'user' ? event.source.userId : null;
+      if (followUserId) {
+        await db
+          .update(participantSessions)
+          .set({ isFriend: true })
+          .where(eq(participantSessions.lineUserId, followUserId));
+        console.log(`[LINE Webhook] Updated isFriend=true for lineUserId=${followUserId}`);
+      }
       break;
+    }
 
-    case 'unfollow':
+    case 'unfollow': {
       console.log('Action: User blocked/unfriended bot');
-      // TODO: Set line_linked=false in database when tables exist
+      const unfollowUserId = event.source?.type === 'user' ? event.source.userId : null;
+      if (unfollowUserId) {
+        await db
+          .update(participantSessions)
+          .set({ isFriend: false })
+          .where(eq(participantSessions.lineUserId, unfollowUserId));
+        console.log(`[LINE Webhook] Updated isFriend=false for lineUserId=${unfollowUserId}`);
+      }
       break;
+    }
 
     case 'join':
       console.log('Action: Bot joined group/room');

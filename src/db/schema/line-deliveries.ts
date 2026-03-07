@@ -5,6 +5,7 @@ import { photographers } from "./photographers";
 import { events } from "./events";
 import { participantSearches } from "./participant-searches";
 import { creditLedger } from "./credit-ledger";
+import { participantSessions } from "./participant-sessions";
 
 export const lineDeliveryStatuses = [
   "pending",
@@ -24,6 +25,7 @@ export const lineDeliveries = pgTable(
       .notNull()
       .references(() => photographers.id, { onDelete: "restrict" }),
     eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
+    sessionId: uuid("session_id").references(() => participantSessions.id, { onDelete: "set null" }),
     searchId: uuid("search_id").references(() => participantSearches.id, { onDelete: "set null" }),
     photoIds: uuid("photo_ids").array(),
     lineUserId: text("line_user_id").notNull(),
@@ -39,6 +41,7 @@ export const lineDeliveries = pgTable(
     createdAt: createdAtCol(),
   },
   (table) => [
+    index("line_deliveries_session_id_idx").on(table.sessionId),
     index("line_deliveries_photographer_id_idx").on(table.photographerId),
     index("line_deliveries_event_id_idx").on(table.eventId),
     uniqueIndex("line_deliveries_search_id_unique_idx").on(table.searchId),

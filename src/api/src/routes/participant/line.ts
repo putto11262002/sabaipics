@@ -27,8 +27,9 @@ import { deliverPhotosViaLine, type DeliveryError } from '../../lib/line/deliver
 import { createLineClient } from '../../lib/line/client';
 import { getMonthlyUsage } from '../../lib/line/allowance';
 import { getBalance } from '../../lib/credits';
-import { events, photographers, lineDeliveries } from '@/db';
-import { eq } from 'drizzle-orm';
+import { events, photographers, lineDeliveries, participantSessions, activeParticipantSessions } from '@/db';
+import { eq, and, ne, isNull } from 'drizzle-orm';
+import { setCookie, extendSession } from '../../middleware/participant-session';
 import type { PhotographerSettings } from '@/db/schema/photographers';
 import { capturePostHogEvent } from '../../lib/posthog';
 
@@ -238,7 +239,9 @@ export const lineParticipantRouter = new Hono<Env>()
         }
       }
 
-      return ok({ available });
+      const photoCap = lineSettings?.photoCap ?? null;
+
+      return ok({ available, photoCap });
     })
       .match(
         (data) => c.json({ data }),
@@ -385,6 +388,67 @@ export const lineParticipantRouter = new Hono<Env>()
           cause: e.cause,
         }),
       );
+
+      // Session reconciliation (Phase 6):
+      // Link lineUserId to session, merge if another active session exists
+      const session = c.var.participantSession;
+      if (session) {
+        const db = c.var.db();
+
+        if (session.lineUserId === lineUserId) {
+          // Same user, just extend and update friendship
+          c.executionCtx.waitUntil(
+            Promise.all([
+              extendSession(db, session.id),
+              db.update(participantSessions)
+                .set({ isFriend })
+                .where(eq(participantSessions.id, session.id)),
+            ]),
+          );
+        } else {
+          // Check for existing active session with this lineUserId
+          const [existingSession] = await db
+            .select({ id: activeParticipantSessions.id, token: activeParticipantSessions.token })
+            .from(activeParticipantSessions)
+            .where(
+              and(
+                eq(activeParticipantSessions.lineUserId, lineUserId),
+                ne(activeParticipantSessions.id, session.id),
+              ),
+            )
+            .limit(1);
+
+          if (existingSession) {
+            // Reuse existing session: extend it, update friendship, swap cookie
+            await Promise.all([
+              extendSession(db, existingSession.id),
+              db.update(participantSessions)
+                .set({ isFriend })
+                .where(eq(participantSessions.id, existingSession.id)),
+            ]);
+            // Delete the current anonymous session (no lineUserId yet, safe to remove)
+            if (!session.lineUserId) {
+              c.executionCtx.waitUntil(
+                db.update(participantSessions)
+                  .set({ deletedAt: new Date().toISOString() })
+                  .where(eq(participantSessions.id, session.id)),
+              );
+            }
+            // Swap cookie to existing session
+            setCookie(c, existingSession.token);
+          } else {
+            // No existing session — set lineUserId on current session
+            c.executionCtx.waitUntil(
+              Promise.all([
+                extendSession(db, session.id),
+                db.update(participantSessions)
+                  .set({ lineUserId, isFriend })
+                  .where(eq(participantSessions.id, session.id)),
+              ]),
+            );
+          }
+        }
+      }
 
       // Redirect back to event app
       const params = new URLSearchParams({
@@ -580,9 +644,11 @@ export const lineParticipantRouter = new Hono<Env>()
 
       while (retryCount <= maxRetries) {
         try {
+          const deliverySession = c.var.participantSession;
           const [deliveryRecord] = await db
             .insert(lineDeliveries)
             .values({
+              sessionId: deliverySession?.id,
               photographerId,
               eventId,
               searchId,

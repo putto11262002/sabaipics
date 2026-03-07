@@ -26,6 +26,7 @@ import { feedbackRouter } from './routes/feedback';
 import { lineDeliveryRouter } from './routes/line-delivery';
 import { observabilityRouter } from './routes/observability';
 import { internalPipelineV2Router } from './routes/internal-pipeline-v2';
+import { participantSessionMiddleware } from './middleware/participant-session';
 import type { Env, Bindings } from './types';
 
 // Queue consumers
@@ -86,6 +87,8 @@ const app = new Hono<Env>()
     }
     return c.json({ status: 'ok', timestamp: Date.now() });
   })
+  // Participant session middleware (creates/resolves session from cookie)
+  .use('/participant/*', participantSessionMiddleware())
   // Participant routes (public, no auth - for event participants)
   .route('/participant', participantRouter)
   // LINE participant routes (public, no auth - LINE Login OAuth + delivery)

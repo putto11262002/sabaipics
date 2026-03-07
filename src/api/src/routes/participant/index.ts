@@ -18,7 +18,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { eq, and, inArray, isNull, desc, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { activeEvents, photos, participantSearches, events, feedback, feedbackCategories, type EventSettings } from '@/db';
+import { activeEvents, photos, participantSearches, participantSessions, selfies, downloads, events, feedback, feedbackCategories, type EventSettings } from '@/db';
 import type { Env } from '../../types';
 import { apiError, type HandlerError } from '../../lib/error';
 import { createExtractor, searchByFace, type RecognitionError, FACE_SEARCH_MAX_RESULTS, FACE_SEARCH_MIN_SIMILARITY } from '../../lib/recognition';
@@ -47,6 +47,8 @@ const bulkDownloadSchema = z.object({
     .array(z.string().uuid('Invalid photo ID format'))
     .min(1, 'At least one photo ID required')
     .max(15, 'Maximum 15 photos per download'),
+  searchId: z.string().uuid('Invalid search ID format').optional(),
+  method: z.enum(['zip', 'share', 'single']).optional().default('zip'),
 });
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -64,9 +66,14 @@ const searchRequestSchema = z.object({
     .refine(
       (f) => ALLOWED_MIME_TYPES.includes(f.type as (typeof ALLOWED_MIME_TYPES)[number]),
       `File type must be one of: ${ALLOWED_MIME_TYPES.join(', ')}`,
-    ),
+    )
+    .optional(),
+  selfieId: z.string().uuid('Invalid selfie ID').optional(),
   consentAccepted: z.preprocess((val) => val === 'true' || val === true, z.boolean()),
-});
+}).refine(
+  (data) => data.selfie || data.selfieId,
+  { message: 'Either selfie file or selfieId is required' },
+);
 
 // =============================================================================
 // URL Generators
@@ -148,6 +155,126 @@ function mapRecognitionError(e: RecognitionError): HandlerError {
 // =============================================================================
 
 export const participantRouter = new Hono<Env>()
+  // =========================================================================
+  // GET /participant/session - Current session state
+  // =========================================================================
+  .get('/session', async (c) => {
+    const session = c.var.participantSession;
+    if (!session) {
+      return c.json({ data: null });
+    }
+
+    // Fetch all non-deleted selfies for this session (newest first)
+    let sessionSelfies: Array<{ id: string; thumbnailUrl: string }> = [];
+    if (session.consentAcceptedAt) {
+      const db = c.var.db();
+      const isDev = c.env.NODE_ENV === 'development';
+      const selfieRows = await db
+        .select({ id: selfies.id, r2Key: selfies.r2Key })
+        .from(selfies)
+        .where(and(eq(selfies.sessionId, session.id), isNull(selfies.deletedAt)))
+        .orderBy(desc(selfies.createdAt));
+
+      sessionSelfies = selfieRows.map((s) => ({
+        id: s.id,
+        thumbnailUrl: isDev
+          ? `${c.env.PHOTO_R2_BASE_URL}/${s.r2Key}`
+          : `https://${c.env.CF_ZONE}/cdn-cgi/image/width=400,fit=cover,format=auto,quality=75/${c.env.PHOTO_R2_BASE_URL}/${s.r2Key}`,
+      }));
+    }
+
+    return c.json({
+      data: {
+        hasConsent: !!session.consentAcceptedAt,
+        lineUserId: session.lineUserId,
+        isFriend: session.isFriend,
+        selfies: sessionSelfies,
+      },
+    });
+  })
+
+  // =========================================================================
+  // POST /participant/session/consent - Record PDPA consent
+  // =========================================================================
+  .post('/session/consent', async (c) => {
+    const session = c.var.participantSession;
+    if (!session) {
+      return c.json({ error: { code: 'UNAUTHORIZED', message: 'No session' } }, 401);
+    }
+    if (!session.consentAcceptedAt) {
+      const db = c.var.db();
+      await db
+        .update(participantSessions)
+        .set({ consentAcceptedAt: new Date().toISOString() })
+        .where(eq(participantSessions.id, session.id));
+    }
+    return c.json({ data: { ok: true } });
+  })
+
+  // =========================================================================
+  // DELETE /participant/session/selfies/:selfieId - Soft delete a selfie
+  // =========================================================================
+  .delete('/session/selfies/:selfieId', async (c) => {
+    const session = c.var.participantSession;
+    if (!session) {
+      return c.json({ error: { code: 'UNAUTHORIZED', message: 'No session' } }, 401);
+    }
+
+    const selfieId = c.req.param('selfieId');
+    const db = c.var.db();
+
+    const result = await db
+      .update(selfies)
+      .set({ deletedAt: new Date().toISOString() })
+      .where(
+        and(
+          eq(selfies.id, selfieId),
+          eq(selfies.sessionId, session.id),
+          isNull(selfies.deletedAt),
+        ),
+      )
+      .returning({ id: selfies.id });
+
+    if (result.length === 0) {
+      return c.json({ error: { code: 'NOT_FOUND', message: 'Selfie not found' } }, 404);
+    }
+
+    return c.json({ data: { ok: true } });
+  })
+
+  // =========================================================================
+  // DELETE /participant/session - Hard delete all session data (PDPA)
+  // =========================================================================
+  .delete('/session', async (c) => {
+    const session = c.var.participantSession;
+    if (!session) {
+      return c.json({ error: { code: 'UNAUTHORIZED', message: 'No session' } }, 401);
+    }
+
+    const db = c.var.db();
+
+    // Get selfie R2 keys before deletion
+    const selfieRows = await db
+      .select({ r2Key: selfies.r2Key })
+      .from(selfies)
+      .where(eq(selfies.sessionId, session.id));
+
+    // Hard delete session — cascades to selfies + downloads.
+    // participant_searches and line_deliveries get sessionId set null (anonymized).
+    await db
+      .delete(participantSessions)
+      .where(eq(participantSessions.id, session.id));
+
+    // Clean up selfie R2 objects
+    if (selfieRows.length > 0) {
+      await Promise.all(
+        selfieRows.map((s) => c.env.PHOTOS_BUCKET.delete(s.r2Key)),
+      );
+    }
+
+    return c.json({ data: { ok: true } });
+  })
+
   // =========================================================================
   // GET /participant/events/:eventId - Public event info
   // =========================================================================
@@ -257,7 +384,7 @@ export const participantRouter = new Hono<Env>()
         }
 
         const db = c.var.db();
-        const { selfie, consentAccepted } = c.req.valid('form');
+        const { selfie, selfieId: existingSelfieId, consentAccepted } = c.req.valid('form');
 
         if (!consentAccepted) {
           return err<never, HandlerError>({ code: 'BAD_REQUEST', message: 'Consent not accepted' });
@@ -283,74 +410,173 @@ export const participantRouter = new Hono<Env>()
         // Step 3: Generate searchId (UUID)
         const searchId = crypto.randomUUID();
 
-        // Step 4: Store selfie to R2 at selfies/{searchId}.jpg (original, no transform)
-        const originalBytes = await selfie.arrayBuffer();
-        const selfieR2Key = `selfies/${searchId}.jpg`;
+        const session = c.var.participantSession;
+        let selfieId: string | undefined;
+        let selfieR2Key: string;
+        let queryEmbedding: number[];
 
-        yield* ResultAsync.fromPromise(
-          c.env.PHOTOS_BUCKET.put(selfieR2Key, originalBytes, {
-            httpMetadata: { contentType: selfie.type },
-          }),
-          (e): HandlerError => ({
-            code: 'BAD_GATEWAY',
-            message: 'Storage upload failed',
-            cause: e,
-          }),
-        );
+        // === Path A: Reuse existing selfie with cached embedding ===
+        if (existingSelfieId) {
+          const [existingSelfie] = yield* ResultAsync.fromPromise(
+            db
+              .select({ id: selfies.id, r2Key: selfies.r2Key, embedding: selfies.embedding })
+              .from(selfies)
+              .where(
+                and(
+                  eq(selfies.id, existingSelfieId),
+                  session ? eq(selfies.sessionId, session.id) : undefined,
+                  isNull(selfies.deletedAt),
+                ),
+              )
+              .limit(1),
+            (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+          );
 
-        // Step 5: Transform selfie via CF Images if too large (best effort, fallback to original)
-        const MAX_EXTRACTION_SIZE = 5 * 1024 * 1024;
-        let transformedBytes = originalBytes;
-        if (originalBytes.byteLength > MAX_EXTRACTION_SIZE) {
-          transformedBytes = yield* ResultAsync.fromPromise(
-            (async () => {
-              const stream = new ReadableStream({
-                start(controller) {
-                  controller.enqueue(new Uint8Array(originalBytes));
-                  controller.close();
-                },
-              });
-              const response = await c.env.IMAGES.input(stream)
-                .transform({ width: 2048, height: 2048, fit: 'scale-down' })
-                .output({ format: 'image/jpeg', quality: 95 });
-              return await response.response().arrayBuffer();
-            })(),
+          if (!existingSelfie) {
+            return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Selfie not found' });
+          }
+
+          selfieId = existingSelfie.id;
+          selfieR2Key = existingSelfie.r2Key;
+
+          if (existingSelfie.embedding) {
+            // Fast path: use cached embedding, skip extraction entirely
+            queryEmbedding = existingSelfie.embedding;
+            extractStatus = 'ok';
+            extractDurationMs = 0;
+          } else {
+            // Selfie exists but no cached embedding — fetch from R2 and extract
+            const selfieObject = yield* ResultAsync.fromPromise(
+              c.env.PHOTOS_BUCKET.get(existingSelfie.r2Key),
+              (e): HandlerError => ({ code: 'BAD_GATEWAY', message: 'Storage fetch failed', cause: e }),
+            );
+
+            if (!selfieObject) {
+              return err<never, HandlerError>({ code: 'NOT_FOUND', message: 'Selfie file not found in storage' });
+            }
+
+            const selfieBytes = await selfieObject.arrayBuffer();
+            const extractor = createExtractor({
+              endpoint: c.env.RECOGNITION_ENDPOINT,
+              modalKey: c.env.MODAL_KEY!,
+              modalSecret: c.env.MODAL_SECRET!,
+            });
+            const extractStartedAt = Date.now();
+            const extractAttempt = await extractor.extractFaces(selfieBytes).mapErr(mapRecognitionError);
+            extractDurationMs = Date.now() - extractStartedAt;
+            if (extractAttempt.isErr()) {
+              extractStatus = 'error';
+              return err<never, HandlerError>(extractAttempt.error);
+            }
+            extractStatus = 'ok';
+            const extractResult = extractAttempt.value;
+            if (extractResult.faces.length === 0) {
+              return err(mapRecognitionError({ type: 'no_face_detected', retryable: false, throttle: false }));
+            }
+            queryEmbedding = extractResult.faces[0].embedding;
+
+            // Cache the embedding for next time
+            c.executionCtx.waitUntil(
+              db
+                .update(selfies)
+                .set({ embedding: queryEmbedding })
+                .where(eq(selfies.id, selfieId!))
+                .catch((e) => console.error('[Selfie embedding cache]', e)),
+            );
+          }
+        }
+        // === Path B: New selfie upload ===
+        else {
+          // Step 4: Store selfie to R2 at selfies/{searchId}.jpg (original, no transform)
+          const originalBytes = await selfie!.arrayBuffer();
+          selfieR2Key = `selfies/${searchId}.jpg`;
+
+          yield* ResultAsync.fromPromise(
+            c.env.PHOTOS_BUCKET.put(selfieR2Key, originalBytes, {
+              httpMetadata: { contentType: selfie!.type },
+            }),
             (e): HandlerError => ({
-              code: 'INTERNAL_ERROR',
-              message: 'Failed to transform image via CF Images API',
+              code: 'BAD_GATEWAY',
+              message: 'Storage upload failed',
               cause: e,
             }),
-          ).orElse((transformErr) => {
-            console.warn(`[search:${searchId}] Transform failed, using original`, {
-              error: transformErr.message,
+          );
+
+          // Step 5: Transform selfie via CF Images if too large (best effort, fallback to original)
+          const MAX_EXTRACTION_SIZE = 5 * 1024 * 1024;
+          let transformedBytes = originalBytes;
+          if (originalBytes.byteLength > MAX_EXTRACTION_SIZE) {
+            transformedBytes = yield* ResultAsync.fromPromise(
+              (async () => {
+                const stream = new ReadableStream({
+                  start(controller) {
+                    controller.enqueue(new Uint8Array(originalBytes));
+                    controller.close();
+                  },
+                });
+                const response = await c.env.IMAGES.input(stream)
+                  .transform({ width: 2048, height: 2048, fit: 'scale-down' })
+                  .output({ format: 'image/jpeg', quality: 95 });
+                return await response.response().arrayBuffer();
+              })(),
+              (e): HandlerError => ({
+                code: 'INTERNAL_ERROR',
+                message: 'Failed to transform image via CF Images API',
+                cause: e,
+              }),
+            ).orElse((transformErr) => {
+              console.warn(`[search:${searchId}] Transform failed, using original`, {
+                error: transformErr.message,
+              });
+              return ok(originalBytes);
             });
-            return ok(originalBytes);
+          }
+
+          // Step 6: Extract face embedding from selfie
+          const extractor = createExtractor({
+            endpoint: c.env.RECOGNITION_ENDPOINT,
+            modalKey: c.env.MODAL_KEY!,
+            modalSecret: c.env.MODAL_SECRET!,
           });
-        }
+          const extractStartedAt = Date.now();
+          const extractAttempt = await extractor.extractFaces(transformedBytes).mapErr(mapRecognitionError);
+          extractDurationMs = Date.now() - extractStartedAt;
+          if (extractAttempt.isErr()) {
+            extractStatus = 'error';
+            return err<never, HandlerError>(extractAttempt.error);
+          }
+          extractStatus = 'ok';
+          const extractResult = extractAttempt.value;
 
-        // Step 6: Extract face embedding from selfie
-        const extractor = createExtractor({
-          endpoint: c.env.RECOGNITION_ENDPOINT,
-          modalKey: c.env.MODAL_KEY!,
-          modalSecret: c.env.MODAL_SECRET!,
-        });
-        const extractStartedAt = Date.now();
-        const extractAttempt = await extractor.extractFaces(transformedBytes).mapErr(mapRecognitionError);
-        extractDurationMs = Date.now() - extractStartedAt;
-        if (extractAttempt.isErr()) {
-          extractStatus = 'error';
-          return err<never, HandlerError>(extractAttempt.error);
-        }
-        extractStatus = 'ok';
-        const extractResult = extractAttempt.value;
+          // Guard: extraction succeeded but no face found
+          if (extractResult.faces.length === 0) {
+            return err(mapRecognitionError({ type: 'no_face_detected', retryable: false, throttle: false }));
+          }
 
-        // Guard: extraction succeeded but no face found (e.g. genuinely no face in image)
-        if (extractResult.faces.length === 0) {
-          return err(mapRecognitionError({ type: 'no_face_detected', retryable: false, throttle: false }));
-        }
+          queryEmbedding = extractResult.faces[0].embedding;
 
-        // Use first face's embedding for search
-        const queryEmbedding = extractResult.faces[0].embedding;
+          // Step 6b: Face found — now create selfie record with embedding
+          if (session) {
+            const [selfieRecord] = yield* ResultAsync.fromPromise(
+              db
+                .insert(selfies)
+                .values({ sessionId: session.id, r2Key: selfieR2Key, embedding: queryEmbedding })
+                .returning({ id: selfies.id }),
+              (e): HandlerError => ({ code: 'INTERNAL_ERROR', message: 'Database error', cause: e }),
+            );
+            selfieId = selfieRecord.id;
+
+            // Set consent on session if not already set
+            if (!session.consentAcceptedAt) {
+              c.executionCtx.waitUntil(
+                db
+                  .update(participantSessions)
+                  .set({ consentAcceptedAt: new Date().toISOString() })
+                  .where(eq(participantSessions.id, session.id)),
+              );
+            }
+          }
+        }
 
         // Step 7: Search pgvector for similar faces in the event
         const vectorSearchStartedAt = Date.now();
@@ -375,6 +601,8 @@ export const participantRouter = new Hono<Env>()
               .insert(participantSearches)
               .values({
                 id: searchId,
+                sessionId: session?.id,
+                selfieId,
                 eventId,
                 selfieR2Key,
                 consentAcceptedAt: new Date().toISOString(),
@@ -421,6 +649,8 @@ export const participantRouter = new Hono<Env>()
             .insert(participantSearches)
             .values({
               id: searchId,
+              sessionId: session?.id,
+              selfieId,
               eventId,
               selfieR2Key,
               consentAcceptedAt: new Date().toISOString(),
@@ -570,7 +800,7 @@ export const participantRouter = new Hono<Env>()
     zValidator('json', bulkDownloadSchema),
     async (c) => {
       const { eventId } = c.req.valid('param');
-      const { photoIds } = c.req.valid('json');
+      const { photoIds, searchId, method } = c.req.valid('json');
 
       return safeTry(async function* () {
         // Check rate limit
@@ -661,6 +891,24 @@ export const participantRouter = new Hono<Env>()
           }),
         );
 
+        // Track download in DB (fire and forget)
+        const dlSession = c.var.participantSession;
+        if (dlSession && searchId) {
+          c.executionCtx.waitUntil(
+            db
+              .insert(downloads)
+              .values({
+                sessionId: dlSession.id,
+                searchId,
+                eventId,
+                photoIds,
+                method,
+                photoCount: photoRows.length,
+              })
+              .catch((e) => console.error('[Download tracking]', e)),
+          );
+        }
+
         return ok({ zipData, photoCount: photoRows.length });
       })
         .orTee((e) => e.cause && console.error(`[${c.req.url}] ${e.code}:`, e.cause))
@@ -683,6 +931,79 @@ export const participantRouter = new Hono<Env>()
         );
     },
   )
+
+  // =========================================================================
+  // GET /participant/events/:eventId/photos/matched - All matched photos for session
+  // =========================================================================
+  .get('/events/:eventId/photos/matched', zValidator('param', eventParamsSchema), async (c) => {
+    const session = c.var.participantSession;
+    if (!session) {
+      return c.json({ data: [] });
+    }
+
+    const { eventId } = c.req.valid('param');
+    const db = c.var.db();
+
+    // Get all searches for this session + event
+    const searches = await db
+      .select({ matchedPhotoIds: participantSearches.matchedPhotoIds })
+      .from(participantSearches)
+      .where(
+        and(
+          eq(participantSearches.sessionId, session.id),
+          eq(participantSearches.eventId, eventId),
+          isNull(participantSearches.deletedAt),
+        ),
+      );
+
+    // Deduplicate photo IDs across all searches
+    const allPhotoIds = new Set<string>();
+    for (const search of searches) {
+      if (search.matchedPhotoIds) {
+        for (const id of search.matchedPhotoIds) {
+          if (id) allPhotoIds.add(id);
+        }
+      }
+    }
+
+    if (allPhotoIds.size === 0) {
+      return c.json({ data: [] });
+    }
+
+    // Fetch photo records
+    const photoRows = await db
+      .select({
+        id: photos.id,
+        r2Key: photos.r2Key,
+      })
+      .from(photos)
+      .where(
+        and(
+          inArray(photos.id, Array.from(allPhotoIds)),
+          eq(photos.status, 'indexed'),
+          isNull(photos.deletedAt),
+        ),
+      );
+
+    const isDev = c.env.NODE_ENV === 'development';
+    const data = photoRows.map((photo) => ({
+      photoId: photo.id,
+      thumbnailUrl: generateThumbnailUrl(
+        photo.r2Key,
+        c.env.CF_ZONE,
+        c.env.PHOTO_R2_BASE_URL,
+        isDev,
+      ),
+      previewUrl: generatePreviewUrl(
+        photo.r2Key,
+        c.env.CF_ZONE,
+        c.env.PHOTO_R2_BASE_URL,
+        isDev,
+      ),
+    }));
+
+    return c.json({ data });
+  })
 
   // =========================================================================
   // GET /participant/events/:eventId/slideshow - Slideshow info + config + stats
