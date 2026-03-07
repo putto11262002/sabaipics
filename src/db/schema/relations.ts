@@ -6,7 +6,10 @@ import { events } from './events';
 import { photos } from './photos';
 import { faceEmbeddings } from './face-embeddings';
 import { consentRecords } from './consent-records';
+import { participantSessions } from './participant-sessions';
+import { selfies } from './selfies';
 import { participantSearches } from './participant-searches';
+import { downloads } from './downloads';
 import { giftCodes, giftCodeRedemptions } from './gift-codes';
 import { photoLuts } from './photo-luts';
 import { lineDeliveries } from './line-deliveries';
@@ -107,13 +110,55 @@ export const consentRecordsRelations = relations(consentRecords, ({ one }) => ({
   }),
 }));
 
+// Participant session relations
+export const participantSessionsRelations = relations(participantSessions, ({ many }) => ({
+  selfies: many(selfies),
+  searches: many(participantSearches),
+  downloads: many(downloads),
+  lineDeliveries: many(lineDeliveries),
+}));
+
+// Selfie relations
+export const selfiesRelations = relations(selfies, ({ one, many }) => ({
+  session: one(participantSessions, {
+    fields: [selfies.sessionId],
+    references: [participantSessions.id],
+  }),
+  searches: many(participantSearches),
+}));
+
 // Participant searches relations
 export const participantSearchesRelations = relations(participantSearches, ({ one, many }) => ({
+  session: one(participantSessions, {
+    fields: [participantSearches.sessionId],
+    references: [participantSessions.id],
+  }),
+  selfie: one(selfies, {
+    fields: [participantSearches.selfieId],
+    references: [selfies.id],
+  }),
   event: one(events, {
     fields: [participantSearches.eventId],
     references: [events.id],
   }),
   lineDeliveries: many(lineDeliveries),
+  downloads: many(downloads),
+}));
+
+// Download relations
+export const downloadsRelations = relations(downloads, ({ one }) => ({
+  session: one(participantSessions, {
+    fields: [downloads.sessionId],
+    references: [participantSessions.id],
+  }),
+  search: one(participantSearches, {
+    fields: [downloads.searchId],
+    references: [participantSearches.id],
+  }),
+  event: one(events, {
+    fields: [downloads.eventId],
+    references: [events.id],
+  }),
 }));
 
 // Gift code relations
@@ -139,6 +184,10 @@ export const giftCodeRedemptionsRelations = relations(giftCodeRedemptions, ({ on
 
 // LINE delivery relations
 export const lineDeliveriesRelations = relations(lineDeliveries, ({ one }) => ({
+  session: one(participantSessions, {
+    fields: [lineDeliveries.sessionId],
+    references: [participantSessions.id],
+  }),
   photographer: one(photographers, {
     fields: [lineDeliveries.photographerId],
     references: [photographers.id],

@@ -1,5 +1,6 @@
 import type { AuthVariables } from '@/auth/types';
 import type { Database, DatabaseTx } from '@/db';
+import type { ParticipantSessionContext } from './middleware/participant-session';
 
 // Bindings are auto-generated from wrangler.jsonc via: pnpm cf-typegen
 // Additional secrets are typed from .dev.vars (local) and .dev.vars.example (documentation)
@@ -31,6 +32,7 @@ export type Variables = AuthVariables & {
   adminEmail?: string; // Admin email from CF Access JWT
   requestId: string; // Request correlation ID
   traceparent: string | null; // Active distributed trace context for this request
+  participantSession?: ParticipantSessionContext; // Participant session (set by middleware on /participant routes)
 };
 
 export type Env = { Bindings: Bindings; Variables: Variables };

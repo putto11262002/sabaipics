@@ -21,6 +21,8 @@ import {
 	ftpCredentials,
 	feedback,
 	photoJobs,
+	faces,
+	downloads,
 } from '@/db';
 import { eq, inArray } from 'drizzle-orm';
 import { ResultAsync, okAsync, errAsync } from 'neverthrow';
@@ -35,10 +37,12 @@ export const EVENT_RELATION_STRATEGIES = {
 		logo_upload_intents: 'delete',
 		photo_jobs: 'delete',
 		ftp_credentials: 'delete',
+		downloads: 'delete',
 		line_deliveries: 'set_null_via_fk',
 		feedback: 'set_null_soft_reference',
 	},
 	transitive: {
+		faces: 'delete_before_photos',
 		face_embeddings: 'delete_via_photo_cascade',
 		line_deliveries: 'set_null_via_fk_from_participant_searches',
 	},
@@ -173,15 +177,27 @@ export function hardDeleteEvents(
 
 							// Step 2: Delete from database in dependency order
 							// face_embeddings cascade-delete with photos (ON DELETE CASCADE)
+							// faces must be deleted before photos (ON DELETE RESTRICT)
 							await tx
 								.update(feedback)
 								.set({ eventId: null })
 								.where(eq(feedback.eventId, eventId));
 
+							if (eventPhotos.length > 0) {
+								await tx
+									.delete(faces)
+									.where(inArray(faces.photoId, eventPhotos.map((p) => p.id)));
+							}
+
 							const photosDeleted = await tx
 								.delete(photos)
 								.where(eq(photos.eventId, eventId))
 								.returning({ id: photos.id });
+
+							// downloads must be deleted before participant_searches (FK dependency)
+							await tx
+								.delete(downloads)
+								.where(eq(downloads.eventId, eventId));
 
 							const searchesDeleted = await tx
 								.delete(participantSearches)

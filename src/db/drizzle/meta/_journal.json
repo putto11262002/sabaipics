@@ -253,6 +253,13 @@
       "when": 1772723607723,
       "tag": "0035_jazzy_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1772885200083,
+      "tag": "0036_wild_brood",
+      "breakpoints": true
     }
   ]
 }

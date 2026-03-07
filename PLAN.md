@@ -1,225 +1,363 @@
-# Image Pipeline Enhancement Plan
+# Participant Session System
 
-## Overview
+## Goal
 
-Add auto-edit, improve LUT performance, and add upscaling capabilities to the FrameFast image pipeline by consolidating processing on Modal (serverless Python).
+Introduce persistent, session-based identity for event participants (photo searchers). Not full auth — a long-lived session that preserves selfies, search history, and LINE identity across visits. Sessions expire after 6 months and are cleaned up, but future LINE OAuth logins reconcile with prior records.
 
-## Goals
+## Current State
 
-1. **Auto-edit** - Automatic color/exposure correction (like Lightroom "Auto")
-2. **LUT application** - Faster processing (native Python vs Wasm)
-3. **Upscaling** - Optional face-aware upscaling (Real-ESRGAN)
+- Event frontend is fully anonymous — each search is a one-off `searchId`
+- LINE OAuth is transactional: used only to deliver photos, tokens discarded after
+- CF KV (`LINE_PENDING_KV`) stores only pending delivery state (10-min TTL)
+- `lineUserId` recorded in `line_deliveries` but never reused
+- PDPA consent stored in `sessionStorage` (lost on tab close)
+- Friendship status checked live every time (no caching)
+- No persistent participant identity exists
 
-## R2 Path Structure
+## Design
 
-```
-events/{eventId}/{photoId}/
-├── original.jpeg        # Always present (normalized original)
-└── processed.jpeg       # Optional (only if pipeline enabled)
-```
-
-## Pipeline Flow
+### Data Model
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                               UPLOAD FLOW (unchanged)                         │
-│  Client → POST /presign → R2 (uploads/) → Queue notification                 │
-└──────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                          UPLOAD CONSUMER (refactored)                         │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                               │
-│  1. Fetch from uploads/                                                       │
-│  2. Extract metadata (EXIF, dimensions)                                      │
-│  3. IF pipeline disabled:                                                     │
-│     └── Normalize via CF Images                                              │
-│     └── Save to events/{eventId}/{photoId}/original.jpeg                     │
-│  4. IF pipeline enabled:                                                      │
-│     └── Normalize via CF Images                                              │
-│     └── Save to events/{eventId}/{photoId}/original.jpeg                     │
-│     └── Call Modal with image + options (auto-edit, LUT, upscale)            │
-│     └── Save result to events/{eventId}/{photoId}/processed.jpeg             │
-│  5. Create photo record                                                       │
-│  6. Deduct credits                                                            │
-│  7. Enqueue to face detection                                                │
-│                                                                               │
-└──────────────────────────────────────────────────────────────────────────────┘
+participant_sessions
+  id              uuid PK
+  token           text UNIQUE (cookie value, cryptographically random)
+  lineUserId      text NULLABLE (set after first OAuth)
+  isFriend        boolean DEFAULT false (updated via webhook + OAuth check)
+  consentAcceptedAt timestamptz NULLABLE
+  expiresAt       timestamptz (created + 6 months)
+  createdAt       timestamptz
+  deletedAt       timestamptz NULLABLE (soft delete for PDPA)
+
+selfies
+  id              uuid PK
+  sessionId       uuid FK -> participant_sessions
+  r2Key           text (selfie image path in R2)
+  createdAt       timestamptz
+  deletedAt       timestamptz NULLABLE (soft delete for PDPA)
+
+participant_searches (existing table, modified)
+  id              uuid PK
+  sessionId       uuid FK -> participant_sessions (NEW)
+  selfieId        uuid FK -> selfies (REPLACES selfieR2Key)
+  eventId         uuid FK -> events
+  matchedPhotoIds uuid[]
+  matchCount      integer
+  searchedAt      timestamptz
+  deletedAt       timestamptz NULLABLE (soft delete for PDPA)
+
+downloads
+  id              uuid PK
+  sessionId       uuid FK -> participant_sessions
+  searchId        uuid FK -> participant_searches
+  eventId         uuid FK -> events
+  photoIds        uuid[] (which photos were downloaded)
+  method          enum ('zip' | 'share' | 'single')
+  photoCount      integer
+  createdAt       timestamptz
+
+line_deliveries (existing table, modified)
+  ...existing columns...
+  sessionId       uuid FK -> participant_sessions (NEW — direct link)
 ```
 
-## DB Schema Changes
+### Key Relationships
+
+- Session 1:many Selfies (participant can have multiple selfies)
+- Session 1:many Searches (search history tied to session)
+- Session 1:many Downloads (self-serve photo retrieval)
+- Session 1:many LINE Deliveries (push via LINE)
+- Search -> Selfie (which selfie was used for this search)
+- Download -> Search (which search triggered the download)
+- LINE Delivery -> Search (which search triggered the delivery)
+- Session has optional `lineUserId` (identity anchor for reconciliation)
+
+Downloads and LINE deliveries are both **delivery methods** — ways a participant gets their photos. Both link directly to the session for a complete participant view.
+
+### Session Lifecycle
+
+1. **Creation** — On first visit (or after expiry), create session + set HTTP-only cookie (6-month max-age)
+2. **LINE OAuth** — After OAuth callback, set `lineUserId` on session. If a previous (expired/deleted) session had the same `lineUserId`, reconcile historical records
+3. **Expiry** — After 6 months, soft-delete session row + cookie expires naturally
+4. **PDPA deletion** — Participant can request deletion of selfies, search history, or entire session
+
+### Reconciliation
+
+When a LINE OAuth login occurs and we get a `lineUserId`:
+
+1. **Current session already has that `lineUserId`** → no-op, extend expiration
+2. **Another active session exists with same `lineUserId`** → reuse that session:
+   - Migrate any data from the current (anonymous) session to the existing one
+   - Swap the cookie to point to the existing session
+   - Extend expiration to 6 months from now
+   - Delete the now-empty anonymous session
+3. **Only expired/deleted sessions have that `lineUserId`** → keep current session, set `lineUserId` on it, link historical data
+4. **No prior session with that `lineUserId`** → just set `lineUserId` on current session
+
+This means `lineUserId` acts as a session merge key — same LINE account always converges to one active session, regardless of device or cookie state.
+
+### Friendship Tracking
+
+Three sources, layered:
+
+1. **OAuth callback** — Initial `friendFlag` from LINE Login API, sets `isFriend` on session
+2. **LINE webhook** — `follow`/`unfollow` events update `isFriend` in real-time (matched by `lineUserId`)
+3. **Delivery-time check** — Still verify live via Messaging API `getProfile` before pushing (safety net)
+
+Benefits:
+- Can skip OAuth redirect entirely if session already has `lineUserId` + `isFriend=true`
+- Can show "add friend" prompt proactively if `isFriend=false`
+- Webhook eliminates the 3-second polling loop on the callback page
+
+### Download UX (Mobile)
+
+Current: Bulk download creates a `.zip` — works on desktop but on iOS it goes to Files app, not Photos gallery.
+
+Strategy: Use Web Share API with `<a download>` fallback.
+
+```
+if (navigator.canShare?.({ files: [imageFile] })) → native share sheet (save to Photos)
+else → traditional <a download>.zip (Files app on iOS, gallery on Android)
+```
+
+| Platform | Share API | Fallback |
+|---|---|---|
+| iOS Safari 15+ | Share sheet → Save to Photos | .zip → Files app |
+| iOS Safari < 15 | Not supported | .zip → Files app |
+| Android Chrome 76+ | Share sheet → gallery | .zip → gallery |
+| LINE in-app browser | Often blocked (WebView) | .zip → depends on WebView |
+
+### What the Session Replaces
+
+| Before | After |
+|---|---|
+| `sessionStorage.pdpa_consent` (lost on tab close) | `session.consentAcceptedAt` (persisted) |
+| `participant_searches.selfieR2Key` (per-search) | `selfies` table (reusable across searches) |
+| Anonymous `searchId` (no continuity) | `sessionId` links all activity |
+| `lineUserId` only in `line_deliveries` | `session.lineUserId` (first-class identity) |
+| Friendship polled live every time | `session.isFriend` updated via webhook |
+| No download tracking | `downloads` table with method + photo history |
+| Zip-only download (bad on iOS) | Web Share API with zip fallback |
+
+### LINE OAuth Flow Changes
+
+With the session in place, the LINE delivery flow simplifies:
+
+1. **Returning user with `lineUserId` + `isFriend=true`** → Skip OAuth entirely, go straight to delivery
+2. **Returning user with `lineUserId` + `isFriend=false`** → Show "re-add friend" prompt before delivery, no OAuth needed
+3. **New user (no `lineUserId`)** → Current OAuth flow, but store `lineUserId` on session after callback
+4. **Expired session, re-login** → OAuth again, reconcile via `lineUserId` match
+
+### Consolidating State (Replaces Scattered KV/SessionStorage)
+
+Everything that was spread across `sessionStorage`, KV flags, and transient state now lives on the session:
+
+- PDPA consent → `session.consentAcceptedAt`
+- LINE identity → `session.lineUserId`
+- Friendship status → `session.isFriend` (webhook-updated)
+- Selfie data → `selfies` table (linked to session)
+- Search history → `participant_searches` (linked to session)
+- Download history → `downloads` table (linked to session)
+
+### What Stays the Same
+
+- CF KV for pending delivery state (10-min TTL — correct scope for transient OAuth flow)
+- `line_deliveries` table (delivery records, credit tracking — now also linked to session)
+- Live friendship check before delivery (safety net)
+- Rate limiting (per-IP for search, per-user for friendship polling)
+
+### Future Possibilities (Not In Scope Now)
+
+- Proactive matching: "notify me when new photos match this selfie"
+- Cross-event selfie reuse: same selfie searches multiple events
+- Self-service PDPA portal: participant views/deletes their data
+- Push notifications for new event photos
+
+## Implementation Plan
+
+### Conventions (from codebase exploration)
+
+**DB Schema:**
+- UUIDs: `uuid('col').primaryKey().default(sql\`gen_random_uuid()\`)`
+- Timestamps: `timestamptz()` helper + `createdAtCol()` from `src/db/schema/common.ts`
+- Soft deletes: nullable `deletedAt` + active view (`pgView` filtering `deleted_at IS NULL`)
+- Enums: `const statuses = [...] as const` + `text('status', { enum: statuses })`
+- Relations: separate `src/db/schema/relations.ts` file
+- Indexes: `{table}_{columns}_{idx|uidx}` naming
+- Types: export `$inferSelect` and `$inferInsert`
+- JSONB for flexible data with `$type<Interface>()`
+
+**API Routes:**
+- Hono method chaining, `zValidator()` for request validation
+- `safeTry` + `ResultAsync.fromPromise()` for error handling (neverthrow)
+- `HandlerError` type: `{ code, message, cause? }`
+- Responses: `{ data }` for success, `{ error: { code, message } }` for failure
+- No cookies currently — this will be the first cookie-based auth for participants
+- Participant routes are public (no auth middleware), mounted before `createAnyAuth()`
+
+**Participant Flow:**
+- `searchId` generated via `crypto.randomUUID()` server-side
+- Selfie uploaded as FormData directly to search endpoint (no presign)
+- Selfie stored at `selfies/{searchId}.jpg` in R2
+- Consent tracked in `sessionStorage` (frontend) + `consentAcceptedAt` (DB per-search)
+- DB uses both HTTP adapter (fast, no tx) and WebSocket adapter (transactions)
+
+### Phase 1: Session Foundation
+
+**New files:**
+- `src/db/schema/participant-sessions.ts` — Session table schema
+- `src/db/schema/selfies.ts` — Selfies table schema
+- `src/db/schema/downloads.ts` — Downloads table schema
+- `src/api/src/middleware/participant-session.ts` — Cookie middleware (read/create session)
+
+**Modified files:**
+- `src/db/schema/participant-searches.ts` — Add `sessionId`, `selfieId`; remove `selfieR2Key`
+- `src/db/schema/line-deliveries.ts` — Add `sessionId`
+- `src/db/schema/relations.ts` — Add new relations
+- `src/db/schema/index.ts` — Export new tables
+- `src/api/src/index.ts` — Add session middleware before participant routes
+- `src/api/src/types.ts` — Add session to Hono context variables
+
+**Schema details:**
 
 ```typescript
-// photos.ts - add fields
-pipelineApplied: jsonb().$type<{
-  autoEdit: boolean;
-  lutId: string | null;
-  upscale: boolean;
-} | null>().default(null),
-```
+// src/db/schema/participant-sessions.ts
+export const participantSessions = pgTable('participant_sessions', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  token: text('token').notNull().unique(),
+  lineUserId: text('line_user_id'),
+  isFriend: boolean('is_friend').notNull().default(false),
+  consentAcceptedAt: timestamptz('consent_accepted_at'),
+  expiresAt: timestamptz('expires_at').notNull(),
+  createdAt: createdAtCol(),
+  deletedAt: timestamptz('deleted_at'),
+}, (table) => [
+  index('participant_sessions_token_idx').on(table.token),
+  index('participant_sessions_line_user_id_idx').on(table.lineUserId),
+  index('participant_sessions_deleted_at_expires_at_idx').on(table.deletedAt, table.expiresAt),
+]);
 
-## Event Settings (extended)
+export const activeParticipantSessions = pgView('active_participant_sessions').as((qb) =>
+  qb.select().from(participantSessions)
+    .where(sql`${participantSessions.deletedAt} IS NULL
+      AND ${participantSessions.expiresAt} > now()`),
+);
+```
 
 ```typescript
-// events.ts - extend EventSettings
-imagePipeline?: {
-  enabled: boolean;
-  autoEdit: boolean;           // Enable auto color/exposure correction
-  lutId: string | null;        // Optional LUT to apply
-  lutIntensity: number;        // 0-100
-  upscale: boolean;            // Enable 2x upscaling
-};
+// src/db/schema/selfies.ts
+export const selfies = pgTable('selfies', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: uuid('session_id').notNull().references(() => participantSessions.id),
+  r2Key: text('r2_key').notNull(),
+  createdAt: createdAtCol(),
+  deletedAt: timestamptz('deleted_at'),
+}, (table) => [
+  index('selfies_session_id_idx').on(table.sessionId),
+]);
 ```
 
-## Modal Service
+```typescript
+// src/db/schema/downloads.ts
+export const downloadMethods = ['zip', 'share', 'single'] as const;
+export type DownloadMethod = (typeof downloadMethods)[number];
 
-### Deployed Endpoints
-
-- **Process**: `https://putto11262002--framefast-image-pipeline-process.modal.run` 🔑
-- **Health**: `https://putto11262002--framefast-image-pipeline-health.modal.run` 🔑
-
-### Authentication
-
-Proxy auth required. Set in Infisical/Terraform:
-
-- `MODAL_KEY` - Token ID
-- `MODAL_SECRET` - Token Secret
-
-Create token at: https://modal.com/settings/proxy-auth-tokens
-
-### API Request
-
-```bash
-curl -X POST https://putto11262002--framefast-image-pipeline-process.modal.run \
-  -H "Modal-Key: $MODAL_KEY" \
-  -H "Modal-Secret: $MODAL_SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "image_base64": "<base64>",
-    "options": {
-      "auto_edit": true,
-      "style": "vibrant",
-      "contrast": 1.2,
-      "saturation": 1.3
-    }
-  }'
+export const downloads = pgTable('downloads', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: uuid('session_id').notNull().references(() => participantSessions.id),
+  searchId: uuid('search_id').notNull().references(() => participantSearches.id),
+  eventId: uuid('event_id').notNull().references(() => events.id),
+  photoIds: uuid('photo_ids').array().notNull(),
+  method: text('method', { enum: downloadMethods }).notNull(),
+  photoCount: integer('photo_count').notNull(),
+  createdAt: createdAtCol(),
+}, (table) => [
+  index('downloads_session_id_idx').on(table.sessionId),
+  index('downloads_search_id_idx').on(table.searchId),
+]);
 ```
 
-### Available Style Presets
+**Session middleware:**
 
-| Preset          | Contrast | Saturation | Use Case      |
-| --------------- | -------- | ---------- | ------------- |
-| `neutral`       | 1.0      | 1.0        | No style      |
-| `warm`          | 1.1      | 1.15       | Golden hour   |
-| `cool`          | 1.1      | 1.1        | Cool tones    |
-| `vibrant`       | 1.2      | 1.4        | Punchy colors |
-| `film`          | 0.95     | 0.85       | Nostalgic     |
-| `portrait`      | 1.05     | 1.1        | Skin-friendly |
-| `high_contrast` | 1.4      | 1.1        | Dramatic      |
-| `soft`          | 0.9      | 0.95       | Soft/dreamy   |
-
-### Endpoints
-
-```python
-@app.function()
-def process_image(
-    image_bytes: bytes,
-    options: ProcessOptions,
-) -> ProcessResult:
-    """
-    Process image with optional auto-edit, LUT, and upscale.
-
-    Returns processed image bytes.
-    """
+```typescript
+// src/api/src/middleware/participant-session.ts
+// Reads session token from cookie, resolves session from DB
+// If no cookie or expired: creates new session, sets cookie (6-month max-age, HTTP-only, SameSite=Lax)
+// Sets c.set('participantSession', session) on context
+// Token: 32-byte crypto.getRandomValues() → base64url
 ```
 
-### Processing Steps
+**Migration:** Single Drizzle migration covering all new tables + column additions.
 
-1. **Normalize** - Ensure consistent format (always)
-2. **Auto-edit** - Pillow-based color/exposure correction (optional)
-3. **LUT** - Apply color grade via colour-science (optional)
-4. **Upscale** - Real-ESRGAN via ONNX or Replicate (optional)
+### Phase 2: Wire Up Search Flow
 
-### Cost Estimate
+**Modified files:**
+- `src/api/src/routes/participant/index.ts` — Search endpoint:
+  - Read `sessionId` from context (middleware)
+  - Create selfie record in `selfies` table (instead of inline R2 key)
+  - Create search with `sessionId` + `selfieId` (instead of standalone `selfieR2Key`)
+  - Track consent on session (first search sets `consentAcceptedAt`)
+- `src/event/src/routes/events/search.tsx` — Remove `sessionStorage` consent; query session state instead
+- `src/event/src/lib/api.ts` — Ensure cookies sent with requests (`credentials: 'include'`)
 
-| Volume         | Modal Cost |
-| -------------- | ---------- |
-| 10K images/mo  | ~$2-5      |
-| 50K images/mo  | ~$10-25    |
-| 100K images/mo | ~$20-50    |
+### Phase 3: Wire Up Downloads
 
-## Implementation Phases
+**Modified files:**
+- `src/api/src/routes/participant/index.ts` — Download endpoints:
+  - Single + bulk download: create `downloads` record with session context
+  - Accept `method` param from frontend (zip/share/single)
+- `src/event/src/components/ResultsStep.tsx` — Web Share API with fallback:
+  - Detect `navigator.canShare` → use share API for mobile
+  - Fall back to zip download
+  - Pass `method` to API
 
-### Phase 1: Modal Service Prototype ✅ (Complete)
+### Phase 4: Wire Up LINE Delivery + Friendship
 
-- [x] Create Modal app structure
-- [x] Implement auto-edit (Pillow) with style presets
-- [x] Implement LUT application (colour-science)
-- [x] Add upscaling placeholder (Pillow Lanczos - Real-ESRGAN deferred)
-- [x] Test with sample images locally
-- [x] Deploy to Modal
-- [x] Enable proxy auth (`requires_proxy_auth=True`)
-- [x] Parallel stress test (10/10 success)
-- [ ] Add Modal secrets to Terraform infra (Infisical)
-  - `MODAL_KEY` - Proxy Auth Token ID
-  - `MODAL_SECRET` - Proxy Auth Token Secret
-  - Create token at: https://modal.com/settings/proxy-auth-tokens
+**Modified files:**
+- `src/api/src/routes/participant/line.ts`:
+  - OAuth callback: set `lineUserId` + `isFriend` on session
+  - Deliver endpoint: set `sessionId` on `line_deliveries` record
+  - Skip OAuth if session already has `lineUserId` + `isFriend=true`
+  - New endpoint: `GET /participant/session/line-status` (check session's LINE state)
+- `src/event/src/components/LineDeliveryButton.tsx`:
+  - Check session LINE state first
+  - If `lineUserId` + `isFriend`: skip OAuth, go straight to deliver
+  - If `lineUserId` + `!isFriend`: show re-add friend prompt
+  - If no `lineUserId`: current OAuth flow
 
-### Phase 2: Integration ✅ (Complete)
+### Phase 5: LINE Webhook for Friendship
 
-- [x] Add Modal client to API (`src/api/src/lib/modal-client.ts`)
-- [x] Update upload-consumer to use Modal
-- [x] Update R2 path structure (`events/{eventId}/{photoId}/original.jpeg` and `processed.jpeg`)
-- [x] Add DB schema changes (`pipelineApplied` on photos, extended `colorGrade` on events)
-- [x] Create new API endpoint (`GET/PUT /events/:id/image-pipeline`)
-- [x] Create UI component (`ImagePipelineCard.tsx`)
-- [x] Create hooks (`useEventImagePipeline.ts`, `useUpdateEventImagePipeline.ts`)
-- [x] Update color tab to use new ImagePipelineCard component
-- [x] Add `MODAL_KEY`/`MODAL_SECRET` to Bindings type
+**New/modified files:**
+- `src/api/src/routes/webhooks/line.ts` (new or extend existing):
+  - Handle `follow` event: find session by `lineUserId`, set `isFriend=true`
+  - Handle `unfollow` event: find session by `lineUserId`, set `isFriend=false`
+  - Verify webhook signature (LINE channel secret HMAC)
+- LINE Official Account console: configure webhook URL
 
-### Phase 3: Cleanup & Deployment
+### Phase 6: Session Reconciliation
 
-- [ ] Remove Photon/Wasm LUT code
-- [ ] Migration script for existing photos (optional)
-- [ ] Update photo download endpoints
-- [ ] Add `MODAL_KEY`, `MODAL_SECRET` to Terraform external_secrets
-- [ ] Tests for upload-consumer changes
-- [ ] Commit and create PR
+**Modified files:**
+- `src/api/src/routes/participant/line.ts` — OAuth callback:
+  - After getting `lineUserId`, check for other sessions with same `lineUserId`
+  - If found: migrate selfies, searches, downloads to current session (or just link via `lineUserId` for queries)
+- Decision: migrate records vs. query across sessions by `lineUserId`
 
-## Files Created/Modified
+### Phase 7: Cleanup & PDPA
 
-### New Files (Created)
-
-- `apps/modal/` - Modal service directory
-  - `pyproject.toml` - UV project config
-  - `src/image_pipeline/main.py` - Modal endpoint with auth
-  - `src/image_pipeline/auto_edit.py` - Auto-edit with style presets
-  - `src/image_pipeline/lut.py` - LUT application (vectorized numpy)
-  - `src/image_pipeline/upscale.py` - Placeholder (deferred)
-- `src/api/src/lib/modal-client.ts` - Modal API client
-- `src/api/src/routes/events/image-pipeline-schema.ts` - Zod schema for new API
-- `src/dashboard/src/hooks/events/useEventImagePipeline.ts` - Fetch hook
-- `src/dashboard/src/hooks/events/useUpdateEventImagePipeline.ts` - Mutation hook
-- `src/dashboard/src/components/events/ImagePipelineCard.tsx` - UI component
-
-### Modified Files
-
-- `src/api/src/queue/upload-consumer.ts` - Modal integration, new R2 paths
-- `src/api/src/routes/events/index.ts` - Added `GET/PUT /:id/image-pipeline` routes
-- `src/api/src/routes/events/color-grade-schema.ts` - Added autoEdit/style fields
-- `src/api/src/types.ts` - Added MODAL_KEY/MODAL_SECRET to Bindings
-- `src/db/schema/events.ts` - Extended `EventSettings.colorGrade`
-- `src/db/schema/photos.ts` - Added `PipelineApplied` type and column
-- `src/db/drizzle/0020_dapper_lady_mastermind.sql` - Migration (merged)
-- `src/dashboard/src/routes/events/[id]/color/index.tsx` - Use ImagePipelineCard
-
-### Files to Remove (Phase 3)
-
-- `src/api/src/lib/images/color-grade.ts` - Photon LUT code (keep LUT parsing)
+**New files:**
+- `src/api/src/routes/participant/session.ts` — Session management endpoints:
+  - `GET /participant/session` — Current session state (consent, LINE status, selfie count)
+  - `DELETE /participant/session/selfies/:id` — Soft-delete a selfie
+  - `DELETE /participant/session/searches/:id` — Soft-delete a search
+  - `DELETE /participant/session` — Soft-delete entire session + all related data
+- Scheduled worker or admin endpoint: hard-delete expired sessions (>6 months past expiry)
 
 ## Open Questions
 
-- [ ] Auto-edit quality: Compare with Cloudinary VIESUS?
-- [ ] Migration: Convert existing photos to new structure?
-- [ ] Upscaling: Add Real-ESRGAN (GPU) later if needed?
+- [ ] Cookie scope: per-event subdomain or global?
+- [ ] Session creation timing: on first page load or on first action (consent/upload)?
+- [ ] Hard delete schedule: how long after soft delete before purging from DB?
+- [ ] Should selfie R2 objects be deleted on PDPA request, or just DB references?
+- [ ] Webhook endpoint: new route or extend existing LINE webhook handler?
+- [ ] Reconciliation strategy: migrate records to new session or query across sessions by `lineUserId`?
+- [ ] CORS: `credentials: 'include'` requires explicit `Access-Control-Allow-Origin` (no wildcard) — need to set event frontend origin
