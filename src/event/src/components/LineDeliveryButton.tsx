@@ -10,6 +10,7 @@ interface LineDeliveryButtonProps {
   eventId: string;
   searchId: string;
   selectedIds: Set<string>;
+  photoCap: number | null;
 }
 
 const LINE_GREEN = '#06C755';
@@ -22,15 +23,21 @@ function LineIcon({ className }: { className?: string }) {
   );
 }
 
-export function LineDeliveryButton({ eventId, searchId, selectedIds }: LineDeliveryButtonProps) {
+export function LineDeliveryButton({ eventId, searchId, selectedIds, photoCap }: LineDeliveryButtonProps) {
   const [isRedirecting, setIsRedirecting] = useState(false);
   const hasSelection = selectedIds.size > 0;
+  const exceedsCap = photoCap !== null && selectedIds.size > photoCap;
   const { mutateAsync: getAuthUrl } = useLineAuthUrl();
   const { mutateAsync: createPending } = usePendingLineDelivery();
 
   const handleClick = useCallback(async () => {
     if (!hasSelection) {
       toast.warning(th.results.lineSelectHint);
+      return;
+    }
+
+    if (exceedsCap) {
+      toast.warning(th.results.lineCapExceeded(photoCap!));
       return;
     }
 
@@ -50,14 +57,14 @@ export function LineDeliveryButton({ eventId, searchId, selectedIds }: LineDeliv
       });
       setIsRedirecting(false);
     }
-  }, [eventId, searchId, selectedIds, hasSelection, createPending, getAuthUrl]);
+  }, [eventId, searchId, selectedIds, hasSelection, exceedsCap, photoCap, createPending, getAuthUrl]);
 
   return (
     <Button
       className="flex-1 text-white"
       style={{ backgroundColor: LINE_GREEN }}
       onClick={handleClick}
-      disabled={isRedirecting || !hasSelection}
+      disabled={isRedirecting || !hasSelection || exceedsCap}
     >
       {isRedirecting ? (
         <Spinner className="mr-1 size-4" />

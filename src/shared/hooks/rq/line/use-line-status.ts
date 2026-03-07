@@ -7,6 +7,7 @@ export interface UseLineStatusInput {
 
 export interface LineStatus {
   available: boolean;
+  photoCap: number | null;
 }
 
 export function useLineStatus(input: UseLineStatusInput) {

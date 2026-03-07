@@ -57,7 +57,7 @@ export function ErrorStep({ type, onRetry }: ErrorStepProps) {
   const Icon = content.icon;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6">
+    <div className="flex flex-1 flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm space-y-6">
         {/* Icon */}
         <div className="flex justify-center">

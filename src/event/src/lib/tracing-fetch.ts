@@ -34,6 +34,7 @@ export const tracingFetch: typeof fetch = async (input, init) => {
   return fetch(
     new Request(request, {
       headers,
+      credentials: 'include',
     }),
   );
 };
